@@ -165,6 +165,68 @@ public struct UnusedCodeDetector: Sendable {
     /// - Parameter files: Array of Swift file paths.
     /// - Returns: Array of unused code findings.
     public func detectUnused(in files: [String]) async throws -> [UnusedCode] {
+        // Use IndexStore if configured
+        if configuration.useIndexStore {
+            return try await detectUnusedWithIndexStore(in: files)
+        }
+
+        // Fall back to SwiftSyntax-only analysis
+        return try await detectUnusedWithSyntax(in: files)
+    }
+
+    /// Detect unused code using IndexStoreDB (accurate but requires project build).
+    private func detectUnusedWithIndexStore(in files: [String]) async throws -> [UnusedCode] {
+        // Find or use configured index store path
+        let indexStorePath: String
+        if let configured = configuration.indexStorePath {
+            indexStorePath = configured
+        } else {
+            // Try to find it automatically
+            guard let found = findIndexStorePath(for: files) else {
+                // Fall back to syntax-only analysis
+                return try await detectUnusedWithSyntax(in: files)
+            }
+            indexStorePath = found
+        }
+
+        // Use the index store based detector
+        let detector = IndexStoreBasedDetector(configuration: configuration)
+        let results = try detector.detect(in: files, indexStorePath: indexStorePath)
+
+        return results
+            .filter { $0.confidence >= configuration.minimumConfidence }
+            .sorted { $0.confidence > $1.confidence }
+    }
+
+    /// Find the index store path for the given files.
+    private func findIndexStorePath(for files: [String]) -> String? {
+        guard let firstFile = files.first else { return nil }
+
+        // Walk up from the first file to find project root
+        var current = URL(fileURLWithPath: firstFile).deletingLastPathComponent()
+        let maxDepth = 10
+
+        for _ in 0..<maxDepth {
+            // Check for Package.swift (Swift package)
+            let packageSwift = current.appendingPathComponent("Package.swift")
+            if FileManager.default.fileExists(atPath: packageSwift.path) {
+                return IndexStorePathFinder.findIndexStorePath(in: current.path)
+            }
+
+            // Check for .xcodeproj
+            if let contents = try? FileManager.default.contentsOfDirectory(atPath: current.path),
+               contents.contains(where: { $0.hasSuffix(".xcodeproj") }) {
+                return IndexStorePathFinder.findIndexStorePath(in: current.path)
+            }
+
+            current = current.deletingLastPathComponent()
+        }
+
+        return nil
+    }
+
+    /// Detect unused code using SwiftSyntax only (fast but approximate).
+    private func detectUnusedWithSyntax(in files: [String]) async throws -> [UnusedCode] {
         // Analyze all files
         let result = try await analyzer.analyze(files)
 

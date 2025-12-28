@@ -34,6 +34,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "600.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
+        .package(url: "https://github.com/swiftlang/indexstore-db.git", branch: "main"),
     ],
     targets: [
         // MARK: - Core Infrastructure
@@ -66,6 +67,7 @@ let package = Package(
             name: "UnusedCodeDetector",
             dependencies: [
                 "SwiftStaticAnalysisCore",
+                .product(name: "IndexStoreDB", package: "indexstore-db"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
