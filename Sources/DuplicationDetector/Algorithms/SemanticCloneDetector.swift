@@ -19,15 +19,20 @@ public struct SemanticCloneDetector: Sendable {
     /// Minimum similarity threshold (0.0 to 1.0).
     public let minimumSimilarity: Double
 
+    /// Whether to normalize result builder closures (SwiftUI views).
+    public let normalizeResultBuilders: Bool
+
     /// The file parser.
     private let parser: SwiftFileParser
 
     public init(
         minimumNodes: Int = 10,
-        minimumSimilarity: Double = 0.7
+        minimumSimilarity: Double = 0.7,
+        normalizeResultBuilders: Bool = true
     ) {
         self.minimumNodes = minimumNodes
         self.minimumSimilarity = minimumSimilarity
+        self.normalizeResultBuilders = normalizeResultBuilders
         self.parser = SwiftFileParser()
     }
 
@@ -84,7 +89,12 @@ public struct SemanticCloneDetector: Sendable {
 
         for file in files {
             let tree = try await parser.parse(file)
-            let visitor = ASTFingerprintVisitor(file: file, tree: tree, minimumNodes: minimumNodes)
+            let visitor = ASTFingerprintVisitor(
+                file: file,
+                tree: tree,
+                minimumNodes: minimumNodes,
+                normalizeResultBuilders: normalizeResultBuilders
+            )
             visitor.walk(tree)
             allNodes.append(contentsOf: visitor.fingerprintedNodes)
         }

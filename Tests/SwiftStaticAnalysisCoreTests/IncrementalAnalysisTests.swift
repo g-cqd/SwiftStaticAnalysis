@@ -5,12 +5,15 @@
 //  Tests for incremental analysis framework.
 //
 
-import XCTest
+import Testing
+import Foundation
 @testable import SwiftStaticAnalysisCore
 
-final class ChangeDetectorTests: XCTestCase {
+@Suite("Change Detector Tests")
+struct ChangeDetectorTests {
 
-    func testChangeDetectorFindsNoChangesForSameFiles() async throws {
+    @Test("Finds no changes for same files")
+    func changeDetectorFindsNoChangesForSameFiles() async throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -27,9 +30,9 @@ final class ChangeDetectorTests: XCTestCase {
             previousState: [:]
         )
 
-        XCTAssertEqual(firstState.addedFiles.count, 1)
-        XCTAssertEqual(firstState.modifiedFiles.count, 0)
-        XCTAssertEqual(firstState.unchangedFiles.count, 0)
+        #expect(firstState.addedFiles.count == 1)
+        #expect(firstState.modifiedFiles.count == 0)
+        #expect(firstState.unchangedFiles.count == 0)
 
         // Build previous state from first detection
         var previousState: [String: FileState] = [:]
@@ -45,13 +48,14 @@ final class ChangeDetectorTests: XCTestCase {
             previousState: previousState
         )
 
-        XCTAssertEqual(secondResult.addedFiles.count, 0)
-        XCTAssertEqual(secondResult.modifiedFiles.count, 0)
-        XCTAssertEqual(secondResult.unchangedFiles.count, 1)
-        XCTAssertFalse(secondResult.hasChanges)
+        #expect(secondResult.addedFiles.count == 0)
+        #expect(secondResult.modifiedFiles.count == 0)
+        #expect(secondResult.unchangedFiles.count == 1)
+        #expect(!secondResult.hasChanges)
     }
 
-    func testChangeDetectorDetectsModifiedFile() async throws {
+    @Test("Detects modified file")
+    func changeDetectorDetectsModifiedFile() async throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -83,11 +87,12 @@ final class ChangeDetectorTests: XCTestCase {
             previousState: previousState
         )
 
-        XCTAssertEqual(secondResult.modifiedFiles.count, 1)
-        XCTAssertTrue(secondResult.hasChanges)
+        #expect(secondResult.modifiedFiles.count == 1)
+        #expect(secondResult.hasChanges)
     }
 
-    func testChangeDetectorDetectsDeletedFile() async throws {
+    @Test("Detects deleted file")
+    func changeDetectorDetectsDeletedFile() async throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tempDir) }
@@ -119,45 +124,52 @@ final class ChangeDetectorTests: XCTestCase {
             previousState: previousState
         )
 
-        XCTAssertEqual(secondResult.deletedFiles.count, 1)
-        XCTAssertTrue(secondResult.hasChanges)
+        #expect(secondResult.deletedFiles.count == 1)
+        #expect(secondResult.hasChanges)
     }
 }
 
-final class FNV1aHashTests: XCTestCase {
+@Suite("FNV1a Hash Tests")
+struct FNV1aHashTests {
 
-    func testHashConsistency() {
+    @Test("Hash consistency")
+    func hashConsistency() {
         let data = "Hello, World!".data(using: .utf8)!
         let hash1 = FNV1a.hash(data)
         let hash2 = FNV1a.hash(data)
-        XCTAssertEqual(hash1, hash2)
+        #expect(hash1 == hash2)
     }
 
-    func testDifferentDataDifferentHash() {
+    @Test("Different data produces different hash")
+    func differentDataDifferentHash() {
         let data1 = "Hello".data(using: .utf8)!
         let data2 = "World".data(using: .utf8)!
-        XCTAssertNotEqual(FNV1a.hash(data1), FNV1a.hash(data2))
+        #expect(FNV1a.hash(data1) != FNV1a.hash(data2))
     }
 
-    func testStringHashing() {
+    @Test("String hashing")
+    func stringHashing() {
         let hash1 = FNV1a.hash("test")
         let hash2 = FNV1a.hash("test")
-        XCTAssertEqual(hash1, hash2)
+        #expect(hash1 == hash2)
     }
 
-    func testArrayHashing() {
+    @Test("Array hashing")
+    func arrayHashing() {
         let hash1 = FNV1a.hash(["a", "b", "c"])
         let hash2 = FNV1a.hash(["a", "b", "c"])
-        XCTAssertEqual(hash1, hash2)
+        #expect(hash1 == hash2)
 
         let hash3 = FNV1a.hash(["a", "b", "d"])
-        XCTAssertNotEqual(hash1, hash3)
+        #expect(hash1 != hash3)
     }
 }
 
-final class AnalysisCacheTests: XCTestCase {
+@Suite("Analysis Cache Tests")
+struct AnalysisCacheTests {
 
-    func testCacheStoresAndRetrieves() async throws {
+    @Test("Cache stores and retrieves")
+    func cacheStoresAndRetrieves() async throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
@@ -173,10 +185,11 @@ final class AnalysisCacheTests: XCTestCase {
         await cache.setFileState(fileState, for: fileState.path)
 
         let retrieved = await cache.getFileState(for: fileState.path)
-        XCTAssertEqual(retrieved?.contentHash, fileState.contentHash)
+        #expect(retrieved?.contentHash == fileState.contentHash)
     }
 
-    func testCachePersistence() async throws {
+    @Test("Cache persistence")
+    func cachePersistence() async throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: tempDir) }
 
@@ -196,10 +209,11 @@ final class AnalysisCacheTests: XCTestCase {
         try await cache2.load()
 
         let retrieved = await cache2.getFileState(for: fileState.path)
-        XCTAssertEqual(retrieved?.contentHash, fileState.contentHash)
+        #expect(retrieved?.contentHash == fileState.contentHash)
     }
 
-    func testCacheStatistics() async {
+    @Test("Cache statistics")
+    func cacheStatistics() async {
         let cache = AnalysisCache()
 
         await cache.setFileState(
@@ -212,13 +226,15 @@ final class AnalysisCacheTests: XCTestCase {
         )
 
         let stats = await cache.statistics()
-        XCTAssertEqual(stats.fileCount, 2)
+        #expect(stats.fileCount == 2)
     }
 }
 
-final class DependencyGraphTests: XCTestCase {
+@Suite("Dependency Graph Tests")
+struct DependencyGraphTests {
 
-    func testDirectDependents() {
+    @Test("Direct dependents")
+    func directDependents() {
         var graph = DependencyGraph()
 
         graph.addDependency(FileDependency(
@@ -227,11 +243,12 @@ final class DependencyGraphTests: XCTestCase {
             type: .typeReference
         ))
 
-        XCTAssertEqual(graph.getDirectDependents(of: "/b.swift"), ["/a.swift"])
-        XCTAssertEqual(graph.getDirectDependencies(of: "/a.swift"), ["/b.swift"])
+        #expect(graph.getDirectDependents(of: "/b.swift") == ["/a.swift"])
+        #expect(graph.getDirectDependencies(of: "/a.swift") == ["/b.swift"])
     }
 
-    func testTransitiveAffectedFiles() {
+    @Test("Transitive affected files")
+    func transitiveAffectedFiles() {
         var graph = DependencyGraph()
 
         // a -> b -> c
@@ -248,12 +265,13 @@ final class DependencyGraphTests: XCTestCase {
 
         // If c changes, both a and b should be affected
         let affected = graph.getAffectedFiles(changedFiles: ["/c.swift"])
-        XCTAssertTrue(affected.contains("/a.swift"))
-        XCTAssertTrue(affected.contains("/b.swift"))
-        XCTAssertTrue(affected.contains("/c.swift"))
+        #expect(affected.contains("/a.swift"))
+        #expect(affected.contains("/b.swift"))
+        #expect(affected.contains("/c.swift"))
     }
 
-    func testRemoveDependencies() {
+    @Test("Remove dependencies")
+    func removeDependencies() {
         var graph = DependencyGraph()
 
         graph.addDependency(FileDependency(
@@ -262,17 +280,19 @@ final class DependencyGraphTests: XCTestCase {
             type: .typeReference
         ))
 
-        XCTAssertEqual(graph.getDirectDependents(of: "/b.swift").count, 1)
+        #expect(graph.getDirectDependents(of: "/b.swift").count == 1)
 
         graph.removeDependencies(for: "/a.swift")
 
-        XCTAssertEqual(graph.getDirectDependents(of: "/b.swift").count, 0)
+        #expect(graph.getDirectDependents(of: "/b.swift").count == 0)
     }
 }
 
-final class CachedDeclarationTests: XCTestCase {
+@Suite("Cached Declaration Tests")
+struct CachedDeclarationTests {
 
-    func testCachedDeclarationFromDeclaration() {
+    @Test("CachedDeclaration from Declaration")
+    func cachedDeclarationFromDeclaration() {
         let declaration = Declaration(
             name: "testFunc",
             kind: .function,
@@ -289,17 +309,19 @@ final class CachedDeclarationTests: XCTestCase {
 
         let cached = CachedDeclaration(from: declaration)
 
-        XCTAssertEqual(cached.name, "testFunc")
-        XCTAssertEqual(cached.kind, "function")
-        XCTAssertEqual(cached.file, "/test.swift")
-        XCTAssertEqual(cached.line, 10)
-        XCTAssertEqual(cached.conformances, ["Sendable"])
+        #expect(cached.name == "testFunc")
+        #expect(cached.kind == "function")
+        #expect(cached.file == "/test.swift")
+        #expect(cached.line == 10)
+        #expect(cached.conformances == ["Sendable"])
     }
 }
 
-final class CachedReferenceTests: XCTestCase {
+@Suite("Cached Reference Tests")
+struct CachedReferenceTests {
 
-    func testCachedReferenceFromReference() {
+    @Test("CachedReference from Reference")
+    func cachedReferenceFromReference() {
         let reference = Reference(
             identifier: "SomeType",
             location: SourceLocation(file: "/test.swift", line: 5, column: 10),
@@ -311,10 +333,10 @@ final class CachedReferenceTests: XCTestCase {
 
         let cached = CachedReference(from: reference)
 
-        XCTAssertEqual(cached.identifier, "SomeType")
-        XCTAssertEqual(cached.file, "/test.swift")
-        XCTAssertEqual(cached.context, "typeAnnotation")
-        XCTAssertTrue(cached.isQualified)
-        XCTAssertEqual(cached.qualifier, "Module")
+        #expect(cached.identifier == "SomeType")
+        #expect(cached.file == "/test.swift")
+        #expect(cached.context == "typeAnnotation")
+        #expect(cached.isQualified)
+        #expect(cached.qualifier == "Module")
     }
 }

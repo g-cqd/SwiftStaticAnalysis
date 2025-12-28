@@ -88,10 +88,23 @@ public final class ASTFingerprintVisitor: SyntaxVisitor {
     /// Minimum nodes to consider.
     private let minimumNodes: Int
 
-    public init(file: String, tree: SourceFileSyntax, minimumNodes: Int = 10) {
+    /// Result builder analyzer for normalizing SwiftUI views.
+    private let resultBuilderAnalyzer: ResultBuilderAnalyzer?
+
+    /// Whether to normalize result builder closures.
+    public let normalizeResultBuilders: Bool
+
+    public init(
+        file: String,
+        tree: SourceFileSyntax,
+        minimumNodes: Int = 10,
+        normalizeResultBuilders: Bool = true
+    ) {
         self.file = file
         self.converter = SourceLocationConverter(fileName: file, tree: tree)
         self.minimumNodes = minimumNodes
+        self.normalizeResultBuilders = normalizeResultBuilders
+        self.resultBuilderAnalyzer = normalizeResultBuilders ? ResultBuilderAnalyzer() : nil
         super.init(viewMode: .sourceAccurate)
     }
 
@@ -150,7 +163,15 @@ public final class ASTFingerprintVisitor: SyntaxVisitor {
     }
 
     private func fingerprintClosure(_ closure: ClosureExprSyntax) {
-        let result = computeFingerprint(for: Syntax(closure))
+        // Check if this is a result builder closure and compute appropriate fingerprint
+        let result: ASTFingerprint
+        if let analyzer = resultBuilderAnalyzer,
+           let normalized = analyzer.normalizeClosure(closure) {
+            // Use normalized fingerprint for result builder closures
+            result = computeNormalizedFingerprint(for: normalized)
+        } else {
+            result = computeFingerprint(for: Syntax(closure))
+        }
 
         guard result.nodeCount >= minimumNodes else { return }
 
@@ -165,6 +186,54 @@ public final class ASTFingerprintVisitor: SyntaxVisitor {
             startColumn: startLoc.column,
             tokenCount: countTokens(in: closure)
         ))
+    }
+
+    /// Compute fingerprint for a normalized result builder closure.
+    private func computeNormalizedFingerprint(for normalized: NormalizedResultBuilderClosure) -> ASTFingerprint {
+        var hasher = FingerprintHasher()
+
+        // Hash the normalized structure instead of raw AST
+        var nodeCount = 0
+        var maxDepth = 0
+
+        // Hash the builder type for context
+        hasher.hashString("ResultBuilder:\(normalized.builderType.rawValue)")
+        nodeCount += 1
+
+        // Hash each normalized statement
+        for statement in normalized.statements {
+            let stats = hashNormalizedStatement(statement, hasher: &hasher, depth: 1)
+            nodeCount += stats.nodeCount
+            maxDepth = max(maxDepth, stats.depth)
+        }
+
+        return ASTFingerprint(
+            hash: hasher.finalHash(),
+            depth: maxDepth,
+            nodeCount: nodeCount,
+            rootKind: "NormalizedResultBuilder"
+        )
+    }
+
+    /// Hash a normalized statement.
+    private func hashNormalizedStatement(
+        _ statement: NormalizedStatement,
+        hasher: inout FingerprintHasher,
+        depth: Int
+    ) -> FingerprintHasher.Stats {
+        var stats = FingerprintHasher.Stats(depth: depth, nodeCount: 1)
+
+        // Hash the statement kind and normalized content
+        hasher.hashString("Statement:\(statement.kind.rawValue):\(statement.normalizedContent)")
+
+        // Hash children recursively
+        for child in statement.children {
+            let childStats = hashNormalizedStatement(child, hasher: &hasher, depth: depth + 1)
+            stats.nodeCount += childStats.nodeCount
+            stats.depth = max(stats.depth, childStats.depth)
+        }
+
+        return stats
     }
 
     /// Compute a structural fingerprint for a syntax node.
@@ -193,7 +262,7 @@ public final class ASTFingerprintVisitor: SyntaxVisitor {
 // MARK: - Fingerprint Hasher
 
 /// Computes a structural hash of an AST.
-private struct FingerprintHasher {
+struct FingerprintHasher {
     private var hash: UInt64 = 0
     private let prime: UInt64 = 1_000_000_007
 
@@ -214,13 +283,18 @@ private struct FingerprintHasher {
         hash
     }
 
+    /// Hash a string and incorporate it into the hash.
+    mutating func hashString(_ str: String) {
+        let strHash = computeStringHash(str)
+        hash = (hash &* 31 &+ strHash) % prime
+    }
+
     private mutating func hashNode(_ node: Syntax, depth: Int, stats: inout Stats) {
         stats.nodeCount += 1
         stats.depth = max(stats.depth, depth)
 
         // Hash the node kind (structure, not content)
-        let kindHash = hashString("\(node.kind)")
-        hash = (hash &* 31 &+ kindHash) % prime
+        hashString("\(node.kind)")
 
         // Recursively hash children
         for child in node.children(viewMode: .sourceAccurate) {
@@ -231,7 +305,7 @@ private struct FingerprintHasher {
         hash = (hash &* 31 &+ 0xDEADBEEF) % prime
     }
 
-    private func hashString(_ str: String) -> UInt64 {
+    private func computeStringHash(_ str: String) -> UInt64 {
         var h: UInt64 = 0
         for char in str.utf8 {
             h = (h &* 31 &+ UInt64(char)) % prime

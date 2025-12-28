@@ -82,11 +82,17 @@ public struct TokenNormalizer: Sendable {
     /// Placeholder for numeric literals.
     public static let numberPlaceholder = "$NUM"
 
+    /// Placeholder for closure shorthand parameters ($0, $1, etc.).
+    public static let shorthandParamPlaceholder = "$PARAM"
+
     /// Whether to normalize identifiers.
     public var normalizeIdentifiers: Bool
 
     /// Whether to normalize literals.
     public var normalizeLiterals: Bool
+
+    /// Whether to normalize closure shorthand parameters.
+    public var normalizeClosureParams: Bool
 
     /// Identifiers to preserve (not normalize).
     public var preservedIdentifiers: Set<String>
@@ -94,10 +100,12 @@ public struct TokenNormalizer: Sendable {
     public init(
         normalizeIdentifiers: Bool = true,
         normalizeLiterals: Bool = true,
+        normalizeClosureParams: Bool = true,
         preservedIdentifiers: Set<String> = []
     ) {
         self.normalizeIdentifiers = normalizeIdentifiers
         self.normalizeLiterals = normalizeLiterals
+        self.normalizeClosureParams = normalizeClosureParams
         self.preservedIdentifiers = preservedIdentifiers
     }
 
@@ -138,6 +146,10 @@ public struct TokenNormalizer: Sendable {
     private func normalizeToken(_ token: TokenInfo) -> String {
         switch token.kind {
         case .identifier:
+            // Check for closure shorthand parameters ($0, $1, etc.)
+            if normalizeClosureParams && isShorthandParameter(token.text) {
+                return Self.shorthandParamPlaceholder
+            }
             if normalizeIdentifiers && !preservedIdentifiers.contains(token.text) {
                 return Self.identifierPlaceholder
             }
@@ -152,6 +164,13 @@ public struct TokenNormalizer: Sendable {
         case .keyword, .operator, .punctuation, .unknown:
             return token.text
         }
+    }
+
+    /// Check if an identifier is a closure shorthand parameter.
+    private func isShorthandParameter(_ text: String) -> Bool {
+        guard text.hasPrefix("$") else { return false }
+        let rest = text.dropFirst()
+        return rest.allSatisfy { $0.isNumber }
     }
 
     /// Classify a literal and return appropriate placeholder.
