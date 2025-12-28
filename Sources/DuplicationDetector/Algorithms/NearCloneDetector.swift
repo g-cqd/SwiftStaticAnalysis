@@ -96,7 +96,7 @@ public struct NearCloneDetector: Sendable {
             }
         }
 
-        return deduplicateGroups(cloneGroups)
+        return cloneGroups.deduplicated()
     }
 
     /// Extract normalized windows from a sequence.
@@ -162,8 +162,11 @@ public struct NearCloneDetector: Sendable {
             for (j, window2) in windows.enumerated() where j > i && !used.contains(j) {
                 // Skip if same file and overlapping
                 if window1.file == window2.file {
-                    let overlap = max(0, min(window1.endIndex, window2.endIndex) - max(window1.startIndex, window2.startIndex) + 1)
-                    if overlap > minimumTokens / 2 {
+                    if CloneDetectionUtilities.hasSignificantOverlap(
+                        start1: window1.startIndex, end1: window1.endIndex,
+                        start2: window2.startIndex, end2: window2.endIndex,
+                        threshold: minimumTokens / 2
+                    ) {
                         continue
                     }
                 }
@@ -193,42 +196,11 @@ public struct NearCloneDetector: Sendable {
 
         for i in 0..<group.count {
             for j in (i + 1)..<group.count {
-                totalSimilarity += tokenSimilarity(group[i].originalTokens, group[j].originalTokens)
+                totalSimilarity += CloneDetectionUtilities.jaccardSimilarity(group[i].originalTokens, group[j].originalTokens)
                 comparisons += 1
             }
         }
 
         return comparisons > 0 ? totalSimilarity / Double(comparisons) : 0
-    }
-
-    /// Calculate Jaccard similarity between two token sequences.
-    private func tokenSimilarity(_ tokens1: [String], _ tokens2: [String]) -> Double {
-        let set1 = Set(tokens1)
-        let set2 = Set(tokens2)
-
-        let intersection = set1.intersection(set2).count
-        let union = set1.union(set2).count
-
-        return union > 0 ? Double(intersection) / Double(union) : 0
-    }
-
-    /// Remove duplicate clone groups.
-    private func deduplicateGroups(_ groups: [CloneGroup]) -> [CloneGroup] {
-        var seen = Set<String>()
-        var result: [CloneGroup] = []
-
-        for group in groups {
-            let locations = group.clones
-                .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
-                .sorted()
-                .joined(separator: "|")
-
-            if !seen.contains(locations) {
-                seen.insert(locations)
-                result.append(group)
-            }
-        }
-
-        return result
     }
 }

@@ -56,6 +56,60 @@ public struct StaticAnalyzer: Sendable {
         )
     }
 
+    /// Analyze Swift source code from a string.
+    ///
+    /// - Parameters:
+    ///   - source: Swift source code string.
+    ///   - file: Virtual file name for reporting.
+    /// - Returns: Analysis result for the source.
+    public func analyzeSource(_ source: String, file: String) async throws -> AnalysisResult {
+        let syntax = try await parser.parse(source: source)
+        let lineCount = try await parser.lineCount(source: source)
+
+        // Collect declarations
+        let declCollector = DeclarationCollector(file: file, tree: syntax)
+        declCollector.walk(syntax)
+
+        // Collect references
+        let refCollector = ReferenceCollector(file: file, tree: syntax)
+        refCollector.walk(syntax)
+
+        var declarationIndex = DeclarationIndex()
+        var referenceIndex = ReferenceIndex()
+        var scopeTree = ScopeTree()
+        var declarationsByKind: [String: Int] = [:]
+
+        for decl in declCollector.declarations + declCollector.imports {
+            declarationIndex.add(decl)
+            declarationsByKind[decl.kind.rawValue, default: 0] += 1
+        }
+
+        for ref in refCollector.references {
+            referenceIndex.add(ref)
+        }
+
+        for scope in declCollector.tracker.tree.scopes.values {
+            scopeTree.add(scope)
+        }
+
+        let statistics = AnalysisStatistics(
+            fileCount: 1,
+            totalLines: lineCount,
+            declarationCount: declarationIndex.declarations.count,
+            referenceCount: referenceIndex.references.count,
+            declarationsByKind: declarationsByKind,
+            analysisTime: 0
+        )
+
+        return AnalysisResult(
+            files: [file],
+            declarations: declarationIndex,
+            references: referenceIndex,
+            scopes: scopeTree,
+            statistics: statistics
+        )
+    }
+
     /// Analyze multiple Swift files.
     ///
     /// - Parameter filePaths: Array of file paths.

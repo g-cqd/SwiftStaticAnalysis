@@ -69,6 +69,9 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
     public override func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {
         let isConstant = node.bindingSpecifier.tokenKind == .keyword(.let)
 
+        // Extract property wrappers from attributes
+        let propertyWrappers = extractPropertyWrappers(from: node.attributes)
+
         for binding in node.bindings {
             guard let identifier = binding.pattern.as(IdentifierPatternSyntax.self) else {
                 continue
@@ -83,7 +86,8 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
                 modifiers: node.modifiers,
                 node: node,
                 typeAnnotation: typeAnnotation,
-                documentation: extractDocumentation(from: node)
+                documentation: extractDocumentation(from: node),
+                propertyWrappers: propertyWrappers
             )
             declarations.append(declaration)
         }
@@ -116,6 +120,9 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     public override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
         let genericParams = extractGenericParameters(from: node.genericParameterClause)
+        let conformances = extractConformances(from: node.inheritanceClause)
+        let swiftUIInfo = extractSwiftUIInfo(from: conformances)
+        let attrs = extractAttributes(from: node.attributes)
 
         let declaration = makeDeclaration(
             name: node.name.text,
@@ -123,7 +130,10 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             modifiers: node.modifiers,
             node: node,
             genericParameters: genericParams,
-            documentation: extractDocumentation(from: node)
+            documentation: extractDocumentation(from: node),
+            swiftUIInfo: swiftUIInfo,
+            conformances: conformances,
+            attributes: attrs
         )
         declarations.append(declaration)
 
@@ -132,6 +142,9 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     public override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
         let genericParams = extractGenericParameters(from: node.genericParameterClause)
+        let conformances = extractConformances(from: node.inheritanceClause)
+        let swiftUIInfo = extractSwiftUIInfo(from: conformances)
+        let attrs = extractAttributes(from: node.attributes)
 
         let declaration = makeDeclaration(
             name: node.name.text,
@@ -139,7 +152,10 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             modifiers: node.modifiers,
             node: node,
             genericParameters: genericParams,
-            documentation: extractDocumentation(from: node)
+            documentation: extractDocumentation(from: node),
+            swiftUIInfo: swiftUIInfo,
+            conformances: conformances,
+            attributes: attrs
         )
         declarations.append(declaration)
 
@@ -148,6 +164,9 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     public override func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind {
         let genericParams = extractGenericParameters(from: node.genericParameterClause)
+        let conformances = extractConformances(from: node.inheritanceClause)
+        let swiftUIInfo = extractSwiftUIInfo(from: conformances)
+        let attrs = extractAttributes(from: node.attributes)
 
         let declaration = makeDeclaration(
             name: node.name.text,
@@ -155,7 +174,10 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             modifiers: node.modifiers,
             node: node,
             genericParameters: genericParams,
-            documentation: extractDocumentation(from: node)
+            documentation: extractDocumentation(from: node),
+            swiftUIInfo: swiftUIInfo,
+            conformances: conformances,
+            attributes: attrs
         )
         declarations.append(declaration)
 
@@ -308,7 +330,11 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
         node: some SyntaxProtocol,
         typeAnnotation: String? = nil,
         genericParameters: [String] = [],
-        documentation: String? = nil
+        documentation: String? = nil,
+        propertyWrappers: [PropertyWrapperInfo] = [],
+        swiftUIInfo: SwiftUITypeInfo? = nil,
+        conformances: [String] = [],
+        attributes: [String] = []
     ) -> Declaration {
         Declaration(
             name: name,
@@ -320,7 +346,11 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             scope: currentScope,
             typeAnnotation: typeAnnotation,
             genericParameters: genericParameters,
-            documentation: documentation
+            documentation: documentation,
+            propertyWrappers: propertyWrappers,
+            swiftUIInfo: swiftUIInfo,
+            conformances: conformances,
+            attributes: attributes
         )
     }
 
@@ -415,5 +445,102 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             }
         }
         return nil
+    }
+
+    // MARK: - Property Wrapper Extraction
+
+    private func extractPropertyWrappers(from attributes: AttributeListSyntax) -> [PropertyWrapperInfo] {
+        var wrappers: [PropertyWrapperInfo] = []
+
+        for element in attributes {
+            guard case .attribute(let attribute) = element else {
+                continue
+            }
+
+            let attributeText = attribute.description.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Extract the attribute name
+            let attributeName: String
+            if let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self) {
+                attributeName = identifier.name.text
+            } else {
+                attributeName = attribute.attributeName.description
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            // Check if this is a known property wrapper
+            let kind = PropertyWrapperKind(attributeName: attributeName)
+
+            // Extract arguments if present
+            var arguments: String?
+            if let args = attribute.arguments {
+                arguments = args.description.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            let wrapper = PropertyWrapperInfo(
+                kind: kind,
+                attributeText: attributeText,
+                arguments: arguments
+            )
+            wrappers.append(wrapper)
+        }
+
+        return wrappers
+    }
+
+    // MARK: - Conformance Extraction
+
+    private func extractConformances(from inheritanceClause: InheritanceClauseSyntax?) -> [String] {
+        guard let clause = inheritanceClause else { return [] }
+
+        return clause.inheritedTypes.map { inheritedType in
+            inheritedType.type.description.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    private func extractSwiftUIInfo(from conformances: [String]) -> SwiftUITypeInfo? {
+        var swiftUIConformances: Set<SwiftUIConformance> = []
+
+        for conformance in conformances {
+            // Handle qualified names like SwiftUI.View
+            let baseName = conformance.components(separatedBy: ".").last ?? conformance
+
+            if let swiftUIConformance = SwiftUIConformance(rawValue: baseName) {
+                swiftUIConformances.insert(swiftUIConformance)
+            }
+        }
+
+        if swiftUIConformances.isEmpty {
+            return nil
+        }
+
+        return SwiftUITypeInfo(conformances: swiftUIConformances)
+    }
+
+    // MARK: - Attribute Extraction
+
+    private func extractAttributes(from attributeList: AttributeListSyntax?) -> [String] {
+        guard let attributes = attributeList else { return [] }
+
+        var result: [String] = []
+
+        for element in attributes {
+            guard case .attribute(let attribute) = element else {
+                continue
+            }
+
+            // Extract the attribute name
+            let attributeName: String
+            if let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self) {
+                attributeName = identifier.name.text
+            } else {
+                attributeName = attribute.attributeName.description
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            result.append(attributeName)
+        }
+
+        return result
     }
 }

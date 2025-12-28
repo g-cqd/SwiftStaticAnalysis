@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import IndexStoreDB
 import SwiftStaticAnalysisCore
 
 // MARK: - Unused Reason
@@ -83,6 +84,20 @@ public struct UnusedCode: Sendable, Codable {
     }
 }
 
+// MARK: - Detection Mode
+
+/// Mode for unused code detection.
+public enum DetectionMode: String, Sendable, Codable {
+    /// Simple reference counting (fast, approximate).
+    case simple
+
+    /// Reachability graph analysis (more accurate, considers entry points).
+    case reachability
+
+    /// IndexStoreDB-based (most accurate, requires project build).
+    case indexStore
+}
+
 // MARK: - Unused Code Configuration
 
 /// Configuration for unused code detection.
@@ -105,8 +120,15 @@ public struct UnusedCodeConfiguration: Sendable {
     /// Ignore public API (may be used externally).
     public var ignorePublicAPI: Bool
 
-    /// Use IndexStoreDB for accurate detection.
-    public var useIndexStore: Bool
+    /// Detection mode to use.
+    public var mode: DetectionMode
+
+    /// Use IndexStoreDB for accurate detection (deprecated, use mode instead).
+    @available(*, deprecated, message: "Use mode = .indexStore instead")
+    public var useIndexStore: Bool {
+        get { mode == .indexStore }
+        set { if newValue { mode = .indexStore } }
+    }
 
     /// Path to the index store (usually .build/...).
     public var indexStorePath: String?
@@ -117,6 +139,38 @@ public struct UnusedCodeConfiguration: Sendable {
     /// Patterns to ignore (regex for declaration names).
     public var ignoredPatterns: [String]
 
+    /// Treat public API as entry points (for reachability mode).
+    public var treatPublicAsRoot: Bool
+
+    /// Treat @objc declarations as entry points.
+    public var treatObjcAsRoot: Bool
+
+    /// Treat test methods as entry points.
+    public var treatTestsAsRoot: Bool
+
+    /// Automatically build the project if index store is missing/stale.
+    public var autoBuild: Bool
+
+    /// Use hybrid mode (index for cross-module, syntax for local).
+    public var hybridMode: Bool
+
+    /// Warn when using a stale index.
+    public var warnOnStaleIndex: Bool
+
+    // MARK: - SwiftUI Configuration
+
+    /// Treat SwiftUI Views as entry points (body is always used).
+    public var treatSwiftUIViewsAsRoot: Bool
+
+    /// Ignore SwiftUI property wrappers (@State, @Binding, etc.).
+    public var ignoreSwiftUIPropertyWrappers: Bool
+
+    /// Ignore PreviewProvider implementations.
+    public var ignorePreviewProviders: Bool
+
+    /// Ignore View body properties.
+    public var ignoreViewBody: Bool
+
     public init(
         detectVariables: Bool = true,
         detectFunctions: Bool = true,
@@ -124,10 +178,20 @@ public struct UnusedCodeConfiguration: Sendable {
         detectImports: Bool = true,
         detectParameters: Bool = true,
         ignorePublicAPI: Bool = true,
-        useIndexStore: Bool = false,
+        mode: DetectionMode = .simple,
         indexStorePath: String? = nil,
         minimumConfidence: Confidence = .medium,
-        ignoredPatterns: [String] = []
+        ignoredPatterns: [String] = [],
+        treatPublicAsRoot: Bool = true,
+        treatObjcAsRoot: Bool = true,
+        treatTestsAsRoot: Bool = true,
+        autoBuild: Bool = false,
+        hybridMode: Bool = false,
+        warnOnStaleIndex: Bool = true,
+        treatSwiftUIViewsAsRoot: Bool = true,
+        ignoreSwiftUIPropertyWrappers: Bool = true,
+        ignorePreviewProviders: Bool = true,
+        ignoreViewBody: Bool = true
     ) {
         self.detectVariables = detectVariables
         self.detectFunctions = detectFunctions
@@ -135,14 +199,50 @@ public struct UnusedCodeConfiguration: Sendable {
         self.detectImports = detectImports
         self.detectParameters = detectParameters
         self.ignorePublicAPI = ignorePublicAPI
-        self.useIndexStore = useIndexStore
+        self.mode = mode
         self.indexStorePath = indexStorePath
         self.minimumConfidence = minimumConfidence
         self.ignoredPatterns = ignoredPatterns
+        self.treatPublicAsRoot = treatPublicAsRoot
+        self.treatObjcAsRoot = treatObjcAsRoot
+        self.treatTestsAsRoot = treatTestsAsRoot
+        self.autoBuild = autoBuild
+        self.hybridMode = hybridMode
+        self.warnOnStaleIndex = warnOnStaleIndex
+        self.treatSwiftUIViewsAsRoot = treatSwiftUIViewsAsRoot
+        self.ignoreSwiftUIPropertyWrappers = ignoreSwiftUIPropertyWrappers
+        self.ignorePreviewProviders = ignorePreviewProviders
+        self.ignoreViewBody = ignoreViewBody
     }
 
     /// Default configuration.
     public static let `default` = UnusedCodeConfiguration()
+
+    /// Reachability-based configuration.
+    public static let reachability = UnusedCodeConfiguration(mode: .reachability)
+
+    /// IndexStore-based configuration (most accurate).
+    public static let indexStore = UnusedCodeConfiguration(mode: .indexStore)
+
+    /// IndexStore with auto-build enabled.
+    public static let indexStoreAutoBuild = UnusedCodeConfiguration(
+        mode: .indexStore,
+        autoBuild: true
+    )
+
+    /// Hybrid mode configuration.
+    public static let hybrid = UnusedCodeConfiguration(
+        mode: .indexStore,
+        hybridMode: true
+    )
+
+    /// Strict configuration (catches more potential issues).
+    public static let strict = UnusedCodeConfiguration(
+        ignorePublicAPI: false,
+        mode: .reachability,
+        minimumConfidence: .low,
+        treatPublicAsRoot: false
+    )
 }
 
 // MARK: - Unused Code Detector
@@ -165,37 +265,232 @@ public struct UnusedCodeDetector: Sendable {
     /// - Parameter files: Array of Swift file paths.
     /// - Returns: Array of unused code findings.
     public func detectUnused(in files: [String]) async throws -> [UnusedCode] {
-        // Use IndexStore if configured
-        if configuration.useIndexStore {
+        switch configuration.mode {
+        case .simple:
+            return try await detectUnusedWithSyntax(in: files)
+
+        case .reachability:
+            return try await detectUnusedWithReachability(in: files)
+
+        case .indexStore:
             return try await detectUnusedWithIndexStore(in: files)
         }
+    }
 
-        // Fall back to SwiftSyntax-only analysis
-        return try await detectUnusedWithSyntax(in: files)
+    /// Detect unused code using reachability graph analysis.
+    private func detectUnusedWithReachability(in files: [String]) async throws -> [UnusedCode] {
+        // Analyze all files
+        let result = try await analyzer.analyze(files)
+
+        // Configure the reachability detector
+        let extractionConfig = DependencyExtractionConfiguration(
+            treatPublicAsRoot: configuration.treatPublicAsRoot,
+            treatObjcAsRoot: configuration.treatObjcAsRoot,
+            treatTestsAsRoot: configuration.treatTestsAsRoot,
+            treatProtocolRequirementsAsRoot: true,
+            trackProtocolWitnesses: true,
+            trackClosureCaptures: true
+        )
+
+        let reachabilityDetector = ReachabilityBasedDetector(
+            configuration: configuration,
+            extractionConfiguration: extractionConfig
+        )
+
+        // Get unreachable code
+        var unusedItems = reachabilityDetector.detect(in: result)
+
+        // Also check for imports if enabled
+        if configuration.detectImports {
+            let unusedImports = detectUnusedImports(result: result)
+            unusedItems.append(contentsOf: unusedImports)
+        }
+
+        return unusedItems
+            .filter { $0.confidence >= configuration.minimumConfidence }
+            .sorted { $0.confidence > $1.confidence }
     }
 
     /// Detect unused code using IndexStoreDB (accurate but requires project build).
     private func detectUnusedWithIndexStore(in files: [String]) async throws -> [UnusedCode] {
-        // Find or use configured index store path
-        let indexStorePath: String
-        if let configured = configuration.indexStorePath {
-            indexStorePath = configured
-        } else {
-            // Try to find it automatically
-            guard let found = findIndexStorePath(for: files) else {
-                // Fall back to syntax-only analysis
-                return try await detectUnusedWithSyntax(in: files)
-            }
-            indexStorePath = found
+        // Find project root
+        guard let projectRoot = findProjectRoot(for: files) else {
+            // Fall back to reachability-only analysis
+            return try await detectUnusedWithReachability(in: files)
         }
 
-        // Use the index store based detector
-        let detector = IndexStoreBasedDetector(configuration: configuration)
-        let results = try detector.detect(in: files, indexStorePath: indexStorePath)
+        // Create fallback manager with configuration
+        let fallbackConfig = FallbackConfiguration(
+            autoBuild: configuration.autoBuild,
+            checkFreshness: true,
+            warnOnStale: configuration.warnOnStaleIndex,
+            hybridMode: configuration.hybridMode
+        )
+        let fallbackManager = IndexStoreFallbackManager(configuration: fallbackConfig)
 
-        return results
+        // Determine which mode to use
+        let modeResult = await fallbackManager.determineAnalysisMode(
+            projectRoot: projectRoot,
+            sourceFiles: files,
+            preferredMode: configuration.mode
+        )
+
+        switch modeResult {
+        case .indexStore(let db, _):
+            // Use index-based dependency graph
+            return detectWithIndexGraph(db: db, files: files)
+
+        case .hybrid(let db, _):
+            // Combine index and syntax analysis
+            return try await detectWithHybridMode(db: db, files: files)
+
+        case .reachability(let reason):
+            // Log the reason and fall back
+            if configuration.warnOnStaleIndex {
+                print("Note: \(reason.description)")
+                print("Falling back to reachability-based analysis.")
+            }
+            return try await detectUnusedWithReachability(in: files)
+        }
+    }
+
+    /// Detect unused code using the index-based dependency graph.
+    private func detectWithIndexGraph(db: IndexStoreDB, files: [String]) -> [UnusedCode] {
+        // Configure the graph
+        let graphConfig = IndexGraphConfiguration(
+            treatTestsAsRoot: configuration.treatTestsAsRoot,
+            treatProtocolRequirementsAsRoot: true,
+            includeCrossModuleEdges: true,
+            trackProtocolWitnesses: true
+        )
+
+        // Build the graph
+        let graph = IndexBasedDependencyGraph(analysisFiles: files, configuration: graphConfig)
+        graph.build(from: db)
+
+        // Get unreachable nodes
+        let unreachable = graph.computeUnreachable()
+
+        // Convert to UnusedCode
+        return unreachable.compactMap { node -> UnusedCode? in
+            // Skip external symbols
+            guard !node.isExternal else { return nil }
+
+            // Apply configuration filters
+            if !shouldReportIndexNode(node) {
+                return nil
+            }
+
+            guard let file = node.definitionFile,
+                  let line = node.definitionLine else {
+                return nil
+            }
+
+            let location = SourceLocation(file: file, line: line, column: 1, offset: 0)
+            let declaration = Declaration(
+                name: node.name,
+                kind: convertIndexKind(node.kind),
+                accessLevel: .internal, // Not available from index
+                modifiers: [],
+                location: location,
+                range: SourceRange(start: location, end: location),
+                scope: .global
+            )
+
+            return UnusedCode(
+                declaration: declaration,
+                reason: .neverReferenced,
+                confidence: .high, // High confidence from index analysis
+                suggestion: "Unreachable symbol '\(node.name)' - consider removing"
+            )
+        }
+        .filter { $0.confidence >= configuration.minimumConfidence }
+        .sorted { $0.confidence > $1.confidence }
+    }
+
+    /// Detect unused code using hybrid mode (index + syntax).
+    private func detectWithHybridMode(db: IndexStoreDB, files: [String]) async throws -> [UnusedCode] {
+        // Get results from both methods
+        let indexResults = detectWithIndexGraph(db: db, files: files)
+        let syntaxResults = try await detectUnusedWithReachability(in: files)
+
+        // Merge results, preferring index results for higher confidence
+        var resultsByName: [String: UnusedCode] = [:]
+
+        // Add index results first (higher confidence)
+        for result in indexResults {
+            resultsByName[result.declaration.name] = result
+        }
+
+        // Add syntax results only if not already present
+        for result in syntaxResults {
+            if resultsByName[result.declaration.name] == nil {
+                resultsByName[result.declaration.name] = result
+            }
+        }
+
+        return Array(resultsByName.values)
             .filter { $0.confidence >= configuration.minimumConfidence }
             .sorted { $0.confidence > $1.confidence }
+    }
+
+    /// Check if an index node should be reported.
+    private func shouldReportIndexNode(_ node: IndexSymbolNode) -> Bool {
+        switch node.kind {
+        case .variable, .property:
+            return configuration.detectVariables
+        case .function, .method:
+            return configuration.detectFunctions
+        case .class, .struct, .enum, .protocol:
+            return configuration.detectTypes
+        case .parameter:
+            return configuration.detectParameters
+        default:
+            return true
+        }
+    }
+
+    /// Convert index kind to declaration kind.
+    private func convertIndexKind(_ kind: IndexedSymbolKind) -> DeclarationKind {
+        switch kind {
+        case .class: return .class
+        case .struct: return .struct
+        case .enum: return .enum
+        case .protocol: return .protocol
+        case .extension: return .extension
+        case .function, .method: return .function
+        case .property, .variable: return .variable
+        case .parameter: return .parameter
+        case .typealias: return .typealias
+        case .module: return .import
+        case .unknown: return .variable
+        }
+    }
+
+    /// Find the project root for the given files.
+    private func findProjectRoot(for files: [String]) -> String? {
+        guard let firstFile = files.first else { return nil }
+
+        var current = URL(fileURLWithPath: firstFile).deletingLastPathComponent()
+        let maxDepth = 10
+
+        for _ in 0..<maxDepth {
+            // Check for Package.swift (Swift package)
+            let packageSwift = current.appendingPathComponent("Package.swift")
+            if FileManager.default.fileExists(atPath: packageSwift.path) {
+                return current.path
+            }
+
+            // Check for .xcodeproj or .xcworkspace
+            if let contents = try? FileManager.default.contentsOfDirectory(atPath: current.path),
+               contents.contains(where: { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".xcworkspace") }) {
+                return current.path
+            }
+
+            current = current.deletingLastPathComponent()
+        }
+
+        return nil
     }
 
     /// Find the index store path for the given files.
@@ -298,6 +593,44 @@ public struct UnusedCodeDetector: Sendable {
             return false
         }
 
+        // Check for entry point attributes (@main, @UIApplicationMain, @NSApplicationMain)
+        let entryPointAttributes = ["main", "UIApplicationMain", "NSApplicationMain"]
+        if declaration.attributes.contains(where: { entryPointAttributes.contains($0) }) {
+            return false
+        }
+
+        // MARK: - SwiftUI-specific exclusions
+
+        // Ignore SwiftUI property wrappers (@State, @Binding, etc.)
+        if configuration.ignoreSwiftUIPropertyWrappers {
+            if declaration.hasImplicitUsageWrapper {
+                return false
+            }
+        }
+
+        // Ignore SwiftUI View types
+        if configuration.treatSwiftUIViewsAsRoot {
+            if declaration.isSwiftUIView {
+                return false
+            }
+        }
+
+        // Ignore PreviewProvider implementations
+        if configuration.ignorePreviewProviders {
+            if declaration.isSwiftUIPreview {
+                return false
+            }
+        }
+
+        // Ignore View body computed property
+        if configuration.ignoreViewBody {
+            if declaration.name == "body" && declaration.kind == .variable {
+                // Check if parent scope is a View type
+                // For now, just check if the name is "body"
+                return false
+            }
+        }
+
         // Check ignored patterns
         for pattern in configuration.ignoredPatterns {
             if let regex = try? Regex(pattern),
@@ -393,6 +726,99 @@ public struct UnusedCodeDetector: Sendable {
         }
 
         return unusedImports
+    }
+
+    /// Detect unused code from source string (for testing).
+    ///
+    /// - Parameters:
+    ///   - source: Swift source code string.
+    ///   - file: Virtual file name for reporting.
+    /// - Returns: Array of unused code findings.
+    public func detectFromSource(_ source: String, file: String) async throws -> [UnusedCode] {
+        // Parse the source
+        let result = try await analyzer.analyzeSource(source, file: file)
+
+        switch configuration.mode {
+        case .simple:
+            return detectFromResult(result)
+
+        case .reachability:
+            let extractionConfig = DependencyExtractionConfiguration(
+                treatPublicAsRoot: configuration.treatPublicAsRoot,
+                treatObjcAsRoot: configuration.treatObjcAsRoot,
+                treatTestsAsRoot: configuration.treatTestsAsRoot
+            )
+            let reachabilityDetector = ReachabilityBasedDetector(
+                configuration: configuration,
+                extractionConfiguration: extractionConfig
+            )
+            return reachabilityDetector.detect(in: result)
+
+        case .indexStore:
+            // For source strings, fall back to simple mode
+            return detectFromResult(result)
+        }
+    }
+
+    /// Detect unused code from an analysis result (simple mode).
+    private func detectFromResult(_ result: AnalysisResult) -> [UnusedCode] {
+        var unusedItems: [UnusedCode] = []
+
+        // Build a set of all referenced identifiers
+        let referencedIdentifiers = result.references.uniqueIdentifiers
+
+        // Check each declaration
+        for declaration in result.declarations.declarations {
+            // Skip based on configuration
+            if !shouldCheck(declaration) {
+                continue
+            }
+
+            // Check if referenced
+            let isReferenced = referencedIdentifiers.contains(declaration.name)
+
+            if !isReferenced {
+                let confidence = determineConfidence(for: declaration)
+
+                // Skip if below minimum confidence
+                if confidence < configuration.minimumConfidence {
+                    continue
+                }
+
+                let reason = determineReason(for: declaration, result: result)
+                let suggestion = generateSuggestion(for: declaration, reason: reason)
+
+                unusedItems.append(UnusedCode(
+                    declaration: declaration,
+                    reason: reason,
+                    confidence: confidence,
+                    suggestion: suggestion
+                ))
+            }
+        }
+
+        return unusedItems.sorted { $0.confidence > $1.confidence }
+    }
+
+    /// Generate a reachability report for the given files.
+    ///
+    /// - Parameter files: Array of Swift file paths.
+    /// - Returns: A reachability report.
+    public func generateReachabilityReport(for files: [String]) async throws -> ReachabilityReport {
+        let result = try await analyzer.analyze(files)
+
+        let extractionConfig = DependencyExtractionConfiguration(
+            treatPublicAsRoot: configuration.treatPublicAsRoot,
+            treatObjcAsRoot: configuration.treatObjcAsRoot,
+            treatTestsAsRoot: configuration.treatTestsAsRoot
+        )
+
+        let reachabilityDetector = ReachabilityBasedDetector(
+            configuration: configuration,
+            extractionConfiguration: extractionConfig
+        )
+
+        return reachabilityDetector.generateReport(for: result)
     }
 }
 

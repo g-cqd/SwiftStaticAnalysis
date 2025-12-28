@@ -93,6 +93,20 @@ public struct CloneGroup: Sendable, Codable {
     }
 }
 
+// MARK: - Detection Algorithm
+
+/// Algorithm used for clone detection.
+public enum DetectionAlgorithm: String, Sendable, Codable {
+    /// Rolling hash (Rabin-Karp) - fast, may have false positives.
+    case rollingHash
+
+    /// Suffix array (SA-IS) - deterministic, exhaustive, no false positives.
+    case suffixArray
+
+    /// MinHash + LSH - probabilistic, O(n) complexity for Type-3 clones.
+    case minHashLSH
+}
+
 // MARK: - Duplication Detector Configuration
 
 /// Configuration for duplication detection.
@@ -109,20 +123,40 @@ public struct DuplicationConfiguration: Sendable {
     /// Minimum similarity for near/semantic clones (0.0-1.0).
     public var minimumSimilarity: Double
 
+    /// Detection algorithm to use.
+    public var algorithm: DetectionAlgorithm
+
     public init(
         minimumTokens: Int = 50,
         cloneTypes: Set<CloneType> = [.exact],
         ignoredPatterns: [String] = [],
-        minimumSimilarity: Double = 0.8
+        minimumSimilarity: Double = 0.8,
+        algorithm: DetectionAlgorithm = .rollingHash
     ) {
         self.minimumTokens = minimumTokens
         self.cloneTypes = cloneTypes
         self.ignoredPatterns = ignoredPatterns
         self.minimumSimilarity = minimumSimilarity
+        self.algorithm = algorithm
     }
 
     /// Default configuration.
     public static let `default` = DuplicationConfiguration()
+
+    /// High-performance configuration using suffix array.
+    public static let highPerformance = DuplicationConfiguration(
+        minimumTokens: 50,
+        cloneTypes: [.exact, .near],
+        algorithm: .suffixArray
+    )
+
+    /// Configuration for Type-3 clones using MinHash + LSH.
+    public static let type3Detection = DuplicationConfiguration(
+        minimumTokens: 50,
+        cloneTypes: [.semantic],
+        minimumSimilarity: 0.5,
+        algorithm: .minHashLSH
+    )
 }
 
 // MARK: - Duplication Detector
@@ -172,9 +206,20 @@ public struct DuplicationDetector: Sendable {
         // Extract token sequences from all files
         let sequences = try await extractTokenSequences(from: files)
 
-        // Run exact clone detection
-        let detector = ExactCloneDetector(minimumTokens: configuration.minimumTokens)
-        return detector.detect(in: sequences)
+        switch configuration.algorithm {
+        case .rollingHash, .minHashLSH:
+            // Rolling hash detection (minHashLSH uses this for Type-1 clones)
+            let detector = ExactCloneDetector(minimumTokens: configuration.minimumTokens)
+            return detector.detect(in: sequences)
+
+        case .suffixArray:
+            // High-performance suffix array detection
+            let detector = SuffixArrayCloneDetector(
+                minimumTokens: configuration.minimumTokens,
+                normalizeForType2: false
+            )
+            return detector.detect(in: sequences)
+        }
     }
 
     // MARK: - Near Clone Detection
@@ -183,23 +228,47 @@ public struct DuplicationDetector: Sendable {
         // Extract token sequences from all files
         let sequences = try await extractTokenSequences(from: files)
 
-        // Run near clone detection with normalized tokens
-        let detector = NearCloneDetector(
-            minimumTokens: configuration.minimumTokens,
-            minimumSimilarity: configuration.minimumSimilarity
-        )
-        return detector.detect(in: sequences)
+        switch configuration.algorithm {
+        case .rollingHash, .minHashLSH:
+            // Near clone detection (minHashLSH uses this for Type-2 clones)
+            let detector = NearCloneDetector(
+                minimumTokens: configuration.minimumTokens,
+                minimumSimilarity: configuration.minimumSimilarity
+            )
+            return detector.detect(in: sequences)
+
+        case .suffixArray:
+            // Suffix array with normalized tokens for Type-2 detection
+            let detector = SuffixArrayCloneDetector(
+                minimumTokens: configuration.minimumTokens,
+                normalizeForType2: true
+            )
+            return detector.detectWithNormalization(in: sequences)
+        }
     }
 
     // MARK: - Semantic Clone Detection
 
     private func detectSemanticClones(in files: [String]) async throws -> [CloneGroup] {
-        // Run semantic clone detection with AST fingerprinting
-        let detector = SemanticCloneDetector(
-            minimumNodes: configuration.minimumTokens / 5, // Roughly 5 tokens per node
-            minimumSimilarity: configuration.minimumSimilarity
-        )
-        return try await detector.detect(in: files)
+        switch configuration.algorithm {
+        case .minHashLSH:
+            // Use MinHash + LSH for Type-3 clone detection
+            let detector = MinHashCloneDetector(
+                minimumTokens: configuration.minimumTokens,
+                shingleSize: 5,
+                numHashes: 128,
+                minimumSimilarity: configuration.minimumSimilarity
+            )
+            return try await detector.detect(in: files)
+
+        case .rollingHash, .suffixArray:
+            // Use AST fingerprinting for semantic clone detection
+            let detector = SemanticCloneDetector(
+                minimumNodes: configuration.minimumTokens / 5, // Roughly 5 tokens per node
+                minimumSimilarity: configuration.minimumSimilarity
+            )
+            return try await detector.detect(in: files)
+        }
     }
 
     // MARK: - Helpers
@@ -297,5 +366,71 @@ public struct DuplicationReport: Sendable, Codable {
         self.filesAnalyzed = filesAnalyzed
         self.totalLines = totalLines
         self.cloneGroups = cloneGroups
+    }
+}
+
+// MARK: - Clone Group Utilities
+
+extension Array where Element == CloneGroup {
+    /// Remove duplicate clone groups based on their location fingerprints.
+    ///
+    /// Two clone groups are considered duplicates if they contain clones
+    /// at the exact same file locations.
+    public func deduplicated() -> [CloneGroup] {
+        var seen = Set<String>()
+        var result: [CloneGroup] = []
+
+        for group in self {
+            let locationFingerprint = group.clones
+                .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
+                .sorted()
+                .joined(separator: "|")
+
+            if !seen.contains(locationFingerprint) {
+                seen.insert(locationFingerprint)
+                result.append(group)
+            }
+        }
+
+        return result
+    }
+}
+
+// MARK: - Clone Detection Utilities
+
+/// Shared utilities for clone detection algorithms.
+public enum CloneDetectionUtilities {
+    /// Check if two code windows overlap significantly.
+    ///
+    /// - Parameters:
+    ///   - start1: Start index of first window.
+    ///   - end1: End index of first window.
+    ///   - start2: Start index of second window.
+    ///   - end2: End index of second window.
+    ///   - threshold: Minimum overlap to be considered significant.
+    /// - Returns: True if the windows overlap more than the threshold.
+    public static func hasSignificantOverlap(
+        start1: Int, end1: Int,
+        start2: Int, end2: Int,
+        threshold: Int
+    ) -> Bool {
+        let overlap = max(0, min(end1, end2) - max(start1, start2) + 1)
+        return overlap > threshold
+    }
+
+    /// Calculate Jaccard similarity between two token sequences.
+    ///
+    /// - Parameters:
+    ///   - tokens1: First token sequence.
+    ///   - tokens2: Second token sequence.
+    /// - Returns: Jaccard similarity coefficient (0.0 to 1.0).
+    public static func jaccardSimilarity(_ tokens1: [String], _ tokens2: [String]) -> Double {
+        let set1 = Set(tokens1)
+        let set2 = Set(tokens2)
+
+        let intersection = set1.intersection(set2).count
+        let union = set1.union(set2).count
+
+        return union > 0 ? Double(intersection) / Double(union) : 0
     }
 }

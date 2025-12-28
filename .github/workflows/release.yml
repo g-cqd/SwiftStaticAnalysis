@@ -1,0 +1,202 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g., 1.0.0)'
+        required: true
+      create_tag:
+        description: 'Create git tag'
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: macos-15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      previous_tag: ${{ steps.previous.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+            TAG="v${VERSION}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}, Tag: ${TAG}"
+
+      - name: Get Previous Tag
+        id: previous
+        run: |
+          PREVIOUS=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          echo "tag=${PREVIOUS}" >> $GITHUB_OUTPUT
+          echo "Previous tag: ${PREVIOUS:-none}"
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+
+      - name: Build Release
+        run: swift build -c release
+
+      - name: Run Tests
+        run: swift test --parallel
+
+  changelog:
+    name: Generate Changelog
+    runs-on: ubuntu-latest
+    needs: validate
+    outputs:
+      changelog: ${{ steps.changelog.outputs.content }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          PREVIOUS="${{ needs.validate.outputs.previous_tag }}"
+          TAG="${{ needs.validate.outputs.tag }}"
+
+          if [[ -n "$PREVIOUS" ]]; then
+            RANGE="${PREVIOUS}..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+
+          echo "Generating changelog for range: $RANGE"
+
+          {
+            echo "content<<CHANGELOG_EOF"
+
+            # Features
+            FEATURES=$(git log $RANGE --pretty=format:"- %s (%h)" --grep="^feat" --grep="^add" --grep="^new" -i 2>/dev/null || echo "")
+            if [[ -n "$FEATURES" ]]; then
+              echo "### Features"
+              echo "$FEATURES"
+              echo ""
+            fi
+
+            # Bug Fixes
+            FIXES=$(git log $RANGE --pretty=format:"- %s (%h)" --grep="^fix" -i 2>/dev/null || echo "")
+            if [[ -n "$FIXES" ]]; then
+              echo "### Bug Fixes"
+              echo "$FIXES"
+              echo ""
+            fi
+
+            # Performance
+            PERF=$(git log $RANGE --pretty=format:"- %s (%h)" --grep="^perf" --grep="performance" -i 2>/dev/null || echo "")
+            if [[ -n "$PERF" ]]; then
+              echo "### Performance"
+              echo "$PERF"
+              echo ""
+            fi
+
+            # Other changes
+            OTHER=$(git log $RANGE --pretty=format:"- %s (%h)" --invert-grep --grep="^feat" --grep="^fix" --grep="^perf" --grep="^add" --grep="^new" -i 2>/dev/null | head -20 || echo "")
+            if [[ -n "$OTHER" ]]; then
+              echo "### Other Changes"
+              echo "$OTHER"
+              echo ""
+            fi
+
+            echo "CHANGELOG_EOF"
+          } >> $GITHUB_OUTPUT
+
+  create-release:
+    name: Create Release
+    runs-on: macos-15
+    needs: [validate, changelog]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create Tag (if requested)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.create_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ needs.validate.outputs.tag }}" -m "Release ${{ needs.validate.outputs.version }}"
+          git push origin "${{ needs.validate.outputs.tag }}"
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+
+      - name: Build Release Binary
+        run: swift build -c release
+
+      - name: Package Binary
+        run: |
+          mkdir -p release
+          cp .build/release/swa release/
+          cd release
+          tar -czvf swa-${{ needs.validate.outputs.version }}-macos.tar.gz swa
+
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          {
+            echo "notes<<NOTES_EOF"
+            echo "## SwiftStaticAnalysis ${{ needs.validate.outputs.version }}"
+            echo ""
+            echo "### Installation"
+            echo ""
+            echo "\`\`\`bash"
+            echo "# Swift Package Manager"
+            echo ".package(url: \"https://github.com/g-cqd/SwiftStaticAnalysis.git\", from: \"${{ needs.validate.outputs.version }}\")"
+            echo "\`\`\`"
+            echo ""
+            echo "### What's Changed"
+            echo ""
+            echo "${{ needs.changelog.outputs.changelog }}"
+            echo ""
+            echo "NOTES_EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Determine Prerelease
+        id: prerelease
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          if [[ "$VERSION" == *"alpha"* ]] || [[ "$VERSION" == *"beta"* ]] || [[ "$VERSION" == *"rc"* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.validate.outputs.tag }}
+          name: ${{ needs.validate.outputs.version }}
+          body: ${{ steps.notes.outputs.notes }}
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
+          files: |
+            release/swa-${{ needs.validate.outputs.version }}-macos.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

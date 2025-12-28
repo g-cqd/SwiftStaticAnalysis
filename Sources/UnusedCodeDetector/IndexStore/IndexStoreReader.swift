@@ -335,7 +335,7 @@ public final class IndexStoreReader: @unchecked Sendable {
     }
 
     /// Find libIndexStore.dylib in the system.
-    private static func findLibIndexStore() -> String {
+    public static func findLibIndexStore() -> String {
         // Try common locations
         let possiblePaths = [
             // Xcode toolchain

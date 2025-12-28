@@ -83,6 +83,24 @@ public actor SwiftFileParser {
         cache[filePath]?.lineCount
     }
 
+    // MARK: - Source String Parsing
+
+    /// Parse Swift source code from a string.
+    ///
+    /// - Parameter source: Swift source code string.
+    /// - Returns: The parsed source file syntax tree.
+    public func parse(source: String) throws -> SourceFileSyntax {
+        Parser.parse(source: source)
+    }
+
+    /// Get the line count for a source string.
+    ///
+    /// - Parameter source: Swift source code string.
+    /// - Returns: Number of lines in the source.
+    public func lineCount(source: String) throws -> Int {
+        source.components(separatedBy: "\n").count
+    }
+
     // MARK: - Cache Management
 
     /// Invalidate the cache for a specific file.

@@ -72,6 +72,16 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
             walk(argument.expression)
         }
 
+        // Track trailing closure (this is critical for closures like `items.map { ... }`)
+        if let trailingClosure = node.trailingClosure {
+            walk(trailingClosure)
+        }
+
+        // Track additional trailing closures
+        for additionalClosure in node.additionalTrailingClosures {
+            walk(additionalClosure.closure)
+        }
+
         return .skipChildren
     }
 

@@ -37,10 +37,7 @@ struct Analyze: AsyncParsableCommand {
     var path: String = "."
 
     @Option(name: .shortAndLong, help: "Output format (text, json, xcode)")
-    var format: OutputFormat = .text
-
-    @Flag(name: .long, help: "Include detailed output")
-    var verbose: Bool = false
+    var format: OutputFormat = .xcode
 
     func run() async throws {
         let files = try findSwiftFiles(in: path)
@@ -135,7 +132,7 @@ struct Duplicates: AsyncParsableCommand {
     var minTokens: Int = 50
 
     @Option(name: .shortAndLong, help: "Output format")
-    var format: OutputFormat = .text
+    var format: OutputFormat = .xcode
 
     func run() async throws {
         let files = try findSwiftFiles(in: path)
@@ -150,9 +147,28 @@ struct Duplicates: AsyncParsableCommand {
         let detector = DuplicationDetector(configuration: config)
         let clones = try await detector.detectClones(in: files)
 
-        print("Found \(clones.count) clone group(s)")
-        for group in clones {
-            print("- \(group.type.rawValue): \(group.occurrences) occurrences")
+        switch format {
+        case .text:
+            print("Found \(clones.count) clone group(s)")
+            for (index, group) in clones.enumerated() {
+                print("\n[\(index + 1)] \(group.type.rawValue) clone (\(group.occurrences) occurrences)")
+                for clone in group.clones {
+                    print("  - \(clone.file):\(clone.startLine)-\(clone.endLine)")
+                }
+            }
+        case .json:
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            if let data = try? encoder.encode(clones),
+               let json = String(data: data, encoding: .utf8) {
+                print(json)
+            }
+        case .xcode:
+            for group in clones {
+                for clone in group.clones {
+                    print("\(clone.file):\(clone.startLine): warning: Duplicate code detected (\(group.type.rawValue) clone, \(group.occurrences) occurrences)")
+                }
+            }
         }
     }
 }
@@ -170,30 +186,155 @@ struct Unused: AsyncParsableCommand {
     @Flag(name: .long, help: "Ignore public API")
     var ignorePublic: Bool = false
 
-    @Flag(name: .long, help: "Use index store for accurate detection")
-    var useIndexStore: Bool = false
+    @Option(name: .long, help: "Detection mode: simple, reachability, indexStore")
+    var mode: String = "simple"
 
     @Option(name: .long, help: "Path to index store")
     var indexStorePath: String?
 
+    @Flag(name: .long, help: "Generate reachability report")
+    var report: Bool = false
+
     @Option(name: .shortAndLong, help: "Output format")
-    var format: OutputFormat = .text
+    var format: OutputFormat = .xcode
+
+    // Exclusion flags
+    @Option(name: .long, parsing: .upToNextOption, help: "Paths to exclude (glob patterns)")
+    var excludePaths: [String] = []
+
+    @Flag(name: .long, help: "Exclude import statements from results")
+    var excludeImports: Bool = false
+
+    @Flag(name: .long, help: "Exclude test suite declarations")
+    var excludeTestSuites: Bool = false
+
+    @Flag(name: .long, help: "Exclude backticked enum cases")
+    var excludeEnumCases: Bool = false
+
+    @Flag(name: .long, help: "Exclude deinit methods")
+    var excludeDeinit: Bool = false
+
+    @Flag(name: .long, help: "Apply sensible defaults (exclude imports, deinit, enum cases)")
+    var sensibleDefaults: Bool = false
 
     func run() async throws {
-        let files = try findSwiftFiles(in: path)
+        var files = try findSwiftFiles(in: path)
+
+        // Apply path exclusions
+        let excludePatterns = sensibleDefaults ? excludePaths : excludePaths
+        if !excludePatterns.isEmpty {
+            files = files.filter { file in
+                !excludePatterns.contains { pattern in
+                    UnusedCodeFilter.matchesGlobPattern(file, pattern: pattern)
+                }
+            }
+        }
+
+        let detectionMode: DetectionMode
+        switch mode.lowercased() {
+        case "reachability":
+            detectionMode = .reachability
+        case "indexstore", "index":
+            detectionMode = .indexStore
+        default:
+            detectionMode = .simple
+        }
 
         let config = UnusedCodeConfiguration(
             ignorePublicAPI: ignorePublic,
-            useIndexStore: useIndexStore,
+            mode: detectionMode,
             indexStorePath: indexStorePath
         )
 
         let detector = UnusedCodeDetector(configuration: config)
-        let unused = try await detector.detectUnused(in: files)
 
-        print("Found \(unused.count) potentially unused item(s)")
-        for item in unused {
-            print("[\(item.confidence.rawValue)] \(item.declaration.location): \(item.suggestion)")
+        if report && detectionMode == .reachability {
+            let reachabilityReport = try await detector.generateReachabilityReport(for: files)
+            print("=== Reachability Report ===")
+            print("Total declarations: \(reachabilityReport.totalDeclarations)")
+            print("Root nodes: \(reachabilityReport.rootCount)")
+            print("Reachable: \(reachabilityReport.reachableCount)")
+            print("Unreachable: \(reachabilityReport.unreachableCount)")
+            print("Reachability: \(String(format: "%.1f", reachabilityReport.reachabilityPercentage))%")
+
+            if !reachabilityReport.rootsByReason.isEmpty {
+                print("\nRoots by reason:")
+                for (reason, count) in reachabilityReport.rootsByReason.sorted(by: { $0.value > $1.value }) {
+                    print("  - \(reason.rawValue): \(count)")
+                }
+            }
+
+            if !reachabilityReport.unreachableByKind.isEmpty {
+                print("\nUnreachable by kind:")
+                for (kind, count) in reachabilityReport.unreachableByKind.sorted(by: { $0.value > $1.value }) {
+                    print("  - \(kind.rawValue): \(count)")
+                }
+            }
+            return
+        }
+
+        var unused = try await detector.detectUnused(in: files)
+
+        // Apply exclusion filters
+        let shouldExcludeImports = excludeImports || sensibleDefaults
+        let shouldExcludeDeinit = excludeDeinit || sensibleDefaults
+        let shouldExcludeEnumCases = excludeEnumCases || sensibleDefaults
+        let shouldExcludeTestSuites = excludeTestSuites || sensibleDefaults
+
+        unused = unused.filter { item in
+            let name = item.declaration.name
+
+            // Exclude imports
+            if shouldExcludeImports && item.declaration.kind == .import {
+                return false
+            }
+
+            // Exclude deinit
+            if shouldExcludeDeinit && name == "deinit" {
+                return false
+            }
+
+            // Exclude backticked enum cases
+            if shouldExcludeEnumCases && name.hasPrefix("`") && name.hasSuffix("`") {
+                return false
+            }
+
+            // Exclude test suites (names ending with Tests)
+            if shouldExcludeTestSuites && name.hasSuffix("Tests") {
+                return false
+            }
+
+            // Exclude based on path patterns
+            if !excludePaths.isEmpty {
+                let filePath = item.declaration.location.file
+                for pattern in excludePaths {
+                    if UnusedCodeFilter.matchesGlobPattern(filePath, pattern: pattern) {
+                        return false
+                    }
+                }
+            }
+
+            return true
+        }
+
+        switch format {
+        case .text:
+            print("Found \(unused.count) potentially unused item(s)")
+            for item in unused {
+                print("[\(item.confidence.rawValue)] \(item.declaration.location): \(item.suggestion)")
+            }
+        case .json:
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            if let data = try? encoder.encode(unused),
+               let json = String(data: data, encoding: .utf8) {
+                print(json)
+            }
+        case .xcode:
+            for item in unused {
+                let loc = item.declaration.location
+                print("\(loc.file):\(loc.line):\(loc.column): warning: \(item.suggestion)")
+            }
         }
     }
 }

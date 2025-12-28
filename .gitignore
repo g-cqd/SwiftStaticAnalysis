@@ -1,18 +1,53 @@
-# Xcode
-.DS_Store
-*.xcodeproj
-*.xcworkspace
-xcuserdata/
-*.xcuserstate
-DerivedData/
-
-# Swift Package Manager
+# Build artifacts
 .build/
 .swiftpm/
 Package.resolved
+DerivedData/
 
-# Temporary files
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+*.xcuserstate
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Benchmark and performance outputs
+benchmark*.txt
+performance*.txt
+*.profraw
+
+# IDE
+.vscode/
+.idea/
 *.swp
 *~
 .#*
 \#*\#
+
+# Coverage
+*.profdata
+.coverage/
+codecov/
+
+# Secrets and environment
+.env
+.env.*
+
+# Index store (generated during builds)
+index-store/
+
+# Analysis outputs
+analysis-report*.json
+unused-code-report*.json
+
+# Development artifacts (plans, reports, compass files)
+*PLAN*.md
+*_PLAN.md
+FINDINGS_ANALYSIS.md
+compass_artifact*.md
+performance_report.md

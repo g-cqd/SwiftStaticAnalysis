@@ -1,0 +1,244 @@
+//
+//  Diagnostic.swift
+//  SwiftStaticAnalysis
+//
+//  Xcode-compatible diagnostic representation.
+//
+
+import Foundation
+
+// MARK: - Diagnostic Severity
+
+/// Severity levels for diagnostics.
+public enum DiagnosticSeverity: String, Sendable, Codable, CaseIterable {
+    case error
+    case warning
+    case note
+    case remark
+
+    /// Xcode-compatible string representation.
+    public var xcodeString: String {
+        rawValue
+    }
+}
+
+// MARK: - Diagnostic Category
+
+/// Categories for diagnostics.
+public enum DiagnosticCategory: String, Sendable, Codable {
+    case unusedCode = "unused-code"
+    case duplication = "duplication"
+    case style = "style"
+    case performance = "performance"
+    case security = "security"
+    case general = "general"
+}
+
+// MARK: - Diagnostic
+
+/// Represents a single diagnostic message.
+public struct Diagnostic: Sendable, Codable, Hashable {
+    /// Location in source.
+    public let file: String
+    public let line: Int
+    public let column: Int
+
+    /// Severity level.
+    public let severity: DiagnosticSeverity
+
+    /// The diagnostic message.
+    public let message: String
+
+    /// Optional category.
+    public let category: DiagnosticCategory
+
+    /// Optional rule/check identifier.
+    public let ruleID: String?
+
+    /// Optional fix-it suggestion.
+    public let fixIt: FixIt?
+
+    /// Related notes (secondary diagnostics).
+    public let notes: [Diagnostic]
+
+    /// Unique identifier for deduplication.
+    public var uniqueKey: String {
+        "\(file):\(line):\(column):\(severity.rawValue):\(message.hashValue)"
+    }
+
+    public init(
+        file: String,
+        line: Int,
+        column: Int,
+        severity: DiagnosticSeverity,
+        message: String,
+        category: DiagnosticCategory = .general,
+        ruleID: String? = nil,
+        fixIt: FixIt? = nil,
+        notes: [Diagnostic] = []
+    ) {
+        self.file = file
+        self.line = line
+        self.column = column
+        self.severity = severity
+        self.message = message
+        self.category = category
+        self.ruleID = ruleID
+        self.fixIt = fixIt
+        self.notes = notes
+    }
+
+    /// Xcode-compatible string representation.
+    ///
+    /// Format: `/path/to/file.swift:42:5: warning: message`
+    public var xcodeFormat: String {
+        "\(file):\(line):\(column): \(severity.xcodeString): \(message)"
+    }
+
+    /// Xcode-compatible string including notes.
+    public var xcodeFormatWithNotes: String {
+        var result = xcodeFormat
+        for note in notes {
+            result += "\n\(note.xcodeFormat)"
+        }
+        return result
+    }
+
+    // MARK: - Hashable
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(file)
+        hasher.combine(line)
+        hasher.combine(column)
+        hasher.combine(severity)
+        hasher.combine(message)
+    }
+
+    public static func == (lhs: Diagnostic, rhs: Diagnostic) -> Bool {
+        lhs.file == rhs.file &&
+        lhs.line == rhs.line &&
+        lhs.column == rhs.column &&
+        lhs.severity == rhs.severity &&
+        lhs.message == rhs.message
+    }
+}
+
+// MARK: - Fix-It
+
+/// A suggested fix for a diagnostic.
+public struct FixIt: Sendable, Codable, Hashable {
+    /// Description of the fix.
+    public let description: String
+
+    /// Text edits to apply.
+    public let edits: [TextEdit]
+
+    public init(description: String, edits: [TextEdit]) {
+        self.description = description
+        self.edits = edits
+    }
+}
+
+// MARK: - Text Edit
+
+/// A text edit for a fix-it.
+public struct TextEdit: Sendable, Codable, Hashable {
+    /// File to edit.
+    public let file: String
+
+    /// Start offset in file.
+    public let startOffset: Int
+
+    /// End offset in file.
+    public let endOffset: Int
+
+    /// Replacement text.
+    public let replacement: String
+
+    public init(file: String, startOffset: Int, endOffset: Int, replacement: String) {
+        self.file = file
+        self.startOffset = startOffset
+        self.endOffset = endOffset
+        self.replacement = replacement
+    }
+}
+
+// MARK: - Diagnostic Builder
+
+/// Builder for creating diagnostics.
+public struct DiagnosticBuilder {
+    private var file: String = ""
+    private var line: Int = 1
+    private var column: Int = 1
+    private var severity: DiagnosticSeverity = .warning
+    private var message: String = ""
+    private var category: DiagnosticCategory = .general
+    private var ruleID: String?
+    private var fixIt: FixIt?
+    private var notes: [Diagnostic] = []
+
+    public init() {}
+
+    public func file(_ file: String) -> DiagnosticBuilder {
+        var copy = self
+        copy.file = file
+        return copy
+    }
+
+    public func location(line: Int, column: Int) -> DiagnosticBuilder {
+        var copy = self
+        copy.line = line
+        copy.column = column
+        return copy
+    }
+
+    public func severity(_ severity: DiagnosticSeverity) -> DiagnosticBuilder {
+        var copy = self
+        copy.severity = severity
+        return copy
+    }
+
+    public func message(_ message: String) -> DiagnosticBuilder {
+        var copy = self
+        copy.message = message
+        return copy
+    }
+
+    public func category(_ category: DiagnosticCategory) -> DiagnosticBuilder {
+        var copy = self
+        copy.category = category
+        return copy
+    }
+
+    public func ruleID(_ ruleID: String) -> DiagnosticBuilder {
+        var copy = self
+        copy.ruleID = ruleID
+        return copy
+    }
+
+    public func fixIt(_ fixIt: FixIt) -> DiagnosticBuilder {
+        var copy = self
+        copy.fixIt = fixIt
+        return copy
+    }
+
+    public func note(_ note: Diagnostic) -> DiagnosticBuilder {
+        var copy = self
+        copy.notes.append(note)
+        return copy
+    }
+
+    public func build() -> Diagnostic {
+        Diagnostic(
+            file: file,
+            line: line,
+            column: column,
+            severity: severity,
+            message: message,
+            category: category,
+            ruleID: ruleID,
+            fixIt: fixIt,
+            notes: notes
+        )
+    }
+}

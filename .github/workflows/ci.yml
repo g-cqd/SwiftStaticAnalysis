@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+
+      - name: Show Swift Version
+        run: swift --version
+
+      - name: Build (Debug)
+        run: swift build
+
+      - name: Build (Release)
+        run: swift build -c release
+
+      - name: Run Tests
+        run: swift test --parallel
+
+  build-platforms:
+    name: Build Platforms
+    runs-on: macos-15
+    strategy:
+      matrix:
+        include:
+          - destination: platform=macOS
+            name: macOS
+          - destination: platform=iOS Simulator,OS=latest,name=iPhone 16 Pro
+            name: iOS
+          - destination: platform=tvOS Simulator,OS=latest,name=Apple TV
+            name: tvOS
+          - destination: platform=watchOS Simulator,OS=latest,name=Apple Watch Series 10 (46mm)
+            name: watchOS
+          - destination: platform=visionOS Simulator,OS=latest,name=Apple Vision Pro
+            name: visionOS
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+
+      - name: Build for ${{ matrix.name }}
+        run: |
+          xcodebuild build \
+            -scheme SwiftStaticAnalysis-Package \
+            -destination "${{ matrix.destination }}" \
+            -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO
+
+  lint:
+    name: Lint
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+
+      - name: Check for warnings
+        run: |
+          swift build 2>&1 | tee build.log
+          if grep -q "warning:" build.log; then
+            echo "::warning::Build produced warnings"
+          fi
+
+  self-analysis:
+    name: Self Analysis
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+
+      - name: Build Release
+        run: swift build -c release
+
+      - name: Run Unused Code Detection
+        run: |
+          .build/release/swa unused . \
+            --mode reachability \
+            --sensible-defaults \
+            --exclude-paths "**/Tests/**" \
+            --exclude-paths "**/Fixtures/**" \
+            --format text

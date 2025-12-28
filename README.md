@@ -1,0 +1,248 @@
+# SwiftStaticAnalysis
+
+[![Swift 6.2](https://img.shields.io/badge/Swift-6.2-orange.svg)](https://swift.org)
+[![Platform](https://img.shields.io/badge/Platform-macOS%2015%2B%20%7C%20iOS%2018%2B-blue.svg)](https://developer.apple.com)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![CI](https://github.com/g-cqd/SwiftStaticAnalysis/actions/workflows/ci.yml/badge.svg)](https://github.com/g-cqd/SwiftStaticAnalysis/actions/workflows/ci.yml)
+
+A high-performance Swift static analysis framework for **code duplication detection** and **unused code elimination**.
+
+## Features
+
+- **Multi-Algorithm Clone Detection**: Exact (Type-1), near (Type-2), and semantic (Type-3/4) clone detection
+- **IndexStoreDB Integration**: Accurate cross-module unused code detection using compiler index data
+- **Reachability Analysis**: Graph-based dead code detection with entry point tracking
+- **High-Performance Parsing**: Memory-mapped I/O, SoA token storage, and arena allocation
+- **Zero-Boilerplate CLI**: Full-featured `swa` command with JSON/text/Xcode output formats
+- **Swift 6 Concurrency**: Thread-safe design with `Sendable` conformance throughout
+- **Configurable Filtering**: Exclude imports, test suites, deinit methods, and custom patterns
+
+## Requirements
+
+- macOS 15.0+ / iOS 18.0+
+- Swift 6.2+
+- Xcode 26.0+
+
+## Installation
+
+### Swift Package Manager
+
+Add to your `Package.swift`:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "1.0.0")
+]
+```
+
+Then add the products you need:
+
+```swift
+.target(
+    name: "YourTarget",
+    dependencies: [
+        .product(name: "SwiftStaticAnalysisCore", package: "SwiftStaticAnalysis"),
+        .product(name: "DuplicationDetector", package: "SwiftStaticAnalysis"),
+        .product(name: "UnusedCodeDetector", package: "SwiftStaticAnalysis"),
+    ]
+)
+```
+
+### CLI Installation
+
+```bash
+# Build release binary
+swift build -c release
+
+# Install to PATH
+cp .build/release/swa /usr/local/bin/
+```
+
+## Quick Start
+
+### CLI Usage
+
+```bash
+# Full analysis (duplicates + unused code)
+swa analyze /path/to/project
+
+# Detect code duplicates
+swa duplicates /path/to/project --types exact,near,semantic
+
+# Detect unused code with reachability analysis
+swa unused /path/to/project --mode reachability
+
+# Apply sensible filters to reduce false positives
+swa unused . --sensible-defaults --exclude-paths "**/Tests/**"
+
+# Output as JSON for CI integration
+swa analyze . --format json > report.json
+
+# Xcode-compatible warnings
+swa unused . --format xcode
+```
+
+### Programmatic API
+
+#### Duplication Detection
+
+```swift
+import DuplicationDetector
+
+let config = DuplicationConfiguration(
+    minimumTokens: 50,
+    cloneTypes: [.exact, .near, .semantic],
+    minimumSimilarity: 0.8
+)
+
+let detector = DuplicationDetector(configuration: config)
+let clones = try await detector.detectClones(in: swiftFiles)
+
+for group in clones {
+    print("[\(group.type.rawValue)] \(group.occurrences) occurrences")
+    for clone in group.clones {
+        print("  \(clone.file):\(clone.startLine)-\(clone.endLine)")
+    }
+}
+```
+
+#### Unused Code Detection
+
+```swift
+import UnusedCodeDetector
+
+// Use reachability analysis for accurate detection
+let config = UnusedCodeConfiguration.reachability
+
+let detector = UnusedCodeDetector(configuration: config)
+let unused = try await detector.detectUnused(in: swiftFiles)
+
+// Filter results with sensible defaults
+let filtered = unused.filteredWithSensibleDefaults()
+
+for item in filtered {
+    print("[\(item.confidence.rawValue)] \(item.declaration.location): \(item.suggestion)")
+}
+```
+
+#### IndexStore-Enhanced Detection
+
+```swift
+import UnusedCodeDetector
+
+// Use compiler's index data for cross-module accuracy
+var config = UnusedCodeConfiguration.indexStore
+config.indexStorePath = ".build/debug/index/store"
+config.autoBuild = true  // Build if index is stale
+
+let detector = UnusedCodeDetector(configuration: config)
+let unused = try await detector.detectUnused(in: swiftFiles)
+```
+
+## Detection Modes
+
+| Mode | Speed | Accuracy | Use Case |
+|------|-------|----------|----------|
+| `simple` | Fast | ~70% | Quick scans, large codebases |
+| `reachability` | Medium | ~85% | Entry-point based dead code detection |
+| `indexStore` | Slow | ~95% | Cross-module, protocol witnesses |
+
+## Clone Types
+
+| Type | Description | Algorithm |
+|------|-------------|-----------|
+| **Exact** (Type-1) | Identical code, whitespace-normalized | Suffix Array (SA-IS) |
+| **Near** (Type-2) | Renamed variables/literals | MinHash + LSH |
+| **Semantic** (Type-3/4) | Functionally equivalent | AST Fingerprinting |
+
+## Filtering Options
+
+Reduce false positives with built-in filters:
+
+```bash
+# Exclude import statements
+swa unused . --exclude-imports
+
+# Exclude test suite declarations
+swa unused . --exclude-test-suites
+
+# Exclude deinit methods
+swa unused . --exclude-deinit
+
+# Exclude backticked enum cases (Swift keywords)
+swa unused . --exclude-enum-cases
+
+# Exclude paths with glob patterns
+swa unused . --exclude-paths "**/Tests/**" --exclude-paths "**/Fixtures/**"
+
+# Apply all sensible defaults at once
+swa unused . --sensible-defaults
+```
+
+## Architecture
+
+```
+SwiftStaticAnalysis/
+├── SwiftStaticAnalysisCore/     # Core infrastructure
+│   ├── Models/                   # Declaration, Reference, Scope
+│   ├── Parsing/                  # SwiftFileParser with caching
+│   ├── Visitors/                 # AST visitors
+│   └── Memory/                   # Zero-copy parsing, arena allocation
+├── DuplicationDetector/          # Clone detection
+│   ├── Algorithms/               # Suffix Array, MinHash, AST Fingerprint
+│   ├── Hashing/                  # LSH, similarity computation
+│   └── Models/                   # Clone, CloneGroup
+├── UnusedCodeDetector/           # Unused code detection
+│   ├── IndexStore/               # IndexStoreDB integration
+│   ├── Reachability/             # Graph-based analysis
+│   └── Filters/                  # False positive reduction
+└── SwiftStaticAnalysisCLI/       # swa command-line tool
+```
+
+## Performance
+
+The framework includes several performance optimizations:
+
+- **Memory-Mapped I/O**: Zero-copy file reading for large codebases
+- **SoA Token Storage**: Cache-efficient struct-of-arrays layout
+- **Arena Allocation**: Reduced allocation overhead for temporary data
+- **Parallel Processing**: Concurrent file parsing with configurable limits
+- **SIMD-Accelerated Hashing**: Fast MinHash signature computation
+
+## Testing
+
+```bash
+# Run all tests (357 tests across 89 suites)
+swift test
+
+# Run tests in parallel
+swift test --parallel
+
+# Run specific test suite
+swift test --filter DuplicationDetectorTests
+
+# Run with verbose output
+swift test -v
+```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Ensure all tests pass (`swift test`)
+4. Add tests for new functionality
+5. Submit a pull request
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for our security policy.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.

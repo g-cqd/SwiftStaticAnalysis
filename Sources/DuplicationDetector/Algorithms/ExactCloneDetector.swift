@@ -145,8 +145,8 @@ public struct ExactCloneDetector: Sendable {
             }
         }
 
-        // Merge overlapping clone groups and extend to maximum size
-        return mergeAndExtendClones(cloneGroups, sequences: sequences)
+        // Deduplicate clone groups
+        return cloneGroups.deduplicated()
     }
 
     /// Extract all token windows from a sequence.
@@ -209,8 +209,11 @@ public struct ExactCloneDetector: Sendable {
             for (j, window2) in windows.enumerated() where j > i && !used.contains(j) {
                 // Skip if same file and overlapping
                 if window1.file == window2.file {
-                    let overlap = max(0, min(window1.endIndex, window2.endIndex) - max(window1.startIndex, window2.startIndex) + 1)
-                    if overlap > minimumTokens / 2 {
+                    if CloneDetectionUtilities.hasSignificantOverlap(
+                        start1: window1.startIndex, end1: window1.endIndex,
+                        start2: window2.startIndex, end2: window2.endIndex,
+                        threshold: minimumTokens / 2
+                    ) {
                         continue
                     }
                 }
@@ -228,30 +231,5 @@ public struct ExactCloneDetector: Sendable {
         }
 
         return groups
-    }
-
-    /// Merge overlapping clones and extend to maximum size.
-    private func mergeAndExtendClones(
-        _ groups: [CloneGroup],
-        sequences: [TokenSequence]
-    ) -> [CloneGroup] {
-        // For now, just deduplicate based on fingerprint
-        var seen = Set<String>()
-        var result: [CloneGroup] = []
-
-        for group in groups {
-            // Create a unique key for this clone group
-            let locations = group.clones
-                .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
-                .sorted()
-                .joined(separator: "|")
-
-            if !seen.contains(locations) {
-                seen.insert(locations)
-                result.append(group)
-            }
-        }
-
-        return result
     }
 }

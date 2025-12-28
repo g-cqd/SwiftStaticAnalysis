@@ -31,6 +31,52 @@ public struct SemanticCloneDetector: Sendable {
         self.parser = SwiftFileParser()
     }
 
+    /// Detect semantic clones from pre-collected fingerprinted nodes.
+    ///
+    /// - Parameter nodes: Array of fingerprinted nodes.
+    /// - Returns: Array of clone groups found.
+    public func detect(in nodes: [FingerprintedNode]) -> [CloneGroup] {
+        // Group nodes by fingerprint hash
+        var hashGroups: [UInt64: [FingerprintedNode]] = [:]
+        for node in nodes {
+            hashGroups[node.fingerprint.hash, default: []].append(node)
+        }
+
+        // Find groups with matching fingerprints
+        var cloneGroups: [CloneGroup] = []
+
+        for (hash, groupNodes) in hashGroups where groupNodes.count >= 2 {
+            let verified = verifySemanticClones(groupNodes)
+
+            for group in verified {
+                let clones = group.map { node in
+                    Clone(
+                        file: node.file,
+                        startLine: node.startLine,
+                        endLine: node.endLine,
+                        tokenCount: node.tokenCount,
+                        codeSnippet: ""
+                    )
+                }
+
+                if clones.count >= 2 {
+                    let similarity = calculateSimilarity(group)
+
+                    if similarity >= minimumSimilarity {
+                        cloneGroups.append(CloneGroup(
+                            type: .semantic,
+                            clones: clones,
+                            similarity: similarity,
+                            fingerprint: String(hash)
+                        ))
+                    }
+                }
+            }
+        }
+
+        return cloneGroups.deduplicated()
+    }
+
     /// Detect semantic clones in the given files.
     public func detect(in files: [String]) async throws -> [CloneGroup] {
         // Collect all fingerprinted nodes from all files
@@ -81,7 +127,7 @@ public struct SemanticCloneDetector: Sendable {
             }
         }
 
-        return deduplicateGroups(cloneGroups)
+        return cloneGroups.deduplicated()
     }
 
     /// Verify fingerprint matches are actual semantic clones.
@@ -165,25 +211,5 @@ public struct SemanticCloneDetector: Sendable {
         }
 
         return 0
-    }
-
-    /// Remove duplicate clone groups.
-    private func deduplicateGroups(_ groups: [CloneGroup]) -> [CloneGroup] {
-        var seen = Set<String>()
-        var result: [CloneGroup] = []
-
-        for group in groups {
-            let locations = group.clones
-                .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
-                .sorted()
-                .joined(separator: "|")
-
-            if !seen.contains(locations) {
-                seen.insert(locations)
-                result.append(group)
-            }
-        }
-
-        return result
     }
 }

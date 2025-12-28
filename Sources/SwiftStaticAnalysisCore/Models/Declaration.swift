@@ -120,6 +120,18 @@ public struct Declaration: Sendable, Hashable, Codable {
     /// Documentation comment (if any).
     public let documentation: String?
 
+    /// Property wrappers applied to this declaration (for variables/constants).
+    public let propertyWrappers: [PropertyWrapperInfo]
+
+    /// SwiftUI type information (for struct/class declarations).
+    public let swiftUIInfo: SwiftUITypeInfo?
+
+    /// Protocol conformances declared on this type.
+    public let conformances: [String]
+
+    /// Attributes applied to this declaration (e.g., @main, @objc, @IBAction).
+    public let attributes: [String]
+
     public init(
         name: String,
         kind: DeclarationKind,
@@ -130,7 +142,11 @@ public struct Declaration: Sendable, Hashable, Codable {
         scope: ScopeID,
         typeAnnotation: String? = nil,
         genericParameters: [String] = [],
-        documentation: String? = nil
+        documentation: String? = nil,
+        propertyWrappers: [PropertyWrapperInfo] = [],
+        swiftUIInfo: SwiftUITypeInfo? = nil,
+        conformances: [String] = [],
+        attributes: [String] = []
     ) {
         self.name = name
         self.kind = kind
@@ -142,6 +158,49 @@ public struct Declaration: Sendable, Hashable, Codable {
         self.typeAnnotation = typeAnnotation
         self.genericParameters = genericParameters
         self.documentation = documentation
+        self.propertyWrappers = propertyWrappers
+        self.swiftUIInfo = swiftUIInfo
+        self.conformances = conformances
+        self.attributes = attributes
+    }
+}
+
+// MARK: - Declaration SwiftUI Extensions
+
+extension Declaration {
+    /// Whether this declaration has SwiftUI property wrappers.
+    public var hasSwiftUIPropertyWrapper: Bool {
+        propertyWrappers.contains { $0.kind.isSwiftUI }
+    }
+
+    /// Whether this declaration's property wrappers imply usage.
+    public var hasImplicitUsageWrapper: Bool {
+        propertyWrappers.contains { $0.kind.impliesUsage }
+    }
+
+    /// Whether this is a SwiftUI View type.
+    public var isSwiftUIView: Bool {
+        swiftUIInfo?.isView ?? false
+    }
+
+    /// Whether this is a SwiftUI App entry point.
+    public var isSwiftUIApp: Bool {
+        swiftUIInfo?.isApp ?? false
+    }
+
+    /// Whether this is a SwiftUI preview.
+    public var isSwiftUIPreview: Bool {
+        swiftUIInfo?.isPreview ?? false
+    }
+
+    /// Whether this declaration's body property is implicitly used.
+    public var hasImplicitBody: Bool {
+        swiftUIInfo?.hasImplicitBody ?? false
+    }
+
+    /// The primary property wrapper kind (if any).
+    public var primaryPropertyWrapper: PropertyWrapperKind? {
+        propertyWrappers.first?.kind
     }
 }
 
