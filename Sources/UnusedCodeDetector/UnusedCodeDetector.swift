@@ -157,6 +157,14 @@ public struct UnusedCodeConfiguration: Sendable {
     /// Warn when using a stale index.
     public var warnOnStaleIndex: Bool
 
+    // MARK: - Incremental Analysis Configuration
+
+    /// Enable incremental analysis with caching.
+    public var useIncremental: Bool
+
+    /// Cache directory for incremental analysis.
+    public var cacheDirectory: URL?
+
     // MARK: - SwiftUI Configuration
 
     /// Treat SwiftUI Views as entry points (body is always used).
@@ -188,6 +196,8 @@ public struct UnusedCodeConfiguration: Sendable {
         autoBuild: Bool = false,
         hybridMode: Bool = false,
         warnOnStaleIndex: Bool = true,
+        useIncremental: Bool = false,
+        cacheDirectory: URL? = nil,
         treatSwiftUIViewsAsRoot: Bool = true,
         ignoreSwiftUIPropertyWrappers: Bool = true,
         ignorePreviewProviders: Bool = true,
@@ -209,6 +219,8 @@ public struct UnusedCodeConfiguration: Sendable {
         self.autoBuild = autoBuild
         self.hybridMode = hybridMode
         self.warnOnStaleIndex = warnOnStaleIndex
+        self.useIncremental = useIncremental
+        self.cacheDirectory = cacheDirectory
         self.treatSwiftUIViewsAsRoot = treatSwiftUIViewsAsRoot
         self.ignoreSwiftUIPropertyWrappers = ignoreSwiftUIPropertyWrappers
         self.ignorePreviewProviders = ignorePreviewProviders
@@ -235,6 +247,15 @@ public struct UnusedCodeConfiguration: Sendable {
         mode: .indexStore,
         hybridMode: true
     )
+
+    /// Incremental configuration with caching enabled.
+    public static func incremental(cacheDirectory: URL? = nil) -> UnusedCodeConfiguration {
+        UnusedCodeConfiguration(
+            mode: .reachability,
+            useIncremental: true,
+            cacheDirectory: cacheDirectory
+        )
+    }
 
     /// Strict configuration (catches more potential issues).
     public static let strict = UnusedCodeConfiguration(

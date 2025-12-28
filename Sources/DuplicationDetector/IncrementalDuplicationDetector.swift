@@ -1,0 +1,267 @@
+//
+//  IncrementalDuplicationDetector.swift
+//  SwiftStaticAnalysis
+//
+//  Incremental duplication detector with token sequence caching.
+//
+
+import Foundation
+import SwiftStaticAnalysisCore
+
+// MARK: - Incremental Duplication Result
+
+/// Result of incremental duplication detection.
+public struct IncrementalDuplicationResult: Sendable {
+    /// Detected clone groups.
+    public let cloneGroups: [CloneGroup]
+
+    /// Files that were analyzed (not cached).
+    public let analyzedFiles: [String]
+
+    /// Files loaded from cache.
+    public let cachedFiles: [String]
+
+    /// Cache hit rate percentage.
+    public var cacheHitRate: Double {
+        let total = analyzedFiles.count + cachedFiles.count
+        return total > 0 ? Double(cachedFiles.count) / Double(total) * 100 : 0
+    }
+}
+
+// MARK: - Incremental Duplication Detector
+
+/// Actor-based incremental duplication detector with caching.
+public actor IncrementalDuplicationDetector {
+
+    /// Configuration for detection.
+    public let configuration: DuplicationConfiguration
+
+    /// Concurrency configuration.
+    public let concurrency: ConcurrencyConfiguration
+
+    /// Token sequence cache.
+    private let tokenCache: TokenSequenceCache
+
+    /// Change detector for file change detection.
+    private let changeDetector: ChangeDetector
+
+    /// File parser.
+    private let parser: SwiftFileParser
+
+    /// Whether the cache has been initialized.
+    private var isInitialized: Bool = false
+
+    // MARK: - Initialization
+
+    public init(
+        configuration: DuplicationConfiguration = .incremental(),
+        concurrency: ConcurrencyConfiguration = .default
+    ) {
+        self.configuration = configuration
+        self.concurrency = concurrency
+        self.tokenCache = TokenSequenceCache(cacheDirectory: configuration.cacheDirectory)
+        self.changeDetector = ChangeDetector()
+        self.parser = SwiftFileParser()
+    }
+
+    /// Initialize by loading cache from disk.
+    public func initialize() async throws {
+        guard !isInitialized else { return }
+        try await tokenCache.load()
+        isInitialized = true
+    }
+
+    /// Save cache to disk.
+    public func saveCache() async throws {
+        try await tokenCache.save()
+    }
+
+    /// Clear the token cache.
+    public func clearCache() async {
+        await tokenCache.clear()
+    }
+
+    // MARK: - Detection
+
+    /// Detect clones incrementally, using cached token sequences where available.
+    ///
+    /// - Parameter files: Files to analyze.
+    /// - Returns: Incremental duplication result.
+    public func detectClones(in files: [String]) async throws -> IncrementalDuplicationResult {
+        try await initialize()
+
+        // Compute file hashes
+        let fileHashes = await computeFileHashes(for: files)
+
+        // Determine which files need re-tokenization
+        var filesToAnalyze: [String] = []
+        var cachedFiles: [String] = []
+
+        for file in files {
+            if let hash = fileHashes[file], await tokenCache.hasValid(file: file, hash: hash) {
+                cachedFiles.append(file)
+            } else {
+                filesToAnalyze.append(file)
+            }
+        }
+
+        // Extract token sequences
+        var sequences: [TokenSequence] = []
+
+        // Load cached sequences
+        for file in cachedFiles {
+            if let hash = fileHashes[file],
+               let cached = await tokenCache.get(file: file, currentHash: hash) {
+                sequences.append(cached.toTokenSequence())
+            }
+        }
+
+        // Extract new sequences
+        if !filesToAnalyze.isEmpty {
+            let extractor = TokenSequenceExtractor()
+
+            let newSequences = try await ParallelProcessor.map(
+                filesToAnalyze,
+                maxConcurrency: concurrency.maxConcurrentFiles
+            ) { [parser] file -> TokenSequence in
+                let tree = try await parser.parse(file)
+                let source = try String(contentsOfFile: file, encoding: .utf8)
+                return extractor.extract(from: tree, file: file, source: source)
+            }
+
+            // Cache new sequences
+            for (index, sequence) in newSequences.enumerated() {
+                let file = filesToAnalyze[index]
+                if let hash = fileHashes[file] {
+                    await tokenCache.set(sequence.toCached(contentHash: hash))
+                }
+            }
+
+            sequences.append(contentsOf: newSequences)
+        }
+
+        // Run detection
+        let cloneGroups = detectClonesInSequences(sequences)
+
+        // Add code snippets
+        let groupsWithSnippets = try await addCodeSnippets(to: cloneGroups, files: files)
+
+        return IncrementalDuplicationResult(
+            cloneGroups: groupsWithSnippets,
+            analyzedFiles: filesToAnalyze,
+            cachedFiles: cachedFiles
+        )
+    }
+
+    // MARK: - Private Helpers
+
+    /// Compute content hashes for files.
+    private func computeFileHashes(for files: [String]) async -> [String: UInt64] {
+        var hashes: [String: UInt64] = [:]
+
+        for file in files {
+            if let data = FileManager.default.contents(atPath: file) {
+                hashes[file] = FNV1a.hash(data)
+            }
+        }
+
+        return hashes
+    }
+
+    /// Detect clones in token sequences (synchronous).
+    private func detectClonesInSequences(_ sequences: [TokenSequence]) -> [CloneGroup] {
+        var cloneGroups: [CloneGroup] = []
+
+        if configuration.cloneTypes.contains(.exact) {
+            switch configuration.algorithm {
+            case .rollingHash, .minHashLSH:
+                let detector = ExactCloneDetector(minimumTokens: configuration.minimumTokens)
+                cloneGroups.append(contentsOf: detector.detect(in: sequences))
+
+            case .suffixArray:
+                let detector = SuffixArrayCloneDetector(
+                    minimumTokens: configuration.minimumTokens,
+                    normalizeForType2: false
+                )
+                cloneGroups.append(contentsOf: detector.detect(in: sequences))
+            }
+        }
+
+        if configuration.cloneTypes.contains(.near) {
+            switch configuration.algorithm {
+            case .rollingHash, .minHashLSH:
+                let detector = NearCloneDetector(
+                    minimumTokens: configuration.minimumTokens,
+                    minimumSimilarity: configuration.minimumSimilarity
+                )
+                cloneGroups.append(contentsOf: detector.detect(in: sequences))
+
+            case .suffixArray:
+                let detector = SuffixArrayCloneDetector(
+                    minimumTokens: configuration.minimumTokens,
+                    normalizeForType2: true
+                )
+                cloneGroups.append(contentsOf: detector.detectWithNormalization(in: sequences))
+            }
+        }
+
+        return cloneGroups
+    }
+
+    /// Add code snippets to clone groups.
+    private func addCodeSnippets(
+        to groups: [CloneGroup],
+        files: [String]
+    ) async throws -> [CloneGroup] {
+        let referencedFiles = Set(groups.flatMap { $0.clones.map(\.file) })
+
+        let fileContentPairs = try await ParallelProcessor.map(
+            Array(referencedFiles),
+            maxConcurrency: concurrency.maxConcurrentFiles
+        ) { file -> (String, [String]) in
+            let source = try String(contentsOfFile: file, encoding: .utf8)
+            return (file, source.components(separatedBy: .newlines))
+        }
+
+        let fileContents = Dictionary(uniqueKeysWithValues: fileContentPairs)
+
+        return groups.map { group in
+            let clonesWithSnippets = group.clones.map { clone -> Clone in
+                let snippet: String
+                if let lines = fileContents[clone.file] {
+                    let start = max(0, clone.startLine - 1)
+                    let end = min(lines.count, clone.endLine)
+                    if start < end {
+                        snippet = lines[start..<end].joined(separator: "\n")
+                    } else {
+                        snippet = ""
+                    }
+                } else {
+                    snippet = ""
+                }
+
+                return Clone(
+                    file: clone.file,
+                    startLine: clone.startLine,
+                    endLine: clone.endLine,
+                    tokenCount: clone.tokenCount,
+                    codeSnippet: snippet
+                )
+            }
+
+            return CloneGroup(
+                type: group.type,
+                clones: clonesWithSnippets,
+                similarity: group.similarity,
+                fingerprint: group.fingerprint
+            )
+        }
+    }
+
+    // MARK: - Statistics
+
+    /// Get cache statistics.
+    public func cacheStatistics() async -> TokenSequenceCache.Statistics {
+        await tokenCache.statistics()
+    }
+}

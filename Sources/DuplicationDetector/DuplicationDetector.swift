@@ -126,18 +126,28 @@ public struct DuplicationConfiguration: Sendable {
     /// Detection algorithm to use.
     public var algorithm: DetectionAlgorithm
 
+    /// Whether to use incremental detection (caches token sequences).
+    public var useIncremental: Bool
+
+    /// Cache directory for incremental detection.
+    public var cacheDirectory: URL?
+
     public init(
         minimumTokens: Int = 50,
         cloneTypes: Set<CloneType> = [.exact],
         ignoredPatterns: [String] = [],
         minimumSimilarity: Double = 0.8,
-        algorithm: DetectionAlgorithm = .rollingHash
+        algorithm: DetectionAlgorithm = .rollingHash,
+        useIncremental: Bool = false,
+        cacheDirectory: URL? = nil
     ) {
         self.minimumTokens = minimumTokens
         self.cloneTypes = cloneTypes
         self.ignoredPatterns = ignoredPatterns
         self.minimumSimilarity = minimumSimilarity
         self.algorithm = algorithm
+        self.useIncremental = useIncremental
+        self.cacheDirectory = cacheDirectory
     }
 
     /// Default configuration.
@@ -157,6 +167,17 @@ public struct DuplicationConfiguration: Sendable {
         minimumSimilarity: 0.5,
         algorithm: .minHashLSH
     )
+
+    /// Incremental configuration with caching enabled.
+    public static func incremental(cacheDirectory: URL? = nil) -> DuplicationConfiguration {
+        DuplicationConfiguration(
+            minimumTokens: 50,
+            cloneTypes: [.exact, .near],
+            algorithm: .suffixArray,
+            useIncremental: true,
+            cacheDirectory: cacheDirectory
+        )
+    }
 }
 
 // MARK: - Duplication Detector
