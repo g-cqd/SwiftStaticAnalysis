@@ -132,12 +132,12 @@ public struct DuplicationDetector: Sendable {
     /// Configuration for detection.
     public let configuration: DuplicationConfiguration
 
-    /// The analyzer for parsing files.
-    private let analyzer: StaticAnalyzer
+    /// The file parser.
+    private let parser: SwiftFileParser
 
     public init(configuration: DuplicationConfiguration = .default) {
         self.configuration = configuration
-        self.analyzer = StaticAnalyzer()
+        self.parser = SwiftFileParser()
     }
 
     /// Detect clones in the given files.
@@ -162,31 +162,106 @@ public struct DuplicationDetector: Sendable {
             cloneGroups.append(contentsOf: semanticClones)
         }
 
-        return cloneGroups
+        // Add code snippets to all clones
+        return try await addCodeSnippets(to: cloneGroups, files: files)
     }
 
     // MARK: - Exact Clone Detection
 
     private func detectExactClones(in files: [String]) async throws -> [CloneGroup] {
-        // Implementation will use token hashing with Rabin-Karp
-        // For now, return empty
-        []
+        // Extract token sequences from all files
+        let sequences = try await extractTokenSequences(from: files)
+
+        // Run exact clone detection
+        let detector = ExactCloneDetector(minimumTokens: configuration.minimumTokens)
+        return detector.detect(in: sequences)
     }
 
     // MARK: - Near Clone Detection
 
     private func detectNearClones(in files: [String]) async throws -> [CloneGroup] {
-        // Implementation will normalize identifiers before hashing
-        // For now, return empty
-        []
+        // Extract token sequences from all files
+        let sequences = try await extractTokenSequences(from: files)
+
+        // Run near clone detection with normalized tokens
+        let detector = NearCloneDetector(
+            minimumTokens: configuration.minimumTokens,
+            minimumSimilarity: configuration.minimumSimilarity
+        )
+        return detector.detect(in: sequences)
     }
 
     // MARK: - Semantic Clone Detection
 
     private func detectSemanticClones(in files: [String]) async throws -> [CloneGroup] {
-        // Implementation will use AST fingerprinting
-        // For now, return empty
-        []
+        // Run semantic clone detection with AST fingerprinting
+        let detector = SemanticCloneDetector(
+            minimumNodes: configuration.minimumTokens / 5, // Roughly 5 tokens per node
+            minimumSimilarity: configuration.minimumSimilarity
+        )
+        return try await detector.detect(in: files)
+    }
+
+    // MARK: - Helpers
+
+    /// Extract token sequences from files.
+    private func extractTokenSequences(from files: [String]) async throws -> [TokenSequence] {
+        let extractor = TokenSequenceExtractor()
+        var sequences: [TokenSequence] = []
+
+        for file in files {
+            let tree = try await parser.parse(file)
+            let source = try String(contentsOfFile: file, encoding: .utf8)
+            let sequence = extractor.extract(from: tree, file: file, source: source)
+            sequences.append(sequence)
+        }
+
+        return sequences
+    }
+
+    /// Add code snippets to clone groups.
+    private func addCodeSnippets(
+        to groups: [CloneGroup],
+        files: [String]
+    ) async throws -> [CloneGroup] {
+        // Cache file contents
+        var fileContents: [String: [String]] = [:]
+        for file in files {
+            let source = try String(contentsOfFile: file, encoding: .utf8)
+            fileContents[file] = source.components(separatedBy: .newlines)
+        }
+
+        return groups.map { group in
+            let clonesWithSnippets = group.clones.map { clone -> Clone in
+                let snippet: String
+                if let lines = fileContents[clone.file] {
+                    let start = max(0, clone.startLine - 1)
+                    let end = min(lines.count, clone.endLine)
+                    if start < end {
+                        snippet = lines[start..<end].joined(separator: "\n")
+                    } else {
+                        snippet = ""
+                    }
+                } else {
+                    snippet = ""
+                }
+
+                return Clone(
+                    file: clone.file,
+                    startLine: clone.startLine,
+                    endLine: clone.endLine,
+                    tokenCount: clone.tokenCount,
+                    codeSnippet: snippet
+                )
+            }
+
+            return CloneGroup(
+                type: group.type,
+                clones: clonesWithSnippets,
+                similarity: group.similarity,
+                fingerprint: group.fingerprint
+            )
+        }
     }
 }
 
