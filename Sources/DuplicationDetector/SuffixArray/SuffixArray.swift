@@ -64,13 +64,12 @@ public struct SuffixArray: Sendable {
 
 // MARK: - Suffix Array Builder
 
-/// Builder for suffix arrays using comparison-based sorting.
+/// Builder for suffix arrays using the SA-IS (Suffix Array Induced Sorting) algorithm.
 ///
-/// This implementation uses O(n log² n) comparison-based sorting with
-/// doubling technique. While not as fast as SA-IS for very large inputs,
-/// it is simpler, more robust, and still efficient for practical code analysis.
+/// SA-IS achieves O(n) time complexity for suffix array construction.
+/// Reference: Nong, Zhang, Chan - "Two Efficient Algorithms for Linear Time Suffix Array Construction" (2009)
 enum SuffixArrayBuilder {
-    /// Build suffix array using doubling algorithm.
+    /// Build suffix array using SA-IS algorithm.
     static func build(_ input: [Int]) -> [Int] {
         let n = input.count
         guard n > 0 else { return [] }
@@ -80,74 +79,234 @@ enum SuffixArrayBuilder {
             return [0]
         }
 
-        // Use doubling algorithm for O(n log² n) construction
-        return buildWithDoubling(input)
+        // Find alphabet size
+        let alphabetSize = (input.max() ?? 0) + 2 // +1 for max value, +1 for sentinel
+
+        // Append sentinel (smaller than all other characters)
+        var text = input
+        text.append(0) // Sentinel
+
+        // Build suffix array using SA-IS
+        let sa = SAIS.build(text, alphabetSize: alphabetSize)
+
+        // Remove sentinel position from result
+        return sa.filter { $0 < n }
+    }
+}
+
+// MARK: - SA-IS Algorithm
+
+/// Implementation of the SA-IS (Suffix Array Induced Sorting) algorithm.
+/// Achieves O(n) time complexity for suffix array construction.
+enum SAIS {
+
+    /// Build suffix array using SA-IS algorithm.
+    ///
+    /// - Parameters:
+    ///   - text: Input text as array of integers (must end with unique smallest character).
+    ///   - alphabetSize: Size of the alphabet (max value + 1).
+    /// - Returns: Suffix array.
+    static func build(_ text: [Int], alphabetSize: Int) -> [Int] {
+        let n = text.count
+        guard n > 1 else { return n == 1 ? [0] : [] }
+
+        // For small inputs, use simple sorting
+        if n <= 32 {
+            return buildSimple(text)
+        }
+
+        // Step 1: Classify each suffix as S-type or L-type
+        // S-type: suffix[i] < suffix[i+1] lexicographically
+        // L-type: suffix[i] > suffix[i+1] lexicographically
+        var types = [Bool](repeating: false, count: n) // true = S-type, false = L-type
+        types[n - 1] = true // Last suffix is always S-type (sentinel)
+
+        for i in stride(from: n - 2, through: 0, by: -1) {
+            if text[i] < text[i + 1] {
+                types[i] = true // S-type
+            } else if text[i] > text[i + 1] {
+                types[i] = false // L-type
+            } else {
+                types[i] = types[i + 1] // Same as next
+            }
+        }
+
+        // Step 2: Find LMS (Leftmost S-type) positions
+        // An LMS suffix is an S-type suffix whose predecessor is L-type
+        var lmsPositions: [Int] = []
+        for i in 1..<n {
+            if types[i] && !types[i - 1] {
+                lmsPositions.append(i)
+            }
+        }
+
+        // Step 3: Get bucket boundaries
+        var bucketSizes = [Int](repeating: 0, count: alphabetSize)
+        for c in text {
+            bucketSizes[c] += 1
+        }
+
+        var bucketHeads = [Int](repeating: 0, count: alphabetSize)
+        var bucketTails = [Int](repeating: 0, count: alphabetSize)
+        var sum = 0
+        for i in 0..<alphabetSize {
+            bucketHeads[i] = sum
+            sum += bucketSizes[i]
+            bucketTails[i] = sum - 1
+        }
+
+        // Step 4: Initial placement of LMS suffixes at bucket tails
+        var sa = [Int](repeating: -1, count: n)
+        var tails = bucketTails // Working copy
+
+        for i in stride(from: lmsPositions.count - 1, through: 0, by: -1) {
+            let pos = lmsPositions[i]
+            let c = text[pos]
+            sa[tails[c]] = pos
+            tails[c] -= 1
+        }
+
+        // Step 5: Induced sort L-type suffixes (left to right)
+        var heads = bucketHeads // Working copy
+        for i in 0..<n {
+            let j = sa[i] - 1
+            if sa[i] > 0 && !types[j] { // L-type predecessor
+                let c = text[j]
+                sa[heads[c]] = j
+                heads[c] += 1
+            }
+        }
+
+        // Step 6: Induced sort S-type suffixes (right to left)
+        tails = bucketTails // Reset working copy
+        for i in stride(from: n - 1, through: 0, by: -1) {
+            let j = sa[i] - 1
+            if sa[i] > 0 && types[j] { // S-type predecessor
+                let c = text[j]
+                sa[tails[c]] = j
+                tails[c] -= 1
+            }
+        }
+
+        // Step 7: Extract sorted LMS substrings and assign names
+        var lmsNames = [Int](repeating: -1, count: n)
+        var name = 0
+        var prevLMS = -1
+
+        for i in 0..<n {
+            let pos = sa[i]
+            if pos > 0 && types[pos] && !types[pos - 1] {
+                // This is an LMS suffix
+                if prevLMS >= 0 && !lmsSubstringsEqual(text: text, types: types, i: prevLMS, j: pos) {
+                    name += 1
+                }
+                lmsNames[pos] = name
+                prevLMS = pos
+            }
+        }
+
+        // Step 8: If all LMS substrings have unique names, we're done
+        // Otherwise, recursively sort LMS substrings
+        let lmsCount = lmsPositions.count
+        if name + 1 < lmsCount {
+            // Build reduced string from LMS names
+            var reducedString = [Int](repeating: 0, count: lmsCount)
+            var j = 0
+            for i in 0..<n {
+                if lmsNames[i] >= 0 {
+                    reducedString[j] = lmsNames[i]
+                    j += 1
+                }
+            }
+
+            // Recursively build suffix array of reduced string
+            let reducedSA = build(reducedString, alphabetSize: name + 1)
+
+            // Step 9: Use reduced SA to place LMS suffixes in correct order
+            sa = [Int](repeating: -1, count: n)
+            tails = bucketTails
+
+            for i in stride(from: lmsCount - 1, through: 0, by: -1) {
+                let pos = lmsPositions[reducedSA[i]]
+                let c = text[pos]
+                sa[tails[c]] = pos
+                tails[c] -= 1
+            }
+
+            // Step 10: Final induced sort
+            heads = bucketHeads
+            for i in 0..<n {
+                let j = sa[i] - 1
+                if sa[i] > 0 && !types[j] {
+                    let c = text[j]
+                    sa[heads[c]] = j
+                    heads[c] += 1
+                }
+            }
+
+            tails = bucketTails
+            for i in stride(from: n - 1, through: 0, by: -1) {
+                let j = sa[i] - 1
+                if sa[i] > 0 && types[j] {
+                    let c = text[j]
+                    sa[tails[c]] = j
+                    tails[c] -= 1
+                }
+            }
+        }
+
+        return sa
     }
 
-    /// Doubling algorithm for suffix array construction.
-    ///
-    /// This algorithm sorts suffixes by comparing prefixes of increasing length
-    /// (1, 2, 4, 8, ...). Each iteration uses the ranks from the previous iteration
-    /// to compare pairs of adjacent positions, achieving O(n log n) comparisons
-    /// per iteration with O(log n) iterations.
-    private static func buildWithDoubling(_ s: [Int]) -> [Int] {
-        let n = s.count
+    /// Check if two LMS substrings are equal.
+    private static func lmsSubstringsEqual(text: [Int], types: [Bool], i: Int, j: Int) -> Bool {
+        let n = text.count
+        var pi = i
+        var pj = j
 
-        // Initialize suffix array with indices 0 to n-1
+        while true {
+            if text[pi] != text[pj] {
+                return false
+            }
+            if types[pi] != types[pj] {
+                return false
+            }
+
+            pi += 1
+            pj += 1
+
+            if pi >= n || pj >= n {
+                return pi >= n && pj >= n
+            }
+
+            // Check if we've reached the end of both LMS substrings
+            let endI = pi > 0 && types[pi] && !types[pi - 1]
+            let endJ = pj > 0 && types[pj] && !types[pj - 1]
+
+            if endI && endJ {
+                return true
+            }
+            if endI != endJ {
+                return false
+            }
+        }
+    }
+
+    /// Simple O(n log n) suffix array for small inputs.
+    private static func buildSimple(_ text: [Int]) -> [Int] {
+        let n = text.count
         var sa = Array(0..<n)
-
-        // Initialize rank array based on first character
-        var rank = [Int](repeating: 0, count: n)
-        for i in 0..<n {
-            rank[i] = s[i]
+        sa.sort { i, j in
+            var pi = i
+            var pj = j
+            while pi < n && pj < n {
+                if text[pi] < text[pj] { return true }
+                if text[pi] > text[pj] { return false }
+                pi += 1
+                pj += 1
+            }
+            return pi >= n // Shorter suffix comes first
         }
-
-        // Temporary array for new ranks
-        var tempRank = [Int](repeating: 0, count: n)
-
-        // Double the prefix length each iteration
-        var k = 1
-        while k < n {
-            // Sort by (rank[i], rank[i+k]) pairs
-            sa.sort { i, j in
-                if rank[i] != rank[j] {
-                    return rank[i] < rank[j]
-                }
-                let ri = i + k < n ? rank[i + k] : -1
-                let rj = j + k < n ? rank[j + k] : -1
-                return ri < rj
-            }
-
-            // Compute new ranks
-            tempRank[sa[0]] = 0
-            for i in 1..<n {
-                let prev = sa[i - 1]
-                let curr = sa[i]
-
-                // Check if current suffix has same key as previous
-                let prevKey1 = rank[prev]
-                let currKey1 = rank[curr]
-                let prevKey2 = prev + k < n ? rank[prev + k] : -1
-                let currKey2 = curr + k < n ? rank[curr + k] : -1
-
-                if prevKey1 == currKey1 && prevKey2 == currKey2 {
-                    tempRank[curr] = tempRank[prev]
-                } else {
-                    tempRank[curr] = tempRank[prev] + 1
-                }
-            }
-
-            // Swap rank arrays
-            swap(&rank, &tempRank)
-
-            // Early termination if all ranks are unique
-            if rank[sa[n - 1]] == n - 1 {
-                break
-            }
-
-            k *= 2
-        }
-
         return sa
     }
 }

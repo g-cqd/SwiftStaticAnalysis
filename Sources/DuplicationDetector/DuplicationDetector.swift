@@ -166,11 +166,18 @@ public struct DuplicationDetector: Sendable {
     /// Configuration for detection.
     public let configuration: DuplicationConfiguration
 
+    /// Concurrency configuration.
+    public let concurrency: ConcurrencyConfiguration
+
     /// The file parser.
     private let parser: SwiftFileParser
 
-    public init(configuration: DuplicationConfiguration = .default) {
+    public init(
+        configuration: DuplicationConfiguration = .default,
+        concurrency: ConcurrencyConfiguration = .default
+    ) {
         self.configuration = configuration
+        self.concurrency = concurrency
         self.parser = SwiftFileParser()
     }
 
@@ -273,16 +280,18 @@ public struct DuplicationDetector: Sendable {
 
     // MARK: - Helpers
 
-    /// Extract token sequences from files.
+    /// Extract token sequences from files in parallel.
     private func extractTokenSequences(from files: [String]) async throws -> [TokenSequence] {
         let extractor = TokenSequenceExtractor()
-        var sequences: [TokenSequence] = []
 
-        for file in files {
+        // Use parallel processing with concurrency limits
+        let sequences = try await ParallelProcessor.map(
+            files,
+            maxConcurrency: concurrency.maxConcurrentFiles
+        ) { [parser] file -> TokenSequence in
             let tree = try await parser.parse(file)
             let source = try String(contentsOfFile: file, encoding: .utf8)
-            let sequence = extractor.extract(from: tree, file: file, source: source)
-            sequences.append(sequence)
+            return extractor.extract(from: tree, file: file, source: source)
         }
 
         return sequences
@@ -293,12 +302,20 @@ public struct DuplicationDetector: Sendable {
         to groups: [CloneGroup],
         files: [String]
     ) async throws -> [CloneGroup] {
-        // Cache file contents
-        var fileContents: [String: [String]] = [:]
-        for file in files {
+        // Collect unique files referenced in clones
+        let referencedFiles = Set(groups.flatMap { $0.clones.map(\.file) })
+
+        // Load file contents in parallel
+        let fileContentPairs = try await ParallelProcessor.map(
+            Array(referencedFiles),
+            maxConcurrency: concurrency.maxConcurrentFiles
+        ) { file -> (String, [String]) in
             let source = try String(contentsOfFile: file, encoding: .utf8)
-            fileContents[file] = source.components(separatedBy: .newlines)
+            return (file, source.components(separatedBy: .newlines))
         }
+
+        // Build lookup dictionary
+        let fileContents = Dictionary(uniqueKeysWithValues: fileContentPairs)
 
         return groups.map { group in
             let clonesWithSnippets = group.clones.map { clone -> Clone in

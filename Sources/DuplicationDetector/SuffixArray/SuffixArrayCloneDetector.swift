@@ -138,8 +138,11 @@ public struct SuffixArrayCloneDetector: Sendable {
             }
 
             // Add separator between files (unique sentinel)
-            // Use negative values as sentinels to ensure they don't match
-            tokens.append(-(fileIndex + 1))
+            // Use sequential IDs after regular tokens to ensure separators don't match
+            // Each file gets a unique separator value
+            let separatorId = nextTokenId
+            nextTokenId += 1
+            tokens.append(separatorId)
             infos.append(TokenStreamInfo(
                 fileIndex: fileIndex,
                 tokenIndex: infos.count,
@@ -191,8 +194,10 @@ public struct SuffixArrayCloneDetector: Sendable {
                 ))
             }
 
-            // Add separator
-            tokens.append(-(fileIndex + 1))
+            // Add separator (unique sequential ID for each file)
+            let separatorId = nextTokenId
+            nextTokenId += 1
+            tokens.append(separatorId)
             infos.append(TokenStreamInfo(
                 fileIndex: fileIndex,
                 tokenIndex: infos.count,

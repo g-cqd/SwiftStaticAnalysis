@@ -26,9 +26,16 @@ public struct StaticAnalyzer: Sendable {
     /// Configuration for the analyzer.
     public let configuration: AnalyzerConfiguration
 
-    public init(configuration: AnalyzerConfiguration = .default) {
+    /// Concurrency configuration.
+    public let concurrency: ConcurrencyConfiguration
+
+    public init(
+        configuration: AnalyzerConfiguration = .default,
+        concurrency: ConcurrencyConfiguration = .default
+    ) {
         self.parser = SwiftFileParser()
         self.configuration = configuration
+        self.concurrency = concurrency
     }
 
     /// Analyze a single Swift file.
@@ -117,35 +124,35 @@ public struct StaticAnalyzer: Sendable {
     public func analyze(_ filePaths: [String]) async throws -> AnalysisResult {
         let startTime = Date()
 
+        // Analyze files in parallel with concurrency limits
+        let results = try await ParallelProcessor.map(
+            filePaths,
+            maxConcurrency: concurrency.maxConcurrentFiles
+        ) { path in
+            try await self.analyzeFile(path)
+        }
+
+        // Aggregate results (sequential - fast operation)
         var declarationIndex = DeclarationIndex()
         var referenceIndex = ReferenceIndex()
         var scopeTree = ScopeTree()
         var totalLines = 0
         var declarationsByKind: [String: Int] = [:]
 
-        // Analyze files concurrently
-        try await withThrowingTaskGroup(of: FileAnalysisResult.self) { group in
-            for path in filePaths {
-                group.addTask {
-                    try await self.analyzeFile(path)
-                }
+        for result in results {
+            totalLines += result.lineCount
+
+            for decl in result.declarations {
+                declarationIndex.add(decl)
+                declarationsByKind[decl.kind.rawValue, default: 0] += 1
             }
 
-            for try await result in group {
-                totalLines += result.lineCount
+            for ref in result.references {
+                referenceIndex.add(ref)
+            }
 
-                for decl in result.declarations {
-                    declarationIndex.add(decl)
-                    declarationsByKind[decl.kind.rawValue, default: 0] += 1
-                }
-
-                for ref in result.references {
-                    referenceIndex.add(ref)
-                }
-
-                for scope in result.scopes {
-                    scopeTree.add(scope)
-                }
+            for scope in result.scopes {
+                scopeTree.add(scope)
             }
         }
 
