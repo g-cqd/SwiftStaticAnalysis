@@ -853,8 +853,10 @@ struct BatchTokenExtractorTests {
 
     @Test("Parallel extraction works")
     func parallelExtraction() async throws {
-        let files = (0 ..< 5).map { i in
-            try! createTempSwiftFile(name: "file\(i)_\(UUID()).swift", content: "let x\(i) = \(i)")
+        var files: [String] = []
+        for i in 0 ..< 5 {
+            let file = try createTempSwiftFile(name: "file\(i)_\(UUID()).swift", content: "let x\(i) = \(i)")
+            files.append(file)
         }
         defer { files.forEach { deleteTempFile($0) } }
 

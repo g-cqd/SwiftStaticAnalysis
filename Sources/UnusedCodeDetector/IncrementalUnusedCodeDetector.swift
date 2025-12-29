@@ -184,9 +184,11 @@ public actor IncrementalUnusedCodeDetector {
         case .constant,
              .variable:
             configuration.detectVariables
+
         case .function,
              .method:
             configuration.detectFunctions
+
         case .class,
              .enum,
              .protocol,
@@ -268,9 +270,11 @@ public actor IncrementalUnusedCodeDetector {
         case .function,
              .method:
             "Consider removing this unused function"
+
         case .constant,
              .variable:
             "Consider removing this unused variable"
+
         case .class,
              .struct:
             "Consider removing this unused type"

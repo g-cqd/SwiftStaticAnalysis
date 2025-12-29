@@ -206,6 +206,7 @@ struct Unused: AsyncParsableCommand {
         let detectionMode: DetectionMode = switch mode.lowercased() {
         case "reachability":
             .reachability
+
         case "index",
              "indexstore":
             .indexStore

@@ -19,7 +19,7 @@ struct StaticAnalysisCommandPlugin: CommandPlugin {
         let swaTool = try context.tool(named: "swa")
 
         // Parse arguments
-        var extractor = ArgumentExtractor(arguments)
+        let extractor = ArgumentExtractor(arguments)
         let analysisType = extractor.remainingArguments.first ?? "all"
 
         // Determine what to analyze
@@ -92,7 +92,7 @@ struct StaticAnalysisCommandPlugin: CommandPlugin {
         ) throws {
             let swaTool = try context.tool(named: "swa")
 
-            var extractor = ArgumentExtractor(arguments)
+            let extractor = ArgumentExtractor(arguments)
             let analysisType = extractor.remainingArguments.first ?? "all"
 
             let commands: [(name: String, args: [String])]

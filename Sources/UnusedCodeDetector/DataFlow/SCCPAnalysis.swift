@@ -54,6 +54,7 @@ public enum LatticeValue: Sendable, Hashable, CustomStringConvertible {
         case let (.top, v),
              let (v, .top):
             v
+
         case (_, .bottom),
              (.bottom, _):
             .bottom
@@ -510,6 +511,7 @@ public final class SCCPAnalysis: @unchecked Sendable {
                     cfgWorklist.append(CFGEdge(from: blockID, to: trueTarget))
                     cfgWorklist.append(CFGEdge(from: blockID, to: falseTarget))
                 }
+
             case .bottom,
                  .constant:
                 // Non-constant or unknown constant type - both branches executable

@@ -154,6 +154,7 @@ public struct DependencyExtractor: Sendable {
         switch context {
         case .call:
             .call
+
         case .read,
              .write:
             .propertyAccess
@@ -169,9 +170,11 @@ public struct DependencyExtractor: Sendable {
 
         case .keyPath:
             .keyPath
+
         case .memberAccessBase,
              .memberAccessMember:
             .propertyAccess
+
         case .attribute,
              .import,
              .pattern,
@@ -431,9 +434,11 @@ public struct ReachabilityBasedDetector: Sendable {
         case .constant,
              .variable:
             configuration.detectVariables
+
         case .function,
              .method:
             configuration.detectFunctions
+
         case .class,
              .enum,
              .protocol,

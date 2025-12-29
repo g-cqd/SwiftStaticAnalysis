@@ -375,9 +375,18 @@ public final class CFGBuilder: SyntaxVisitor {
     }
 
     private func processStmt(_ stmt: StmtSyntax) {
-        if let ifStmt = stmt.as(IfExprSyntax.self) {
-            processIfStatement(ifStmt)
-        } else if let guardStmt = stmt.as(GuardStmtSyntax.self) {
+        // Handle expression statements that contain if/switch expressions
+        if let exprStmt = stmt.as(ExpressionStmtSyntax.self) {
+            if let ifExpr = exprStmt.expression.as(IfExprSyntax.self) {
+                processIfStatement(ifExpr)
+                return
+            } else if let switchExpr = exprStmt.expression.as(SwitchExprSyntax.self) {
+                processSwitchStatement(switchExpr)
+                return
+            }
+        }
+
+        if let guardStmt = stmt.as(GuardStmtSyntax.self) {
             processGuardStatement(guardStmt)
         } else if let forStmt = stmt.as(ForStmtSyntax.self) {
             processForStatement(forStmt)
@@ -385,8 +394,6 @@ public final class CFGBuilder: SyntaxVisitor {
             processWhileStatement(whileStmt)
         } else if let repeatStmt = stmt.as(RepeatStmtSyntax.self) {
             processRepeatWhileStatement(repeatStmt)
-        } else if let switchStmt = stmt.as(SwitchExprSyntax.self) {
-            processSwitchStatement(switchStmt)
         } else if let returnStmt = stmt.as(ReturnStmtSyntax.self) {
             processReturnStatement(returnStmt)
         } else if let throwStmt = stmt.as(ThrowStmtSyntax.self) {
@@ -643,7 +650,6 @@ public final class CFGBuilder: SyntaxVisitor {
         }
 
         // Process each case
-        var prevCaseBlock: BlockID?
         for caseItem in switchStmt.cases {
             switch caseItem {
             case let .switchCase(switchCase):
@@ -661,9 +667,6 @@ public final class CFGBuilder: SyntaxVisitor {
                 for statement in switchCase.statements {
                     processStatement(statement.item)
                 }
-
-                // If previous case had fallthrough to us, we handled it
-                prevCaseBlock = caseBlock
 
                 if cfg.blocks[currentBlockID]?.terminator == nil {
                     cfg.addEdge(from: currentBlockID, to: exitBlock)
