@@ -4,6 +4,7 @@
 [![Platform](https://img.shields.io/badge/Platform-macOS%2015%2B-blue.svg)](https://developer.apple.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/g-cqd/SwiftStaticAnalysis/actions/workflows/ci.yml/badge.svg)](https://github.com/g-cqd/SwiftStaticAnalysis/actions/workflows/ci.yml)
+[![Documentation](https://img.shields.io/badge/Documentation-DocC-blue.svg)](https://g-cqd.github.io/SwiftStaticAnalysis/documentation/swiftstaticanalysiscore/)
 
 A high-performance Swift static analysis framework for **code duplication detection** and **unused code elimination**.
 
@@ -32,7 +33,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "1.0.0")
+    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.1.0")
 ]
 ```
 
@@ -49,7 +50,23 @@ Then add the products you need:
 )
 ```
 
-### CLI Installation
+### Pre-built Binary (Recommended)
+
+Download the latest release from GitHub:
+
+```bash
+# Universal binary (works on both Apple Silicon and Intel)
+curl -L https://github.com/g-cqd/SwiftStaticAnalysis/releases/latest/download/swa-macos-universal.tar.gz | tar xz
+sudo mv swa /usr/local/bin/
+
+# Or for Apple Silicon only
+curl -L https://github.com/g-cqd/SwiftStaticAnalysis/releases/latest/download/swa-macos-arm64.tar.gz | tar xz
+
+# Or for Intel only
+curl -L https://github.com/g-cqd/SwiftStaticAnalysis/releases/latest/download/swa-macos-x86_64.tar.gz | tar xz
+```
+
+### Build from Source
 
 ```bash
 # Build release binary
@@ -68,7 +85,7 @@ cp .build/release/swa /usr/local/bin/
 swa analyze /path/to/project
 
 # Detect code duplicates
-swa duplicates /path/to/project --types exact,near,semantic
+swa duplicates /path/to/project --types exact --types near --types semantic
 
 # Detect unused code with reachability analysis
 swa unused /path/to/project --mode reachability
@@ -244,6 +261,18 @@ SwiftStaticAnalysis/
 │   └── Filters/                  # False positive reduction
 └── SwiftStaticAnalysisCLI/       # swa command-line tool
 ```
+
+## Documentation
+
+Full API documentation is available at **[g-cqd.github.io/SwiftStaticAnalysis](https://g-cqd.github.io/SwiftStaticAnalysis/documentation/swiftstaticanalysiscore/)**.
+
+The documentation includes:
+- **Getting Started Guide**: Installation and first analysis
+- **Clone Detection**: Algorithm details and configuration
+- **Unused Code Detection**: Detection modes and filtering
+- **Ignore Directives**: Reference for suppressing false positives
+- **CI Integration**: Setting up automated analysis
+- **API Reference**: Complete API documentation for all modules
 
 ## Performance
 

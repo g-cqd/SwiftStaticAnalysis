@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Full DocC documentation with API reference and guides
+- GitHub Pages documentation hosting at https://g-cqd.github.io/SwiftStaticAnalysis/
+- Documentation articles: Getting Started, Clone Detection, Unused Code Detection, Ignore Directives, Performance Optimization, CI Integration
+- Pre-built universal binary releases (arm64 + x86_64)
+- SHA256 checksums for release verification
+- SwiftProjectKit integration for SwiftLint/SwiftFormat build plugins
 - IndexStoreDB integration for accurate cross-module unused code detection
 - Reachability-based analysis with entry point tracking
 - Auto-build support when index store is stale (`--auto-build` flag)
@@ -33,7 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Upgraded to Swift 6.2
 - Minimum platform requirements: macOS 15.0+, iOS 18.0+
-- Improved test coverage (357 tests across 89 suites)
+- Improved test coverage (488 tests across 119 suites)
+
+### Fixed
+- README version in installation instructions (1.0.0 → 0.1.0)
+- CLI `--types` argument syntax in README examples
+- CLI argument validation now properly rejects invalid `--types` and `--mode` values
 
 ## [0.1.0] - Initial Release
 

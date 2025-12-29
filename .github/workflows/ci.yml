@@ -74,3 +74,19 @@ jobs:
             --exclude-paths "**/Tests/**" \
             --exclude-paths "**/Fixtures/**" \
             --format text
+
+  docs:
+    name: Documentation
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+
+      - name: Build Documentation
+        run: |
+          swift package generate-documentation \
+            --target SwiftStaticAnalysisCore \
+            --warnings-as-errors
