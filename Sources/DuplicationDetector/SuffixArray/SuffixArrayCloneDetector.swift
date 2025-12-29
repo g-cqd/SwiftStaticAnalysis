@@ -203,10 +203,12 @@ public struct SuffixArrayCloneDetector: Sendable {
     // MARK: - Clone Group Conversion
 
     /// Convert repeat groups to clone groups with full location information.
+    /// - Note: `fileBoundaries` is kept for API consistency but file boundary checking
+    ///   is done via `tokenInfos[pos].fileIndex` comparison.
     private func convertToCloneGroups(
         repeatGroups: [RepeatGroup],
         tokenInfos: [TokenStreamInfo],
-        fileBoundaries: [FileBoundary],
+        fileBoundaries _: [FileBoundary],
         sequences: [TokenSequence],
     ) -> [CloneGroup] {
         var cloneGroups: [CloneGroup] = []
@@ -265,10 +267,12 @@ public struct SuffixArrayCloneDetector: Sendable {
     }
 
     /// Convert normalized repeat groups to clone groups.
+    /// - Note: `fileBoundaries` is kept for API consistency but file boundary checking
+    ///   is done via `tokenInfos[pos].fileIndex` comparison.
     private func convertNormalizedToCloneGroups(
         repeatGroups: [RepeatGroup],
         tokenInfos: [TokenStreamInfo],
-        fileBoundaries: [FileBoundary],
+        fileBoundaries _: [FileBoundary],
         sequences: [NormalizedSequence],
     ) -> [CloneGroup] {
         var cloneGroups: [CloneGroup] = []

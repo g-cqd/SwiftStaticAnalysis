@@ -130,6 +130,16 @@ public struct XcodeFormatterConfiguration: Sendable {
 
 public extension Diagnostic {
     /// Create a diagnostic from an unused code finding.
+    ///
+    /// This factory method converts an unused code detection result into
+    /// an Xcode-compatible diagnostic format.
+    ///
+    /// - Parameters:
+    ///   - declaration: The unused declaration.
+    ///   - reason: Why the declaration is considered unused.
+    ///   - suggestion: Action suggestion for the user.
+    ///   - severity: Diagnostic severity level.
+    /// - Returns: A formatted diagnostic.
     static func fromUnusedCode(
         declaration: Declaration,
         reason: String,
@@ -141,21 +151,28 @@ public extension Diagnostic {
             line: declaration.location.line,
             column: declaration.location.column,
             severity: severity,
-            message: suggestion,
+            message: "\(suggestion) (\(reason))",
             category: .unusedCode,
             ruleID: "unused-\(declaration.kind.rawValue)",
         )
     }
 
-    /// Create a diagnostic from a clone group.
+    /// Create diagnostics from a clone group.
+    ///
+    /// This factory method converts a clone detection result into
+    /// Xcode-compatible diagnostics with notes linking related occurrences.
+    ///
+    /// - Parameters:
+    ///   - clones: Array of clone locations (file, startLine, endLine).
+    ///   - cloneType: Type of clone (exact, near, semantic).
+    ///   - severity: Diagnostic severity level.
+    /// - Returns: Array of formatted diagnostics.
     static func fromCloneGroup(
         clones: [(file: String, startLine: Int, endLine: Int)],
         cloneType: String,
         severity: DiagnosticSeverity = .warning,
     ) -> [Diagnostic] {
         guard let first = clones.first else { return [] }
-
-        var diagnostics: [Diagnostic] = []
 
         // Primary diagnostic at first occurrence
         let primary = Diagnostic(
@@ -183,8 +200,6 @@ public extension Diagnostic {
         }
 
         let primaryWithNotes = primary.replacingNotes(notes)
-
-        diagnostics.append(primaryWithNotes)
-        return diagnostics
+        return [primaryWithNotes]
     }
 }
