@@ -11,10 +11,37 @@
 
 import Foundation
 
-// MARK: - MinHash Clone Detector
+// MARK: - MinHashCloneDetector
 
 /// Detects Type-3 clones using MinHash and LSH.
 public struct MinHashCloneDetector: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        minimumTokens: Int = 50,
+        shingleSize: Int = 5,
+        numHashes: Int = 128,
+        minimumSimilarity: Double = 0.5,
+    ) {
+        self.minimumTokens = minimumTokens
+        self.shingleSize = shingleSize
+        self.numHashes = numHashes
+        self.minimumSimilarity = minimumSimilarity
+
+        shingleGenerator = ShingleGenerator(shingleSize: shingleSize, normalize: true)
+        minHashGenerator = MinHashGenerator(numHashes: numHashes)
+
+        // Calculate optimal LSH parameters for the threshold
+        let (b, r) = LSHIndex.optimalBandsAndRows(
+            signatureSize: numHashes,
+            threshold: minimumSimilarity,
+        )
+        lshBands = b
+        lshRows = r
+    }
+
+    // MARK: Public
+
     /// Minimum tokens to consider as a clone.
     public let minimumTokens: Int
 
@@ -26,39 +53,6 @@ public struct MinHashCloneDetector: Sendable {
 
     /// Minimum similarity threshold for clones.
     public let minimumSimilarity: Double
-
-    /// Shingle generator.
-    private let shingleGenerator: ShingleGenerator
-
-    /// MinHash generator.
-    private let minHashGenerator: MinHashGenerator
-
-    /// LSH bands and rows.
-    private let lshBands: Int
-    private let lshRows: Int
-
-    public init(
-        minimumTokens: Int = 50,
-        shingleSize: Int = 5,
-        numHashes: Int = 128,
-        minimumSimilarity: Double = 0.5
-    ) {
-        self.minimumTokens = minimumTokens
-        self.shingleSize = shingleSize
-        self.numHashes = numHashes
-        self.minimumSimilarity = minimumSimilarity
-
-        self.shingleGenerator = ShingleGenerator(shingleSize: shingleSize, normalize: true)
-        self.minHashGenerator = MinHashGenerator(numHashes: numHashes)
-
-        // Calculate optimal LSH parameters for the threshold
-        let (b, r) = LSHIndex.optimalBandsAndRows(
-            signatureSize: numHashes,
-            threshold: minimumSimilarity
-        )
-        self.lshBands = b
-        self.lshRows = r
-    }
 
     /// Detect Type-3 clones in the given token sequences.
     ///
@@ -73,7 +67,7 @@ public struct MinHashCloneDetector: Sendable {
             let documents = shingleGenerator.generateBlockDocuments(
                 from: sequence,
                 blockSize: minimumTokens,
-                startId: documentId
+                startId: documentId,
             )
             allDocuments.append(contentsOf: documents)
             documentId += documents.count
@@ -140,11 +134,23 @@ public struct MinHashCloneDetector: Sendable {
         return detect(in: sequences)
     }
 
+    // MARK: Private
+
+    /// Shingle generator.
+    private let shingleGenerator: ShingleGenerator
+
+    /// MinHash generator.
+    private let minHashGenerator: MinHashGenerator
+
+    /// LSH bands and rows.
+    private let lshBands: Int
+    private let lshRows: Int
+
     // MARK: - Private Helpers
 
     /// Group clone pairs into clone groups.
     private func groupClones(
-        _ pairs: [(doc1: ShingledDocument, doc2: ShingledDocument, similarity: Double)]
+        _ pairs: [(doc1: ShingledDocument, doc2: ShingledDocument, similarity: Double)],
     ) -> [CloneGroup] {
         guard !pairs.isEmpty else { return [] }
 
@@ -196,7 +202,7 @@ public struct MinHashCloneDetector: Sendable {
                     startLine: info.startLine,
                     endLine: info.endLine,
                     tokenCount: info.tokenCount,
-                    codeSnippet: ""
+                    codeSnippet: "",
                 )
             }
 
@@ -216,41 +222,39 @@ public struct MinHashCloneDetector: Sendable {
                 type: .semantic, // Type-3 clones are reported as semantic
                 clones: clones,
                 similarity: avgSimilarity,
-                fingerprint: fingerprint
+                fingerprint: fingerprint,
             )
         }
     }
 }
 
-// MARK: - Fast Similarity Checker
+// MARK: - FastSimilarityChecker
 
 /// Fast similarity checking using MinHash without full LSH.
 ///
 /// Useful for comparing a small number of specific code blocks.
 public struct FastSimilarityChecker: Sendable {
-    /// Shingle generator.
-    private let shingleGenerator: ShingleGenerator
-
-    /// MinHash generator.
-    private let minHashGenerator: MinHashGenerator
+    // MARK: Lifecycle
 
     public init(shingleSize: Int = 5, numHashes: Int = 128) {
-        self.shingleGenerator = ShingleGenerator(shingleSize: shingleSize, normalize: true)
-        self.minHashGenerator = MinHashGenerator(numHashes: numHashes)
+        shingleGenerator = ShingleGenerator(shingleSize: shingleSize, normalize: true)
+        minHashGenerator = MinHashGenerator(numHashes: numHashes)
     }
+
+    // MARK: Public
 
     /// Estimate similarity between two token sequences.
     public func estimateSimilarity(
         _ tokens1: [String],
         kinds1: [TokenKind],
         _ tokens2: [String],
-        kinds2: [TokenKind]
+        kinds2: [TokenKind],
     ) -> Double {
         let shingles1 = shingleGenerator.generate(tokens: tokens1, kinds: kinds1)
         let shingles2 = shingleGenerator.generate(tokens: tokens2, kinds: kinds2)
 
-        let hashes1 = Set(shingles1.map { $0.hash })
-        let hashes2 = Set(shingles2.map { $0.hash })
+        let hashes1 = Set(shingles1.map(\.hash))
+        let hashes2 = Set(shingles2.map(\.hash))
 
         let sig1 = minHashGenerator.computeSignature(for: hashes1, documentId: 0)
         let sig2 = minHashGenerator.computeSignature(for: hashes2, documentId: 1)
@@ -263,16 +267,24 @@ public struct FastSimilarityChecker: Sendable {
         _ tokens1: [String],
         kinds1: [TokenKind],
         _ tokens2: [String],
-        kinds2: [TokenKind]
+        kinds2: [TokenKind],
     ) -> Double {
         let shingles1 = shingleGenerator.generate(tokens: tokens1, kinds: kinds1)
         let shingles2 = shingleGenerator.generate(tokens: tokens2, kinds: kinds2)
 
-        let hashes1 = Set(shingles1.map { $0.hash })
-        let hashes2 = Set(shingles2.map { $0.hash })
+        let hashes1 = Set(shingles1.map(\.hash))
+        let hashes2 = Set(shingles2.map(\.hash))
 
         return MinHashGenerator.exactJaccardSimilarity(hashes1, hashes2)
     }
+
+    // MARK: Private
+
+    /// Shingle generator.
+    private let shingleGenerator: ShingleGenerator
+
+    /// MinHash generator.
+    private let minHashGenerator: MinHashGenerator
 }
 
 // MARK: - SwiftStaticAnalysisCore Import

@@ -7,24 +7,23 @@ import Foundation
 import SwiftParser
 import SwiftSyntax
 
-// MARK: - Swift File Parser
+// MARK: - SwiftFileParser
 
 /// Actor-based Swift file parser with AST caching.
 ///
 /// Provides thread-safe parsing of Swift source files with
 /// automatic caching to avoid re-parsing unchanged files.
 public actor SwiftFileParser {
-    /// Cached parsed files.
-    private var cache: [String: CachedParse] = [:]
-
-    /// Cache entry with timestamp for invalidation.
-    private struct CachedParse: Sendable {
-        let syntax: SourceFileSyntax
-        let modificationDate: Date
-        let lineCount: Int
-    }
+    // MARK: Lifecycle
 
     public init() {}
+
+    // MARK: Public
+
+    /// Get the number of cached files.
+    public var cacheSize: Int {
+        cache.count
+    }
 
     // MARK: - Parsing
 
@@ -52,7 +51,7 @@ public actor SwiftFileParser {
         cache[filePath] = CachedParse(
             syntax: syntax,
             modificationDate: modDate,
-            lineCount: lineCount
+            lineCount: lineCount,
         )
 
         return syntax
@@ -113,10 +112,17 @@ public actor SwiftFileParser {
         cache.removeAll()
     }
 
-    /// Get the number of cached files.
-    public var cacheSize: Int {
-        cache.count
+    // MARK: Private
+
+    /// Cache entry with timestamp for invalidation.
+    private struct CachedParse: Sendable {
+        let syntax: SourceFileSyntax
+        let modificationDate: Date
+        let lineCount: Int
     }
+
+    /// Cached parsed files.
+    private var cache: [String: CachedParse] = [:]
 
     // MARK: - Private Helpers
 
@@ -143,36 +149,36 @@ public actor SwiftFileParser {
 // MARK: - Source Location Converter Helper
 
 /// Extension to help convert SwiftSyntax positions to SourceLocation.
-extension SourceFileSyntax {
+public extension SourceFileSyntax {
     /// Create a source location converter for this file.
-    public func makeLocationConverter(fileName: String) -> SourceLocationConverter {
+    func makeLocationConverter(fileName: String) -> SourceLocationConverter {
         SourceLocationConverter(fileName: fileName, tree: self)
     }
 }
 
 // MARK: - Syntax Position Extensions
 
-extension AbsolutePosition {
+public extension AbsolutePosition {
     /// Convert to SourceLocation using a converter.
-    public func toSourceLocation(
+    func toSourceLocation(
         using converter: SourceLocationConverter,
-        file: String
+        file: String,
     ) -> SourceLocation {
         let location = converter.location(for: self)
         return SourceLocation(
             file: file,
             line: location.line,
             column: location.column,
-            offset: self.utf8Offset
+            offset: utf8Offset,
         )
     }
 }
 
-extension SyntaxProtocol {
+public extension SyntaxProtocol {
     /// Get the source range for this syntax node.
-    public func sourceRange(
+    func sourceRange(
         using converter: SourceLocationConverter,
-        file: String
+        file: String,
     ) -> SourceRange {
         let start = position.toSourceLocation(using: converter, file: file)
         let end = endPosition.toSourceLocation(using: converter, file: file)

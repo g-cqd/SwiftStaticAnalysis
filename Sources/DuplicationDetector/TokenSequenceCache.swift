@@ -8,10 +8,17 @@
 import Foundation
 import SwiftStaticAnalysisCore
 
-// MARK: - Cached Token Sequence
+// MARK: - CachedTokenSequence
 
 /// Token sequence data suitable for caching.
 public struct CachedTokenSequence: Codable, Sendable {
+    public struct CachedToken: Codable, Sendable {
+        public let text: String
+        public let kind: String
+        public let line: Int
+        public let column: Int
+    }
+
     /// The file path.
     public let file: String
 
@@ -23,54 +30,53 @@ public struct CachedTokenSequence: Codable, Sendable {
 
     /// Source lines for snippet extraction.
     public let sourceLines: [String]
-
-    public struct CachedToken: Codable, Sendable {
-        public let text: String
-        public let kind: String
-        public let line: Int
-        public let column: Int
-    }
 }
 
-// MARK: - Token Sequence Cache Data
+// MARK: - TokenCacheData
 
 /// Data structure for persisting token cache to disk.
 struct TokenCacheData: Codable {
+    // MARK: Lifecycle
+
+    init(sequences: [String: CachedTokenSequence]) {
+        version = Self.formatVersion
+        self.sequences = sequences
+        timestamp = Date()
+    }
+
+    // MARK: Internal
+
     static let formatVersion = 1
 
     let version: Int
     let sequences: [String: CachedTokenSequence]
     let timestamp: Date
-
-    init(sequences: [String: CachedTokenSequence]) {
-        self.version = Self.formatVersion
-        self.sequences = sequences
-        self.timestamp = Date()
-    }
 }
 
-// MARK: - Token Sequence Cache
+// MARK: - TokenSequenceCache
 
 /// Actor-based cache for token sequences.
 public actor TokenSequenceCache {
-
-    /// Cached sequences by file path.
-    private var sequences: [String: CachedTokenSequence] = [:]
-
-    /// Cache file URL.
-    private let cacheURL: URL?
-
-    /// Whether cache has unsaved changes.
-    private var isDirty: Bool = false
+    // MARK: Lifecycle
 
     // MARK: - Initialization
 
     public init(cacheDirectory: URL? = nil) {
         if let directory = cacheDirectory {
-            self.cacheURL = directory.appendingPathComponent("token_cache.json")
+            cacheURL = directory.appendingPathComponent("token_cache.json")
         } else {
-            self.cacheURL = nil
+            cacheURL = nil
         }
+    }
+
+    // MARK: Public
+
+    // MARK: - Statistics
+
+    /// Cache statistics.
+    public struct Statistics: Sendable {
+        public let cachedFileCount: Int
+        public let totalTokens: Int
     }
 
     // MARK: - Persistence
@@ -78,7 +84,8 @@ public actor TokenSequenceCache {
     /// Load cache from disk.
     public func load() async throws {
         guard let url = cacheURL,
-              FileManager.default.fileExists(atPath: url.path) else {
+              FileManager.default.fileExists(atPath: url.path)
+        else {
             return
         }
 
@@ -89,8 +96,8 @@ public actor TokenSequenceCache {
             return
         }
 
-        self.sequences = cached.sequences
-        self.isDirty = false
+        sequences = cached.sequences
+        isDirty = false
     }
 
     /// Save cache to disk.
@@ -118,7 +125,8 @@ public actor TokenSequenceCache {
     /// - Returns: Cached sequence if valid, nil otherwise.
     public func get(file: String, currentHash: UInt64) -> CachedTokenSequence? {
         guard let cached = sequences[file],
-              cached.contentHash == currentHash else {
+              cached.contentHash == currentHash
+        else {
             return nil
         }
         return cached
@@ -162,27 +170,30 @@ public actor TokenSequenceCache {
         Set(sequences.keys)
     }
 
-    // MARK: - Statistics
-
-    /// Cache statistics.
-    public struct Statistics: Sendable {
-        public let cachedFileCount: Int
-        public let totalTokens: Int
-    }
-
     public func statistics() -> Statistics {
         Statistics(
             cachedFileCount: sequences.count,
-            totalTokens: sequences.values.reduce(0) { $0 + $1.tokens.count }
+            totalTokens: sequences.values.reduce(0) { $0 + $1.tokens.count },
         )
     }
+
+    // MARK: Private
+
+    /// Cached sequences by file path.
+    private var sequences: [String: CachedTokenSequence] = [:]
+
+    /// Cache file URL.
+    private let cacheURL: URL?
+
+    /// Whether cache has unsaved changes.
+    private var isDirty: Bool = false
 }
 
 // MARK: - Token Sequence Conversion
 
-extension TokenSequence {
+public extension TokenSequence {
     /// Convert to a cacheable format.
-    public func toCached(contentHash: UInt64) -> CachedTokenSequence {
+    func toCached(contentHash: UInt64) -> CachedTokenSequence {
         CachedTokenSequence(
             file: file,
             contentHash: contentHash,
@@ -191,17 +202,17 @@ extension TokenSequence {
                     text: token.text,
                     kind: token.kind.rawValue,
                     line: token.line,
-                    column: token.column
+                    column: token.column,
                 )
             },
-            sourceLines: sourceLines
+            sourceLines: sourceLines,
         )
     }
 }
 
-extension CachedTokenSequence {
+public extension CachedTokenSequence {
     /// Convert back to a TokenSequence.
-    public func toTokenSequence() -> TokenSequence {
+    func toTokenSequence() -> TokenSequence {
         TokenSequence(
             file: file,
             tokens: tokens.map { cached in
@@ -209,10 +220,10 @@ extension CachedTokenSequence {
                     kind: TokenKind(rawValue: cached.kind) ?? .identifier,
                     text: cached.text,
                     line: cached.line,
-                    column: cached.column
+                    column: cached.column,
                 )
             },
-            sourceLines: sourceLines
+            sourceLines: sourceLines,
         )
     }
 }

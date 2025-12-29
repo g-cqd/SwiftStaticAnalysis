@@ -8,7 +8,7 @@
 
 import Foundation
 
-// MARK: - Models
+// MARK: - User
 
 struct User: Codable {
     let id: Int
@@ -16,11 +16,15 @@ struct User: Codable {
     let email: String
 }
 
+// MARK: - Product
+
 struct Product: Codable {
     let id: Int
     let title: String
     let price: Double
 }
+
+// MARK: - Order
 
 struct Order: Codable {
     let id: Int
@@ -29,7 +33,7 @@ struct Order: Codable {
     let total: Double
 }
 
-// MARK: - Error Types
+// MARK: - NetworkError
 
 enum NetworkError: Error {
     case invalidResponse
@@ -45,7 +49,8 @@ func fetchUsers() async throws -> [User] {
     let url = URL(string: "https://api.example.com/users")!
     let (data, response) = try await URLSession.shared.data(from: url)
     guard let httpResponse = response as? HTTPURLResponse,
-          (200...299).contains(httpResponse.statusCode) else {
+          (200 ... 299).contains(httpResponse.statusCode)
+    else {
         throw NetworkError.invalidResponse
     }
     return try JSONDecoder().decode([User].self, from: data)
@@ -56,7 +61,8 @@ func fetchProducts() async throws -> [Product] {
     let url = URL(string: "https://api.example.com/products")!
     let (data, response) = try await URLSession.shared.data(from: url)
     guard let httpResponse = response as? HTTPURLResponse,
-          (200...299).contains(httpResponse.statusCode) else {
+          (200 ... 299).contains(httpResponse.statusCode)
+    else {
         throw NetworkError.invalidResponse
     }
     return try JSONDecoder().decode([Product].self, from: data)
@@ -67,7 +73,8 @@ func fetchOrders() async throws -> [Order] {
     let url = URL(string: "https://api.example.com/orders")!
     let (data, response) = try await URLSession.shared.data(from: url)
     guard let httpResponse = response as? HTTPURLResponse,
-          (200...299).contains(httpResponse.statusCode) else {
+          (200 ... 299).contains(httpResponse.statusCode)
+    else {
         throw NetworkError.invalidResponse
     }
     return try JSONDecoder().decode([Order].self, from: data)

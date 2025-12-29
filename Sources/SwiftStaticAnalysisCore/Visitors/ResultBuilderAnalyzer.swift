@@ -10,7 +10,7 @@
 import Foundation
 import SwiftSyntax
 
-// MARK: - Result Builder Type
+// MARK: - ResultBuilderType
 
 /// Known result builder types in Swift/SwiftUI.
 /// Exhaustive coverage for result builder detection. // swa:ignore-unused-cases
@@ -34,15 +34,22 @@ public enum ResultBuilderType: String, Sendable, Codable, CaseIterable {
     // Custom/unknown builder
     case custom
 
+    // MARK: Public
+
     /// Whether this is a SwiftUI-specific builder.
     public var isSwiftUI: Bool {
         switch self {
-        case .viewBuilder, .commandsBuilder, .sceneBuilder,
-             .toolbarContentBuilder, .accessibilityRotorContentBuilder,
-             .tableColumnBuilder, .tableRowBuilder:
-            return true
+        case .accessibilityRotorContentBuilder,
+             .commandsBuilder,
+             .sceneBuilder,
+             .tableColumnBuilder,
+             .tableRowBuilder,
+             .toolbarContentBuilder,
+             .viewBuilder:
+            true
+
         default:
-            return false
+            false
         }
     }
 
@@ -64,7 +71,7 @@ public enum ResultBuilderType: String, Sendable, Codable, CaseIterable {
     }
 }
 
-// MARK: - Normalized Closure
+// MARK: - NormalizedResultBuilderClosure
 
 /// A normalized representation of a result builder closure.
 public struct NormalizedResultBuilderClosure: Sendable, Hashable {
@@ -90,17 +97,10 @@ public struct NormalizedResultBuilderClosure: Sendable, Hashable {
     }
 }
 
+// MARK: - NormalizedStatement
+
 /// A normalized statement within a result builder.
 public struct NormalizedStatement: Sendable, Hashable {
-    /// The type of statement.
-    public let kind: StatementKind
-
-    /// Normalized content (type names, identifiers normalized).
-    public let normalizedContent: String
-
-    /// Child statements (for control flow).
-    public let children: [NormalizedStatement]
-
     public enum StatementKind: String, Sendable, Hashable {
         case expression
         case ifStatement
@@ -110,9 +110,18 @@ public struct NormalizedStatement: Sendable, Hashable {
         case viewModifier
         case other
     }
+
+    /// The type of statement.
+    public let kind: StatementKind
+
+    /// Normalized content (type names, identifiers normalized).
+    public let normalizedContent: String
+
+    /// Child statements (for control flow).
+    public let children: [NormalizedStatement]
 }
 
-// MARK: - Result Builder Context
+// MARK: - ResultBuilderContext
 
 /// Context information for result builder detection.
 public struct ResultBuilderContext: Sendable {
@@ -139,12 +148,15 @@ public struct ResultBuilderContext: Sendable {
     }
 }
 
-// MARK: - Result Builder Analyzer
+// MARK: - ResultBuilderAnalyzer
 
 /// Analyzes result builder usage in Swift code.
 public struct ResultBuilderAnalyzer: Sendable {
+    // MARK: Lifecycle
 
     public init() {}
+
+    // MARK: Public
 
     // MARK: - Convenience Methods
 
@@ -166,7 +178,7 @@ public struct ResultBuilderAnalyzer: Sendable {
             statements: statements,
             startLine: 0,
             endLine: 0,
-            file: ""
+            file: "",
         )
     }
 
@@ -180,7 +192,7 @@ public struct ResultBuilderAnalyzer: Sendable {
     /// - Returns: The detected builder type, or nil.
     public func detectResultBuilder(
         in closure: ClosureExprSyntax,
-        context: ResultBuilderContext
+        context: ResultBuilderContext,
     ) -> ResultBuilderType? {
         // Check explicit attributes first
         for attr in context.attributes {
@@ -190,7 +202,7 @@ public struct ResultBuilderAnalyzer: Sendable {
         }
 
         // Check if it's a View body
-        if context.declarationName == "body" && context.conformsTo("View") {
+        if context.declarationName == "body", context.conformsTo("View") {
             return .viewBuilder
         }
 
@@ -243,7 +255,7 @@ public struct ResultBuilderAnalyzer: Sendable {
         _ closure: ClosureExprSyntax,
         builderType: ResultBuilderType,
         file: String,
-        converter: SourceLocationConverter
+        converter: SourceLocationConverter,
     ) -> NormalizedResultBuilderClosure {
         let statements = normalizeStatements(closure.statements)
 
@@ -255,9 +267,11 @@ public struct ResultBuilderAnalyzer: Sendable {
             statements: statements,
             startLine: startLoc.line,
             endLine: endLoc.line,
-            file: file
+            file: file,
         )
     }
+
+    // MARK: Private
 
     // MARK: - Private Helpers
 
@@ -266,7 +280,7 @@ public struct ResultBuilderAnalyzer: Sendable {
         let statements = closure.statements
 
         // Empty closures aren't result builders
-        guard statements.count > 0 else { return false }
+        guard !statements.isEmpty else { return false }
 
         // Single expression with return is normal
         if statements.count == 1 {
@@ -284,7 +298,7 @@ public struct ResultBuilderAnalyzer: Sendable {
                 hasExplicitReturn = true
             }
             if statement.item.is(ExpressionStmtSyntax.self) ||
-               statement.item.is(FunctionCallExprSyntax.self) {
+                statement.item.is(FunctionCallExprSyntax.self) {
                 expressionCount += 1
             }
         }
@@ -322,10 +336,11 @@ public struct ResultBuilderAnalyzer: Sendable {
     /// Extract attribute name from an attribute element.
     private func extractAttributeName(_ attribute: AttributeListSyntax.Element) -> String? {
         switch attribute {
-        case .attribute(let attr):
-            return attr.attributeName.trimmedDescription
+        case let .attribute(attr):
+            attr.attributeName.trimmedDescription
+
         case .ifConfigDecl:
-            return nil
+            nil
         }
     }
 
@@ -361,7 +376,7 @@ public struct ResultBuilderAnalyzer: Sendable {
             return NormalizedStatement(
                 kind: .binding,
                 normalizedContent: normalizeVariableDecl(varDecl),
-                children: []
+                children: [],
             )
         }
 
@@ -370,7 +385,7 @@ public struct ResultBuilderAnalyzer: Sendable {
             return NormalizedStatement(
                 kind: .expression,
                 normalizedContent: normalizeExpression(expr.expression),
-                children: []
+                children: [],
             )
         }
 
@@ -379,7 +394,7 @@ public struct ResultBuilderAnalyzer: Sendable {
             return NormalizedStatement(
                 kind: .expression,
                 normalizedContent: normalizeFunctionCall(funcCall),
-                children: []
+                children: [],
             )
         }
 
@@ -396,9 +411,10 @@ public struct ResultBuilderAnalyzer: Sendable {
         // Normalize else clause if present
         if let elseClause = ifStmt.elseBody {
             switch elseClause {
-            case .codeBlock(let block):
+            case let .codeBlock(block):
                 children.append(contentsOf: normalizeStatements(block.statements))
-            case .ifExpr(let elseIf):
+
+            case let .ifExpr(elseIf):
                 if let normalized = normalizeIfStatement(elseIf) as NormalizedStatement? {
                     children.append(normalized)
                 }
@@ -408,7 +424,7 @@ public struct ResultBuilderAnalyzer: Sendable {
         return NormalizedStatement(
             kind: .ifStatement,
             normalizedContent: "if",
-            children: children
+            children: children,
         )
     }
 
@@ -417,7 +433,7 @@ public struct ResultBuilderAnalyzer: Sendable {
         var children: [NormalizedStatement] = []
 
         for caseItem in switchStmt.cases {
-            if case .switchCase(let switchCase) = caseItem {
+            if case let .switchCase(switchCase) = caseItem {
                 children.append(contentsOf: normalizeStatements(switchCase.statements))
             }
         }
@@ -425,7 +441,7 @@ public struct ResultBuilderAnalyzer: Sendable {
         return NormalizedStatement(
             kind: .switchStatement,
             normalizedContent: "switch",
-            children: children
+            children: children,
         )
     }
 
@@ -436,14 +452,14 @@ public struct ResultBuilderAnalyzer: Sendable {
         return NormalizedStatement(
             kind: .forLoop,
             normalizedContent: "for",
-            children: bodyStatements
+            children: bodyStatements,
         )
     }
 
     /// Normalize a variable declaration.
     private func normalizeVariableDecl(_ varDecl: VariableDeclSyntax) -> String {
         let keyword = varDecl.bindingSpecifier.text
-        let bindings = varDecl.bindings.map { $0.pattern.trimmedDescription }
+        let bindings = varDecl.bindings.map(\.pattern.trimmedDescription)
         return "\(keyword) \(bindings.joined(separator: ", "))"
     }
 
@@ -473,7 +489,7 @@ public struct ResultBuilderAnalyzer: Sendable {
     /// Normalize member access (view modifier chains).
     private func normalizeMemberAccess(_ access: MemberAccessExprSyntax) -> String {
         var chain: [String] = []
-        var current: ExprSyntax = ExprSyntax(access)
+        var current = ExprSyntax(access)
 
         while let memberAccess = current.as(MemberAccessExprSyntax.self) {
             chain.insert(memberAccess.declName.baseName.text, at: 0)
@@ -503,26 +519,149 @@ public struct ResultBuilderAnalyzer: Sendable {
         normalized = normalized.replacingOccurrences(
             of: #""[^"]*""#,
             with: "\"$STR\"",
-            options: .regularExpression
+            options: .regularExpression,
         )
 
         // Replace numeric literals
         normalized = normalized.replacingOccurrences(
             of: #"\b\d+(\.\d+)?\b"#,
             with: "$NUM",
-            options: .regularExpression
+            options: .regularExpression,
         )
 
         return normalized
     }
 }
 
-// MARK: - Result Builder Visitor
+// MARK: - ResultBuilderVisitor
 
 /// Visits a syntax tree to find all result builder closures.
 public final class ResultBuilderVisitor: SyntaxVisitor {
+    // MARK: Lifecycle
+
+    public init(file: String, tree: SourceFileSyntax) {
+        analyzer = ResultBuilderAnalyzer()
+        self.file = file
+        converter = SourceLocationConverter(fileName: file, tree: tree)
+        super.init(viewMode: .sourceAccurate)
+    }
+
+    // MARK: Public
+
+    /// Info about a detected result builder.
+    public struct ResultBuilderInfo {
+        public let type: ResultBuilderType
+        public let closure: NormalizedResultBuilderClosure
+        public let declarationName: String?
+        public let typeName: String?
+    }
+
     /// Detected result builder closures.
     public private(set) var builders: [ResultBuilderInfo] = []
+
+    // MARK: - Visit Methods
+
+    override public func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
+        let conformances = node.inheritanceClause?.inheritedTypes.map(\.type.trimmedDescription) ?? []
+
+        let attributes = node.attributes.compactMap { attr -> String? in
+            if case let .attribute(a) = attr {
+                return a.attributeName.trimmedDescription
+            }
+            return nil
+        }
+
+        let context = ResultBuilderContext(
+            declarationName: nil,
+            typeName: node.name.text,
+            attributes: attributes,
+            conformances: conformances,
+        )
+
+        contextStack.append(context)
+        return .visitChildren
+    }
+
+    override public func visitPost(_ node: StructDeclSyntax) {
+        contextStack.removeLast()
+    }
+
+    override public func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+        let conformances = node.inheritanceClause?.inheritedTypes.map(\.type.trimmedDescription) ?? []
+
+        let attributes = node.attributes.compactMap { attr -> String? in
+            if case let .attribute(a) = attr {
+                return a.attributeName.trimmedDescription
+            }
+            return nil
+        }
+
+        let context = ResultBuilderContext(
+            declarationName: nil,
+            typeName: node.name.text,
+            attributes: attributes,
+            conformances: conformances,
+        )
+
+        contextStack.append(context)
+        return .visitChildren
+    }
+
+    override public func visitPost(_ node: ClassDeclSyntax) {
+        contextStack.removeLast()
+    }
+
+    override public func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {
+        let name = node.bindings.first?.pattern.trimmedDescription
+
+        let attributes = node.attributes.compactMap { attr -> String? in
+            if case let .attribute(a) = attr {
+                return a.attributeName.trimmedDescription
+            }
+            return nil
+        }
+
+        let parentContext = contextStack.last
+        let context = ResultBuilderContext(
+            declarationName: name,
+            typeName: parentContext?.typeName,
+            attributes: attributes + (parentContext?.attributes ?? []),
+            conformances: parentContext?.conformances ?? [],
+        )
+
+        contextStack.append(context)
+        return .visitChildren
+    }
+
+    override public func visitPost(_ node: VariableDeclSyntax) {
+        contextStack.removeLast()
+    }
+
+    override public func visit(_ node: ClosureExprSyntax) -> SyntaxVisitorContinueKind {
+        guard let context = contextStack.last else {
+            return .visitChildren
+        }
+
+        if let builderType = analyzer.detectResultBuilder(in: node, context: context) {
+            let normalized = analyzer.normalize(
+                node,
+                builderType: builderType,
+                file: file,
+                converter: converter,
+            )
+
+            builders.append(ResultBuilderInfo(
+                type: builderType,
+                closure: normalized,
+                declarationName: context.declarationName,
+                typeName: context.typeName,
+            ))
+        }
+
+        return .visitChildren
+    }
+
+    // MARK: Private
 
     /// The analyzer to use.
     private let analyzer: ResultBuilderAnalyzer
@@ -535,125 +674,4 @@ public final class ResultBuilderVisitor: SyntaxVisitor {
 
     /// Current context stack.
     private var contextStack: [ResultBuilderContext] = []
-
-    /// Info about a detected result builder.
-    public struct ResultBuilderInfo {
-        public let type: ResultBuilderType
-        public let closure: NormalizedResultBuilderClosure
-        public let declarationName: String?
-        public let typeName: String?
-    }
-
-    public init(file: String, tree: SourceFileSyntax) {
-        self.analyzer = ResultBuilderAnalyzer()
-        self.file = file
-        self.converter = SourceLocationConverter(fileName: file, tree: tree)
-        super.init(viewMode: .sourceAccurate)
-    }
-
-    // MARK: - Visit Methods
-
-    public override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
-        let conformances = node.inheritanceClause?.inheritedTypes.map {
-            $0.type.trimmedDescription
-        } ?? []
-
-        let attributes = node.attributes.compactMap { attr -> String? in
-            if case .attribute(let a) = attr {
-                return a.attributeName.trimmedDescription
-            }
-            return nil
-        }
-
-        let context = ResultBuilderContext(
-            declarationName: nil,
-            typeName: node.name.text,
-            attributes: attributes,
-            conformances: conformances
-        )
-
-        contextStack.append(context)
-        return .visitChildren
-    }
-
-    public override func visitPost(_ node: StructDeclSyntax) {
-        contextStack.removeLast()
-    }
-
-    public override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
-        let conformances = node.inheritanceClause?.inheritedTypes.map {
-            $0.type.trimmedDescription
-        } ?? []
-
-        let attributes = node.attributes.compactMap { attr -> String? in
-            if case .attribute(let a) = attr {
-                return a.attributeName.trimmedDescription
-            }
-            return nil
-        }
-
-        let context = ResultBuilderContext(
-            declarationName: nil,
-            typeName: node.name.text,
-            attributes: attributes,
-            conformances: conformances
-        )
-
-        contextStack.append(context)
-        return .visitChildren
-    }
-
-    public override func visitPost(_ node: ClassDeclSyntax) {
-        contextStack.removeLast()
-    }
-
-    public override func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {
-        let name = node.bindings.first?.pattern.trimmedDescription
-
-        let attributes = node.attributes.compactMap { attr -> String? in
-            if case .attribute(let a) = attr {
-                return a.attributeName.trimmedDescription
-            }
-            return nil
-        }
-
-        let parentContext = contextStack.last
-        let context = ResultBuilderContext(
-            declarationName: name,
-            typeName: parentContext?.typeName,
-            attributes: attributes + (parentContext?.attributes ?? []),
-            conformances: parentContext?.conformances ?? []
-        )
-
-        contextStack.append(context)
-        return .visitChildren
-    }
-
-    public override func visitPost(_ node: VariableDeclSyntax) {
-        contextStack.removeLast()
-    }
-
-    public override func visit(_ node: ClosureExprSyntax) -> SyntaxVisitorContinueKind {
-        guard let context = contextStack.last else {
-            return .visitChildren
-        }
-
-        if let builderType = analyzer.detectResultBuilder(in: node, context: context) {
-            let normalized = analyzer.normalize(
-                node,
-                builderType: builderType,
-                file: file,
-                converter: converter
-            )
-
-            builders.append(ResultBuilderInfo(
-                type: builderType,
-                closure: normalized,
-                declarationName: context.declarationName,
-                typeName: context.typeName
-            ))
-        }
-
-        return .visitChildren
-    }
 }

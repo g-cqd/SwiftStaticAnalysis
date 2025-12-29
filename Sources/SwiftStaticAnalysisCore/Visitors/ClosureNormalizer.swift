@@ -10,16 +10,16 @@
 import Foundation
 import SwiftSyntax
 
-// MARK: - Closure Form
+// MARK: - ClosureForm
 
 /// The syntactic form of a closure.
 public enum ClosureForm: String, Sendable, Codable {
-    case trailingClosure       // foo { ... }
+    case trailingClosure // foo { ... }
     case parenthesizedArgument // foo({ ... })
     case multipleTrailingClosures // foo { } bar: { }
 }
 
-// MARK: - Normalized Closure
+// MARK: - NormalizedClosure
 
 /// A normalized representation of a closure expression.
 public struct NormalizedClosure: Sendable, Hashable {
@@ -47,7 +47,7 @@ public struct NormalizedClosure: Sendable, Hashable {
     }
 }
 
-// MARK: - Normalized Parameter
+// MARK: - NormalizedParameter
 
 /// A normalized closure parameter.
 public struct NormalizedParameter: Sendable, Hashable {
@@ -61,10 +61,16 @@ public struct NormalizedParameter: Sendable, Hashable {
     public let index: Int
 }
 
-// MARK: - Normalized Closure Body
+// MARK: - NormalizedClosureBody
 
 /// Normalized representation of a closure body.
 public struct NormalizedClosureBody: Sendable, Hashable {
+    public enum BodyKind: String, Sendable, Hashable {
+        case expression // Single expression
+        case multiStatement // Multiple statements
+        case empty // Empty closure
+    }
+
     /// The kind of body.
     public let kind: BodyKind
 
@@ -76,20 +82,17 @@ public struct NormalizedClosureBody: Sendable, Hashable {
 
     /// Whether it's a single expression (implicit return).
     public let isSingleExpression: Bool
-
-    public enum BodyKind: String, Sendable, Hashable {
-        case expression    // Single expression
-        case multiStatement // Multiple statements
-        case empty         // Empty closure
-    }
 }
 
-// MARK: - Closure Normalizer
+// MARK: - ClosureNormalizer
 
 /// Normalizes closures for clone detection.
 public struct ClosureNormalizer: Sendable {
+    // MARK: Lifecycle
 
     public init() {}
+
+    // MARK: Public
 
     // MARK: - Normalization
 
@@ -101,7 +104,7 @@ public struct ClosureNormalizer: Sendable {
     /// - Returns: Normalized closure representation.
     public func normalize(
         _ closure: ClosureExprSyntax,
-        form: ClosureForm = .trailingClosure
+        form: ClosureForm = .trailingClosure,
     ) -> NormalizedClosure {
         let parameters = normalizeParameters(closure)
         let body = normalizeBody(closure)
@@ -111,7 +114,7 @@ public struct ClosureNormalizer: Sendable {
             parameters: parameters,
             bodyStructure: body,
             hasCaptures: hasCaptures,
-            originalForm: form
+            originalForm: form,
         )
     }
 
@@ -121,7 +124,7 @@ public struct ClosureNormalizer: Sendable {
     /// - Returns: The form of the trailing closure, if any.
     public func detectClosureForm(in call: FunctionCallExprSyntax) -> ClosureForm? {
         if call.trailingClosure != nil {
-            if call.additionalTrailingClosures.count > 0 {
+            if !call.additionalTrailingClosures.isEmpty {
                 return .multipleTrailingClosures
             }
             return .trailingClosure
@@ -145,7 +148,7 @@ public struct ClosureNormalizer: Sendable {
     /// - Returns: True if semantically equivalent.
     public func areSemanticallyEquivalent(
         _ closure1: ClosureExprSyntax,
-        _ closure2: ClosureExprSyntax
+        _ closure2: ClosureExprSyntax,
     ) -> Bool {
         let norm1 = normalize(closure1)
         let norm2 = normalize(closure2)
@@ -161,6 +164,8 @@ public struct ClosureNormalizer: Sendable {
         return norm1.bodyStructure.contentFingerprint == norm2.bodyStructure.contentFingerprint
     }
 
+    // MARK: Private
+
     // MARK: - Parameter Normalization
 
     /// Normalize closure parameters.
@@ -171,23 +176,23 @@ public struct ClosureNormalizer: Sendable {
             // Has explicit signature
             if let params = signature.parameterClause {
                 switch params {
-                case .simpleInput(let identifiers):
+                case let .simpleInput(identifiers):
                     // { a, b in ... }
                     for (index, _) in identifiers.enumerated() {
                         parameters.append(NormalizedParameter(
                             normalizedName: "param_\(index)",
                             hasTypeAnnotation: false,
-                            index: index
+                            index: index,
                         ))
                     }
 
-                case .parameterClause(let parameterClause):
+                case let .parameterClause(parameterClause):
                     // { (a: Int, b: String) in ... }
                     for (index, param) in parameterClause.parameters.enumerated() {
                         parameters.append(NormalizedParameter(
                             normalizedName: "param_\(index)",
                             hasTypeAnnotation: param.type != nil,
-                            index: index
+                            index: index,
                         ))
                     }
                 }
@@ -195,11 +200,11 @@ public struct ClosureNormalizer: Sendable {
         } else {
             // Infer parameter count from shorthand usage
             let count = inferShorthandParameterCount(closure)
-            for index in 0..<count {
+            for index in 0 ..< count {
                 parameters.append(NormalizedParameter(
                     normalizedName: "$\(index)",
                     hasTypeAnnotation: false,
-                    index: index
+                    index: index,
                 ))
             }
         }
@@ -220,12 +225,12 @@ public struct ClosureNormalizer: Sendable {
     private func normalizeBody(_ closure: ClosureExprSyntax) -> NormalizedClosureBody {
         let statements = closure.statements
 
-        if statements.count == 0 {
+        if statements.isEmpty {
             return NormalizedClosureBody(
                 kind: .empty,
                 contentFingerprint: "empty",
                 statementCount: 0,
-                isSingleExpression: false
+                isSingleExpression: false,
             )
         }
 
@@ -240,7 +245,7 @@ public struct ClosureNormalizer: Sendable {
             kind: kind,
             contentFingerprint: fingerprint,
             statementCount: statements.count,
-            isSingleExpression: isSingleExpression
+            isSingleExpression: isSingleExpression,
         )
     }
 
@@ -265,7 +270,7 @@ public struct ClosureNormalizer: Sendable {
         normalized = normalized.replacingOccurrences(
             of: #"\$\d+"#,
             with: "$X",
-            options: .regularExpression
+            options: .regularExpression,
         )
 
         // Replace named parameters with $X (if we knew them)
@@ -275,29 +280,33 @@ public struct ClosureNormalizer: Sendable {
         normalized = normalized.replacingOccurrences(
             of: #""[^"]*""#,
             with: "\"$STR\"",
-            options: .regularExpression
+            options: .regularExpression,
         )
 
         // Replace numeric literals
         normalized = normalized.replacingOccurrences(
             of: #"\b\d+(\.\d+)?\b"#,
             with: "$NUM",
-            options: .regularExpression
+            options: .regularExpression,
         )
 
         return normalized
     }
 }
 
-// MARK: - Shorthand Parameter Visitor
+// MARK: - ShorthandParameterVisitor
 
 /// Finds the highest shorthand parameter index used in a closure.
 private final class ShorthandParameterVisitor: SyntaxVisitor {
-    var maxParameterIndex: Int = -1
+    // MARK: Lifecycle
 
     init() {
         super.init(viewMode: .sourceAccurate)
     }
+
+    // MARK: Internal
+
+    var maxParameterIndex: Int = -1
 
     override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
         let name = node.baseName.text
@@ -311,15 +320,17 @@ private final class ShorthandParameterVisitor: SyntaxVisitor {
     }
 }
 
-// MARK: - Closure Equivalence Checker
+// MARK: - ClosureEquivalenceChecker
 
 /// Checks if closures are equivalent despite syntactic differences.
 public struct ClosureEquivalenceChecker: Sendable {
-    private let normalizer: ClosureNormalizer
+    // MARK: Lifecycle
 
     public init() {
-        self.normalizer = ClosureNormalizer()
+        normalizer = ClosureNormalizer()
     }
+
+    // MARK: Public
 
     /// Check if two function calls with closures are equivalent.
     ///
@@ -330,16 +341,21 @@ public struct ClosureEquivalenceChecker: Sendable {
     /// - Returns: True if equivalent.
     public func areEquivalent(
         _ call1: FunctionCallExprSyntax,
-        _ call2: FunctionCallExprSyntax
+        _ call2: FunctionCallExprSyntax,
     ) -> Bool {
         // Get closures from both calls
         guard let closure1 = extractClosure(from: call1),
-              let closure2 = extractClosure(from: call2) else {
+              let closure2 = extractClosure(from: call2)
+        else {
             return false
         }
 
         return normalizer.areSemanticallyEquivalent(closure1, closure2)
     }
+
+    // MARK: Private
+
+    private let normalizer: ClosureNormalizer
 
     /// Extract the primary closure from a function call.
     private func extractClosure(from call: FunctionCallExprSyntax) -> ClosureExprSyntax? {
@@ -359,15 +375,17 @@ public struct ClosureEquivalenceChecker: Sendable {
     }
 }
 
-// MARK: - Function Call Normalizer
+// MARK: - FunctionCallNormalizer
 
 /// Normalizes function calls with closures to a canonical form.
 public struct FunctionCallNormalizer: Sendable {
-    private let closureNormalizer: ClosureNormalizer
+    // MARK: Lifecycle
 
     public init() {
-        self.closureNormalizer = ClosureNormalizer()
+        closureNormalizer = ClosureNormalizer()
     }
+
+    // MARK: Public
 
     /// Normalize a function call for clone detection.
     ///
@@ -404,6 +422,10 @@ public struct FunctionCallNormalizer: Sendable {
         return result
     }
 
+    // MARK: Private
+
+    private let closureNormalizer: ClosureNormalizer
+
     /// Normalize the callee expression.
     private func normalizeCallee(_ expr: ExprSyntax) -> String {
         if let memberAccess = expr.as(MemberAccessExprSyntax.self) {
@@ -439,7 +461,7 @@ public struct FunctionCallNormalizer: Sendable {
             return "$STR"
         }
         if expr.is(IntegerLiteralExprSyntax.self) ||
-           expr.is(FloatLiteralExprSyntax.self) {
+            expr.is(FloatLiteralExprSyntax.self) {
             return "$NUM"
         }
         if expr.is(BooleanLiteralExprSyntax.self) {

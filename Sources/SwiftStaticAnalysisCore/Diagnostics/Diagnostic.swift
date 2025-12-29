@@ -7,7 +7,7 @@
 
 import Foundation
 
-// MARK: - Diagnostic Severity
+// MARK: - DiagnosticSeverity
 
 /// Severity levels for diagnostics.
 public enum DiagnosticSeverity: String, Sendable, Codable, CaseIterable {
@@ -16,29 +16,57 @@ public enum DiagnosticSeverity: String, Sendable, Codable, CaseIterable {
     case note
     case remark
 
+    // MARK: Public
+
     /// Xcode-compatible string representation.
     public var xcodeString: String {
         rawValue
     }
 }
 
-// MARK: - Diagnostic Category
+// MARK: - DiagnosticCategory
 
 /// Categories for diagnostics.
 /// Exhaustive coverage for all diagnostic categories. // swa:ignore-unused-cases
 public enum DiagnosticCategory: String, Sendable, Codable {
     case unusedCode = "unused-code"
-    case duplication = "duplication"
-    case style = "style"
-    case performance = "performance"
-    case security = "security"
-    case general = "general"
+    case duplication
+    case style
+    case performance
+    case security
+    case general
 }
 
 // MARK: - Diagnostic
 
 /// Represents a single diagnostic message.
 public struct Diagnostic: Sendable, Codable, Hashable {
+    // MARK: Lifecycle
+
+    public init(
+        file: String,
+        line: Int,
+        column: Int,
+        severity: DiagnosticSeverity,
+        message: String,
+        category: DiagnosticCategory = .general,
+        ruleID: String? = nil,
+        fixIt: FixIt? = nil,
+        notes: [Diagnostic] = [],
+    ) {
+        self.file = file
+        self.line = line
+        self.column = column
+        self.severity = severity
+        self.message = message
+        self.category = category
+        self.ruleID = ruleID
+        self.fixIt = fixIt
+        self.notes = notes
+    }
+
+    // MARK: Public
+
     /// Location in source.
     public let file: String
     public let line: Int
@@ -67,28 +95,6 @@ public struct Diagnostic: Sendable, Codable, Hashable {
         "\(file):\(line):\(column):\(severity.rawValue):\(message.hashValue)"
     }
 
-    public init(
-        file: String,
-        line: Int,
-        column: Int,
-        severity: DiagnosticSeverity,
-        message: String,
-        category: DiagnosticCategory = .general,
-        ruleID: String? = nil,
-        fixIt: FixIt? = nil,
-        notes: [Diagnostic] = []
-    ) {
-        self.file = file
-        self.line = line
-        self.column = column
-        self.severity = severity
-        self.message = message
-        self.category = category
-        self.ruleID = ruleID
-        self.fixIt = fixIt
-        self.notes = notes
-    }
-
     /// Xcode-compatible string representation.
     ///
     /// Format: `/path/to/file.swift:42:5: warning: message`
@@ -105,6 +111,14 @@ public struct Diagnostic: Sendable, Codable, Hashable {
         return result
     }
 
+    public static func == (lhs: Diagnostic, rhs: Diagnostic) -> Bool {
+        lhs.file == rhs.file &&
+            lhs.line == rhs.line &&
+            lhs.column == rhs.column &&
+            lhs.severity == rhs.severity &&
+            lhs.message == rhs.message
+    }
+
     // MARK: - Hashable
 
     public func hash(into hasher: inout Hasher) {
@@ -113,14 +127,6 @@ public struct Diagnostic: Sendable, Codable, Hashable {
         hasher.combine(column)
         hasher.combine(severity)
         hasher.combine(message)
-    }
-
-    public static func == (lhs: Diagnostic, rhs: Diagnostic) -> Bool {
-        lhs.file == rhs.file &&
-        lhs.line == rhs.line &&
-        lhs.column == rhs.column &&
-        lhs.severity == rhs.severity &&
-        lhs.message == rhs.message
     }
 
     /// Create a copy of this diagnostic with additional notes appended.
@@ -134,7 +140,7 @@ public struct Diagnostic: Sendable, Codable, Hashable {
             category: category,
             ruleID: ruleID,
             fixIt: fixIt,
-            notes: notes + additionalNotes
+            notes: notes + additionalNotes,
         )
     }
 
@@ -149,31 +155,46 @@ public struct Diagnostic: Sendable, Codable, Hashable {
             category: category,
             ruleID: ruleID,
             fixIt: fixIt,
-            notes: newNotes
+            notes: newNotes,
         )
     }
 }
 
-// MARK: - Fix-It
+// MARK: - FixIt
 
 /// A suggested fix for a diagnostic.
 public struct FixIt: Sendable, Codable, Hashable {
-    /// Description of the fix.
-    public let description: String
-
-    /// Text edits to apply.
-    public let edits: [TextEdit]
+    // MARK: Lifecycle
 
     public init(description: String, edits: [TextEdit]) {
         self.description = description
         self.edits = edits
     }
+
+    // MARK: Public
+
+    /// Description of the fix.
+    public let description: String
+
+    /// Text edits to apply.
+    public let edits: [TextEdit]
 }
 
-// MARK: - Text Edit
+// MARK: - TextEdit
 
 /// A text edit for a fix-it.
 public struct TextEdit: Sendable, Codable, Hashable {
+    // MARK: Lifecycle
+
+    public init(file: String, startOffset: Int, endOffset: Int, replacement: String) {
+        self.file = file
+        self.startOffset = startOffset
+        self.endOffset = endOffset
+        self.replacement = replacement
+    }
+
+    // MARK: Public
+
     /// File to edit.
     public let file: String
 
@@ -185,30 +206,17 @@ public struct TextEdit: Sendable, Codable, Hashable {
 
     /// Replacement text.
     public let replacement: String
-
-    public init(file: String, startOffset: Int, endOffset: Int, replacement: String) {
-        self.file = file
-        self.startOffset = startOffset
-        self.endOffset = endOffset
-        self.replacement = replacement
-    }
 }
 
-// MARK: - Diagnostic Builder
+// MARK: - DiagnosticBuilder
 
 /// Builder for creating diagnostics.
 public struct DiagnosticBuilder {
-    private var file: String = ""
-    private var line: Int = 1
-    private var column: Int = 1
-    private var severity: DiagnosticSeverity = .warning
-    private var message: String = ""
-    private var category: DiagnosticCategory = .general
-    private var ruleID: String?
-    private var fixIt: FixIt?
-    private var notes: [Diagnostic] = []
+    // MARK: Lifecycle
 
     public init() {}
+
+    // MARK: Public
 
     public func file(_ file: String) -> DiagnosticBuilder {
         var copy = self
@@ -269,7 +277,19 @@ public struct DiagnosticBuilder {
             category: category,
             ruleID: ruleID,
             fixIt: fixIt,
-            notes: notes
+            notes: notes,
         )
     }
+
+    // MARK: Private
+
+    private var file: String = ""
+    private var line: Int = 1
+    private var column: Int = 1
+    private var severity: DiagnosticSeverity = .warning
+    private var message: String = ""
+    private var category: DiagnosticCategory = .general
+    private var ruleID: String?
+    private var fixIt: FixIt?
+    private var notes: [Diagnostic] = []
 }

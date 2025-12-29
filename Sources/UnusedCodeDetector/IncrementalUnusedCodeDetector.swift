@@ -8,7 +8,7 @@
 import Foundation
 import SwiftStaticAnalysisCore
 
-// MARK: - Incremental Unused Code Result
+// MARK: - IncrementalUnusedCodeResult
 
 /// Result of incremental unused code detection.
 public struct IncrementalUnusedCodeResult: Sendable {
@@ -31,28 +31,17 @@ public struct IncrementalUnusedCodeResult: Sendable {
     }
 }
 
-// MARK: - Incremental Unused Code Detector
+// MARK: - IncrementalUnusedCodeDetector
 
 /// Actor-based incremental unused code detector with caching.
 public actor IncrementalUnusedCodeDetector {
-
-    /// Configuration for detection.
-    public let configuration: UnusedCodeConfiguration
-
-    /// Concurrency configuration.
-    public let concurrency: ConcurrencyConfiguration
-
-    /// Incremental analyzer.
-    private let incrementalAnalyzer: IncrementalAnalyzer
-
-    /// Whether initialized.
-    private var isInitialized: Bool = false
+    // MARK: Lifecycle
 
     // MARK: - Initialization
 
     public init(
         configuration: UnusedCodeConfiguration = .incremental(),
-        concurrency: ConcurrencyConfiguration = .default
+        concurrency: ConcurrencyConfiguration = .default,
     ) {
         self.configuration = configuration
         self.concurrency = concurrency
@@ -60,10 +49,18 @@ public actor IncrementalUnusedCodeDetector {
         let incrementalConfig = IncrementalConfiguration(
             cacheDirectory: configuration.cacheDirectory,
             trackDependencies: true,
-            concurrency: concurrency
+            concurrency: concurrency,
         )
-        self.incrementalAnalyzer = IncrementalAnalyzer(configuration: incrementalConfig)
+        incrementalAnalyzer = IncrementalAnalyzer(configuration: incrementalConfig)
     }
+
+    // MARK: Public
+
+    /// Configuration for detection.
+    public let configuration: UnusedCodeConfiguration
+
+    /// Concurrency configuration.
+    public let concurrency: ConcurrencyConfiguration
 
     /// Initialize by loading caches from disk.
     public func initialize() async throws {
@@ -101,9 +98,29 @@ public actor IncrementalUnusedCodeDetector {
             unusedCode: unusedCode,
             analyzedFiles: analysisResult.analyzedFiles,
             cachedFiles: analysisResult.cachedFiles,
-            timeSavedMs: analysisResult.timeSavedMs
+            timeSavedMs: analysisResult.timeSavedMs,
         )
     }
+
+    // MARK: - Statistics
+
+    /// Get cache statistics.
+    public func cacheStatistics() async -> AnalysisCache.Statistics {
+        await incrementalAnalyzer.cacheStatistics()
+    }
+
+    /// Get dependency statistics.
+    public func dependencyStatistics() async -> DependencyTracker.Statistics {
+        await incrementalAnalyzer.dependencyStatistics()
+    }
+
+    // MARK: Private
+
+    /// Incremental analyzer.
+    private let incrementalAnalyzer: IncrementalAnalyzer
+
+    /// Whether initialized.
+    private var isInitialized: Bool = false
 
     // MARK: - Private Detection
 
@@ -136,7 +153,7 @@ public actor IncrementalUnusedCodeDetector {
                         declaration: declaration,
                         reason: .neverReferenced,
                         confidence: confidence,
-                        suggestion: suggestion(for: declaration)
+                        suggestion: suggestion(for: declaration),
                     ))
                 }
             } else if isSelfReferenceOnly(declaration, referenceCount: count, in: result) {
@@ -147,7 +164,7 @@ public actor IncrementalUnusedCodeDetector {
                         declaration: declaration,
                         reason: .onlySelfReferenced,
                         confidence: confidence,
-                        suggestion: suggestion(for: declaration)
+                        suggestion: suggestion(for: declaration),
                     ))
                 }
             }
@@ -164,52 +181,63 @@ public actor IncrementalUnusedCodeDetector {
     /// Check if a declaration should be checked based on configuration.
     private func shouldCheck(_ declaration: Declaration) -> Bool {
         switch declaration.kind {
-        case .variable, .constant:
-            return configuration.detectVariables
-        case .function, .method:
-            return configuration.detectFunctions
-        case .class, .struct, .enum, .protocol:
-            return configuration.detectTypes
+        case .constant,
+             .variable:
+            configuration.detectVariables
+        case .function,
+             .method:
+            configuration.detectFunctions
+        case .class,
+             .enum,
+             .protocol,
+             .struct:
+            configuration.detectTypes
+
         case .import:
-            return configuration.detectImports
+            configuration.detectImports
+
         case .parameter:
-            return configuration.detectParameters
+            configuration.detectParameters
+
         default:
-            return false
+            false
         }
     }
 
     /// Check if declaration passes configured filters.
     private func passesFilters(_ declaration: Declaration) -> Bool {
         // Check public API filter
-        if configuration.ignorePublicAPI &&
-           (declaration.accessLevel == .public || declaration.accessLevel == .open) {
+        if configuration.ignorePublicAPI,
+           declaration.accessLevel == .public || declaration.accessLevel == .open {
             return false
         }
 
         // Check ignored patterns
         for pattern in configuration.ignoredPatterns {
             if let regex = try? NSRegularExpression(pattern: pattern),
-               regex.firstMatch(in: declaration.name, range: NSRange(declaration.name.startIndex..., in: declaration.name)) != nil {
+               regex.firstMatch(
+                   in: declaration.name,
+                   range: NSRange(declaration.name.startIndex..., in: declaration.name),
+               ) != nil {
                 return false
             }
         }
 
         // SwiftUI filters
-        if configuration.ignoreSwiftUIPropertyWrappers && declaration.hasSwiftUIPropertyWrapper {
+        if configuration.ignoreSwiftUIPropertyWrappers, declaration.hasSwiftUIPropertyWrapper {
             return false
         }
 
-        if configuration.ignoreViewBody && declaration.name == "body" && declaration.kind == .variable {
+        if configuration.ignoreViewBody, declaration.name == "body", declaration.kind == .variable {
             return false
         }
 
-        if configuration.ignorePreviewProviders && declaration.isSwiftUIPreview {
+        if configuration.ignorePreviewProviders, declaration.isSwiftUIPreview {
             return false
         }
 
         // Check @objc as root
-        if configuration.treatObjcAsRoot && declaration.attributes.contains("objc") {
+        if configuration.treatObjcAsRoot, declaration.attributes.contains("objc") {
             return false
         }
 
@@ -220,7 +248,7 @@ public actor IncrementalUnusedCodeDetector {
     private func isSelfReferenceOnly(
         _ declaration: Declaration,
         referenceCount: Int,
-        in result: AnalysisResult
+        in result: AnalysisResult,
     ) -> Bool {
         // For now, simplified check - if there's only one reference
         // and it's in the same file, it might be self-referencing
@@ -237,18 +265,24 @@ public actor IncrementalUnusedCodeDetector {
     /// Generate suggestion for unused declaration.
     private func suggestion(for declaration: Declaration) -> String {
         switch declaration.kind {
-        case .function, .method:
-            return "Consider removing this unused function"
-        case .variable, .constant:
-            return "Consider removing this unused variable"
-        case .class, .struct:
-            return "Consider removing this unused type"
+        case .function,
+             .method:
+            "Consider removing this unused function"
+        case .constant,
+             .variable:
+            "Consider removing this unused variable"
+        case .class,
+             .struct:
+            "Consider removing this unused type"
+
         case .protocol:
-            return "Consider removing this unused protocol"
+            "Consider removing this unused protocol"
+
         case .import:
-            return "Consider removing this unused import"
+            "Consider removing this unused import"
+
         default:
-            return "Consider removing this unused declaration"
+            "Consider removing this unused declaration"
         }
     }
 
@@ -267,23 +301,11 @@ public actor IncrementalUnusedCodeDetector {
                     declaration: importDecl,
                     reason: .importNotUsed,
                     confidence: .low, // Low confidence without full type resolution
-                    suggestion: "Consider removing unused import '\(importDecl.name)'"
+                    suggestion: "Consider removing unused import '\(importDecl.name)'",
                 ))
             }
         }
 
         return unused
-    }
-
-    // MARK: - Statistics
-
-    /// Get cache statistics.
-    public func cacheStatistics() async -> AnalysisCache.Statistics {
-        await incrementalAnalyzer.cacheStatistics()
-    }
-
-    /// Get dependency statistics.
-    public func dependencyStatistics() async -> DependencyTracker.Statistics {
-        await incrementalAnalyzer.dependencyStatistics()
     }
 }

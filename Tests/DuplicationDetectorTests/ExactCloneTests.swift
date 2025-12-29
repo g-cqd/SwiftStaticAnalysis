@@ -5,16 +5,17 @@
 //  Tests for exact clone (Type-1) detection.
 //
 
-import Foundation
-import Testing
 @testable import DuplicationDetector
+import Foundation
+import SwiftParser
 @testable import SwiftStaticAnalysisCore
 import SwiftSyntax
-import SwiftParser
+import Testing
+
+// MARK: - ExactCloneTests
 
 @Suite("Exact Clone Detection Tests")
 struct ExactCloneTests {
-
     // MARK: - Basic Detection
 
     @Test("Detect identical code blocks")
@@ -132,7 +133,8 @@ struct ExactCloneTests {
         let productAPIPath = fixturesPath.appendingPathComponent("ProductAPI.swift")
 
         guard FileManager.default.fileExists(atPath: userAPIPath.path),
-              FileManager.default.fileExists(atPath: productAPIPath.path) else {
+              FileManager.default.fileExists(atPath: productAPIPath.path)
+        else {
             Issue.record("Fixture files not found")
             return
         }
@@ -200,9 +202,10 @@ struct ExactCloneTests {
     }
 }
 
+// MARK: - CloneMergingTests
+
 @Suite("Clone Merging Tests")
 struct CloneMergingTests {
-
     @Test("Merge overlapping clones")
     func mergeOverlapping() {
         let source = """
@@ -235,9 +238,10 @@ struct CloneMergingTests {
     }
 }
 
+// MARK: - HashCollisionTests
+
 @Suite("Hash Collision Tests")
 struct HashCollisionTests {
-
     @Test("Verify actual content on hash match")
     func verifyHashMatch() {
         // Two different code blocks that might have same hash (unlikely but test verification)

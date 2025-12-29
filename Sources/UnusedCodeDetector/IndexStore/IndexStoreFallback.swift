@@ -16,7 +16,7 @@ import Foundation
 @preconcurrency import IndexStoreDB
 import SwiftStaticAnalysisCore
 
-// MARK: - Index Store Status
+// MARK: - IndexStoreStatus
 
 /// Status of the index store for analysis.
 public enum IndexStoreStatus: Sendable {
@@ -32,28 +32,34 @@ public enum IndexStoreStatus: Sendable {
     /// Index store exists but failed to open.
     case failed(error: String)
 
+    // MARK: Public
+
     /// Whether the index is usable (available or stale with warnings).
     public var isUsable: Bool {
         switch self {
-        case .available, .stale:
-            return true
-        case .notFound, .failed:
-            return false
+        case .available,
+             .stale:
+            true
+        case .failed,
+             .notFound:
+            false
         }
     }
 
     /// The path to the index store, if available.
     public var path: String? {
         switch self {
-        case .available(let path), .stale(let path, _):
-            return path
-        case .notFound, .failed:
-            return nil
+        case let .available(path),
+             let .stale(path, _):
+            path
+        case .failed,
+             .notFound:
+            nil
         }
     }
 }
 
-// MARK: - Analysis Mode Result
+// MARK: - AnalysisModeResult
 
 /// Result of determining which analysis mode to use.
 public enum AnalysisModeResult {
@@ -67,7 +73,7 @@ public enum AnalysisModeResult {
     case hybrid(db: IndexStoreDB, status: IndexStoreStatus)
 }
 
-// MARK: - Fallback Reason
+// MARK: - FallbackReason
 
 /// Reason for falling back to syntax-based analysis.
 public enum FallbackReason: Sendable, CustomStringConvertible {
@@ -83,24 +89,40 @@ public enum FallbackReason: Sendable, CustomStringConvertible {
     /// User requested syntax-only mode.
     case userRequested
 
+    // MARK: Public
+
     public var description: String {
         switch self {
         case .noIndexStore:
-            return "No index store found. Run 'swift build' to generate one."
-        case .indexStoreFailed(let error):
-            return "Failed to open index store: \(error)"
-        case .buildFailed(let error):
-            return "Build failed: \(error)"
+            "No index store found. Run 'swift build' to generate one."
+
+        case let .indexStoreFailed(error):
+            "Failed to open index store: \(error)"
+
+        case let .buildFailed(error):
+            "Build failed: \(error)"
+
         case .userRequested:
-            return "Syntax-only mode requested by user."
+            "Syntax-only mode requested by user."
         }
     }
 }
 
-// MARK: - Build Result
+// MARK: - BuildResult
 
 /// Result of attempting to build the project.
 public struct BuildResult: Sendable {
+    // MARK: Lifecycle
+
+    public init(success: Bool, output: String, duration: TimeInterval, indexStorePath: String?) {
+        self.success = success
+        self.output = output
+        self.duration = duration
+        self.indexStorePath = indexStorePath
+    }
+
+    // MARK: Public
+
     /// Whether the build succeeded.
     public let success: Bool
 
@@ -112,29 +134,23 @@ public struct BuildResult: Sendable {
 
     /// Path to generated index store (if successful).
     public let indexStorePath: String?
-
-    public init(success: Bool, output: String, duration: TimeInterval, indexStorePath: String?) {
-        self.success = success
-        self.output = output
-        self.duration = duration
-        self.indexStorePath = indexStorePath
-    }
 }
 
-// MARK: - Index Store Fallback Manager
+// MARK: - IndexStoreFallbackManager
 
 /// Manages index store availability and fallback strategies.
 public final class IndexStoreFallbackManager: @unchecked Sendable {
-    /// Configuration for fallback behavior.
-    public let configuration: FallbackConfiguration
-
-    /// Path to libIndexStore.dylib.
-    private let libIndexStorePath: String?
+    // MARK: Lifecycle
 
     public init(configuration: FallbackConfiguration = .default, libIndexStorePath: String? = nil) {
         self.configuration = configuration
         self.libIndexStorePath = libIndexStorePath
     }
+
+    // MARK: Public
+
+    /// Configuration for fallback behavior.
+    public let configuration: FallbackConfiguration
 
     // MARK: - Status Checking
 
@@ -146,7 +162,7 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
     /// - Returns: The status of the index store.
     public func checkIndexStoreStatus(
         projectRoot: String,
-        sourceFiles: [String]
+        sourceFiles: [String],
     ) -> IndexStoreStatus {
         // Try to find the index store
         guard let indexStorePath = IndexStorePathFinder.findIndexStorePath(in: projectRoot) else {
@@ -157,7 +173,7 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
         do {
             let reader = try IndexStoreReader(
                 indexStorePath: indexStorePath,
-                libIndexStorePath: libIndexStorePath
+                libIndexStorePath: libIndexStorePath,
             )
 
             // Check freshness if enabled
@@ -165,7 +181,7 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
                 let staleFiles = findStaleFiles(
                     sourceFiles: sourceFiles,
                     indexStorePath: indexStorePath,
-                    reader: reader
+                    reader: reader,
                 )
 
                 if !staleFiles.isEmpty {
@@ -179,11 +195,147 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
         }
     }
 
+    // MARK: - Auto Build
+
+    /// Attempt to build the project to generate/update the index store.
+    ///
+    /// - Parameter projectRoot: Path to the project root.
+    /// - Returns: The build result.
+    public func autoBuild(projectRoot: String) async -> BuildResult {
+        let startTime = Date()
+
+        // Detect project type and build
+        let projectURL = URL(fileURLWithPath: projectRoot)
+        let packageSwift = projectURL.appendingPathComponent("Package.swift")
+
+        if FileManager.default.fileExists(atPath: packageSwift.path) {
+            // Swift Package Manager project
+            return await buildSPMProject(at: projectRoot, startTime: startTime)
+        }
+
+        // Check for Xcode project
+        if let contents = try? FileManager.default.contentsOfDirectory(atPath: projectRoot),
+           contents.contains(where: { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".xcworkspace") }) {
+            return await buildXcodeProject(at: projectRoot, startTime: startTime)
+        }
+
+        return BuildResult(
+            success: false,
+            output: "Could not determine project type. No Package.swift or .xcodeproj found.",
+            duration: Date().timeIntervalSince(startTime),
+            indexStorePath: nil,
+        )
+    }
+
+    // MARK: - Analysis Mode Selection
+
+    /// Determine which analysis mode to use.
+    ///
+    /// - Parameters:
+    ///   - projectRoot: Path to the project root.
+    ///   - sourceFiles: Source files to analyze.
+    ///   - preferredMode: The preferred mode from configuration.
+    /// - Returns: The analysis mode to use.
+    public func determineAnalysisMode(
+        projectRoot: String,
+        sourceFiles: [String],
+        preferredMode: DetectionMode,
+    ) async -> AnalysisModeResult {
+        // If user explicitly requested simple or reachability mode
+        if preferredMode == .simple {
+            return .reachability(reason: .userRequested)
+        }
+
+        if preferredMode == .reachability {
+            return .reachability(reason: .userRequested)
+        }
+
+        // Check index store status
+        var status = checkIndexStoreStatus(projectRoot: projectRoot, sourceFiles: sourceFiles)
+
+        // If not available and auto-build is enabled, try building
+        if !status.isUsable, configuration.autoBuild {
+            let buildResult = await autoBuild(projectRoot: projectRoot)
+
+            if buildResult.success, buildResult.indexStorePath != nil {
+                // Re-check status
+                status = checkIndexStoreStatus(projectRoot: projectRoot, sourceFiles: sourceFiles)
+            } else {
+                return .reachability(reason: .buildFailed(error: buildResult.output))
+            }
+        }
+
+        // If still not available, fall back
+        if !status.isUsable {
+            switch status {
+            case .notFound:
+                return .reachability(reason: .noIndexStore)
+
+            case let .failed(error):
+                return .reachability(reason: .indexStoreFailed(error: error))
+
+            default:
+                return .reachability(reason: .noIndexStore)
+            }
+        }
+
+        // Open the index store
+        guard let indexStorePath = status.path else {
+            return .reachability(reason: .noIndexStore)
+        }
+
+        do {
+            let storePath = URL(fileURLWithPath: indexStorePath)
+            let databasePath = storePath.deletingLastPathComponent().appendingPathComponent("IndexDatabase")
+
+            try FileManager.default.createDirectory(at: databasePath, withIntermediateDirectories: true)
+
+            let libPath = libIndexStorePath ?? IndexStoreReader.findLibIndexStore()
+
+            let db = try IndexStoreDB(
+                storePath: storePath.path,
+                databasePath: databasePath.path,
+                library: IndexStoreLibrary(dylibPath: libPath),
+                waitUntilDoneInitializing: true,
+            )
+
+            // Warn about stale files if applicable
+            if case let .stale(_, staleFiles) = status {
+                if configuration.warnOnStale {
+                    // Log warning (in a real implementation, use proper logging)
+                    print(
+                        "Warning: Index store is stale. \(staleFiles.count) file(s) have been modified since last build:",
+                    )
+                    for file in staleFiles.prefix(5) {
+                        print("  - \(file)")
+                    }
+                    if staleFiles.count > 5 {
+                        print("  ... and \(staleFiles.count - 5) more")
+                    }
+                }
+            }
+
+            // Return based on hybrid preference
+            if configuration.hybridMode {
+                return .hybrid(db: db, status: status)
+            } else {
+                return .indexStore(db: db, status: status)
+            }
+        } catch {
+            return .reachability(reason: .indexStoreFailed(error: error.localizedDescription))
+        }
+    }
+
+    // MARK: Private
+
+    /// Path to libIndexStore.dylib.
+    private let libIndexStorePath: String?
+
     /// Find files that are newer than the index.
     private func findStaleFiles(
         sourceFiles: [String],
         indexStorePath: String,
-        reader: IndexStoreReader
+        reader: IndexStoreReader,
     ) -> [String] {
         var staleFiles: [String] = []
 
@@ -237,7 +389,7 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
                 storePath: storePath.path,
                 databasePath: databasePath.path,
                 library: IndexStoreLibrary(dylibPath: libPath),
-                waitUntilDoneInitializing: true
+                waitUntilDoneInitializing: true,
             )
 
             return db.dateOfLatestUnitFor(filePath: sourceFile)
@@ -245,38 +397,6 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
             // Fallback: check store directory mod time
             return fileModificationTime(indexStorePath)
         }
-    }
-
-    // MARK: - Auto Build
-
-    /// Attempt to build the project to generate/update the index store.
-    ///
-    /// - Parameter projectRoot: Path to the project root.
-    /// - Returns: The build result.
-    public func autoBuild(projectRoot: String) async -> BuildResult {
-        let startTime = Date()
-
-        // Detect project type and build
-        let projectURL = URL(fileURLWithPath: projectRoot)
-        let packageSwift = projectURL.appendingPathComponent("Package.swift")
-
-        if FileManager.default.fileExists(atPath: packageSwift.path) {
-            // Swift Package Manager project
-            return await buildSPMProject(at: projectRoot, startTime: startTime)
-        }
-
-        // Check for Xcode project
-        if let contents = try? FileManager.default.contentsOfDirectory(atPath: projectRoot),
-           contents.contains(where: { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".xcworkspace") }) {
-            return await buildXcodeProject(at: projectRoot, startTime: startTime)
-        }
-
-        return BuildResult(
-            success: false,
-            output: "Could not determine project type. No Package.swift or .xcodeproj found.",
-            duration: Date().timeIntervalSince(startTime),
-            indexStorePath: nil
-        )
     }
 
     /// Build an SPM project.
@@ -300,20 +420,20 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
             let success = process.terminationStatus == 0
             let indexPath = success ?
                 URL(fileURLWithPath: projectRoot)
-                    .appendingPathComponent(".build/index/store").path : nil
+                .appendingPathComponent(".build/index/store").path : nil
 
             return BuildResult(
                 success: success,
                 output: output,
                 duration: Date().timeIntervalSince(startTime),
-                indexStorePath: indexPath
+                indexStorePath: indexPath,
             )
         } catch {
             return BuildResult(
                 success: false,
                 output: "Failed to run swift build: \(error.localizedDescription)",
                 duration: Date().timeIntervalSince(startTime),
-                indexStorePath: nil
+                indexStorePath: nil,
             )
         }
     }
@@ -326,14 +446,14 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
                 success: false,
                 output: "Could not read project directory",
                 duration: Date().timeIntervalSince(startTime),
-                indexStorePath: nil
+                indexStorePath: nil,
             )
         }
 
         let workspace = contents.first { $0.hasSuffix(".xcworkspace") }
         let project = contents.first { $0.hasSuffix(".xcodeproj") }
 
-        var arguments: [String] = ["build"]
+        var arguments = ["build"]
 
         if let ws = workspace {
             arguments += ["-workspace", ws]
@@ -346,7 +466,7 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
         // Add index store path
         arguments += [
             "INDEX_ENABLE_DATA_STORE=YES",
-            "INDEX_DATA_STORE_DIR=$(PROJECT_DIR)/.build/index/store"
+            "INDEX_DATA_STORE_DIR=$(PROJECT_DIR)/.build/index/store",
         ]
 
         let process = Process()
@@ -368,7 +488,7 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
             let success = process.terminationStatus == 0
 
             // Try to find the index store path
-            var indexPath: String? = nil
+            var indexPath: String?
             if success {
                 indexPath = IndexStorePathFinder.findIndexStorePath(in: projectRoot)
             }
@@ -377,119 +497,62 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
                 success: success,
                 output: output,
                 duration: Date().timeIntervalSince(startTime),
-                indexStorePath: indexPath
+                indexStorePath: indexPath,
             )
         } catch {
             return BuildResult(
                 success: false,
                 output: "Failed to run xcodebuild: \(error.localizedDescription)",
                 duration: Date().timeIntervalSince(startTime),
-                indexStorePath: nil
+                indexStorePath: nil,
             )
-        }
-    }
-
-    // MARK: - Analysis Mode Selection
-
-    /// Determine which analysis mode to use.
-    ///
-    /// - Parameters:
-    ///   - projectRoot: Path to the project root.
-    ///   - sourceFiles: Source files to analyze.
-    ///   - preferredMode: The preferred mode from configuration.
-    /// - Returns: The analysis mode to use.
-    public func determineAnalysisMode(
-        projectRoot: String,
-        sourceFiles: [String],
-        preferredMode: DetectionMode
-    ) async -> AnalysisModeResult {
-        // If user explicitly requested simple or reachability mode
-        if preferredMode == .simple {
-            return .reachability(reason: .userRequested)
-        }
-
-        if preferredMode == .reachability {
-            return .reachability(reason: .userRequested)
-        }
-
-        // Check index store status
-        var status = checkIndexStoreStatus(projectRoot: projectRoot, sourceFiles: sourceFiles)
-
-        // If not available and auto-build is enabled, try building
-        if !status.isUsable && configuration.autoBuild {
-            let buildResult = await autoBuild(projectRoot: projectRoot)
-
-            if buildResult.success, buildResult.indexStorePath != nil {
-                // Re-check status
-                status = checkIndexStoreStatus(projectRoot: projectRoot, sourceFiles: sourceFiles)
-            } else {
-                return .reachability(reason: .buildFailed(error: buildResult.output))
-            }
-        }
-
-        // If still not available, fall back
-        if !status.isUsable {
-            switch status {
-            case .notFound:
-                return .reachability(reason: .noIndexStore)
-            case .failed(let error):
-                return .reachability(reason: .indexStoreFailed(error: error))
-            default:
-                return .reachability(reason: .noIndexStore)
-            }
-        }
-
-        // Open the index store
-        guard let indexStorePath = status.path else {
-            return .reachability(reason: .noIndexStore)
-        }
-
-        do {
-            let storePath = URL(fileURLWithPath: indexStorePath)
-            let databasePath = storePath.deletingLastPathComponent().appendingPathComponent("IndexDatabase")
-
-            try FileManager.default.createDirectory(at: databasePath, withIntermediateDirectories: true)
-
-            let libPath = libIndexStorePath ?? IndexStoreReader.findLibIndexStore()
-
-            let db = try IndexStoreDB(
-                storePath: storePath.path,
-                databasePath: databasePath.path,
-                library: IndexStoreLibrary(dylibPath: libPath),
-                waitUntilDoneInitializing: true
-            )
-
-            // Warn about stale files if applicable
-            if case .stale(_, let staleFiles) = status {
-                if configuration.warnOnStale {
-                    // Log warning (in a real implementation, use proper logging)
-                    print("Warning: Index store is stale. \(staleFiles.count) file(s) have been modified since last build:")
-                    for file in staleFiles.prefix(5) {
-                        print("  - \(file)")
-                    }
-                    if staleFiles.count > 5 {
-                        print("  ... and \(staleFiles.count - 5) more")
-                    }
-                }
-            }
-
-            // Return based on hybrid preference
-            if configuration.hybridMode {
-                return .hybrid(db: db, status: status)
-            } else {
-                return .indexStore(db: db, status: status)
-            }
-
-        } catch {
-            return .reachability(reason: .indexStoreFailed(error: error.localizedDescription))
         }
     }
 }
 
-// MARK: - Fallback Configuration
+// MARK: - FallbackConfiguration
 
 /// Configuration for fallback behavior.
 public struct FallbackConfiguration: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        autoBuild: Bool = false,
+        checkFreshness: Bool = true,
+        warnOnStale: Bool = true,
+        hybridMode: Bool = false,
+        maxStaleness: TimeInterval = 3600, // 1 hour
+    ) {
+        self.autoBuild = autoBuild
+        self.checkFreshness = checkFreshness
+        self.warnOnStale = warnOnStale
+        self.hybridMode = hybridMode
+        self.maxStaleness = maxStaleness
+    }
+
+    // MARK: Public
+
+    public static let `default` = FallbackConfiguration()
+
+    /// Configuration with auto-build enabled.
+    public static let withAutoBuild = FallbackConfiguration(autoBuild: true)
+
+    /// Configuration for CI/CD where index is expected.
+    public static let cicd = FallbackConfiguration(
+        autoBuild: false,
+        checkFreshness: true,
+        warnOnStale: false,
+        hybridMode: false,
+    )
+
+    /// Hybrid mode configuration.
+    public static let hybrid = FallbackConfiguration(
+        autoBuild: false,
+        checkFreshness: true,
+        warnOnStale: true,
+        hybridMode: true,
+    )
+
     /// Whether to automatically build the project if index is missing/stale.
     public var autoBuild: Bool
 
@@ -504,40 +567,4 @@ public struct FallbackConfiguration: Sendable {
 
     /// Maximum staleness (in seconds) before considering a rebuild.
     public var maxStaleness: TimeInterval
-
-    public init(
-        autoBuild: Bool = false,
-        checkFreshness: Bool = true,
-        warnOnStale: Bool = true,
-        hybridMode: Bool = false,
-        maxStaleness: TimeInterval = 3600 // 1 hour
-    ) {
-        self.autoBuild = autoBuild
-        self.checkFreshness = checkFreshness
-        self.warnOnStale = warnOnStale
-        self.hybridMode = hybridMode
-        self.maxStaleness = maxStaleness
-    }
-
-    public static let `default` = FallbackConfiguration()
-
-    /// Configuration with auto-build enabled.
-    public static let withAutoBuild = FallbackConfiguration(autoBuild: true)
-
-    /// Configuration for CI/CD where index is expected.
-    public static let cicd = FallbackConfiguration(
-        autoBuild: false,
-        checkFreshness: true,
-        warnOnStale: false,
-        hybridMode: false
-    )
-
-    /// Hybrid mode configuration.
-    public static let hybrid = FallbackConfiguration(
-        autoBuild: false,
-        checkFreshness: true,
-        warnOnStale: true,
-        hybridMode: true
-    )
 }
-

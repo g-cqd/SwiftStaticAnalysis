@@ -7,10 +7,10 @@
 //
 
 import Foundation
-import SwiftSyntax
 import SwiftStaticAnalysisCore
+import SwiftSyntax
 
-// MARK: - Normalized Window
+// MARK: - NormalizedWindow
 
 /// A window of normalized tokens with its hash.
 struct NormalizedWindow: Sendable, GroupableWindow {
@@ -28,27 +28,28 @@ struct NormalizedWindow: Sendable, GroupableWindow {
     }
 }
 
-// MARK: - Near Clone Detector
+// MARK: - NearCloneDetector
 
 /// Detects near-clones using normalized token comparison.
 public struct NearCloneDetector: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        minimumTokens: Int = 50,
+        minimumSimilarity: Double = 0.8,
+    ) {
+        self.minimumTokens = minimumTokens
+        self.minimumSimilarity = minimumSimilarity
+        normalizer = .default
+    }
+
+    // MARK: Public
+
     /// Minimum number of tokens to consider.
     public let minimumTokens: Int
 
     /// Minimum similarity threshold (0.0 to 1.0).
     public let minimumSimilarity: Double
-
-    /// Token normalizer.
-    private let normalizer: TokenNormalizer
-
-    public init(
-        minimumTokens: Int = 50,
-        minimumSimilarity: Double = 0.8
-    ) {
-        self.minimumTokens = minimumTokens
-        self.minimumSimilarity = minimumSimilarity
-        self.normalizer = .default
-    }
 
     /// Detect near-clones across multiple token sequences.
     public func detect(in sequences: [TokenSequence]) -> [CloneGroup] {
@@ -80,7 +81,7 @@ public struct NearCloneDetector: Sendable {
                         startLine: window.startLine,
                         endLine: window.endLine,
                         tokenCount: minimumTokens,
-                        codeSnippet: ""
+                        codeSnippet: "",
                     )
                 }
 
@@ -93,7 +94,7 @@ public struct NearCloneDetector: Sendable {
                             type: .near,
                             clones: clones,
                             similarity: similarity,
-                            fingerprint: String(hash)
+                            fingerprint: String(hash),
                         ))
                     }
                 }
@@ -103,17 +104,22 @@ public struct NearCloneDetector: Sendable {
         return cloneGroups.deduplicated()
     }
 
+    // MARK: Private
+
+    /// Token normalizer.
+    private let normalizer: TokenNormalizer
+
     /// Extract normalized windows from a sequence.
     private func extractNormalizedWindows(
         from sequence: NormalizedSequence,
-        rollingHash: RollingHash
+        rollingHash: RollingHash,
     ) -> [NormalizedWindow] {
         guard sequence.tokens.count >= minimumTokens else { return [] }
 
         var windows: [NormalizedWindow] = []
         let tokens = sequence.tokens
-        let normalizedTexts = tokens.map { $0.normalized }
-        let originalTexts = tokens.map { $0.original }
+        let normalizedTexts = tokens.map(\.normalized)
+        let originalTexts = tokens.map(\.original)
 
         // Compute initial hash of normalized tokens
         var hash = rollingHash.initialHash(Array(normalizedTexts.prefix(minimumTokens)))
@@ -127,12 +133,12 @@ public struct NearCloneDetector: Sendable {
             startLine: tokens[0].line,
             endLine: tokens[minimumTokens - 1].line,
             normalizedTokens: Array(normalizedTexts.prefix(minimumTokens)),
-            originalTokens: Array(originalTexts.prefix(minimumTokens))
+            originalTokens: Array(originalTexts.prefix(minimumTokens)),
         ))
 
         // Roll through remaining windows
         let maxStartIndex = tokens.count - minimumTokens
-        for i in 1...maxStartIndex where maxStartIndex >= 1 {
+        for i in 1 ... maxStartIndex where maxStartIndex >= 1 {
             let outgoing = normalizedTexts[i - 1]
             let incoming = normalizedTexts[i + minimumTokens - 1]
             hash = rollingHash.roll(hash: hash, outgoing: outgoing, incoming: incoming)
@@ -144,8 +150,8 @@ public struct NearCloneDetector: Sendable {
                 endIndex: i + minimumTokens - 1,
                 startLine: tokens[i].line,
                 endLine: tokens[i + minimumTokens - 1].line,
-                normalizedTokens: Array(normalizedTexts[i..<(i + minimumTokens)]),
-                originalTokens: Array(originalTexts[i..<(i + minimumTokens)])
+                normalizedTokens: Array(normalizedTexts[i ..< (i + minimumTokens)]),
+                originalTokens: Array(originalTexts[i ..< (i + minimumTokens)]),
             ))
         }
 
@@ -165,9 +171,12 @@ public struct NearCloneDetector: Sendable {
         var totalSimilarity = 0.0
         var comparisons = 0
 
-        for i in 0..<group.count {
-            for j in (i + 1)..<group.count {
-                totalSimilarity += CloneDetectionUtilities.jaccardSimilarity(group[i].originalTokens, group[j].originalTokens)
+        for i in 0 ..< group.count {
+            for j in (i + 1) ..< group.count {
+                totalSimilarity += CloneDetectionUtilities.jaccardSimilarity(
+                    group[i].originalTokens,
+                    group[j].originalTokens,
+                )
                 comparisons += 1
             }
         }

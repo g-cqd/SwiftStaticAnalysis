@@ -8,35 +8,33 @@
 
 import Foundation
 
-// MARK: - Mock API
+// MARK: - API
 
 struct API {
     static let shared = API()
 
     func fetchUsers() async throws -> [String] {
-        return ["User1", "User2"]
+        ["User1", "User2"]
     }
 
     func fetchProducts() async throws -> [String] {
-        return ["Product1", "Product2"]
+        ["Product1", "Product2"]
     }
 
     func fetchOrders() async throws -> [String] {
-        return ["Order1", "Order2"]
+        ["Order1", "Order2"]
     }
 
     func fetchCategories() async throws -> [String] {
-        return ["Category1", "Category2"]
+        ["Category1", "Category2"]
     }
 }
 
-// MARK: - Near-Clone ViewModels (Type-2 Clones - Renamed Variables)
+// MARK: - UserViewModel
 
 /// UserViewModel - NEAR CLONE 1
 class UserViewModel {
-    private var userData: [String] = []
-    private var userIsLoading = false
-    private var userError: Error?
+    // MARK: Internal
 
     var items: [String] { userData }
     var isLoading: Bool { userIsLoading }
@@ -58,13 +56,19 @@ class UserViewModel {
         userData = []
         userError = nil
     }
+
+    // MARK: Private
+
+    private var userData: [String] = []
+    private var userIsLoading = false
+    private var userError: Error?
 }
+
+// MARK: - ProductViewModel
 
 /// ProductViewModel - NEAR CLONE 2
 class ProductViewModel {
-    private var productData: [String] = []
-    private var productIsLoading = false
-    private var productError: Error?
+    // MARK: Internal
 
     var items: [String] { productData }
     var isLoading: Bool { productIsLoading }
@@ -86,13 +90,19 @@ class ProductViewModel {
         productData = []
         productError = nil
     }
+
+    // MARK: Private
+
+    private var productData: [String] = []
+    private var productIsLoading = false
+    private var productError: Error?
 }
+
+// MARK: - OrderViewModel
 
 /// OrderViewModel - NEAR CLONE 3
 class OrderViewModel {
-    private var orderData: [String] = []
-    private var orderIsLoading = false
-    private var orderError: Error?
+    // MARK: Internal
 
     var items: [String] { orderData }
     var isLoading: Bool { orderIsLoading }
@@ -114,13 +124,19 @@ class OrderViewModel {
         orderData = []
         orderError = nil
     }
+
+    // MARK: Private
+
+    private var orderData: [String] = []
+    private var orderIsLoading = false
+    private var orderError: Error?
 }
+
+// MARK: - CategoryViewModel
 
 /// CategoryViewModel - NEAR CLONE 4
 class CategoryViewModel {
-    private var categoryData: [String] = []
-    private var categoryIsLoading = false
-    private var categoryError: Error?
+    // MARK: Internal
 
     var items: [String] { categoryData }
     var isLoading: Bool { categoryIsLoading }
@@ -142,14 +158,19 @@ class CategoryViewModel {
         categoryData = []
         categoryError = nil
     }
+
+    // MARK: Private
+
+    private var categoryData: [String] = []
+    private var categoryIsLoading = false
+    private var categoryError: Error?
 }
 
-// MARK: - Unique Code (No Clones)
+// MARK: - SettingsViewModel
 
 /// This ViewModel has different structure and should not be detected
 class SettingsViewModel {
-    private var settings: [String: Any] = [:]
-    private var isDirty = false
+    // MARK: Internal
 
     func loadSettings() {
         settings = UserDefaults.standard.dictionaryRepresentation()
@@ -167,4 +188,9 @@ class SettingsViewModel {
         settings[key] = value
         isDirty = true
     }
+
+    // MARK: Private
+
+    private var settings: [String: Any] = [:]
+    private var isDirty = false
 }

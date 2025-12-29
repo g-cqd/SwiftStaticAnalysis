@@ -5,16 +5,15 @@
 //  Tests for reachability graph analysis.
 //
 
-import Testing
 import Foundation
-@testable import UnusedCodeDetector
 @testable import SwiftStaticAnalysisCore
+import Testing
+@testable import UnusedCodeDetector
 
-// MARK: - Reachability Graph Tests
+// MARK: - ReachabilityGraphTests
 
 @Suite("Reachability Graph Tests")
 struct ReachabilityGraphTests {
-
     @Test("Empty graph has no reachable nodes")
     func emptyGraph() {
         let graph = ReachabilityGraph()
@@ -35,7 +34,7 @@ struct ReachabilityGraphTests {
             modifiers: [],
             location: location,
             range: range,
-            scope: .global
+            scope: .global,
         )
 
         let node = graph.addNode(decl, isRoot: true, rootReason: .mainFunction)
@@ -57,7 +56,7 @@ struct ReachabilityGraphTests {
             kind: .function,
             location: location,
             range: range,
-            scope: .global
+            scope: .global,
         )
 
         let helperDecl = Declaration(
@@ -65,7 +64,7 @@ struct ReachabilityGraphTests {
             kind: .function,
             location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
             range: range,
-            scope: .global
+            scope: .global,
         )
 
         let mainNode = graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
@@ -90,7 +89,7 @@ struct ReachabilityGraphTests {
             kind: .function,
             location: location,
             range: range,
-            scope: .global
+            scope: .global,
         )
 
         let unusedDecl = Declaration(
@@ -98,7 +97,7 @@ struct ReachabilityGraphTests {
             kind: .function,
             location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
             range: range,
-            scope: .global
+            scope: .global,
         )
 
         graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
@@ -118,8 +117,20 @@ struct ReachabilityGraphTests {
 
         // Create chain: main -> helper -> utility
         let mainDecl = Declaration(name: "main", kind: .function, location: location, range: range, scope: .global)
-        let helperDecl = Declaration(name: "helper", kind: .function, location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100), range: range, scope: .global)
-        let utilityDecl = Declaration(name: "utility", kind: .function, location: SourceLocation(file: "test.swift", line: 20, column: 1, offset: 200), range: range, scope: .global)
+        let helperDecl = Declaration(
+            name: "helper",
+            kind: .function,
+            location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
+            range: range,
+            scope: .global,
+        )
+        let utilityDecl = Declaration(
+            name: "utility",
+            kind: .function,
+            location: SourceLocation(file: "test.swift", line: 20, column: 1, offset: 200),
+            range: range,
+            scope: .global,
+        )
 
         let mainNode = graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
         let helperNode = graph.addNode(helperDecl)
@@ -141,7 +152,13 @@ struct ReachabilityGraphTests {
         let range = SourceRange(start: location, end: location)
 
         let mainDecl = Declaration(name: "main", kind: .function, location: location, range: range, scope: .global)
-        let helperDecl = Declaration(name: "helper", kind: .function, location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100), range: range, scope: .global)
+        let helperDecl = Declaration(
+            name: "helper",
+            kind: .function,
+            location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
+            range: range,
+            scope: .global,
+        )
 
         let mainNode = graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
         let helperNode = graph.addNode(helperDecl)
@@ -163,7 +180,13 @@ struct ReachabilityGraphTests {
         let range = SourceRange(start: location, end: location)
 
         let mainDecl = Declaration(name: "main", kind: .function, location: location, range: range, scope: .global)
-        let unusedDecl = Declaration(name: "unused", kind: .function, location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100), range: range, scope: .global)
+        let unusedDecl = Declaration(
+            name: "unused",
+            kind: .function,
+            location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
+            range: range,
+            scope: .global,
+        )
 
         graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
         let unusedNode = graph.addNode(unusedDecl)
@@ -173,11 +196,10 @@ struct ReachabilityGraphTests {
     }
 }
 
-// MARK: - Root Detection Tests
+// MARK: - RootDetectionTests
 
 @Suite("Root Detection Tests")
 struct RootDetectionTests {
-
     @Test("Public declarations are roots by default")
     func publicAsRoot() {
         let graph = ReachabilityGraph()
@@ -192,7 +214,7 @@ struct RootDetectionTests {
             modifiers: [],
             location: location,
             range: range,
-            scope: .global
+            scope: .global,
         )
 
         let declarations = [publicDecl]
@@ -206,7 +228,7 @@ struct RootDetectionTests {
     }
 
     @Test("Test methods are roots")
-    func testMethodsAsRoots() {
+    func methodsAsRoots() {
         let graph = ReachabilityGraph()
 
         let location = SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0)
@@ -219,7 +241,7 @@ struct RootDetectionTests {
             modifiers: [],
             location: location,
             range: range,
-            scope: .global
+            scope: .global,
         )
 
         let declarations = [testDecl]
@@ -246,7 +268,7 @@ struct RootDetectionTests {
             modifiers: [],
             location: location,
             range: range,
-            scope: .global
+            scope: .global,
         )
 
         let declarations = [mainDecl]
@@ -273,7 +295,7 @@ struct RootDetectionTests {
             modifiers: [],
             location: location,
             range: range,
-            scope: .global
+            scope: .global,
         )
 
         let declarations = [publicDecl]
@@ -287,11 +309,10 @@ struct RootDetectionTests {
     }
 }
 
-// MARK: - Reachability Report Tests
+// MARK: - ReachabilityReportTests
 
 @Suite("Reachability Report Tests")
 struct ReachabilityReportTests {
-
     @Test("Report contains correct counts")
     func reportCounts() {
         let graph = ReachabilityGraph()
@@ -300,8 +321,20 @@ struct ReachabilityReportTests {
         let range = SourceRange(start: location, end: location)
 
         let mainDecl = Declaration(name: "main", kind: .function, location: location, range: range, scope: .global)
-        let usedDecl = Declaration(name: "used", kind: .function, location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100), range: range, scope: .global)
-        let unusedDecl = Declaration(name: "unused", kind: .function, location: SourceLocation(file: "test.swift", line: 20, column: 1, offset: 200), range: range, scope: .global)
+        let usedDecl = Declaration(
+            name: "used",
+            kind: .function,
+            location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
+            range: range,
+            scope: .global,
+        )
+        let unusedDecl = Declaration(
+            name: "unused",
+            kind: .function,
+            location: SourceLocation(file: "test.swift", line: 20, column: 1, offset: 200),
+            range: range,
+            scope: .global,
+        )
 
         let mainNode = graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
         let usedNode = graph.addNode(usedDecl)
@@ -326,9 +359,27 @@ struct ReachabilityReportTests {
 
         // 2 reachable out of 4 = 50%
         let decl1 = Declaration(name: "root", kind: .function, location: location, range: range, scope: .global)
-        let decl2 = Declaration(name: "used", kind: .function, location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100), range: range, scope: .global)
-        let decl3 = Declaration(name: "unused1", kind: .function, location: SourceLocation(file: "test.swift", line: 20, column: 1, offset: 200), range: range, scope: .global)
-        let decl4 = Declaration(name: "unused2", kind: .function, location: SourceLocation(file: "test.swift", line: 30, column: 1, offset: 300), range: range, scope: .global)
+        let decl2 = Declaration(
+            name: "used",
+            kind: .function,
+            location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
+            range: range,
+            scope: .global,
+        )
+        let decl3 = Declaration(
+            name: "unused1",
+            kind: .function,
+            location: SourceLocation(file: "test.swift", line: 20, column: 1, offset: 200),
+            range: range,
+            scope: .global,
+        )
+        let decl4 = Declaration(
+            name: "unused2",
+            kind: .function,
+            location: SourceLocation(file: "test.swift", line: 30, column: 1, offset: 300),
+            range: range,
+            scope: .global,
+        )
 
         let rootNode = graph.addNode(decl1, isRoot: true, rootReason: .mainFunction)
         let usedNode = graph.addNode(decl2)
@@ -350,8 +401,20 @@ struct ReachabilityReportTests {
         let range = SourceRange(start: location, end: location)
 
         let main = Declaration(name: "main", kind: .function, location: location, range: range, scope: .global)
-        let unusedFunc = Declaration(name: "unusedFunc", kind: .function, location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100), range: range, scope: .global)
-        let unusedClass = Declaration(name: "UnusedClass", kind: .class, location: SourceLocation(file: "test.swift", line: 20, column: 1, offset: 200), range: range, scope: .global)
+        let unusedFunc = Declaration(
+            name: "unusedFunc",
+            kind: .function,
+            location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
+            range: range,
+            scope: .global,
+        )
+        let unusedClass = Declaration(
+            name: "UnusedClass",
+            kind: .class,
+            location: SourceLocation(file: "test.swift", line: 20, column: 1, offset: 200),
+            range: range,
+            scope: .global,
+        )
 
         graph.addNode(main, isRoot: true, rootReason: .mainFunction)
         graph.addNode(unusedFunc)
@@ -364,11 +427,10 @@ struct ReachabilityReportTests {
     }
 }
 
-// MARK: - Dependency Extraction Tests
+// MARK: - DependencyExtractionTests
 
 @Suite("Dependency Extraction Tests")
 struct DependencyExtractionTests {
-
     @Test("DependencyExtractor initialization")
     func extractorInitialization() {
         let extractor = DependencyExtractor()
@@ -380,7 +442,7 @@ struct DependencyExtractionTests {
         let config = DependencyExtractionConfiguration(
             treatPublicAsRoot: false,
             treatObjcAsRoot: false,
-            treatTestsAsRoot: false
+            treatTestsAsRoot: false,
         )
         let extractor = DependencyExtractor(configuration: config)
         #expect(extractor.configuration.treatPublicAsRoot == false)
@@ -394,11 +456,10 @@ struct DependencyExtractionTests {
     }
 }
 
-// MARK: - Reachability-Based Detector Tests
+// MARK: - ReachabilityBasedDetectorTests
 
 @Suite("Reachability-Based Detector Tests")
 struct ReachabilityBasedDetectorTests {
-
     @Test("Detector initialization")
     func detectorInitialization() {
         let detector = ReachabilityBasedDetector()
@@ -412,11 +473,10 @@ struct ReachabilityBasedDetectorTests {
     }
 }
 
-// MARK: - Detection Mode Tests
+// MARK: - DetectionModeTests
 
 @Suite("Detection Mode Tests")
 struct DetectionModeTests {
-
     @Test("Simple mode is default")
     func defaultMode() {
         let config = UnusedCodeConfiguration()

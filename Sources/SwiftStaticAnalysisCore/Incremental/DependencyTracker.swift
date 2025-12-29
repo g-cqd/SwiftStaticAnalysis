@@ -8,7 +8,7 @@
 
 import Foundation
 
-// MARK: - Dependency Type
+// MARK: - DependencyType
 
 /// Types of dependencies between files.
 /// Exhaustive coverage for dependency tracking. // swa:ignore-unused-cases
@@ -32,10 +32,26 @@ public enum DependencyType: String, Codable, Sendable {
     case extensionDependency
 }
 
-// MARK: - File Dependency
+// MARK: - FileDependency
 
 /// Represents a dependency from one file to another.
 public struct FileDependency: Codable, Sendable, Hashable {
+    // MARK: Lifecycle
+
+    public init(
+        dependentFile: String,
+        dependencyFile: String,
+        type: DependencyType,
+        symbolName: String? = nil,
+    ) {
+        self.dependentFile = dependentFile
+        self.dependencyFile = dependencyFile
+        self.type = type
+        self.symbolName = symbolName
+    }
+
+    // MARK: Public
+
     /// The file that has the dependency.
     public let dependentFile: String
 
@@ -47,24 +63,22 @@ public struct FileDependency: Codable, Sendable, Hashable {
 
     /// Name of the symbol creating the dependency (type name, function name, etc.)
     public let symbolName: String?
-
-    public init(
-        dependentFile: String,
-        dependencyFile: String,
-        type: DependencyType,
-        symbolName: String? = nil
-    ) {
-        self.dependentFile = dependentFile
-        self.dependencyFile = dependencyFile
-        self.type = type
-        self.symbolName = symbolName
-    }
 }
 
-// MARK: - Dependency Graph
+// MARK: - DependencyGraph
 
 /// Graph of file dependencies for efficient traversal.
 public struct DependencyGraph: Codable, Sendable {
+    // MARK: Lifecycle
+
+    public init() {
+        dependencies = [:]
+        dependents = [:]
+        details = []
+    }
+
+    // MARK: Public
+
     /// Forward edges: file -> files it depends on.
     public var dependencies: [String: Set<String>]
 
@@ -73,12 +87,6 @@ public struct DependencyGraph: Codable, Sendable {
 
     /// Detailed dependency information.
     public var details: [FileDependency]
-
-    public init() {
-        self.dependencies = [:]
-        self.dependents = [:]
-        self.details = []
-    }
 
     /// Add a dependency.
     public mutating func addDependency(_ dependency: FileDependency) {
@@ -148,30 +156,35 @@ public struct DependencyGraph: Codable, Sendable {
     }
 }
 
-// MARK: - Dependency Tracker
+// MARK: - DependencyTracker
 
 /// Tracks and manages file dependencies.
 public actor DependencyTracker {
-
-    /// The dependency graph.
-    private var graph: DependencyGraph
-
-    /// Cache URL for persistence.
-    private let cacheURL: URL?
-
-    /// Whether the graph has unsaved changes.
-    private var isDirty: Bool = false
+    // MARK: Lifecycle
 
     // MARK: - Initialization
 
     public init(cacheDirectory: URL? = nil) {
-        self.graph = DependencyGraph()
+        graph = DependencyGraph()
 
         if let directory = cacheDirectory {
-            self.cacheURL = directory.appendingPathComponent("dependencies.json")
+            cacheURL = directory.appendingPathComponent("dependencies.json")
         } else {
-            self.cacheURL = nil
+            cacheURL = nil
         }
+    }
+
+    // MARK: Public
+
+    // MARK: - Statistics
+
+    /// Dependency statistics.
+    public struct Statistics: Sendable {
+        public let fileCount: Int
+        public let dependencyCount: Int
+        public let averageDependencies: Double
+        public let maxDependencies: Int
+        public let maxDependents: Int
     }
 
     // MARK: - Persistence
@@ -179,12 +192,13 @@ public actor DependencyTracker {
     /// Load dependency graph from disk.
     public func load() async throws {
         guard let url = cacheURL,
-              FileManager.default.fileExists(atPath: url.path) else {
+              FileManager.default.fileExists(atPath: url.path)
+        else {
             return
         }
 
         let data = try Data(contentsOf: url)
-        self.graph = try JSONDecoder().decode(DependencyGraph.self, from: data)
+        graph = try JSONDecoder().decode(DependencyGraph.self, from: data)
         isDirty = false
     }
 
@@ -271,17 +285,6 @@ public actor DependencyTracker {
         graph
     }
 
-    // MARK: - Statistics
-
-    /// Dependency statistics.
-    public struct Statistics: Sendable {
-        public let fileCount: Int
-        public let dependencyCount: Int
-        public let averageDependencies: Double
-        public let maxDependencies: Int
-        public let maxDependents: Int
-    }
-
     /// Get dependency statistics.
     public func statistics() -> Statistics {
         let fileCount = Set(graph.dependencies.keys).union(graph.dependents.keys).count
@@ -297,22 +300,33 @@ public actor DependencyTracker {
             dependencyCount: dependencyCount,
             averageDependencies: avgDeps,
             maxDependencies: maxDeps,
-            maxDependents: maxDependents
+            maxDependents: maxDependents,
         )
     }
+
+    // MARK: Private
+
+    /// The dependency graph.
+    private var graph: DependencyGraph
+
+    /// Cache URL for persistence.
+    private let cacheURL: URL?
+
+    /// Whether the graph has unsaved changes.
+    private var isDirty: Bool = false
 }
 
-// MARK: - Dependency Extraction
+// MARK: - DependencyExtractor
 
 /// Extracts dependencies from analysis results.
 public struct DependencyExtractor: Sendable {
-
-    /// Declaration index for looking up symbol locations.
-    private let declarationIndex: DeclarationIndex
+    // MARK: Lifecycle
 
     public init(declarationIndex: DeclarationIndex) {
         self.declarationIndex = declarationIndex
     }
+
+    // MARK: Public
 
     /// Extract dependencies from references in a file.
     ///
@@ -322,7 +336,7 @@ public struct DependencyExtractor: Sendable {
     /// - Returns: Dependencies to other files.
     public func extractDependencies(
         from references: [Reference],
-        in sourceFile: String
+        in sourceFile: String,
     ) -> [FileDependency] {
         var dependencies: [FileDependency] = []
 
@@ -336,28 +350,31 @@ public struct DependencyExtractor: Sendable {
                 // Skip if defined in same file
                 guard definition.location.file != sourceFile else { continue }
 
-                let depType: DependencyType
-                switch reference.context {
-                case .typeAnnotation, .genericConstraint:
-                    depType = .typeReference
+                let depType: DependencyType = switch reference.context {
+                case .genericConstraint,
+                     .typeAnnotation:
+                    .typeReference
+
                 case .call:
-                    depType = .functionCall
+                    .functionCall
+
                 case .inheritance:
                     // Check if it's a protocol or class
                     if definition.kind == .protocol {
-                        depType = .protocolConformance
+                        .protocolConformance
                     } else {
-                        depType = .inheritance
+                        .inheritance
                     }
+
                 default:
-                    depType = .typeReference
+                    .typeReference
                 }
 
                 dependencies.append(FileDependency(
                     dependentFile: sourceFile,
                     dependencyFile: definition.location.file,
                     type: depType,
-                    symbolName: reference.identifier
+                    symbolName: reference.identifier,
                 ))
             }
         }
@@ -376,7 +393,7 @@ public struct DependencyExtractor: Sendable {
     public func extractImportDependencies(
         from declarations: [Declaration],
         in sourceFile: String,
-        moduleToFiles: [String: [String]]
+        moduleToFiles: [String: [String]],
     ) -> [FileDependency] {
         var dependencies: [FileDependency] = []
 
@@ -390,7 +407,7 @@ public struct DependencyExtractor: Sendable {
                         dependentFile: sourceFile,
                         dependencyFile: file,
                         type: .importDependency,
-                        symbolName: declaration.name
+                        symbolName: declaration.name,
                     ))
                 }
             }
@@ -398,4 +415,9 @@ public struct DependencyExtractor: Sendable {
 
         return dependencies
     }
+
+    // MARK: Private
+
+    /// Declaration index for looking up symbol locations.
+    private let declarationIndex: DeclarationIndex
 }

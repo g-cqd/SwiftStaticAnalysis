@@ -3,9 +3,9 @@
 //  SwiftStaticAnalysis
 //
 
+@testable import SwiftStaticAnalysisCore
 import Testing
 @testable import UnusedCodeDetector
-@testable import SwiftStaticAnalysisCore
 
 @Suite("UnusedCodeDetector Tests")
 struct UnusedCodeDetectorTests {
@@ -32,15 +32,15 @@ struct UnusedCodeDetectorTests {
             location: SourceLocation(file: "test.swift", line: 10, column: 5),
             range: SourceRange(
                 start: SourceLocation(file: "test.swift", line: 10, column: 5),
-                end: SourceLocation(file: "test.swift", line: 10, column: 20)
+                end: SourceLocation(file: "test.swift", line: 10, column: 20),
             ),
-            scope: .global
+            scope: .global,
         )
 
         let unused = UnusedCode(
             declaration: decl,
             reason: .neverReferenced,
-            confidence: .high
+            confidence: .high,
         )
 
         #expect(unused.declaration.name == "unusedVar")
@@ -65,7 +65,7 @@ struct UnusedCodeDetectorTests {
         let config = UnusedCodeConfiguration(
             detectVariables: true,
             detectFunctions: false,
-            ignorePublicAPI: false
+            ignorePublicAPI: false,
         )
 
         let detector = UnusedCodeDetector(configuration: config)
@@ -85,9 +85,9 @@ struct UnusedCodeDetectorTests {
             location: SourceLocation(file: "test.swift", line: 10, column: 5),
             range: SourceRange(
                 start: SourceLocation(file: "test.swift", line: 10, column: 5),
-                end: SourceLocation(file: "test.swift", line: 10, column: 20)
+                end: SourceLocation(file: "test.swift", line: 10, column: 20),
             ),
-            scope: .global
+            scope: .global,
         )
 
         let decl2 = Declaration(
@@ -98,9 +98,9 @@ struct UnusedCodeDetectorTests {
             location: SourceLocation(file: "test.swift", line: 20, column: 1),
             range: SourceRange(
                 start: SourceLocation(file: "test.swift", line: 20, column: 1),
-                end: SourceLocation(file: "test.swift", line: 25, column: 1)
+                end: SourceLocation(file: "test.swift", line: 25, column: 1),
             ),
-            scope: .global
+            scope: .global,
         )
 
         let unusedItems = [
@@ -111,7 +111,7 @@ struct UnusedCodeDetectorTests {
         let report = UnusedCodeReport(
             filesAnalyzed: 5,
             totalDeclarations: 100,
-            unusedItems: unusedItems
+            unusedItems: unusedItems,
         )
 
         #expect(report.summaryByKind["variable"] == 1)

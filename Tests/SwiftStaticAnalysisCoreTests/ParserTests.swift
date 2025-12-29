@@ -6,14 +6,15 @@
 //
 
 import Foundation
-import Testing
+import SwiftParser
 @testable import SwiftStaticAnalysisCore
 import SwiftSyntax
-import SwiftParser
+import Testing
+
+// MARK: - ParserTests
 
 @Suite("SwiftFileParser Tests")
 struct ParserTests {
-
     // MARK: - Basic Parsing
 
     @Test("Parse valid Swift source code")
@@ -34,7 +35,7 @@ struct ParserTests {
         let parser = SwiftFileParser()
         let tree = try await parser.parse(source: source)
 
-        #expect(tree.statements.count > 0)
+        #expect(!tree.statements.isEmpty)
     }
 
     @Test("Parse source with syntax errors gracefully")
@@ -50,7 +51,7 @@ struct ParserTests {
         let tree = try await parser.parse(source: source)
 
         // Tree should still exist despite errors
-        #expect(tree.statements.count > 0)
+        #expect(!tree.statements.isEmpty)
     }
 
     @Test("Parse empty source")
@@ -60,7 +61,7 @@ struct ParserTests {
         let parser = SwiftFileParser()
         let tree = try await parser.parse(source: source)
 
-        #expect(tree.statements.count == 0)
+        #expect(tree.statements.isEmpty)
     }
 
     @Test("Parse source with only comments")
@@ -75,7 +76,7 @@ struct ParserTests {
         let tree = try await parser.parse(source: source)
 
         // Comments don't create statements
-        #expect(tree.statements.count == 0)
+        #expect(tree.statements.isEmpty)
     }
 
     // MARK: - File Parsing
@@ -98,7 +99,7 @@ struct ParserTests {
         let parser = SwiftFileParser()
         let tree = try await parser.parse(fixturesPath.path)
 
-        #expect(tree.statements.count > 0)
+        #expect(!tree.statements.isEmpty)
     }
 
     // MARK: - Line Counting
@@ -176,7 +177,7 @@ struct ParserTests {
         let parser = SwiftFileParser()
         let tree = try await parser.parse(source: source)
 
-        #expect(tree.statements.count > 0)
+        #expect(!tree.statements.isEmpty)
     }
 
     @Test("Parse async/await syntax")
@@ -200,7 +201,7 @@ struct ParserTests {
         let parser = SwiftFileParser()
         let tree = try await parser.parse(source: source)
 
-        #expect(tree.statements.count > 0)
+        #expect(!tree.statements.isEmpty)
     }
 
     @Test("Parse generic types")
@@ -224,7 +225,7 @@ struct ParserTests {
         let parser = SwiftFileParser()
         let tree = try await parser.parse(source: source)
 
-        #expect(tree.statements.count > 0)
+        #expect(!tree.statements.isEmpty)
     }
 
     @Test("Parse property wrappers and result builders")
@@ -252,18 +253,17 @@ struct ParserTests {
         let parser = SwiftFileParser()
         let tree = try await parser.parse(source: source)
 
-        #expect(tree.statements.count > 0)
+        #expect(!tree.statements.isEmpty)
     }
 }
 
-// MARK: - Concurrent Parsing Tests
+// MARK: - ConcurrentParsingTests
 
 @Suite("Concurrent Parsing Tests")
 struct ConcurrentParsingTests {
-
     @Test("Parse multiple sources concurrently")
     func parseConcurrently() async throws {
-        let sources = (1...10).map { i in
+        let sources = (1 ... 10).map { i in
             """
             struct Type\(i) {
                 let value: Int = \(i)

@@ -8,7 +8,7 @@
 
 import Foundation
 
-// MARK: - Suffix Array
+// MARK: - SuffixArray
 
 /// A suffix array data structure for efficient substring matching.
 ///
@@ -16,24 +16,28 @@ import Foundation
 /// lexicographically sorted suffixes of the input. Combined with the LCP array,
 /// it enables linear-time detection of all repeated substrings.
 public struct SuffixArray: Sendable {
-    /// The suffix array - indices of sorted suffixes.
-    public let array: [Int]
-
-    /// The original input length.
-    public let length: Int
+    // MARK: Lifecycle
 
     /// Creates a suffix array from an array of integers (token IDs).
     ///
     /// - Parameter tokens: Array of integer token IDs.
     /// - Note: Token IDs should be in range [0, alphabetSize).
     public init(tokens: [Int]) {
-        self.length = tokens.count
+        length = tokens.count
         if tokens.isEmpty {
-            self.array = []
+            array = []
         } else {
-            self.array = SuffixArrayBuilder.build(tokens)
+            array = SuffixArrayBuilder.build(tokens)
         }
     }
+
+    // MARK: Public
+
+    /// The suffix array - indices of sorted suffixes.
+    public let array: [Int]
+
+    /// The original input length.
+    public let length: Int
 
     /// Creates a suffix array from an array of strings.
     ///
@@ -62,7 +66,7 @@ public struct SuffixArray: Sendable {
     }
 }
 
-// MARK: - Suffix Array Builder
+// MARK: - SuffixArrayBuilder
 
 /// Builder for suffix arrays using the SA-IS (Suffix Array Induced Sorting) algorithm.
 ///
@@ -94,11 +98,12 @@ enum SuffixArrayBuilder {
     }
 }
 
-// MARK: - SA-IS Algorithm
+// MARK: - SAIS
 
 /// Implementation of the SA-IS (Suffix Array Induced Sorting) algorithm.
 /// Achieves O(n) time complexity for suffix array construction.
 enum SAIS {
+    // MARK: Internal
 
     /// Build suffix array using SA-IS algorithm.
     ///
@@ -134,8 +139,8 @@ enum SAIS {
         // Step 2: Find LMS (Leftmost S-type) positions
         // An LMS suffix is an S-type suffix whose predecessor is L-type
         var lmsPositions: [Int] = []
-        for i in 1..<n {
-            if types[i] && !types[i - 1] {
+        for i in 1 ..< n {
+            if types[i], !types[i - 1] {
                 lmsPositions.append(i)
             }
         }
@@ -149,7 +154,7 @@ enum SAIS {
         var bucketHeads = [Int](repeating: 0, count: alphabetSize)
         var bucketTails = [Int](repeating: 0, count: alphabetSize)
         var sum = 0
-        for i in 0..<alphabetSize {
+        for i in 0 ..< alphabetSize {
             bucketHeads[i] = sum
             sum += bucketSizes[i]
             bucketTails[i] = sum - 1
@@ -168,9 +173,9 @@ enum SAIS {
 
         // Step 5: Induced sort L-type suffixes (left to right)
         var heads = bucketHeads // Working copy
-        for i in 0..<n {
+        for i in 0 ..< n {
             let j = sa[i] - 1
-            if sa[i] > 0 && !types[j] { // L-type predecessor
+            if sa[i] > 0, !types[j] { // L-type predecessor
                 let c = text[j]
                 sa[heads[c]] = j
                 heads[c] += 1
@@ -181,7 +186,7 @@ enum SAIS {
         tails = bucketTails // Reset working copy
         for i in stride(from: n - 1, through: 0, by: -1) {
             let j = sa[i] - 1
-            if sa[i] > 0 && types[j] { // S-type predecessor
+            if sa[i] > 0, types[j] { // S-type predecessor
                 let c = text[j]
                 sa[tails[c]] = j
                 tails[c] -= 1
@@ -193,11 +198,11 @@ enum SAIS {
         var name = 0
         var prevLMS = -1
 
-        for i in 0..<n {
+        for i in 0 ..< n {
             let pos = sa[i]
-            if pos > 0 && types[pos] && !types[pos - 1] {
+            if pos > 0, types[pos], !types[pos - 1] {
                 // This is an LMS suffix
-                if prevLMS >= 0 && !lmsSubstringsEqual(text: text, types: types, i: prevLMS, j: pos) {
+                if prevLMS >= 0, !lmsSubstringsEqual(text: text, types: types, i: prevLMS, j: pos) {
                     name += 1
                 }
                 lmsNames[pos] = name
@@ -212,7 +217,7 @@ enum SAIS {
             // Build reduced string from LMS names
             var reducedString = [Int](repeating: 0, count: lmsCount)
             var j = 0
-            for i in 0..<n {
+            for i in 0 ..< n {
                 if lmsNames[i] >= 0 {
                     reducedString[j] = lmsNames[i]
                     j += 1
@@ -235,9 +240,9 @@ enum SAIS {
 
             // Step 10: Final induced sort
             heads = bucketHeads
-            for i in 0..<n {
+            for i in 0 ..< n {
                 let j = sa[i] - 1
-                if sa[i] > 0 && !types[j] {
+                if sa[i] > 0, !types[j] {
                     let c = text[j]
                     sa[heads[c]] = j
                     heads[c] += 1
@@ -247,7 +252,7 @@ enum SAIS {
             tails = bucketTails
             for i in stride(from: n - 1, through: 0, by: -1) {
                 let j = sa[i] - 1
-                if sa[i] > 0 && types[j] {
+                if sa[i] > 0, types[j] {
                     let c = text[j]
                     sa[tails[c]] = j
                     tails[c] -= 1
@@ -257,6 +262,8 @@ enum SAIS {
 
         return sa
     }
+
+    // MARK: Private
 
     /// Check if two LMS substrings are equal.
     private static func lmsSubstringsEqual(text: [Int], types: [Bool], i: Int, j: Int) -> Bool {
@@ -283,7 +290,7 @@ enum SAIS {
             let endI = pi > 0 && types[pi] && !types[pi - 1]
             let endJ = pj > 0 && types[pj] && !types[pj - 1]
 
-            if endI && endJ {
+            if endI, endJ {
                 return true
             }
             if endI != endJ {
@@ -295,11 +302,11 @@ enum SAIS {
     /// Simple O(n log n) suffix array for small inputs.
     private static func buildSimple(_ text: [Int]) -> [Int] {
         let n = text.count
-        var sa = Array(0..<n)
+        var sa = Array(0 ..< n)
         sa.sort { i, j in
             var pi = i
             var pj = j
-            while pi < n && pj < n {
+            while pi < n, pj < n {
                 if text[pi] < text[pj] { return true }
                 if text[pi] > text[pj] { return false }
                 pi += 1
@@ -313,14 +320,14 @@ enum SAIS {
 
 // MARK: - Suffix Array Utilities
 
-extension SuffixArray {
+public extension SuffixArray {
     /// Binary search for a pattern in the suffix array.
     ///
     /// - Parameters:
     ///   - pattern: The pattern to search for (as token IDs).
     ///   - tokens: The original token array.
     /// - Returns: Range of indices in the suffix array where pattern occurs.
-    public func search(pattern: [Int], in tokens: [Int]) -> Range<Int>? {
+    func search(pattern: [Int], in tokens: [Int]) -> Range<Int>? {
         guard !pattern.isEmpty, !array.isEmpty else { return nil }
 
         // Find lower bound
@@ -348,13 +355,13 @@ extension SuffixArray {
         }
         let upper = lo
 
-        return lower < upper ? lower..<upper : nil
+        return lower < upper ? lower ..< upper : nil
     }
 
     /// Compare a suffix with a pattern.
     /// Returns negative if suffix < pattern, 0 if prefix match, positive if suffix > pattern.
     private func compare(suffix start: Int, with pattern: [Int], in tokens: [Int]) -> Int {
-        for i in 0..<pattern.count {
+        for i in 0 ..< pattern.count {
             let pos = start + i
             if pos >= tokens.count {
                 return -1 // Suffix is shorter, so it's "less than"
@@ -370,8 +377,8 @@ extension SuffixArray {
     }
 
     /// Get all occurrences of a pattern.
-    public func findOccurrences(of pattern: [Int], in tokens: [Int]) -> [Int] {
+    func findOccurrences(of pattern: [Int], in tokens: [Int]) -> [Int] {
         guard let range = search(pattern: pattern, in: tokens) else { return [] }
-        return (range.lowerBound..<range.upperBound).map { array[$0] }
+        return (range.lowerBound ..< range.upperBound).map { array[$0] }
     }
 }

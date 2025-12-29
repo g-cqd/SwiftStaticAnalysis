@@ -6,12 +6,13 @@
 //
 
 import Foundation
-import Testing
 @testable import SwiftStaticAnalysisCore
+import Testing
+
+// MARK: - PropertyWrapperDetectionTests
 
 @Suite("SwiftUI Property Wrapper Detection")
 struct PropertyWrapperDetectionTests {
-
     @Test("Detect @State wrapper")
     func detectStateWrapper() {
         let wrapper = PropertyWrapperInfo.parse(from: "@State")
@@ -98,9 +99,10 @@ struct PropertyWrapperDetectionTests {
     }
 }
 
+// MARK: - SwiftUIConformanceTests
+
 @Suite("SwiftUI Conformance Detection")
 struct SwiftUIConformanceTests {
-
     @Test("View conformance detected")
     func viewConformanceDetected() {
         let conformance = SwiftUIConformance(rawValue: "View")
@@ -141,9 +143,10 @@ struct SwiftUIConformanceTests {
     }
 }
 
+// MARK: - DeclarationSwiftUIExtensionTests
+
 @Suite("Declaration SwiftUI Extensions")
 struct DeclarationSwiftUIExtensionTests {
-
     @Test("Declaration with State wrapper has implicit usage")
     func declarationWithStateHasImplicitUsage() {
         let stateWrapper = PropertyWrapperInfo(kind: .state, attributeText: "@State")
@@ -153,10 +156,10 @@ struct DeclarationSwiftUIExtensionTests {
             location: SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0),
             range: SourceRange(
                 start: SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0),
-                end: SourceLocation(file: "test.swift", line: 1, column: 10, offset: 10)
+                end: SourceLocation(file: "test.swift", line: 1, column: 10, offset: 10),
             ),
             scope: .global,
-            propertyWrappers: [stateWrapper]
+            propertyWrappers: [stateWrapper],
         )
 
         #expect(declaration.hasSwiftUIPropertyWrapper == true)
@@ -173,11 +176,11 @@ struct DeclarationSwiftUIExtensionTests {
             location: SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0),
             range: SourceRange(
                 start: SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0),
-                end: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100)
+                end: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
             ),
             scope: .global,
             swiftUIInfo: swiftUIInfo,
-            conformances: ["View"]
+            conformances: ["View"],
         )
 
         #expect(declaration.isSwiftUIView == true)
@@ -194,11 +197,11 @@ struct DeclarationSwiftUIExtensionTests {
             location: SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0),
             range: SourceRange(
                 start: SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0),
-                end: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100)
+                end: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
             ),
             scope: .global,
             swiftUIInfo: swiftUIInfo,
-            conformances: ["App"]
+            conformances: ["App"],
         )
 
         #expect(declaration.isSwiftUIView == false)
@@ -206,9 +209,10 @@ struct DeclarationSwiftUIExtensionTests {
     }
 }
 
+// MARK: - SwiftUISourceParsingTests
+
 @Suite("SwiftUI Source Parsing")
 struct SwiftUISourceParsingTests {
-
     @Test("Parse SwiftUI View with @State properties")
     func parseSwiftUIViewWithStateProperties() async throws {
         let source = """
@@ -239,7 +243,7 @@ struct SwiftUISourceParsingTests {
         #expect(structDecl?.conformances.contains("View") == true)
 
         // Find @State properties
-        let stateProps = declarations.filter { $0.hasSwiftUIPropertyWrapper }
+        let stateProps = declarations.filter(\.hasSwiftUIPropertyWrapper)
         #expect(stateProps.count == 2)
 
         // All @State properties should have implicit usage

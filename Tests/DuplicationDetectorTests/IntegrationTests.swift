@@ -5,14 +5,15 @@
 //  End-to-end integration tests for the duplication detector.
 //
 
-import Foundation
-import Testing
 @testable import DuplicationDetector
+import Foundation
 @testable import SwiftStaticAnalysisCore
+import Testing
+
+// MARK: - DuplicationDetectorIntegrationTests
 
 @Suite("Duplication Detector Integration Tests")
 struct DuplicationDetectorIntegrationTests {
-
     // MARK: - Full Pipeline Tests
 
     @Test("Full detection pipeline on exact clones")
@@ -32,7 +33,7 @@ struct DuplicationDetectorIntegrationTests {
 
         let config = DuplicationConfiguration(
             minimumTokens: 20,
-            cloneTypes: [.exact]
+            cloneTypes: [.exact],
         )
 
         let detector = DuplicationDetector(configuration: config)
@@ -66,7 +67,7 @@ struct DuplicationDetectorIntegrationTests {
         let config = DuplicationConfiguration(
             minimumTokens: 15,
             cloneTypes: [.near],
-            minimumSimilarity: 0.7
+            minimumSimilarity: 0.7,
         )
 
         let detector = DuplicationDetector(configuration: config)
@@ -98,7 +99,7 @@ struct DuplicationDetectorIntegrationTests {
         let config = DuplicationConfiguration(
             minimumTokens: 10,
             cloneTypes: [.semantic],
-            minimumSimilarity: 0.6
+            minimumSimilarity: 0.6,
         )
 
         let detector = DuplicationDetector(configuration: config)
@@ -125,7 +126,7 @@ struct DuplicationDetectorIntegrationTests {
         let files = [
             fixturesPath.appendingPathComponent("UserAPI.swift").path,
             fixturesPath.appendingPathComponent("ProductAPI.swift").path,
-            fixturesPath.appendingPathComponent("OrderAPI.swift").path
+            fixturesPath.appendingPathComponent("OrderAPI.swift").path,
         ]
 
         for file in files {
@@ -138,7 +139,7 @@ struct DuplicationDetectorIntegrationTests {
         let config = DuplicationConfiguration(
             minimumTokens: 25,
             cloneTypes: [.exact, .near],
-            minimumSimilarity: 0.8
+            minimumSimilarity: 0.8,
         )
 
         let detector = DuplicationDetector(configuration: config)
@@ -176,7 +177,7 @@ struct DuplicationDetectorIntegrationTests {
         let config = DuplicationConfiguration(
             minimumTokens: 15,
             cloneTypes: [.exact, .near, .semantic],
-            minimumSimilarity: 0.7
+            minimumSimilarity: 0.7,
         )
 
         let detector = DuplicationDetector(configuration: config)
@@ -211,7 +212,7 @@ struct DuplicationDetectorIntegrationTests {
 
         let config = DuplicationConfiguration(
             minimumTokens: 20,
-            cloneTypes: [.exact]
+            cloneTypes: [.exact],
         )
 
         let detector = DuplicationDetector(configuration: config)
@@ -221,7 +222,7 @@ struct DuplicationDetectorIntegrationTests {
         let report = DuplicationReport(
             filesAnalyzed: 1,
             totalLines: 100, // Approximate
-            cloneGroups: clones
+            cloneGroups: clones,
         )
 
         #expect(report.filesAnalyzed == 1)
@@ -259,9 +260,10 @@ struct DuplicationDetectorIntegrationTests {
     }
 }
 
+// MARK: - ConfigurationIntegrationTests
+
 @Suite("Configuration Tests")
 struct ConfigurationIntegrationTests {
-
     @Test("Default configuration values")
     func defaultConfiguration() {
         let config = DuplicationConfiguration.default
@@ -277,7 +279,7 @@ struct ConfigurationIntegrationTests {
             minimumTokens: 25,
             cloneTypes: [.exact, .near],
             ignoredPatterns: ["test_", "mock_"],
-            minimumSimilarity: 0.75
+            minimumSimilarity: 0.75,
         )
 
         #expect(config.minimumTokens == 25)

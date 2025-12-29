@@ -5,15 +5,14 @@
 //  Tests for arena allocation, memory-mapped files, and SoA token storage.
 //
 
-import Testing
 import Foundation
 @testable import SwiftStaticAnalysisCore
+import Testing
 
-// MARK: - Arena Allocation Tests
+// MARK: - ArenaAllocationTests
 
 @Suite("Arena Allocation Tests")
 struct ArenaAllocationTests {
-
     @Test("Arena can allocate raw memory")
     func basicAllocation() {
         let arena = Arena()
@@ -29,10 +28,10 @@ struct ArenaAllocationTests {
         #expect(buffer.count == 10)
 
         // Write and verify
-        for i in 0..<10 {
+        for i in 0 ..< 10 {
             buffer[i] = i * 10
         }
-        for i in 0..<10 {
+        for i in 0 ..< 10 {
             #expect(buffer[i] == i * 10)
         }
     }
@@ -59,7 +58,7 @@ struct ArenaAllocationTests {
         let arena = Arena()
 
         // Make some allocations
-        for _ in 0..<100 {
+        for _ in 0 ..< 100 {
             arena.allocate(size: 1000, alignment: 8)
         }
 
@@ -77,7 +76,7 @@ struct ArenaAllocationTests {
         let arena = Arena()
 
         // Make some allocations
-        for _ in 0..<10 {
+        for _ in 0 ..< 10 {
             arena.allocate(size: 10000, alignment: 8)
         }
 
@@ -150,11 +149,10 @@ struct ArenaAllocationTests {
     }
 }
 
-// MARK: - Arena Allocatable Tests
+// MARK: - ArenaAllocatableTests
 
 @Suite("Arena Allocatable Tests")
 struct ArenaAllocatableTests {
-
     @Test("Primitive types are arena allocatable")
     func primitiveTypes() {
         let arena = Arena()
@@ -170,11 +168,10 @@ struct ArenaAllocatableTests {
     }
 }
 
-// MARK: - Thread Local Arena Tests
+// MARK: - ThreadLocalArenaTests
 
 @Suite("Thread Local Arena Tests")
 struct ThreadLocalArenaTests {
-
     @Test("Thread local arena provides arena for current thread")
     func currentArena() {
         let arena = ThreadLocalArena.current
@@ -195,11 +192,10 @@ struct ThreadLocalArenaTests {
     }
 }
 
-// MARK: - Memory Mapped File Tests
+// MARK: - MemoryMappedFileTests
 
 @Suite("Memory Mapped File Tests")
 struct MemoryMappedFileTests {
-
     // Helper to create a temporary file
     func createTempFile(content: String) throws -> String {
         let tempDir = FileManager.default.temporaryDirectory
@@ -310,11 +306,10 @@ struct MemoryMappedFileTests {
     }
 }
 
-// MARK: - File Slice Tests
+// MARK: - FileSliceTests
 
 @Suite("File Slice Tests")
 struct FileSliceTests {
-
     func createTempFile(content: String) throws -> String {
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = "test_\(UUID().uuidString).txt"
@@ -381,11 +376,10 @@ struct FileSliceTests {
     }
 }
 
-// MARK: - Token Slice Tests
+// MARK: - TokenSliceTests
 
 @Suite("Token Slice Tests")
 struct TokenSliceTests {
-
     func createTempFile(content: String) throws -> String {
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = "test_\(UUID().uuidString).txt"
@@ -420,15 +414,14 @@ struct TokenSliceTests {
     }
 }
 
-// MARK: - SoA Token Storage Tests
+// MARK: - SoATokenStorageTests
 
 @Suite("SoA Token Storage Tests")
 struct SoATokenStorageTests {
-
     @Test("Empty storage has correct initial state")
     func emptyStorage() {
         let storage = SoATokenStorage()
-        #expect(storage.count == 0)
+        #expect(storage.isEmpty)
         #expect(storage.isEmpty)
     }
 
@@ -464,7 +457,7 @@ struct SoATokenStorageTests {
         storage.reserveCapacity(1000)
 
         // Should be able to add without reallocation
-        for i in 0..<1000 {
+        for i in 0 ..< 1000 {
             storage.append(kind: .identifier, offset: i, length: 1, line: 1)
         }
 
@@ -474,12 +467,12 @@ struct SoATokenStorageTests {
     @Test("RemoveAll clears storage")
     func removeAll() {
         var storage = SoATokenStorage()
-        for i in 0..<100 {
+        for i in 0 ..< 100 {
             storage.append(kind: .keyword, offset: i, length: 1, line: 1)
         }
 
         storage.removeAll()
-        #expect(storage.count == 0)
+        #expect(storage.isEmpty)
         #expect(storage.isEmpty)
     }
 
@@ -524,8 +517,8 @@ struct SoATokenStorageTests {
         storage.append(kind: .keyword, offset: 3, length: 1, line: 4)
         storage.append(kind: .keyword, offset: 4, length: 1, line: 5)
 
-        let range = storage.tokensInLineRange(2...4)
-        #expect(range == 1..<4)
+        let range = storage.tokensInLineRange(2 ... 4)
+        #expect(range == 1 ..< 4)
     }
 
     @Test("Hash range produces consistent hash")
@@ -534,8 +527,8 @@ struct SoATokenStorageTests {
         storage.append(kind: .keyword, offset: 0, length: 4, line: 1)
         storage.append(kind: .identifier, offset: 5, length: 3, line: 1)
 
-        let hash1 = storage.hashRange(0..<2)
-        let hash2 = storage.hashRange(0..<2)
+        let hash1 = storage.hashRange(0 ..< 2)
+        let hash2 = storage.hashRange(0 ..< 2)
 
         #expect(hash1 == hash2)
     }
@@ -548,13 +541,13 @@ struct SoATokenStorageTests {
         storage.append(kind: .keyword, offset: 10, length: 4, line: 2)
         storage.append(kind: .identifier, offset: 15, length: 3, line: 2)
 
-        #expect(storage.rangesEqual(0..<2, 2..<4))
+        #expect(storage.rangesEqual(0 ..< 2, 2 ..< 4))
     }
 
     @Test("Memory usage is calculated correctly")
     func memoryUsage() {
         var storage = SoATokenStorage()
-        for i in 0..<100 {
+        for i in 0 ..< 100 {
             storage.append(kind: .keyword, offset: i, length: 1, line: 1)
         }
 
@@ -568,7 +561,7 @@ struct SoATokenStorageTests {
         let tokens: [(kind: TokenKindByte, offset: Int, length: Int, line: Int, column: Int)] = [
             (.keyword, 0, 4, 1, 1),
             (.identifier, 5, 3, 1, 6),
-            (.punctuation, 8, 1, 1, 9)
+            (.punctuation, 8, 1, 1, 9),
         ]
 
         let storage = SoATokenStorage.from(tokens)
@@ -579,11 +572,10 @@ struct SoATokenStorageTests {
     }
 }
 
-// MARK: - Arena Token Storage Tests
+// MARK: - ArenaTokenStorageTests
 
 @Suite("Arena Token Storage Tests")
 struct ArenaTokenStorageTests {
-
     @Test("Arena token storage copies from SoA storage")
     func copyFromSoA() {
         var soaStorage = SoATokenStorage()
@@ -601,11 +593,10 @@ struct ArenaTokenStorageTests {
     }
 }
 
-// MARK: - Multi-File SoA Storage Tests
+// MARK: - MultiFileSoAStorageTests
 
 @Suite("Multi-File SoA Storage Tests")
 struct MultiFileSoAStorageTests {
-
     @Test("Empty multi-file storage has correct initial state")
     func emptyMultiFile() {
         let storage = MultiFileSoAStorage()
@@ -635,13 +626,13 @@ struct MultiFileSoAStorageTests {
         var multi = MultiFileSoAStorage()
 
         var tokens1 = SoATokenStorage()
-        for i in 0..<5 {
+        for i in 0 ..< 5 {
             tokens1.append(kind: .keyword, offset: i, length: 1, line: 1)
         }
         multi.addFile(path: "file1.swift", tokens: tokens1)
 
         var tokens2 = SoATokenStorage()
-        for i in 0..<3 {
+        for i in 0 ..< 3 {
             tokens2.append(kind: .identifier, offset: i, length: 1, line: 1)
         }
         multi.addFile(path: "file2.swift", tokens: tokens2)
@@ -660,13 +651,13 @@ struct MultiFileSoAStorageTests {
         var multi = MultiFileSoAStorage()
 
         var tokens1 = SoATokenStorage()
-        for i in 0..<5 {
+        for i in 0 ..< 5 {
             tokens1.append(kind: .keyword, offset: i, length: 1, line: 1)
         }
         multi.addFile(path: "file1.swift", tokens: tokens1)
 
         var tokens2 = SoATokenStorage()
-        for i in 0..<3 {
+        for i in 0 ..< 3 {
             tokens2.append(kind: .identifier, offset: i, length: 1, line: 1)
         }
         multi.addFile(path: "file2.swift", tokens: tokens2)
@@ -678,11 +669,10 @@ struct MultiFileSoAStorageTests {
     }
 }
 
-// MARK: - Token Kind Byte Tests
+// MARK: - TokenKindByteTests
 
 @Suite("Token Kind Byte Tests")
 struct TokenKindByteTests {
-
     @Test("Token kind byte constants have correct values")
     func tokenKindByteValues() {
         #expect(TokenKindByte.keyword.rawValue == 0)
@@ -711,11 +701,10 @@ struct TokenKindByteTests {
     }
 }
 
-// MARK: - Zero-Copy Parser Tests
+// MARK: - ZeroCopyParserTests
 
 @Suite("Zero-Copy Parser Tests")
 struct ZeroCopyParserTests {
-
     func createTempSwiftFile(content: String) throws -> String {
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = "test_\(UUID().uuidString).swift"
@@ -742,7 +731,7 @@ struct ZeroCopyParserTests {
         let result = try await parser.parse(path)
 
         #expect(result.path == path)
-        #expect(result.tokens.count > 0)
+        #expect(!result.tokens.isEmpty)
         #expect(result.syntaxTree != nil)
     }
 
@@ -759,7 +748,7 @@ struct ZeroCopyParserTests {
         #expect(result.tokens.count >= 4)
 
         // Check token kinds
-        let kinds = (0..<result.tokens.count).map { result.tokens.kind(at: $0) }
+        let kinds = (0 ..< result.tokens.count).map { result.tokens.kind(at: $0) }
         #expect(kinds.contains(.keyword))
         #expect(kinds.contains(.identifier))
         #expect(kinds.contains(.literal))
@@ -831,11 +820,10 @@ struct ZeroCopyParserTests {
     }
 }
 
-// MARK: - Batch Token Extractor Tests
+// MARK: - BatchTokenExtractorTests
 
 @Suite("Batch Token Extractor Tests")
 struct BatchTokenExtractorTests {
-
     func createTempSwiftFile(name: String, content: String) throws -> String {
         let tempDir = FileManager.default.temporaryDirectory
         let path = tempDir.appendingPathComponent(name).path
@@ -849,10 +837,10 @@ struct BatchTokenExtractorTests {
 
     @Test("Batch extractor processes multiple files")
     func multipleFiles() async throws {
-        let files = [
-            try createTempSwiftFile(name: "a_\(UUID()).swift", content: "let a = 1"),
-            try createTempSwiftFile(name: "b_\(UUID()).swift", content: "let b = 2"),
-            try createTempSwiftFile(name: "c_\(UUID()).swift", content: "let c = 3")
+        let files = try [
+            createTempSwiftFile(name: "a_\(UUID()).swift", content: "let a = 1"),
+            createTempSwiftFile(name: "b_\(UUID()).swift", content: "let b = 2"),
+            createTempSwiftFile(name: "c_\(UUID()).swift", content: "let c = 3"),
         ]
         defer { files.forEach { deleteTempFile($0) } }
 
@@ -865,7 +853,7 @@ struct BatchTokenExtractorTests {
 
     @Test("Parallel extraction works")
     func parallelExtraction() async throws {
-        let files = (0..<5).map { i in
+        let files = (0 ..< 5).map { i in
             try! createTempSwiftFile(name: "file\(i)_\(UUID()).swift", content: "let x\(i) = \(i)")
         }
         defer { files.forEach { deleteTempFile($0) } }
@@ -877,11 +865,10 @@ struct BatchTokenExtractorTests {
     }
 }
 
-// MARK: - Slice-Based Token Sequence Tests
+// MARK: - SliceBasedTokenSequenceTests
 
 @Suite("Slice-Based Token Sequence Tests")
 struct SliceBasedTokenSequenceTests {
-
     func createTempSwiftFile(content: String) throws -> String {
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = "test_\(UUID().uuidString).swift"
@@ -902,8 +889,8 @@ struct SliceBasedTokenSequenceTests {
 
         let mmf = try MemoryMappedFile(path: path)
         let tokens = [
-            TokenSlice(offset: 0, length: 4, line: 1, column: 1),  // func
-            TokenSlice(offset: 5, length: 4, line: 1, column: 6)   // test
+            TokenSlice(offset: 0, length: 4, line: 1, column: 1), // func
+            TokenSlice(offset: 5, length: 4, line: 1, column: 6), // test
         ]
         let kinds: [UInt8] = [0, 1] // keyword, identifier
 
@@ -911,7 +898,7 @@ struct SliceBasedTokenSequenceTests {
             file: path,
             source: mmf,
             tokens: tokens,
-            kinds: kinds
+            kinds: kinds,
         )
 
         #expect(sequence.count == 2)

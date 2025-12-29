@@ -3,8 +3,8 @@
 //  SwiftStaticAnalysis
 //
 
-import Testing
 @testable import SwiftStaticAnalysisCore
+import Testing
 
 @Suite("SwiftStaticAnalysisCore Tests")
 struct SwiftStaticAnalysisCoreTests {
@@ -51,7 +51,7 @@ struct SwiftStaticAnalysisCoreTests {
         let globalScope = Scope(
             id: .global,
             kind: .global,
-            location: SourceLocation(file: "test.swift", line: 1, column: 1)
+            location: SourceLocation(file: "test.swift", line: 1, column: 1),
         )
         tree.add(globalScope)
 
@@ -60,7 +60,7 @@ struct SwiftStaticAnalysisCoreTests {
             kind: .function,
             name: "myFunc",
             parent: .global,
-            location: SourceLocation(file: "test.swift", line: 5, column: 1)
+            location: SourceLocation(file: "test.swift", line: 5, column: 1),
         )
         tree.add(funcScope)
 
@@ -70,7 +70,7 @@ struct SwiftStaticAnalysisCoreTests {
 
     @Test("DeclarationKind all cases")
     func declarationKindCases() {
-        #expect(DeclarationKind.allCases.count > 0)
+        #expect(!DeclarationKind.allCases.isEmpty)
         #expect(DeclarationKind.function.rawValue == "function")
         #expect(DeclarationKind.variable.rawValue == "variable")
     }
@@ -95,9 +95,9 @@ struct SwiftStaticAnalysisCoreTests {
             location: SourceLocation(file: "test.swift", line: 10, column: 1),
             range: SourceRange(
                 start: SourceLocation(file: "test.swift", line: 10, column: 1),
-                end: SourceLocation(file: "test.swift", line: 15, column: 1)
+                end: SourceLocation(file: "test.swift", line: 15, column: 1),
             ),
-            scope: .global
+            scope: .global,
         )
 
         index.add(decl)
@@ -115,7 +115,7 @@ struct SwiftStaticAnalysisCoreTests {
             identifier: "myVar",
             location: SourceLocation(file: "test.swift", line: 20, column: 5),
             scope: .global,
-            context: .read
+            context: .read,
         )
 
         index.add(ref)

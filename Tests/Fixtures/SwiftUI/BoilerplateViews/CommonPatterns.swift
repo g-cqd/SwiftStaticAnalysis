@@ -8,12 +8,10 @@
 
 import SwiftUI
 
-// MARK: - Loading State Pattern (appears in many views)
+// MARK: - AsyncUserView
 
 struct AsyncUserView: View {
-    @State private var data: User?
-    @State private var isLoading = true
-    @State private var error: Error?
+    // MARK: Internal
 
     var body: some View {
         // This loading/error/content pattern is VERY common
@@ -34,6 +32,12 @@ struct AsyncUserView: View {
         .task { await load() }
     }
 
+    // MARK: Private
+
+    @State private var data: User?
+    @State private var isLoading = true
+    @State private var error: Error?
+
     private func load() async {
         isLoading = true
         defer { isLoading = false }
@@ -45,10 +49,10 @@ struct AsyncUserView: View {
     }
 }
 
+// MARK: - AsyncProductView
+
 struct AsyncProductView: View {
-    @State private var data: Product?
-    @State private var isLoading = true
-    @State private var error: Error?
+    // MARK: Internal
 
     var body: some View {
         // Same loading/error/content pattern
@@ -69,6 +73,12 @@ struct AsyncProductView: View {
         .task { await load() }
     }
 
+    // MARK: Private
+
+    @State private var data: Product?
+    @State private var isLoading = true
+    @State private var error: Error?
+
     private func load() async {
         isLoading = true
         defer { isLoading = false }
@@ -80,7 +90,7 @@ struct AsyncProductView: View {
     }
 }
 
-// MARK: - Form Field Pattern
+// MARK: - UserFormView
 
 struct UserFormView: View {
     @Binding var user: UserFormData
@@ -117,6 +127,8 @@ struct UserFormView: View {
     }
 }
 
+// MARK: - CompanyFormView
+
 struct CompanyFormView: View {
     @Binding var company: CompanyFormData
 
@@ -151,7 +163,7 @@ struct CompanyFormView: View {
     }
 }
 
-// MARK: - Card View Pattern
+// MARK: - UserCardView
 
 struct UserCardView: View {
     let user: User
@@ -183,6 +195,8 @@ struct UserCardView: View {
     }
 }
 
+// MARK: - ProductCardView
+
 struct ProductCardView: View {
     let product: Product
 
@@ -213,7 +227,7 @@ struct ProductCardView: View {
     }
 }
 
-// MARK: - Supporting Types
+// MARK: - User
 
 struct User {
     var name: String = ""
@@ -221,11 +235,15 @@ struct User {
     var avatarURL: URL?
 }
 
+// MARK: - Product
+
 struct Product {
     var name: String = ""
     var description: String = ""
     var imageURL: URL?
 }
+
+// MARK: - UserFormData
 
 struct UserFormData {
     var firstName: String = ""
@@ -236,6 +254,8 @@ struct UserFormData {
     var zip: String = ""
 }
 
+// MARK: - CompanyFormData
+
 struct CompanyFormData {
     var name: String = ""
     var industry: String = ""
@@ -245,13 +265,19 @@ struct CompanyFormData {
     var zip: String = ""
 }
 
+// MARK: - UserContent
+
 struct UserContent: View {
     let user: User
+
     var body: some View { Text(user.name) }
 }
 
+// MARK: - ProductContent
+
 struct ProductContent: View {
     let product: Product
+
     var body: some View { Text(product.name) }
 }
 

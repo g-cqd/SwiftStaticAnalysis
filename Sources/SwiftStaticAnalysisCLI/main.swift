@@ -6,10 +6,12 @@
 //
 
 import ArgumentParser
+import DuplicationDetector
 import Foundation
 import SwiftStaticAnalysisCore
-import DuplicationDetector
 import UnusedCodeDetector
+
+// MARK: - SWA
 
 @main
 struct SWA: AsyncParsableCommand {
@@ -22,15 +24,17 @@ struct SWA: AsyncParsableCommand {
             Duplicates.self,
             Unused.self,
         ],
-        defaultSubcommand: Analyze.self
+        defaultSubcommand: Analyze.self,
     )
 }
 
-// MARK: - Analyze Command
+// MARK: - Analyze
 
 struct Analyze: AsyncParsableCommand {
+    // MARK: Internal
+
     static let configuration = CommandConfiguration(
-        abstract: "Run full analysis (duplicates + unused code)"
+        abstract: "Run full analysis (duplicates + unused code)",
     )
 
     @Argument(help: "Path to analyze (directory or file)")
@@ -56,16 +60,20 @@ struct Analyze: AsyncParsableCommand {
         outputResults(clones: clones, unused: unused, format: format)
     }
 
+    // MARK: Private
+
     private func outputResults(
         clones: [CloneGroup],
         unused: [UnusedCode],
-        format: OutputFormat
+        format: OutputFormat,
     ) {
         switch format {
         case .text:
             outputText(clones: clones, unused: unused)
+
         case .json:
             outputJSON(clones: clones, unused: unused)
+
         case .xcode:
             outputXcode(clones: clones, unused: unused)
         }
@@ -92,11 +100,11 @@ struct Analyze: AsyncParsableCommand {
     }
 }
 
-// MARK: - Duplicates Command
+// MARK: - Duplicates
 
 struct Duplicates: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Detect code duplication"
+        abstract: "Detect code duplication",
     )
 
     @Argument(help: "Path to analyze")
@@ -118,7 +126,7 @@ struct Duplicates: AsyncParsableCommand {
 
         let config = DuplicationConfiguration(
             minimumTokens: minTokens,
-            cloneTypes: cloneTypes.isEmpty ? [.exact] : cloneTypes
+            cloneTypes: cloneTypes.isEmpty ? [.exact] : cloneTypes,
         )
 
         let detector = DuplicationDetector(configuration: config)
@@ -128,19 +136,21 @@ struct Duplicates: AsyncParsableCommand {
         case .text:
             print("Found \(clones.count) clone group(s)")
             OutputFormatter.printCloneGroupsText(clones)
+
         case .json:
             OutputFormatter.printJSON(clones)
+
         case .xcode:
             OutputFormatter.printCloneGroupsXcode(clones)
         }
     }
 }
 
-// MARK: - Unused Command
+// MARK: - Unused
 
 struct Unused: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Detect unused code"
+        abstract: "Detect unused code",
     )
 
     @Argument(help: "Path to analyze")
@@ -193,20 +203,21 @@ struct Unused: AsyncParsableCommand {
             }
         }
 
-        let detectionMode: DetectionMode
-        switch mode.lowercased() {
+        let detectionMode: DetectionMode = switch mode.lowercased() {
         case "reachability":
-            detectionMode = .reachability
-        case "indexstore", "index":
-            detectionMode = .indexStore
+            .reachability
+        case "index",
+             "indexstore":
+            .indexStore
+
         default:
-            detectionMode = .simple
+            .simple
         }
 
         let config = UnusedCodeConfiguration(
             ignorePublicAPI: ignorePublic,
             mode: detectionMode,
-            indexStorePath: indexStorePath
+            indexStorePath: indexStorePath,
         )
 
         let detector = UnusedCodeDetector(configuration: config)
@@ -253,22 +264,22 @@ struct Unused: AsyncParsableCommand {
             }
 
             // Exclude imports
-            if shouldExcludeImports && item.declaration.kind == .import {
+            if shouldExcludeImports, item.declaration.kind == .import {
                 return false
             }
 
             // Exclude deinit
-            if shouldExcludeDeinit && name == "deinit" {
+            if shouldExcludeDeinit, name == "deinit" {
                 return false
             }
 
             // Exclude backticked enum cases
-            if shouldExcludeEnumCases && name.hasPrefix("`") && name.hasSuffix("`") {
+            if shouldExcludeEnumCases, name.hasPrefix("`"), name.hasSuffix("`") {
                 return false
             }
 
             // Exclude test suites (names ending with Tests)
-            if shouldExcludeTestSuites && name.hasSuffix("Tests") {
+            if shouldExcludeTestSuites, name.hasSuffix("Tests") {
                 return false
             }
 
@@ -289,15 +300,17 @@ struct Unused: AsyncParsableCommand {
         case .text:
             print("Found \(unused.count) potentially unused item(s)")
             OutputFormatter.printUnusedText(unused)
+
         case .json:
             OutputFormatter.printJSON(unused)
+
         case .xcode:
             OutputFormatter.printUnusedXcode(unused)
         }
     }
 }
 
-// MARK: - Helpers
+// MARK: - OutputFormat
 
 enum OutputFormat: String, ExpressibleByArgument, CaseIterable {
     case text
@@ -305,12 +318,14 @@ enum OutputFormat: String, ExpressibleByArgument, CaseIterable {
     case xcode
 }
 
+// MARK: - CombinedReport
+
 struct CombinedReport: Codable {
     let clones: [CloneGroup]
     let unused: [UnusedCode]
 }
 
-// MARK: - Output Formatting Helpers
+// MARK: - OutputFormatter
 
 /// Shared formatting utilities to avoid code duplication across commands.
 enum OutputFormatter {
@@ -331,7 +346,9 @@ enum OutputFormatter {
     static func printCloneGroupsXcode(_ clones: [CloneGroup]) {
         for group in clones {
             for clone in group.clones {
-                print("\(clone.file):\(clone.startLine): warning: Duplicate code detected (\(group.type.rawValue) clone, \(group.occurrences) occurrences)")
+                print(
+                    "\(clone.file):\(clone.startLine): warning: Duplicate code detected (\(group.type.rawValue) clone, \(group.occurrences) occurrences)",
+                )
             }
         }
     }
@@ -352,7 +369,7 @@ enum OutputFormatter {
     }
 
     /// Encode and print as JSON.
-    static func printJSON<T: Encodable>(_ value: T) {
+    static func printJSON(_ value: some Encodable) {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         if let data = try? encoder.encode(value),
@@ -385,7 +402,7 @@ func findSwiftFiles(in path: String) throws -> [String] {
     if let enumerator = fileManager.enumerator(
         at: url,
         includingPropertiesForKeys: [.isRegularFileKey],
-        options: [.skipsHiddenFiles]
+        options: [.skipsHiddenFiles],
     ) {
         for case let fileURL as URL in enumerator {
             if fileURL.pathExtension == "swift" {

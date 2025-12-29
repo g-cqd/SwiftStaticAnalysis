@@ -7,13 +7,13 @@
 
 import SwiftUI
 
-// MARK: - Repeated Button Styles
+// MARK: - ActionButtonsView
 
 struct ActionButtonsView: View {
     var body: some View {
         VStack(spacing: 16) {
             // These button modifier chains are duplicated
-            Button("Save") { }
+            Button("Save") {}
                 .font(.headline)
                 .foregroundColor(.white)
                 .padding(.horizontal, 24)
@@ -22,7 +22,7 @@ struct ActionButtonsView: View {
                 .cornerRadius(8)
                 .shadow(color: .blue.opacity(0.3), radius: 4, x: 0, y: 2)
 
-            Button("Submit") { }
+            Button("Submit") {}
                 .font(.headline)
                 .foregroundColor(.white)
                 .padding(.horizontal, 24)
@@ -31,7 +31,7 @@ struct ActionButtonsView: View {
                 .cornerRadius(8)
                 .shadow(color: .blue.opacity(0.3), radius: 4, x: 0, y: 2)
 
-            Button("Confirm") { }
+            Button("Confirm") {}
                 .font(.headline)
                 .foregroundColor(.white)
                 .padding(.horizontal, 24)
@@ -40,7 +40,7 @@ struct ActionButtonsView: View {
                 .cornerRadius(8)
                 .shadow(color: .blue.opacity(0.3), radius: 4, x: 0, y: 2)
 
-            Button("Cancel") { }
+            Button("Cancel") {}
                 .font(.headline)
                 .foregroundColor(.white)
                 .padding(.horizontal, 24)
@@ -52,7 +52,7 @@ struct ActionButtonsView: View {
     }
 }
 
-// MARK: - Repeated Card Styles
+// MARK: - CardGridView
 
 struct CardGridView: View {
     var body: some View {
@@ -88,7 +88,7 @@ struct CardGridView: View {
     }
 }
 
-// MARK: - Repeated Text Styles
+// MARK: - StyledTextView
 
 struct StyledTextView: View {
     var body: some View {
@@ -123,7 +123,7 @@ struct StyledTextView: View {
     }
 }
 
-// MARK: - Repeated Image Styles
+// MARK: - ImageGalleryView
 
 struct ImageGalleryView: View {
     let imageURLs: [URL] = []
@@ -142,7 +142,7 @@ struct ImageGalleryView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1),
                 )
 
                 AsyncImage(url: imageURLs.dropFirst().first) { image in
@@ -155,7 +155,7 @@ struct ImageGalleryView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1),
                 )
 
                 AsyncImage(url: imageURLs.dropFirst(2).first) { image in
@@ -168,19 +168,17 @@ struct ImageGalleryView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1),
                 )
             }
         }
     }
 }
 
-// MARK: - Repeated Input Field Styles
+// MARK: - FormFieldsView
 
 struct FormFieldsView: View {
-    @State private var field1 = ""
-    @State private var field2 = ""
-    @State private var field3 = ""
+    // MARK: Internal
 
     var body: some View {
         VStack(spacing: 16) {
@@ -192,7 +190,7 @@ struct FormFieldsView: View {
                 .cornerRadius(8)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1),
                 )
 
             TextField("Field 2", text: $field2)
@@ -202,7 +200,7 @@ struct FormFieldsView: View {
                 .cornerRadius(8)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1),
                 )
 
             TextField("Field 3", text: $field3)
@@ -212,8 +210,14 @@ struct FormFieldsView: View {
                 .cornerRadius(8)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1),
                 )
         }
     }
+
+    // MARK: Private
+
+    @State private var field1 = ""
+    @State private var field2 = ""
+    @State private var field3 = ""
 }

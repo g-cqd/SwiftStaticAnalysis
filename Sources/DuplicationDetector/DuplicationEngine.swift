@@ -23,7 +23,8 @@ struct DuplicationEngine: Sendable {
 
         if configuration.cloneTypes.contains(.exact) {
             switch configuration.algorithm {
-            case .rollingHash, .minHashLSH:
+            case .minHashLSH,
+                 .rollingHash:
                 // Rolling hash detection (minHashLSH uses this for Type-1 clones)
                 let detector = ExactCloneDetector(minimumTokens: configuration.minimumTokens)
                 cloneGroups.append(contentsOf: detector.detect(in: sequences))
@@ -32,7 +33,7 @@ struct DuplicationEngine: Sendable {
                 // High-performance suffix array detection
                 let detector = SuffixArrayCloneDetector(
                     minimumTokens: configuration.minimumTokens,
-                    normalizeForType2: false
+                    normalizeForType2: false,
                 )
                 cloneGroups.append(contentsOf: detector.detect(in: sequences))
             }
@@ -40,11 +41,12 @@ struct DuplicationEngine: Sendable {
 
         if configuration.cloneTypes.contains(.near) {
             switch configuration.algorithm {
-            case .rollingHash, .minHashLSH:
+            case .minHashLSH,
+                 .rollingHash:
                 // Near clone detection (minHashLSH uses this for Type-2 clones)
                 let detector = NearCloneDetector(
                     minimumTokens: configuration.minimumTokens,
-                    minimumSimilarity: configuration.minimumSimilarity
+                    minimumSimilarity: configuration.minimumSimilarity,
                 )
                 cloneGroups.append(contentsOf: detector.detect(in: sequences))
 
@@ -52,7 +54,7 @@ struct DuplicationEngine: Sendable {
                 // Suffix array with normalized tokens for Type-2 detection
                 let detector = SuffixArrayCloneDetector(
                     minimumTokens: configuration.minimumTokens,
-                    normalizeForType2: true
+                    normalizeForType2: true,
                 )
                 cloneGroups.append(contentsOf: detector.detectWithNormalization(in: sequences))
             }
@@ -69,7 +71,7 @@ struct DuplicationEngine: Sendable {
         // Load file contents in parallel
         let fileContentPairs = try await ParallelProcessor.map(
             Array(referencedFiles),
-            maxConcurrency: concurrency.maxConcurrentFiles
+            maxConcurrency: concurrency.maxConcurrentFiles,
         ) { file -> (String, [String]) in
             let source = try String(contentsOfFile: file, encoding: .utf8)
             return (file, source.components(separatedBy: .newlines))
@@ -85,7 +87,7 @@ struct DuplicationEngine: Sendable {
                     let start = max(0, clone.startLine - 1)
                     let end = min(lines.count, clone.endLine)
                     if start < end {
-                        snippet = lines[start..<end].joined(separator: "\n")
+                        snippet = lines[start ..< end].joined(separator: "\n")
                     } else {
                         snippet = ""
                     }
@@ -98,7 +100,7 @@ struct DuplicationEngine: Sendable {
                     startLine: clone.startLine,
                     endLine: clone.endLine,
                     tokenCount: clone.tokenCount,
-                    codeSnippet: snippet
+                    codeSnippet: snippet,
                 )
             }
 
@@ -106,7 +108,7 @@ struct DuplicationEngine: Sendable {
                 type: group.type,
                 clones: clonesWithSnippets,
                 similarity: group.similarity,
-                fingerprint: group.fingerprint
+                fingerprint: group.fingerprint,
             )
         }
     }

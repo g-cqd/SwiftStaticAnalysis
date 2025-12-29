@@ -7,13 +7,10 @@
 
 import Foundation
 
-// MARK: - API Models
+// MARK: - User
 
 public struct User: Codable, Identifiable {
-    public let id: Int
-    public let name: String
-    public let email: String
-    public let createdAt: Date
+    // MARK: Lifecycle
 
     public init(id: Int, name: String, email: String, createdAt: Date = Date()) {
         self.id = id
@@ -21,14 +18,19 @@ public struct User: Codable, Identifiable {
         self.email = email
         self.createdAt = createdAt
     }
+
+    // MARK: Public
+
+    public let id: Int
+    public let name: String
+    public let email: String
+    public let createdAt: Date
 }
 
+// MARK: - Product
+
 public struct Product: Codable, Identifiable {
-    public let id: Int
-    public let title: String
-    public let description: String
-    public let price: Double
-    public let categoryId: Int
+    // MARK: Lifecycle
 
     public init(id: Int, title: String, description: String, price: Double, categoryId: Int) {
         self.id = id
@@ -37,15 +39,20 @@ public struct Product: Codable, Identifiable {
         self.price = price
         self.categoryId = categoryId
     }
+
+    // MARK: Public
+
+    public let id: Int
+    public let title: String
+    public let description: String
+    public let price: Double
+    public let categoryId: Int
 }
 
+// MARK: - Order
+
 public struct Order: Codable, Identifiable {
-    public let id: Int
-    public let userId: Int
-    public let productIds: [Int]
-    public let total: Double
-    public let status: OrderStatus
-    public let createdAt: Date
+    // MARK: Lifecycle
 
     public init(id: Int, userId: Int, productIds: [Int], total: Double, status: OrderStatus, createdAt: Date = Date()) {
         self.id = id
@@ -55,7 +62,18 @@ public struct Order: Codable, Identifiable {
         self.status = status
         self.createdAt = createdAt
     }
+
+    // MARK: Public
+
+    public let id: Int
+    public let userId: Int
+    public let productIds: [Int]
+    public let total: Double
+    public let status: OrderStatus
+    public let createdAt: Date
 }
+
+// MARK: - OrderStatus
 
 public enum OrderStatus: String, Codable {
     case pending
@@ -65,25 +83,28 @@ public enum OrderStatus: String, Codable {
     case cancelled
 }
 
-// MARK: - API Response Wrappers
+// MARK: - APIResponse
 
 public struct APIResponse<T: Codable>: Codable {
-    public let data: T
-    public let success: Bool
-    public let message: String?
+    // MARK: Lifecycle
 
     public init(data: T, success: Bool = true, message: String? = nil) {
         self.data = data
         self.success = success
         self.message = message
     }
+
+    // MARK: Public
+
+    public let data: T
+    public let success: Bool
+    public let message: String?
 }
 
+// MARK: - PaginatedResponse
+
 public struct PaginatedResponse<T: Codable>: Codable {
-    public let data: [T]
-    public let page: Int
-    public let totalPages: Int
-    public let totalItems: Int
+    // MARK: Lifecycle
 
     public init(data: [T], page: Int, totalPages: Int, totalItems: Int) {
         self.data = data
@@ -91,9 +112,16 @@ public struct PaginatedResponse<T: Codable>: Codable {
         self.totalPages = totalPages
         self.totalItems = totalItems
     }
+
+    // MARK: Public
+
+    public let data: [T]
+    public let page: Int
+    public let totalPages: Int
+    public let totalItems: Int
 }
 
-// MARK: - Error Types
+// MARK: - NetworkError
 
 public enum NetworkError: Error, Equatable {
     case invalidURL

@@ -6,15 +6,17 @@
 //  These should NOT be flagged as unused.
 //
 
-import SwiftUI
 import Combine
+import SwiftUI
 
-// MARK: - Protocol Witnesses
+// MARK: - ViewModelProtocol
 
 protocol ViewModelProtocol: ObservableObject {
     var title: String { get }
     func load() async
 }
+
+// MARK: - ConcreteViewModel
 
 /// The 'title' and 'load()' are used via protocol - should NOT be flagged
 class ConcreteViewModel: ViewModelProtocol {
@@ -26,20 +28,22 @@ class ConcreteViewModel: ViewModelProtocol {
     }
 }
 
+// MARK: - ProtocolConsumerView
+
 struct ProtocolConsumerView<VM: ViewModelProtocol>: View {
     @StateObject var viewModel: VM
 
     var body: some View {
         VStack {
-            Text(viewModel.title)  // Uses protocol property
+            Text(viewModel.title) // Uses protocol property
         }
         .task {
-            await viewModel.load()  // Uses protocol method
+            await viewModel.load() // Uses protocol method
         }
     }
 }
 
-// MARK: - Implicit Usage via Key Paths
+// MARK: - KeyPathUser
 
 struct KeyPathUser {
     var name: String = ""
@@ -47,8 +51,10 @@ struct KeyPathUser {
     var email: String = ""
 }
 
+// MARK: - KeyPathView
+
 struct KeyPathView: View {
-    @State private var user = KeyPathUser()
+    // MARK: Internal
 
     var body: some View {
         // These properties are accessed via key paths - should NOT be flagged
@@ -57,9 +63,13 @@ struct KeyPathView: View {
             TextField("Email", text: $user[keyPath: \.email])
         }
     }
+
+    // MARK: Private
+
+    @State private var user = KeyPathUser()
 }
 
-// MARK: - Codable Conformance
+// MARK: - APIResponse
 
 /// All properties are used for encoding/decoding - should NOT be flagged
 struct APIResponse: Codable {
@@ -69,14 +79,13 @@ struct APIResponse: Codable {
     let metadata: [String: String]
 }
 
-// MARK: - Combine Publishers
+// MARK: - DataService
 
 class DataService: ObservableObject {
+    // MARK: Internal
+
     // This publisher IS subscribed to - should NOT be flagged
     let dataPublisher = PassthroughSubject<String, Never>()
-
-    // This cancellable stores subscription - should NOT be flagged
-    private var cancellables = Set<AnyCancellable>()
 
     func startListening() {
         dataPublisher
@@ -85,9 +94,14 @@ class DataService: ObservableObject {
             }
             .store(in: &cancellables)
     }
+
+    // MARK: Private
+
+    // This cancellable stores subscription - should NOT be flagged
+    private var cancellables = Set<AnyCancellable>()
 }
 
-// MARK: - Environment Keys
+// MARK: - ThemeColorKey
 
 /// Custom environment key - the defaultValue IS used - should NOT be flagged
 private struct ThemeColorKey: EnvironmentKey {
@@ -101,7 +115,7 @@ extension EnvironmentValues {
     }
 }
 
-// MARK: - Preference Keys
+// MARK: - ScrollOffsetPreferenceKey
 
 /// Custom preference key - the defaultValue and reduce ARE used - should NOT be flagged
 struct ScrollOffsetPreferenceKey: PreferenceKey {
@@ -112,24 +126,30 @@ struct ScrollOffsetPreferenceKey: PreferenceKey {
     }
 }
 
+// MARK: - ScrollTrackingView
+
 struct ScrollTrackingView: View {
-    @State private var offset: CGFloat = 0
+    // MARK: Internal
 
     var body: some View {
         ScrollView {
             GeometryReader { geo in
                 Color.clear
                     .preference(key: ScrollOffsetPreferenceKey.self,
-                              value: geo.frame(in: .global).minY)
+                                value: geo.frame(in: .global).minY)
             }
         }
         .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
             offset = value
         }
     }
+
+    // MARK: Private
+
+    @State private var offset: CGFloat = 0
 }
 
-// MARK: - Result Builders
+// MARK: - ArrayBuilder
 
 /// This result builder IS used - should NOT be flagged
 @resultBuilder
@@ -147,16 +167,14 @@ func makeArray<T>(@ArrayBuilder<T> content: () -> [T]) -> [T] {
     content()
 }
 
-// MARK: - Lazy Initialization
+// MARK: - ExpensiveResource
 
 class ExpensiveResource {
     /// This property IS accessed lazily - should NOT be flagged
-    lazy var computedValue: Int = {
-        return (0..<1000).reduce(0, +)
-    }()
+    lazy var computedValue: Int = (0 ..< 1000).reduce(0, +)
 }
 
-// MARK: - Used in #Preview
+// MARK: - PreviewedView
 
 /// This view IS used in preview macro - should NOT be flagged
 struct PreviewedView: View {
@@ -169,7 +187,7 @@ struct PreviewedView: View {
     PreviewedView()
 }
 
-// MARK: - Implicitly Used Initializers
+// MARK: - AutoInitView
 
 struct AutoInitView: View {
     // These properties require memberwise init - should NOT be flagged
@@ -184,6 +202,8 @@ struct AutoInitView: View {
         }
     }
 }
+
+// MARK: - ParentView
 
 struct ParentView: View {
     var body: some View {

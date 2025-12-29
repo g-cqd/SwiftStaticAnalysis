@@ -8,7 +8,7 @@
 import Foundation
 import SwiftStaticAnalysisCore
 
-// MARK: - Clone Type
+// MARK: - CloneType
 
 /// Types of code clones.
 public enum CloneType: String, Sendable, Codable, CaseIterable {
@@ -26,6 +26,24 @@ public enum CloneType: String, Sendable, Codable, CaseIterable {
 
 /// Represents a detected code clone.
 public struct Clone: Sendable, Codable {
+    // MARK: Lifecycle
+
+    public init(
+        file: String,
+        startLine: Int,
+        endLine: Int,
+        tokenCount: Int,
+        codeSnippet: String,
+    ) {
+        self.file = file
+        self.startLine = startLine
+        self.endLine = endLine
+        self.tokenCount = tokenCount
+        self.codeSnippet = codeSnippet
+    }
+
+    // MARK: Public
+
     /// File containing the clone.
     public let file: String
 
@@ -40,26 +58,28 @@ public struct Clone: Sendable, Codable {
 
     /// The actual code snippet.
     public let codeSnippet: String
-
-    public init(
-        file: String,
-        startLine: Int,
-        endLine: Int,
-        tokenCount: Int,
-        codeSnippet: String
-    ) {
-        self.file = file
-        self.startLine = startLine
-        self.endLine = endLine
-        self.tokenCount = tokenCount
-        self.codeSnippet = codeSnippet
-    }
 }
 
-// MARK: - Clone Group
+// MARK: - CloneGroup
 
 /// A group of related clones.
 public struct CloneGroup: Sendable, Codable {
+    // MARK: Lifecycle
+
+    public init(
+        type: CloneType,
+        clones: [Clone],
+        similarity: Double,
+        fingerprint: String,
+    ) {
+        self.type = type
+        self.clones = clones
+        self.similarity = similarity
+        self.fingerprint = fingerprint
+    }
+
+    // MARK: Public
+
     /// Type of clone.
     public let type: CloneType
 
@@ -72,18 +92,6 @@ public struct CloneGroup: Sendable, Codable {
     /// Hash or fingerprint identifying this clone group.
     public let fingerprint: String
 
-    public init(
-        type: CloneType,
-        clones: [Clone],
-        similarity: Double,
-        fingerprint: String
-    ) {
-        self.type = type
-        self.clones = clones
-        self.similarity = similarity
-        self.fingerprint = fingerprint
-    }
-
     /// Number of occurrences.
     public var occurrences: Int { clones.count }
 
@@ -93,7 +101,7 @@ public struct CloneGroup: Sendable, Codable {
     }
 }
 
-// MARK: - Detection Algorithm
+// MARK: - DetectionAlgorithm
 
 /// Algorithm used for clone detection.
 public enum DetectionAlgorithm: String, Sendable, Codable {
@@ -107,10 +115,50 @@ public enum DetectionAlgorithm: String, Sendable, Codable {
     case minHashLSH
 }
 
-// MARK: - Duplication Detector Configuration
+// MARK: - DuplicationConfiguration
 
 /// Configuration for duplication detection.
 public struct DuplicationConfiguration: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        minimumTokens: Int = 50,
+        cloneTypes: Set<CloneType> = [.exact],
+        ignoredPatterns: [String] = [],
+        minimumSimilarity: Double = 0.8,
+        algorithm: DetectionAlgorithm = .rollingHash,
+        useIncremental: Bool = false,
+        cacheDirectory: URL? = nil,
+    ) {
+        self.minimumTokens = minimumTokens
+        self.cloneTypes = cloneTypes
+        self.ignoredPatterns = ignoredPatterns
+        self.minimumSimilarity = minimumSimilarity
+        self.algorithm = algorithm
+        self.useIncremental = useIncremental
+        self.cacheDirectory = cacheDirectory
+    }
+
+    // MARK: Public
+
+    /// Default configuration.
+    public static let `default` = DuplicationConfiguration()
+
+    /// High-performance configuration using suffix array.
+    public static let highPerformance = DuplicationConfiguration(
+        minimumTokens: 50,
+        cloneTypes: [.exact, .near],
+        algorithm: .suffixArray,
+    )
+
+    /// Configuration for Type-3 clones using MinHash + LSH.
+    public static let type3Detection = DuplicationConfiguration(
+        minimumTokens: 50,
+        cloneTypes: [.semantic],
+        minimumSimilarity: 0.5,
+        algorithm: .minHashLSH,
+    )
+
     /// Minimum tokens to consider as a clone.
     public var minimumTokens: Int
 
@@ -132,42 +180,6 @@ public struct DuplicationConfiguration: Sendable {
     /// Cache directory for incremental detection.
     public var cacheDirectory: URL?
 
-    public init(
-        minimumTokens: Int = 50,
-        cloneTypes: Set<CloneType> = [.exact],
-        ignoredPatterns: [String] = [],
-        minimumSimilarity: Double = 0.8,
-        algorithm: DetectionAlgorithm = .rollingHash,
-        useIncremental: Bool = false,
-        cacheDirectory: URL? = nil
-    ) {
-        self.minimumTokens = minimumTokens
-        self.cloneTypes = cloneTypes
-        self.ignoredPatterns = ignoredPatterns
-        self.minimumSimilarity = minimumSimilarity
-        self.algorithm = algorithm
-        self.useIncremental = useIncremental
-        self.cacheDirectory = cacheDirectory
-    }
-
-    /// Default configuration.
-    public static let `default` = DuplicationConfiguration()
-
-    /// High-performance configuration using suffix array.
-    public static let highPerformance = DuplicationConfiguration(
-        minimumTokens: 50,
-        cloneTypes: [.exact, .near],
-        algorithm: .suffixArray
-    )
-
-    /// Configuration for Type-3 clones using MinHash + LSH.
-    public static let type3Detection = DuplicationConfiguration(
-        minimumTokens: 50,
-        cloneTypes: [.semantic],
-        minimumSimilarity: 0.5,
-        algorithm: .minHashLSH
-    )
-
     /// Incremental configuration with caching enabled.
     public static func incremental(cacheDirectory: URL? = nil) -> DuplicationConfiguration {
         DuplicationConfiguration(
@@ -175,36 +187,34 @@ public struct DuplicationConfiguration: Sendable {
             cloneTypes: [.exact, .near],
             algorithm: .suffixArray,
             useIncremental: true,
-            cacheDirectory: cacheDirectory
+            cacheDirectory: cacheDirectory,
         )
     }
 }
 
-// MARK: - Duplication Detector
+// MARK: - DuplicationDetector
 
 /// Detects code duplication in Swift source files.
 public struct DuplicationDetector: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        configuration: DuplicationConfiguration = .default,
+        concurrency: ConcurrencyConfiguration = .default,
+    ) {
+        self.configuration = configuration
+        self.concurrency = concurrency
+        parser = SwiftFileParser()
+        engine = DuplicationEngine(configuration: configuration, concurrency: concurrency)
+    }
+
+    // MARK: Public
+
     /// Configuration for detection.
     public let configuration: DuplicationConfiguration
 
     /// Concurrency configuration.
     public let concurrency: ConcurrencyConfiguration
-
-    /// The file parser.
-    private let parser: SwiftFileParser
-
-    /// The shared duplication engine.
-    private let engine: DuplicationEngine
-
-    public init(
-        configuration: DuplicationConfiguration = .default,
-        concurrency: ConcurrencyConfiguration = .default
-    ) {
-        self.configuration = configuration
-        self.concurrency = concurrency
-        self.parser = SwiftFileParser()
-        self.engine = DuplicationEngine(configuration: configuration, concurrency: concurrency)
-    }
 
     /// Detect clones in the given files.
     ///
@@ -229,6 +239,14 @@ public struct DuplicationDetector: Sendable {
         return try await engine.addCodeSnippets(to: cloneGroups)
     }
 
+    // MARK: Private
+
+    /// The file parser.
+    private let parser: SwiftFileParser
+
+    /// The shared duplication engine.
+    private let engine: DuplicationEngine
+
     // MARK: - Semantic Clone Detection
 
     private func detectSemanticClones(in files: [String]) async throws -> [CloneGroup] {
@@ -239,15 +257,16 @@ public struct DuplicationDetector: Sendable {
                 minimumTokens: configuration.minimumTokens,
                 shingleSize: 5,
                 numHashes: 128,
-                minimumSimilarity: configuration.minimumSimilarity
+                minimumSimilarity: configuration.minimumSimilarity,
             )
             return try await detector.detect(in: files)
 
-        case .rollingHash, .suffixArray:
+        case .rollingHash,
+             .suffixArray:
             // Use AST fingerprinting for semantic clone detection
             let detector = SemanticCloneDetector(
                 minimumNodes: configuration.minimumTokens / 5, // Roughly 5 tokens per node
-                minimumSimilarity: configuration.minimumSimilarity
+                minimumSimilarity: configuration.minimumSimilarity,
             )
             return try await detector.detect(in: files)
         }
@@ -262,7 +281,7 @@ public struct DuplicationDetector: Sendable {
         // Use parallel processing with concurrency limits
         let sequences = try await ParallelProcessor.map(
             files,
-            maxConcurrency: concurrency.maxConcurrentFiles
+            maxConcurrency: concurrency.maxConcurrentFiles,
         ) { [parser] file -> TokenSequence in
             let tree = try await parser.parse(file)
             let source = try String(contentsOfFile: file, encoding: .utf8)
@@ -273,10 +292,24 @@ public struct DuplicationDetector: Sendable {
     }
 }
 
-// MARK: - Duplication Report
+// MARK: - DuplicationReport
 
 /// Report summarizing duplication findings.
 public struct DuplicationReport: Sendable, Codable {
+    // MARK: Lifecycle
+
+    public init(
+        filesAnalyzed: Int,
+        totalLines: Int,
+        cloneGroups: [CloneGroup],
+    ) {
+        self.filesAnalyzed = filesAnalyzed
+        self.totalLines = totalLines
+        self.cloneGroups = cloneGroups
+    }
+
+    // MARK: Public
+
     /// Total files analyzed.
     public let filesAnalyzed: Int
 
@@ -296,26 +329,16 @@ public struct DuplicationReport: Sendable, Codable {
         guard totalLines > 0 else { return 0 }
         return Double(duplicatedLines) / Double(totalLines) * 100
     }
-
-    public init(
-        filesAnalyzed: Int,
-        totalLines: Int,
-        cloneGroups: [CloneGroup]
-    ) {
-        self.filesAnalyzed = filesAnalyzed
-        self.totalLines = totalLines
-        self.cloneGroups = cloneGroups
-    }
 }
 
 // MARK: - Clone Group Utilities
 
-extension Array where Element == CloneGroup {
+public extension [CloneGroup] {
     /// Remove duplicate clone groups based on their location fingerprints.
     ///
     /// Two clone groups are considered duplicates if they contain clones
     /// at the exact same file locations.
-    public func deduplicated() -> [CloneGroup] {
+    func deduplicated() -> [CloneGroup] {
         var seen = Set<String>()
         var result: [CloneGroup] = []
 
@@ -335,7 +358,7 @@ extension Array where Element == CloneGroup {
     }
 }
 
-// MARK: - Clone Detection Utilities
+// MARK: - GroupableWindow
 
 /// Protocol for windows that can be grouped by the clone detection algorithm.
 public protocol GroupableWindow {
@@ -348,6 +371,8 @@ public protocol GroupableWindow {
     /// Check if this window matches another for grouping purposes.
     func matches(_ other: Self) -> Bool
 }
+
+// MARK: - CloneDetectionUtilities
 
 /// Shared utilities for clone detection algorithms.
 public enum CloneDetectionUtilities {
@@ -363,7 +388,7 @@ public enum CloneDetectionUtilities {
     public static func hasSignificantOverlap(
         start1: Int, end1: Int,
         start2: Int, end2: Int,
-        threshold: Int
+        threshold: Int,
     ) -> Bool {
         let overlap = max(0, min(end1, end2) - max(start1, start2) + 1)
         return overlap > threshold
@@ -393,7 +418,7 @@ public enum CloneDetectionUtilities {
     /// - Returns: Groups of matching windows (groups with < 2 windows are excluded).
     public static func groupMatchingWindows<W: GroupableWindow>(
         _ windows: [W],
-        overlapThreshold: Int
+        overlapThreshold: Int,
     ) -> [[W]] {
         var groups: [[W]] = []
         var used = Set<Int>()
@@ -410,7 +435,7 @@ public enum CloneDetectionUtilities {
                     if hasSignificantOverlap(
                         start1: window1.startIndex, end1: window1.endIndex,
                         start2: window2.startIndex, end2: window2.endIndex,
-                        threshold: overlapThreshold
+                        threshold: overlapThreshold,
                     ) {
                         continue
                     }

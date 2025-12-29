@@ -8,55 +8,65 @@
 
 import Foundation
 
-// MARK: - Protocol Definitions
+// MARK: - Displayable
 
 protocol Displayable {
     func display()
 }
 
+// MARK: - Identifiable
+
 protocol Identifiable {
     var id: String { get }
 }
 
+// MARK: - Comparable
+
 protocol Comparable {
     func compare(to other: Self) -> Int
 }
+
+// MARK: - Processable
 
 protocol Processable {
     associatedtype Output
     func process() -> Output
 }
 
-// MARK: - Protocol Conformances (Methods Should NOT Be Flagged)
+// MARK: - User
 
 struct User: Displayable, Identifiable {
     let name: String
-
-    /// This method appears unused but satisfies Displayable protocol
-    func display() {
-        print("User: \(name)")
-    }
 
     /// This property appears unused but satisfies Identifiable protocol
     var id: String {
         "user-\(name)"
     }
+
+    /// This method appears unused but satisfies Displayable protocol
+    func display() {
+        print("User: \(name)")
+    }
 }
+
+// MARK: - Product
 
 struct Product: Displayable, Identifiable {
     let title: String
     let price: Double
 
     /// Protocol witness - should NOT be flagged
-    func display() {
-        print("Product: \(title) - $\(price)")
-    }
-
-    /// Protocol witness - should NOT be flagged
     var id: String {
         "product-\(title)"
     }
+
+    /// Protocol witness - should NOT be flagged
+    func display() {
+        print("Product: \(title) - $\(price)")
+    }
 }
+
+// MARK: - Order
 
 struct Order: Processable {
     let items: [String]
@@ -73,11 +83,11 @@ func showAll(_ items: [any Displayable]) {
     items.forEach { $0.display() }
 }
 
-func getAllIds<T: Identifiable>(_ items: [T]) -> [String] {
+func getAllIds(_ items: [some Identifiable]) -> [String] {
     items.map(\.id)
 }
 
-// MARK: - Equatable/Hashable Conformance
+// MARK: - Point
 
 struct Point: Equatable, Hashable {
     let x: Int
@@ -95,20 +105,20 @@ struct Point: Equatable, Hashable {
     }
 }
 
-// MARK: - Codable Conformance
+// MARK: - Config
 
 struct Config: Codable {
-    let name: String
-    let value: Int
-
     /// CodingKeys is a protocol requirement - should NOT be flagged
     enum CodingKeys: String, CodingKey {
         case name
         case value = "val"
     }
+
+    let name: String
+    let value: Int
 }
 
-// MARK: - CustomStringConvertible
+// MARK: - DebugInfo
 
 struct DebugInfo: CustomStringConvertible {
     let message: String
@@ -119,20 +129,22 @@ struct DebugInfo: CustomStringConvertible {
     }
 }
 
-// MARK: - Actually Unused Code (SHOULD Be Flagged)
+// MARK: - UnusedStruct
 
 /// This method is NOT a protocol witness
 struct UnusedStruct {
     /// Not a protocol requirement - SHOULD BE FLAGGED
-    private func unusedMethod() {
-        print("unused")
-    }
-
-    /// Not a protocol requirement - SHOULD BE FLAGGED
     private var unusedProperty: Int {
         42
     }
+
+    /// Not a protocol requirement - SHOULD BE FLAGGED
+    private func unusedMethod() {
+        print("unused")
+    }
 }
+
+// MARK: - NonConformingClass
 
 /// This class doesn't conform to any protocol
 class NonConformingClass {
@@ -142,7 +154,7 @@ class NonConformingClass {
     }
 }
 
-// MARK: - Protocol with Default Implementation
+// MARK: - Defaultable
 
 protocol Defaultable {
     func requiredMethod()
@@ -155,6 +167,8 @@ extension Defaultable {
         print("default implementation")
     }
 }
+
+// MARK: - DefaultUser
 
 struct DefaultUser: Defaultable {
     /// Required - should NOT be flagged
@@ -170,7 +184,7 @@ struct DefaultUser: Defaultable {
 func runConformanceTests() {
     let users: [any Displayable] = [
         User(name: "Alice"),
-        Product(title: "Widget", price: 9.99)
+        Product(title: "Widget", price: 9.99),
     ]
     showAll(users)
 

@@ -7,16 +7,20 @@
 
 import Foundation
 
-// MARK: - Diagnostic Deduplicator
+// MARK: - DiagnosticDeduplicator
 
 /// Deduplicates diagnostics to prevent duplicate warnings/errors.
 public struct DiagnosticDeduplicator: Sendable {
-    /// Configuration for deduplication.
-    public let configuration: DeduplicationConfiguration
+    // MARK: Lifecycle
 
     public init(configuration: DeduplicationConfiguration = .default) {
         self.configuration = configuration
     }
+
+    // MARK: Public
+
+    /// Configuration for deduplication.
+    public let configuration: DeduplicationConfiguration
 
     /// Deduplicate a list of diagnostics.
     ///
@@ -98,7 +102,7 @@ public struct DiagnosticDeduplicator: Sendable {
 
                 // Look for related diagnostics (within 5 lines)
                 var j = i + 1
-                while j < sorted.count && sorted[j].line - primary.line <= 5 {
+                while j < sorted.count, sorted[j].line - primary.line <= 5 {
                     // Convert secondary to note if it's a lower severity
                     if sorted[j].severity.priority < primary.severity.priority {
                         let note = Diagnostic(
@@ -107,7 +111,7 @@ public struct DiagnosticDeduplicator: Sendable {
                             column: sorted[j].column,
                             severity: .note,
                             message: sorted[j].message,
-                            category: sorted[j].category
+                            category: sorted[j].category,
                         )
                         notes.append(note)
                     } else {
@@ -131,18 +135,23 @@ public struct DiagnosticDeduplicator: Sendable {
         return result
     }
 
+    // MARK: Private
+
     // MARK: - Private Helpers
 
     private func deduplicationKey(for diagnostic: Diagnostic) -> String {
         switch configuration.deduplicationLevel {
         case .exact:
-            return diagnostic.uniqueKey
+            diagnostic.uniqueKey
+
         case .location:
-            return "\(diagnostic.file):\(diagnostic.line):\(diagnostic.column)"
+            "\(diagnostic.file):\(diagnostic.line):\(diagnostic.column)"
+
         case .message:
-            return "\(diagnostic.file):\(diagnostic.message.hashValue)"
+            "\(diagnostic.file):\(diagnostic.message.hashValue)"
+
         case .locationAndSeverity:
-            return "\(diagnostic.file):\(diagnostic.line):\(diagnostic.column):\(diagnostic.severity.rawValue)"
+            "\(diagnostic.file):\(diagnostic.line):\(diagnostic.column):\(diagnostic.severity.rawValue)"
         }
     }
 
@@ -164,7 +173,7 @@ public struct DiagnosticDeduplicator: Sendable {
                     column: 1,
                     severity: .note,
                     message: "Additional diagnostics in this file were suppressed (limit: \(limit))",
-                    category: .general
+                    category: .general,
                 )
                 result.append(summary)
                 countByFile[diagnostic.file] = currentCount + 1
@@ -176,10 +185,43 @@ public struct DiagnosticDeduplicator: Sendable {
     }
 }
 
-// MARK: - Deduplication Configuration
+// MARK: - DeduplicationConfiguration
 
 /// Configuration for diagnostic deduplication.
 public struct DeduplicationConfiguration: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        deduplicationLevel: DeduplicationLevel = .exact,
+        maxDiagnosticsPerFile: Int? = nil,
+        groupRelatedDiagnostics: Bool = true,
+        preferHigherSeverity: Bool = true,
+    ) {
+        self.deduplicationLevel = deduplicationLevel
+        self.maxDiagnosticsPerFile = maxDiagnosticsPerFile
+        self.groupRelatedDiagnostics = groupRelatedDiagnostics
+        self.preferHigherSeverity = preferHigherSeverity
+    }
+
+    // MARK: Public
+
+    /// Default configuration.
+    public static let `default` = DeduplicationConfiguration()
+
+    /// Strict deduplication (exact matches only).
+    public static let strict = DeduplicationConfiguration(
+        deduplicationLevel: .exact,
+        maxDiagnosticsPerFile: nil,
+        groupRelatedDiagnostics: false,
+    )
+
+    /// Lenient deduplication (dedupe by location only).
+    public static let lenient = DeduplicationConfiguration(
+        deduplicationLevel: .location,
+        maxDiagnosticsPerFile: 50,
+        groupRelatedDiagnostics: true,
+    )
+
     /// Level of deduplication.
     public var deduplicationLevel: DeduplicationLevel
 
@@ -191,38 +233,9 @@ public struct DeduplicationConfiguration: Sendable {
 
     /// Whether to prefer higher severity when deduplicating.
     public var preferHigherSeverity: Bool
-
-    public init(
-        deduplicationLevel: DeduplicationLevel = .exact,
-        maxDiagnosticsPerFile: Int? = nil,
-        groupRelatedDiagnostics: Bool = true,
-        preferHigherSeverity: Bool = true
-    ) {
-        self.deduplicationLevel = deduplicationLevel
-        self.maxDiagnosticsPerFile = maxDiagnosticsPerFile
-        self.groupRelatedDiagnostics = groupRelatedDiagnostics
-        self.preferHigherSeverity = preferHigherSeverity
-    }
-
-    /// Default configuration.
-    public static let `default` = DeduplicationConfiguration()
-
-    /// Strict deduplication (exact matches only).
-    public static let strict = DeduplicationConfiguration(
-        deduplicationLevel: .exact,
-        maxDiagnosticsPerFile: nil,
-        groupRelatedDiagnostics: false
-    )
-
-    /// Lenient deduplication (dedupe by location only).
-    public static let lenient = DeduplicationConfiguration(
-        deduplicationLevel: .location,
-        maxDiagnosticsPerFile: 50,
-        groupRelatedDiagnostics: true
-    )
 }
 
-// MARK: - Deduplication Level
+// MARK: - DeduplicationLevel
 
 /// Level of deduplication to apply.
 public enum DeduplicationLevel: String, Sendable, Codable {
@@ -245,10 +258,10 @@ extension DiagnosticSeverity {
     /// Priority for comparing severities.
     var priority: Int {
         switch self {
-        case .error: return 4
-        case .warning: return 3
-        case .note: return 2
-        case .remark: return 1
+        case .error: 4
+        case .warning: 3
+        case .note: 2
+        case .remark: 1
         }
     }
 }

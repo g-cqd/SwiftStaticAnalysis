@@ -5,13 +5,14 @@
 //  Tests for incremental analysis framework.
 //
 
-import Testing
 import Foundation
 @testable import SwiftStaticAnalysisCore
+import Testing
+
+// MARK: - ChangeDetectorTests
 
 @Suite("Change Detector Tests")
 struct ChangeDetectorTests {
-
     @Test("Finds no changes for same files")
     func changeDetectorFindsNoChangesForSameFiles() async throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -27,12 +28,12 @@ struct ChangeDetectorTests {
         // First detection - all files are new
         let firstState = await detector.detectChanges(
             currentFiles: [testFile.path],
-            previousState: [:]
+            previousState: [:],
         )
 
         #expect(firstState.addedFiles.count == 1)
-        #expect(firstState.modifiedFiles.count == 0)
-        #expect(firstState.unchangedFiles.count == 0)
+        #expect(firstState.modifiedFiles.isEmpty)
+        #expect(firstState.unchangedFiles.isEmpty)
 
         // Build previous state from first detection
         var previousState: [String: FileState] = [:]
@@ -45,11 +46,11 @@ struct ChangeDetectorTests {
         // Second detection with same state - no changes
         let secondResult = await detector.detectChanges(
             currentFiles: [testFile.path],
-            previousState: previousState
+            previousState: previousState,
         )
 
-        #expect(secondResult.addedFiles.count == 0)
-        #expect(secondResult.modifiedFiles.count == 0)
+        #expect(secondResult.addedFiles.isEmpty)
+        #expect(secondResult.modifiedFiles.isEmpty)
         #expect(secondResult.unchangedFiles.count == 1)
         #expect(!secondResult.hasChanges)
     }
@@ -68,7 +69,7 @@ struct ChangeDetectorTests {
         // Get initial state
         let firstResult = await detector.detectChanges(
             currentFiles: [testFile.path],
-            previousState: [:]
+            previousState: [:],
         )
 
         var previousState: [String: FileState] = [:]
@@ -84,7 +85,7 @@ struct ChangeDetectorTests {
         // Detect changes
         let secondResult = await detector.detectChanges(
             currentFiles: [testFile.path],
-            previousState: previousState
+            previousState: previousState,
         )
 
         #expect(secondResult.modifiedFiles.count == 1)
@@ -105,7 +106,7 @@ struct ChangeDetectorTests {
         // Get initial state
         let firstResult = await detector.detectChanges(
             currentFiles: [testFile.path],
-            previousState: [:]
+            previousState: [:],
         )
 
         var previousState: [String: FileState] = [:]
@@ -121,7 +122,7 @@ struct ChangeDetectorTests {
         // Detect changes with empty current files
         let secondResult = await detector.detectChanges(
             currentFiles: [],
-            previousState: previousState
+            previousState: previousState,
         )
 
         #expect(secondResult.deletedFiles.count == 1)
@@ -129,9 +130,10 @@ struct ChangeDetectorTests {
     }
 }
 
+// MARK: - FNV1aHashTests
+
 @Suite("FNV1a Hash Tests")
 struct FNV1aHashTests {
-
     @Test("Hash consistency")
     func hashConsistency() {
         let data = "Hello, World!".data(using: .utf8)!
@@ -165,9 +167,10 @@ struct FNV1aHashTests {
     }
 }
 
+// MARK: - AnalysisCacheTests
+
 @Suite("Analysis Cache Tests")
 struct AnalysisCacheTests {
-
     @Test("Cache stores and retrieves")
     func cacheStoresAndRetrieves() async throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -179,7 +182,7 @@ struct AnalysisCacheTests {
             path: "/test/file.swift",
             contentHash: 12345,
             modificationTime: Date(),
-            size: 100
+            size: 100,
         )
 
         await cache.setFileState(fileState, for: fileState.path)
@@ -199,7 +202,7 @@ struct AnalysisCacheTests {
             path: "/test/file.swift",
             contentHash: 12345,
             modificationTime: Date(),
-            size: 100
+            size: 100,
         )
         await cache1.setFileState(fileState, for: fileState.path)
         try await cache1.save()
@@ -218,11 +221,11 @@ struct AnalysisCacheTests {
 
         await cache.setFileState(
             FileState(path: "/a.swift", contentHash: 1, modificationTime: Date(), size: 10),
-            for: "/a.swift"
+            for: "/a.swift",
         )
         await cache.setFileState(
             FileState(path: "/b.swift", contentHash: 2, modificationTime: Date(), size: 20),
-            for: "/b.swift"
+            for: "/b.swift",
         )
 
         let stats = await cache.statistics()
@@ -230,9 +233,10 @@ struct AnalysisCacheTests {
     }
 }
 
+// MARK: - DependencyGraphTests
+
 @Suite("Dependency Graph Tests")
 struct DependencyGraphTests {
-
     @Test("Direct dependents")
     func directDependents() {
         var graph = DependencyGraph()
@@ -240,7 +244,7 @@ struct DependencyGraphTests {
         graph.addDependency(FileDependency(
             dependentFile: "/a.swift",
             dependencyFile: "/b.swift",
-            type: .typeReference
+            type: .typeReference,
         ))
 
         #expect(graph.getDirectDependents(of: "/b.swift") == ["/a.swift"])
@@ -255,12 +259,12 @@ struct DependencyGraphTests {
         graph.addDependency(FileDependency(
             dependentFile: "/a.swift",
             dependencyFile: "/b.swift",
-            type: .typeReference
+            type: .typeReference,
         ))
         graph.addDependency(FileDependency(
             dependentFile: "/b.swift",
             dependencyFile: "/c.swift",
-            type: .typeReference
+            type: .typeReference,
         ))
 
         // If c changes, both a and b should be affected
@@ -277,20 +281,21 @@ struct DependencyGraphTests {
         graph.addDependency(FileDependency(
             dependentFile: "/a.swift",
             dependencyFile: "/b.swift",
-            type: .typeReference
+            type: .typeReference,
         ))
 
         #expect(graph.getDirectDependents(of: "/b.swift").count == 1)
 
         graph.removeDependencies(for: "/a.swift")
 
-        #expect(graph.getDirectDependents(of: "/b.swift").count == 0)
+        #expect(graph.getDirectDependents(of: "/b.swift").isEmpty)
     }
 }
 
+// MARK: - CachedDeclarationTests
+
 @Suite("Cached Declaration Tests")
 struct CachedDeclarationTests {
-
     @Test("CachedDeclaration from Declaration")
     func cachedDeclarationFromDeclaration() {
         let declaration = Declaration(
@@ -301,10 +306,10 @@ struct CachedDeclarationTests {
             location: SourceLocation(file: "/test.swift", line: 10, column: 5),
             range: SourceRange(
                 start: SourceLocation(file: "/test.swift", line: 10, column: 5),
-                end: SourceLocation(file: "/test.swift", line: 15, column: 1)
+                end: SourceLocation(file: "/test.swift", line: 15, column: 1),
             ),
             scope: ScopeID("global"),
-            conformances: ["Sendable"]
+            conformances: ["Sendable"],
         )
 
         let cached = CachedDeclaration(from: declaration)
@@ -317,9 +322,10 @@ struct CachedDeclarationTests {
     }
 }
 
+// MARK: - CachedReferenceTests
+
 @Suite("Cached Reference Tests")
 struct CachedReferenceTests {
-
     @Test("CachedReference from Reference")
     func cachedReferenceFromReference() {
         let reference = Reference(
@@ -328,7 +334,7 @@ struct CachedReferenceTests {
             scope: ScopeID("func_body"),
             context: .typeAnnotation,
             isQualified: true,
-            qualifier: "Module"
+            qualifier: "Module",
         )
 
         let cached = CachedReference(from: reference)

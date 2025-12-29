@@ -8,16 +8,20 @@
 import Foundation
 import SwiftStaticAnalysisCore
 
-// MARK: - Dependency Extractor
+// MARK: - DependencyExtractor
 
 /// Extracts dependencies from analysis results to build a reachability graph.
 public struct DependencyExtractor: Sendable {
-    /// Configuration for extraction.
-    public let configuration: DependencyExtractionConfiguration
+    // MARK: Lifecycle
 
     public init(configuration: DependencyExtractionConfiguration = .default) {
         self.configuration = configuration
     }
+
+    // MARK: Public
+
+    /// Configuration for extraction.
+    public let configuration: DependencyExtractionConfiguration
 
     /// Build a reachability graph from analysis results.
     public func buildGraph(from result: AnalysisResult) -> ReachabilityGraph {
@@ -28,13 +32,13 @@ public struct DependencyExtractor: Sendable {
             treatPublicAsRoot: configuration.treatPublicAsRoot,
             treatObjcAsRoot: configuration.treatObjcAsRoot,
             treatTestsAsRoot: configuration.treatTestsAsRoot,
-            treatProtocolRequirementsAsRoot: configuration.treatProtocolRequirementsAsRoot
+            treatProtocolRequirementsAsRoot: configuration.treatProtocolRequirementsAsRoot,
         )
 
         graph.detectRoots(
             declarations: result.declarations.declarations,
             references: result.references,
-            configuration: rootConfig
+            configuration: rootConfig,
         )
 
         // Build edges based on references
@@ -42,6 +46,8 @@ public struct DependencyExtractor: Sendable {
 
         return graph
     }
+
+    // MARK: Private
 
     /// Build edges between declarations based on references.
     private func buildEdges(graph: ReachabilityGraph, result: AnalysisResult) {
@@ -61,14 +67,14 @@ public struct DependencyExtractor: Sendable {
             // Find all references within this declaration's scope
             let scopeRefs = findReferencesInScope(
                 declaration: declaration,
-                allRefs: references
+                allRefs: references,
             )
 
             for ref in scopeRefs {
                 // Find target declarations for this reference
                 let targets = findTargetDeclarations(
                     for: ref,
-                    declarations: declByName
+                    declarations: declByName,
                 )
 
                 for target in targets {
@@ -95,7 +101,7 @@ public struct DependencyExtractor: Sendable {
             addInheritanceEdges(
                 for: declaration,
                 graph: graph,
-                declarations: declByName
+                declarations: declByName,
             )
         }
 
@@ -108,7 +114,7 @@ public struct DependencyExtractor: Sendable {
     /// Find references that appear within a declaration's scope.
     private func findReferencesInScope(
         declaration: Declaration,
-        allRefs: ReferenceIndex
+        allRefs: ReferenceIndex,
     ) -> [Reference] {
         // Get references in the same file within the declaration's range
         let fileRefs = allRefs.find(inFile: declaration.location.file)
@@ -116,14 +122,14 @@ public struct DependencyExtractor: Sendable {
         return fileRefs.filter { ref in
             // Check if the reference is within the declaration's range
             ref.location.line >= declaration.range.start.line &&
-            ref.location.line <= declaration.range.end.line
+                ref.location.line <= declaration.range.end.line
         }
     }
 
     /// Find declarations that a reference might be pointing to.
     private func findTargetDeclarations(
         for reference: Reference,
-        declarations: [String: [Declaration]]
+        declarations: [String: [Declaration]],
     ) -> [Declaration] {
         var targets: [Declaration] = []
 
@@ -147,21 +153,30 @@ public struct DependencyExtractor: Sendable {
     private func mapReferenceContextToEdgeKind(_ context: ReferenceContext) -> DependencyKind {
         switch context {
         case .call:
-            return .call
-        case .read, .write:
-            return .propertyAccess
+            .call
+        case .read,
+             .write:
+            .propertyAccess
+
         case .typeAnnotation:
-            return .typeReference
+            .typeReference
+
         case .inheritance:
-            return .inheritance
+            .inheritance
+
         case .genericConstraint:
-            return .genericConstraint
+            .genericConstraint
+
         case .keyPath:
-            return .keyPath
-        case .memberAccessBase, .memberAccessMember:
-            return .propertyAccess
-        case .import, .attribute, .pattern, .unknown:
-            return .typeReference
+            .keyPath
+        case .memberAccessBase,
+             .memberAccessMember:
+            .propertyAccess
+        case .attribute,
+             .import,
+             .pattern,
+             .unknown:
+            .typeReference
         }
     }
 
@@ -189,8 +204,8 @@ public struct DependencyExtractor: Sendable {
             let name = String(part).trimmingCharacters(in: .whitespaces)
 
             // Skip keywords and basic types
-            if !name.isEmpty &&
-               name.first?.isUppercase == true &&
+            if !name.isEmpty,
+               name.first?.isUppercase == true,
                !isBuiltInType(name) {
                 names.append(name)
             }
@@ -211,7 +226,7 @@ public struct DependencyExtractor: Sendable {
             "Void", "Never",
             "Error", "Equatable", "Hashable", "Comparable",
             "Codable", "Encodable", "Decodable",
-            "Sendable", "Identifiable"
+            "Sendable", "Identifiable",
         ]
         return builtIns.contains(name)
     }
@@ -220,7 +235,7 @@ public struct DependencyExtractor: Sendable {
     private func addInheritanceEdges(
         for declaration: Declaration,
         graph: ReachabilityGraph,
-        declarations: [String: [Declaration]]
+        declarations: [String: [Declaration]],
     ) {
         // This would ideally use inheritance info from the syntax tree
         // For now, we rely on references with inheritance context
@@ -230,7 +245,7 @@ public struct DependencyExtractor: Sendable {
     private func addProtocolWitnessEdges(
         graph: ReachabilityGraph,
         result: AnalysisResult,
-        declByName: [String: [Declaration]]
+        declByName: [String: [Declaration]],
     ) {
         // Find all protocols
         let protocols = result.declarations.find(kind: .protocol)
@@ -248,7 +263,7 @@ public struct DependencyExtractor: Sendable {
             // Get methods declared in the protocol (approximate by scope)
             let protoMethods = result.declarations.declarations.filter { decl in
                 (decl.kind == .function || decl.kind == .method) &&
-                decl.scope.id.contains(proto.name)
+                    decl.scope.id.contains(proto.name)
             }
 
             for protoMethod in protoMethods {
@@ -257,7 +272,7 @@ public struct DependencyExtractor: Sendable {
                     for impl in implementations {
                         // Check if this is likely a protocol implementation
                         // (same kind, not in protocol itself)
-                        if impl.kind == protoMethod.kind &&
+                        if impl.kind == protoMethod.kind,
                            !impl.scope.id.contains(proto.name) {
                             // Add edge from protocol method to implementation
                             let protoNode = DeclarationNode(declaration: protoMethod)
@@ -279,7 +294,7 @@ public struct DependencyExtractor: Sendable {
             // Find methods in this type's scope
             let typeMethods = result.declarations.declarations.filter { decl in
                 (decl.kind == .function || decl.kind == .method) &&
-                decl.scope.id.contains(type.name)
+                    decl.scope.id.contains(type.name)
             }
 
             for method in typeMethods {
@@ -290,10 +305,43 @@ public struct DependencyExtractor: Sendable {
     }
 }
 
-// MARK: - Dependency Extraction Configuration
+// MARK: - DependencyExtractionConfiguration
 
 /// Configuration for dependency extraction.
 public struct DependencyExtractionConfiguration: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        treatPublicAsRoot: Bool = true,
+        treatObjcAsRoot: Bool = true,
+        treatTestsAsRoot: Bool = true,
+        treatProtocolRequirementsAsRoot: Bool = true,
+        trackProtocolWitnesses: Bool = true,
+        trackClosureCaptures: Bool = true,
+    ) {
+        self.treatPublicAsRoot = treatPublicAsRoot
+        self.treatObjcAsRoot = treatObjcAsRoot
+        self.treatTestsAsRoot = treatTestsAsRoot
+        self.treatProtocolRequirementsAsRoot = treatProtocolRequirementsAsRoot
+        self.trackProtocolWitnesses = trackProtocolWitnesses
+        self.trackClosureCaptures = trackClosureCaptures
+    }
+
+    // MARK: Public
+
+    /// Default configuration.
+    public static let `default` = DependencyExtractionConfiguration()
+
+    /// Strict configuration for finding more unused code.
+    public static let strict = DependencyExtractionConfiguration(
+        treatPublicAsRoot: false,
+        treatObjcAsRoot: true,
+        treatTestsAsRoot: true,
+        treatProtocolRequirementsAsRoot: true,
+        trackProtocolWitnesses: true,
+        trackClosureCaptures: true,
+    )
+
     /// Treat public/open declarations as roots.
     public var treatPublicAsRoot: Bool
 
@@ -311,54 +359,29 @@ public struct DependencyExtractionConfiguration: Sendable {
 
     /// Track closure captures.
     public var trackClosureCaptures: Bool
-
-    public init(
-        treatPublicAsRoot: Bool = true,
-        treatObjcAsRoot: Bool = true,
-        treatTestsAsRoot: Bool = true,
-        treatProtocolRequirementsAsRoot: Bool = true,
-        trackProtocolWitnesses: Bool = true,
-        trackClosureCaptures: Bool = true
-    ) {
-        self.treatPublicAsRoot = treatPublicAsRoot
-        self.treatObjcAsRoot = treatObjcAsRoot
-        self.treatTestsAsRoot = treatTestsAsRoot
-        self.treatProtocolRequirementsAsRoot = treatProtocolRequirementsAsRoot
-        self.trackProtocolWitnesses = trackProtocolWitnesses
-        self.trackClosureCaptures = trackClosureCaptures
-    }
-
-    /// Default configuration.
-    public static let `default` = DependencyExtractionConfiguration()
-
-    /// Strict configuration for finding more unused code.
-    public static let strict = DependencyExtractionConfiguration(
-        treatPublicAsRoot: false,
-        treatObjcAsRoot: true,
-        treatTestsAsRoot: true,
-        treatProtocolRequirementsAsRoot: true,
-        trackProtocolWitnesses: true,
-        trackClosureCaptures: true
-    )
 }
 
-// MARK: - Reachability-Based Detector
+// MARK: - ReachabilityBasedDetector
 
 /// Unused code detector using reachability analysis.
 public struct ReachabilityBasedDetector: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        configuration: UnusedCodeConfiguration = .default,
+        extractionConfiguration: DependencyExtractionConfiguration = .default,
+    ) {
+        self.configuration = configuration
+        self.extractionConfiguration = extractionConfiguration
+    }
+
+    // MARK: Public
+
     /// Configuration.
     public let configuration: UnusedCodeConfiguration
 
     /// Dependency extraction configuration.
     public let extractionConfiguration: DependencyExtractionConfiguration
-
-    public init(
-        configuration: UnusedCodeConfiguration = .default,
-        extractionConfiguration: DependencyExtractionConfiguration = .default
-    ) {
-        self.configuration = configuration
-        self.extractionConfiguration = extractionConfiguration
-    }
 
     /// Detect unused code using reachability analysis.
     public func detect(in result: AnalysisResult) -> [UnusedCode] {
@@ -388,26 +411,8 @@ public struct ReachabilityBasedDetector: Sendable {
                 declaration: declaration,
                 reason: .neverReferenced,
                 confidence: confidence,
-                suggestion: "Unreachable from any entry point - consider removing '\(declaration.name)'"
+                suggestion: "Unreachable from any entry point - consider removing '\(declaration.name)'",
             )
-        }
-    }
-
-    /// Check if a declaration should be reported based on configuration.
-    private func shouldReport(_ declaration: Declaration) -> Bool {
-        switch declaration.kind {
-        case .variable, .constant:
-            return configuration.detectVariables
-        case .function, .method:
-            return configuration.detectFunctions
-        case .class, .struct, .enum, .protocol:
-            return configuration.detectTypes
-        case .parameter:
-            return configuration.detectParameters
-        case .import:
-            return configuration.detectImports
-        default:
-            return true
         }
     }
 
@@ -416,5 +421,33 @@ public struct ReachabilityBasedDetector: Sendable {
         let extractor = DependencyExtractor(configuration: extractionConfiguration)
         let graph = extractor.buildGraph(from: result)
         return graph.generateReport()
+    }
+
+    // MARK: Private
+
+    /// Check if a declaration should be reported based on configuration.
+    private func shouldReport(_ declaration: Declaration) -> Bool {
+        switch declaration.kind {
+        case .constant,
+             .variable:
+            configuration.detectVariables
+        case .function,
+             .method:
+            configuration.detectFunctions
+        case .class,
+             .enum,
+             .protocol,
+             .struct:
+            configuration.detectTypes
+
+        case .parameter:
+            configuration.detectParameters
+
+        case .import:
+            configuration.detectImports
+
+        default:
+            true
+        }
     }
 }

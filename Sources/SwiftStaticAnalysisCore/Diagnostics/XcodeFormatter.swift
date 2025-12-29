@@ -7,16 +7,20 @@
 
 import Foundation
 
-// MARK: - Xcode Formatter
+// MARK: - XcodeFormatter
 
 /// Formats diagnostics for Xcode integration.
 public struct XcodeFormatter: Sendable {
-    /// Configuration for formatting.
-    public let configuration: XcodeFormatterConfiguration
+    // MARK: Lifecycle
 
     public init(configuration: XcodeFormatterConfiguration = .default) {
         self.configuration = configuration
     }
+
+    // MARK: Public
+
+    /// Configuration for formatting.
+    public let configuration: XcodeFormatterConfiguration
 
     /// Format diagnostics for Xcode output.
     ///
@@ -42,6 +46,8 @@ public struct XcodeFormatter: Sendable {
         return lines.joined(separator: "\n")
     }
 
+    // MARK: Private
+
     /// Format a single diagnostic.
     private func formatDiagnostic(_ diagnostic: Diagnostic) -> String {
         var message = diagnostic.message
@@ -65,10 +71,45 @@ public struct XcodeFormatter: Sendable {
     }
 }
 
-// MARK: - Xcode Formatter Configuration
+// MARK: - XcodeFormatterConfiguration
 
 /// Configuration for Xcode formatter.
 public struct XcodeFormatterConfiguration: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        includeRuleID: Bool = false,
+        includeCategory: Bool = false,
+        includeFixIts: Bool = true,
+        useRelativePaths: Bool = false,
+        basePath: String? = nil,
+    ) {
+        self.includeRuleID = includeRuleID
+        self.includeCategory = includeCategory
+        self.includeFixIts = includeFixIts
+        self.useRelativePaths = useRelativePaths
+        self.basePath = basePath
+    }
+
+    // MARK: Public
+
+    /// Default configuration.
+    public static let `default` = XcodeFormatterConfiguration()
+
+    /// Verbose configuration (includes all metadata).
+    public static let verbose = XcodeFormatterConfiguration(
+        includeRuleID: true,
+        includeCategory: true,
+        includeFixIts: true,
+    )
+
+    /// Minimal configuration.
+    public static let minimal = XcodeFormatterConfiguration(
+        includeRuleID: false,
+        includeCategory: false,
+        includeFixIts: false,
+    )
+
     /// Include rule ID in output.
     public var includeRuleID: Bool
 
@@ -83,48 +124,17 @@ public struct XcodeFormatterConfiguration: Sendable {
 
     /// Base path for relative paths.
     public var basePath: String?
-
-    public init(
-        includeRuleID: Bool = false,
-        includeCategory: Bool = false,
-        includeFixIts: Bool = true,
-        useRelativePaths: Bool = false,
-        basePath: String? = nil
-    ) {
-        self.includeRuleID = includeRuleID
-        self.includeCategory = includeCategory
-        self.includeFixIts = includeFixIts
-        self.useRelativePaths = useRelativePaths
-        self.basePath = basePath
-    }
-
-    /// Default configuration.
-    public static let `default` = XcodeFormatterConfiguration()
-
-    /// Verbose configuration (includes all metadata).
-    public static let verbose = XcodeFormatterConfiguration(
-        includeRuleID: true,
-        includeCategory: true,
-        includeFixIts: true
-    )
-
-    /// Minimal configuration.
-    public static let minimal = XcodeFormatterConfiguration(
-        includeRuleID: false,
-        includeCategory: false,
-        includeFixIts: false
-    )
 }
 
 // MARK: - Diagnostic Conversion
 
-extension Diagnostic {
+public extension Diagnostic {
     /// Create a diagnostic from an unused code finding.
-    public static func fromUnusedCode(
+    static func fromUnusedCode(
         declaration: Declaration,
         reason: String,
         suggestion: String,
-        severity: DiagnosticSeverity = .warning
+        severity: DiagnosticSeverity = .warning,
     ) -> Diagnostic {
         Diagnostic(
             file: declaration.location.file,
@@ -133,15 +143,15 @@ extension Diagnostic {
             severity: severity,
             message: suggestion,
             category: .unusedCode,
-            ruleID: "unused-\(declaration.kind.rawValue)"
+            ruleID: "unused-\(declaration.kind.rawValue)",
         )
     }
 
     /// Create a diagnostic from a clone group.
-    public static func fromCloneGroup(
+    static func fromCloneGroup(
         clones: [(file: String, startLine: Int, endLine: Int)],
         cloneType: String,
-        severity: DiagnosticSeverity = .warning
+        severity: DiagnosticSeverity = .warning,
     ) -> [Diagnostic] {
         guard let first = clones.first else { return [] }
 
@@ -155,7 +165,7 @@ extension Diagnostic {
             severity: severity,
             message: "Duplicate code detected (\(cloneType) clone, \(clones.count) occurrences)",
             category: .duplication,
-            ruleID: "duplicate-\(cloneType)"
+            ruleID: "duplicate-\(cloneType)",
         )
 
         // Add notes for other occurrences
@@ -167,7 +177,7 @@ extension Diagnostic {
                 column: 1,
                 severity: .note,
                 message: "Also appears here (lines \(clone.startLine)-\(clone.endLine))",
-                category: .duplication
+                category: .duplication,
             )
             notes.append(note)
         }

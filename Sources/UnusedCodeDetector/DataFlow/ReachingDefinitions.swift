@@ -12,13 +12,33 @@
 //
 
 import Foundation
-import SwiftSyntax
 import SwiftStaticAnalysisCore
+import SwiftSyntax
 
-// MARK: - Definition Site
+// MARK: - DefinitionSite
 
 /// Represents a variable definition at a specific location.
 public struct DefinitionSite: Sendable, Hashable {
+    // MARK: Lifecycle
+
+    public init(
+        variable: String,
+        block: BlockID,
+        statementIndex: Int,
+        location: SwiftStaticAnalysisCore.SourceLocation,
+        value: String? = nil,
+        isInitial: Bool = false,
+    ) {
+        self.variable = variable
+        self.block = block
+        self.statementIndex = statementIndex
+        self.location = location
+        self.value = value
+        self.isInitial = isInitial
+    }
+
+    // MARK: Public
+
     /// The variable being defined.
     public let variable: String
 
@@ -36,27 +56,11 @@ public struct DefinitionSite: Sendable, Hashable {
 
     /// Whether this is an initial definition (function parameter, etc.).
     public let isInitial: Bool
-
-    public init(
-        variable: String,
-        block: BlockID,
-        statementIndex: Int,
-        location: SwiftStaticAnalysisCore.SourceLocation,
-        value: String? = nil,
-        isInitial: Bool = false
-    ) {
-        self.variable = variable
-        self.block = block
-        self.statementIndex = statementIndex
-        self.location = location
-        self.value = value
-        self.isInitial = isInitial
-    }
 }
 
 // MARK: - Definition Site Set Extensions
 
-extension Set where Element == DefinitionSite {
+extension Set<DefinitionSite> {
     /// Update definitions by killing old definitions for a variable and inserting a new one.
     mutating func updateDefinition(
         for variable: String,
@@ -64,10 +68,10 @@ extension Set where Element == DefinitionSite {
         statementIndex: Int = -1,
         location: SwiftStaticAnalysisCore.SourceLocation,
         value: String? = nil,
-        isInitial: Bool = false
+        isInitial: Bool = false,
     ) {
         // Kill old definitions
-        self = self.filter { $0.variable != variable }
+        self = filter { $0.variable != variable }
         // Add new definition
         let newDef = DefinitionSite(
             variable: variable,
@@ -75,16 +79,32 @@ extension Set where Element == DefinitionSite {
             statementIndex: statementIndex,
             location: location,
             value: value,
-            isInitial: isInitial
+            isInitial: isInitial,
         )
-        self.insert(newDef)
+        insert(newDef)
     }
 }
 
-// MARK: - Potentially Uninitialized Use
+// MARK: - UninitializedUse
 
 /// Represents a use of a potentially uninitialized variable.
 public struct UninitializedUse: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        variable: String,
+        location: SwiftStaticAnalysisCore.SourceLocation,
+        reachingDefinitionCount: Int,
+        definitelyUninitialized: Bool,
+    ) {
+        self.variable = variable
+        self.location = location
+        self.reachingDefinitionCount = reachingDefinitionCount
+        self.definitelyUninitialized = definitelyUninitialized
+    }
+
+    // MARK: Public
+
     /// The variable being used.
     public let variable: String
 
@@ -96,24 +116,32 @@ public struct UninitializedUse: Sendable {
 
     /// Whether the variable is definitely uninitialized.
     public let definitelyUninitialized: Bool
-
-    public init(
-        variable: String,
-        location: SwiftStaticAnalysisCore.SourceLocation,
-        reachingDefinitionCount: Int,
-        definitelyUninitialized: Bool
-    ) {
-        self.variable = variable
-        self.location = location
-        self.reachingDefinitionCount = reachingDefinitionCount
-        self.definitelyUninitialized = definitelyUninitialized
-    }
 }
 
-// MARK: - Reaching Definitions Result
+// MARK: - ReachingDefinitionsResult
 
 /// Results from reaching definitions analysis.
 public struct ReachingDefinitionsResult: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        cfg: ControlFlowGraph,
+        definitions: [DefinitionSite],
+        reachIn: [BlockID: Set<DefinitionSite>],
+        reachOut: [BlockID: Set<DefinitionSite>],
+        uninitializedUses: [UninitializedUse],
+        defUseChains: [DefinitionSite: Set<SwiftStaticAnalysisCore.SourceLocation>],
+    ) {
+        self.cfg = cfg
+        self.definitions = definitions
+        self.reachIn = reachIn
+        self.reachOut = reachOut
+        self.uninitializedUses = uninitializedUses
+        self.defUseChains = defUseChains
+    }
+
+    // MARK: Public
+
     /// The analyzed CFG.
     public let cfg: ControlFlowGraph
 
@@ -131,31 +159,40 @@ public struct ReachingDefinitionsResult: Sendable {
 
     /// Definition-use chains.
     public let defUseChains: [DefinitionSite: Set<SwiftStaticAnalysisCore.SourceLocation>]
-
-    public init(
-        cfg: ControlFlowGraph,
-        definitions: [DefinitionSite],
-        reachIn: [BlockID: Set<DefinitionSite>],
-        reachOut: [BlockID: Set<DefinitionSite>],
-        uninitializedUses: [UninitializedUse],
-        defUseChains: [DefinitionSite: Set<SwiftStaticAnalysisCore.SourceLocation>]
-    ) {
-        self.cfg = cfg
-        self.definitions = definitions
-        self.reachIn = reachIn
-        self.reachOut = reachOut
-        self.uninitializedUses = uninitializedUses
-        self.defUseChains = defUseChains
-    }
 }
 
-// MARK: - Reaching Definitions Analysis
+// MARK: - ReachingDefinitionsAnalysis
 
 /// Performs forward data flow analysis for reaching definitions.
 public struct ReachingDefinitionsAnalysis: Sendable {
+    // MARK: Lifecycle
+
+    public init(configuration: Configuration = .default) {
+        self.configuration = configuration
+    }
+
+    // MARK: Public
 
     /// Configuration for the analysis.
     public struct Configuration: Sendable {
+        // MARK: Lifecycle
+
+        public init(
+            maxIterations: Int = 1000,
+            detectUninitializedUses: Bool = true,
+            buildDefUseChains: Bool = true,
+            ignoredVariables: Set<String> = ["_"],
+        ) {
+            self.maxIterations = maxIterations
+            self.detectUninitializedUses = detectUninitializedUses
+            self.buildDefUseChains = buildDefUseChains
+            self.ignoredVariables = ignoredVariables
+        }
+
+        // MARK: Public
+
+        public static let `default` = Configuration()
+
         /// Maximum iterations for fixed-point computation.
         public var maxIterations: Int
 
@@ -167,26 +204,6 @@ public struct ReachingDefinitionsAnalysis: Sendable {
 
         /// Variables to ignore in analysis.
         public var ignoredVariables: Set<String>
-
-        public init(
-            maxIterations: Int = 1000,
-            detectUninitializedUses: Bool = true,
-            buildDefUseChains: Bool = true,
-            ignoredVariables: Set<String> = ["_"]
-        ) {
-            self.maxIterations = maxIterations
-            self.detectUninitializedUses = detectUninitializedUses
-            self.buildDefUseChains = buildDefUseChains
-            self.ignoredVariables = ignoredVariables
-        }
-
-        public static let `default` = Configuration()
-    }
-
-    private let configuration: Configuration
-
-    public init(configuration: Configuration = .default) {
-        self.configuration = configuration
     }
 
     /// Analyze a control flow graph for reaching definitions.
@@ -204,7 +221,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
         for id in cfg.blockOrder {
             let (gen, kill) = computeGenKill(
                 block: cfg.blocks[id]!,
-                definitions: definitions
+                definitions: definitions,
             )
             genSets[id] = gen
             killSets[id] = kill
@@ -214,7 +231,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
         let (reachIn, reachOut) = computeReachingDefinitions(
             cfg: cfg,
             genSets: genSets,
-            killSets: killSets
+            killSets: killSets,
         )
 
         // Find uninitialized uses if enabled
@@ -235,9 +252,13 @@ public struct ReachingDefinitionsAnalysis: Sendable {
             reachIn: reachIn,
             reachOut: reachOut,
             uninitializedUses: uninitializedUses,
-            defUseChains: defUseChains
+            defUseChains: defUseChains,
         )
     }
+
+    // MARK: Private
+
+    private let configuration: Configuration
 
     // MARK: - Definition Collection
 
@@ -261,7 +282,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
                         statementIndex: index,
                         location: statement.location,
                         value: extractValue(from: statement),
-                        isInitial: id == .entry && index == 0
+                        isInitial: id == .entry && index == 0,
                     )
                     definitions.append(def)
                 }
@@ -285,7 +306,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
     /// Compute GEN and KILL sets for a block.
     private func computeGenKill(
         block: BasicBlock,
-        definitions: [DefinitionSite]
+        definitions: [DefinitionSite],
     ) -> (gen: Set<DefinitionSite>, kill: Set<DefinitionSite>) {
         var gen = Set<DefinitionSite>()
         var kill = Set<DefinitionSite>()
@@ -300,8 +321,8 @@ public struct ReachingDefinitionsAnalysis: Sendable {
                 // GEN: definitions created in this block
                 let newDef = definitions.first {
                     $0.block == block.id &&
-                    $0.statementIndex == index &&
-                    $0.variable == variable
+                        $0.statementIndex == index &&
+                        $0.variable == variable
                 }
                 if let newDef = newDef {
                     gen.insert(newDef)
@@ -327,7 +348,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
     private func computeReachingDefinitions(
         cfg: ControlFlowGraph,
         genSets: [BlockID: Set<DefinitionSite>],
-        killSets: [BlockID: Set<DefinitionSite>]
+        killSets: [BlockID: Set<DefinitionSite>],
     ) -> (reachIn: [BlockID: Set<DefinitionSite>], reachOut: [BlockID: Set<DefinitionSite>]) {
         var reachIn: [BlockID: Set<DefinitionSite>] = [:]
         var reachOut: [BlockID: Set<DefinitionSite>] = [:]
@@ -342,7 +363,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
         var worklist = Set(cfg.blockOrder)
         var iterations = 0
 
-        while !worklist.isEmpty && iterations < configuration.maxIterations {
+        while !worklist.isEmpty, iterations < configuration.maxIterations {
             iterations += 1
 
             // Get next block (prefer reverse postorder)
@@ -388,7 +409,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
     /// Find uses of potentially uninitialized variables.
     private func findUninitializedUses(
         cfg: ControlFlowGraph,
-        reachIn: [BlockID: Set<DefinitionSite>]
+        reachIn: [BlockID: Set<DefinitionSite>],
     ) -> [UninitializedUse] {
         var uninitializedUses: [UninitializedUse] = []
 
@@ -414,7 +435,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
                             variable: usedVar,
                             location: statement.location,
                             reachingDefinitionCount: 0,
-                            definitelyUninitialized: true
+                            definitelyUninitialized: true,
                         ))
                     }
                 }
@@ -424,7 +445,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
                     reachingDefs.updateDefinition(
                         for: definedVar,
                         block: id,
-                        location: statement.location
+                        location: statement.location,
                     )
                 }
             }
@@ -438,7 +459,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
     /// Build definition-use chains.
     private func buildDefUseChains(
         cfg: ControlFlowGraph,
-        reachIn: [BlockID: Set<DefinitionSite>]
+        reachIn: [BlockID: Set<DefinitionSite>],
     ) -> [DefinitionSite: Set<SwiftStaticAnalysisCore.SourceLocation>] {
         var chains: [DefinitionSite: Set<SwiftStaticAnalysisCore.SourceLocation>] = [:]
 
@@ -461,7 +482,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
                     reachingDefs.updateDefinition(
                         for: definedVar,
                         block: id,
-                        location: statement.location
+                        location: statement.location,
                     )
                 }
             }
@@ -473,9 +494,9 @@ public struct ReachingDefinitionsAnalysis: Sendable {
 
 // MARK: - Debug Output
 
-extension ReachingDefinitionsResult {
+public extension ReachingDefinitionsResult {
     /// Generate a debug string showing reaching definitions information.
-    public func debugDescription() -> String {
+    func debugDescription() -> String {
         var output = "Reaching Definitions Analysis Results:\n"
         output += "======================================\n\n"
 
@@ -532,25 +553,26 @@ extension ReachingDefinitionsResult {
     }
 }
 
-// MARK: - Combined Analysis
+// MARK: - CombinedDataFlowAnalysis
 
 /// Combines live variable and reaching definitions analysis.
 public struct CombinedDataFlowAnalysis: Sendable {
-    private let liveAnalysis: LiveVariableAnalysis
-    private let reachingAnalysis: ReachingDefinitionsAnalysis
+    // MARK: Lifecycle
 
     public init(
         liveConfig: LiveVariableAnalysis.Configuration = .default,
-        reachingConfig: ReachingDefinitionsAnalysis.Configuration = .default
+        reachingConfig: ReachingDefinitionsAnalysis.Configuration = .default,
     ) {
-        self.liveAnalysis = LiveVariableAnalysis(configuration: liveConfig)
-        self.reachingAnalysis = ReachingDefinitionsAnalysis(configuration: reachingConfig)
+        liveAnalysis = LiveVariableAnalysis(configuration: liveConfig)
+        reachingAnalysis = ReachingDefinitionsAnalysis(configuration: reachingConfig)
     }
+
+    // MARK: Public
 
     /// Perform combined analysis on a CFG.
     public func analyze(_ cfg: ControlFlowGraph) -> (
         live: LiveVariableResult,
-        reaching: ReachingDefinitionsResult
+        reaching: ReachingDefinitionsResult,
     ) {
         let liveResult = liveAnalysis.analyze(cfg)
         let reachingResult = reachingAnalysis.analyze(cfg)
@@ -576,12 +598,12 @@ public struct CombinedDataFlowAnalysis: Sendable {
         // Add stores that have no uses in def-use chains
         for def in reachingResult.definitions {
             let uses = reachingResult.defUseChains[def] ?? []
-            if uses.isEmpty && !def.isInitial {
+            if uses.isEmpty, !def.isInitial {
                 let store = DeadStore(
                     variable: def.variable,
                     location: def.location,
                     assignedValue: def.value,
-                    suggestion: "Definition of '\(def.variable)' is never used"
+                    suggestion: "Definition of '\(def.variable)' is never used",
                 )
                 deadStores.insert(store)
             }
@@ -589,15 +611,20 @@ public struct CombinedDataFlowAnalysis: Sendable {
 
         return Array(deadStores)
     }
+
+    // MARK: Private
+
+    private let liveAnalysis: LiveVariableAnalysis
+    private let reachingAnalysis: ReachingDefinitionsAnalysis
 }
 
-// MARK: - Hashable Conformance for DeadStore
+// MARK: - DeadStore + Hashable
 
 extension DeadStore: Hashable {
     public static func == (lhs: DeadStore, rhs: DeadStore) -> Bool {
         lhs.variable == rhs.variable &&
-        lhs.location.line == rhs.location.line &&
-        lhs.location.file == rhs.location.file
+            lhs.location.line == rhs.location.line &&
+            lhs.location.file == rhs.location.file
     }
 
     public func hash(into hasher: inout Hasher) {

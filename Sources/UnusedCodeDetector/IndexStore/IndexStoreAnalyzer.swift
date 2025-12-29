@@ -8,10 +8,32 @@
 import Foundation
 import SwiftStaticAnalysisCore
 
-// MARK: - Symbol Usage
+// MARK: - SymbolUsage
 
 /// Tracks usage information for a symbol.
 public struct SymbolUsage: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        usr: String,
+        name: String,
+        kind: IndexedSymbolKind,
+        definitionLocation: SourceLocation?,
+        referenceCount: Int,
+        onlySelfReferenced: Bool,
+        isTestSymbol: Bool,
+    ) {
+        self.usr = usr
+        self.name = name
+        self.kind = kind
+        self.definitionLocation = definitionLocation
+        self.referenceCount = referenceCount
+        self.onlySelfReferenced = onlySelfReferenced
+        self.isTestSymbol = isTestSymbol
+    }
+
+    // MARK: Public
+
     /// The symbol's USR.
     public let usr: String
 
@@ -33,45 +55,25 @@ public struct SymbolUsage: Sendable {
     /// Whether this appears to be a test symbol.
     public let isTestSymbol: Bool
 
-    public init(
-        usr: String,
-        name: String,
-        kind: IndexedSymbolKind,
-        definitionLocation: SourceLocation?,
-        referenceCount: Int,
-        onlySelfReferenced: Bool,
-        isTestSymbol: Bool
-    ) {
-        self.usr = usr
-        self.name = name
-        self.kind = kind
-        self.definitionLocation = definitionLocation
-        self.referenceCount = referenceCount
-        self.onlySelfReferenced = onlySelfReferenced
-        self.isTestSymbol = isTestSymbol
-    }
-
     /// Whether this symbol is unused.
     public var isUnused: Bool {
         referenceCount == 0
     }
 }
 
-// MARK: - Index Store Analyzer
+// MARK: - IndexStoreAnalyzer
 
 /// Analyzes symbol usage using the index store.
 public final class IndexStoreAnalyzer: @unchecked Sendable {
-    /// The index store reader.
-    private let reader: IndexStoreReader
-
-    /// Files to analyze.
-    private let files: Set<String>
+    // MARK: Lifecycle
 
     /// Initialize with an index store reader and files to analyze.
     public init(reader: IndexStoreReader, files: [String]) {
         self.reader = reader
         self.files = Set(files.map { URL(fileURLWithPath: $0).standardizedFileURL.path })
     }
+
+    // MARK: Public
 
     /// Analyze all symbols and return their usage information.
     public func analyzeUsage() -> [SymbolUsage] {
@@ -110,8 +112,16 @@ public final class IndexStoreAnalyzer: @unchecked Sendable {
 
     /// Analyze unused symbols only.
     public func findUnusedSymbols() -> [SymbolUsage] {
-        analyzeUsage().filter { $0.isUnused }
+        analyzeUsage().filter(\.isUnused)
     }
+
+    // MARK: Private
+
+    /// The index store reader.
+    private let reader: IndexStoreReader
+
+    /// Files to analyze.
+    private let files: Set<String>
 
     /// Analyze a specific symbol's usage.
     private func analyzeSymbol(_ definition: IndexedOccurrence) -> SymbolUsage {
@@ -132,8 +142,8 @@ public final class IndexStoreAnalyzer: @unchecked Sendable {
             }
 
             if occ.roles.contains(.reference) ||
-               occ.roles.contains(.call) ||
-               occ.roles.contains(.read) {
+                occ.roles.contains(.call) ||
+                occ.roles.contains(.read) {
                 referenceCount += 1
                 referenceFiles.insert(occ.file)
             }
@@ -152,7 +162,7 @@ public final class IndexStoreAnalyzer: @unchecked Sendable {
             file: definition.file,
             line: definition.line,
             column: definition.column,
-            offset: 0
+            offset: 0,
         )
 
         return SymbolUsage(
@@ -162,7 +172,7 @@ public final class IndexStoreAnalyzer: @unchecked Sendable {
             definitionLocation: definitionLocation,
             referenceCount: referenceCount,
             onlySelfReferenced: onlySelfReferenced,
-            isTestSymbol: isTestSymbol
+            isTestSymbol: isTestSymbol,
         )
     }
 
@@ -193,16 +203,20 @@ public final class IndexStoreAnalyzer: @unchecked Sendable {
     }
 }
 
-// MARK: - Index Store Based Detector
+// MARK: - IndexStoreBasedDetector
 
 /// Unused code detector that uses the index store for accurate detection.
 public struct IndexStoreBasedDetector: Sendable {
-    /// Configuration.
-    public let configuration: UnusedCodeConfiguration
+    // MARK: Lifecycle
 
     public init(configuration: UnusedCodeConfiguration) {
         self.configuration = configuration
     }
+
+    // MARK: Public
+
+    /// Configuration.
+    public let configuration: UnusedCodeConfiguration
 
     /// Detect unused code using the index store.
     public func detect(in files: [String], indexStorePath: String) throws -> [UnusedCode] {
@@ -241,7 +255,7 @@ public struct IndexStoreBasedDetector: Sendable {
                 modifiers: [],
                 location: location,
                 range: SourceRange(start: location, end: location),
-                scope: .global
+                scope: .global,
             )
 
             let reason: UnusedReason = usage.onlySelfReferenced ? .onlySelfReferenced : .neverReferenced
@@ -251,10 +265,12 @@ public struct IndexStoreBasedDetector: Sendable {
                 declaration: declaration,
                 reason: reason,
                 confidence: confidence,
-                suggestion: generateSuggestion(for: usage)
+                suggestion: generateSuggestion(for: usage),
             )
         }
     }
+
+    // MARK: Private
 
     /// Check if a symbol should be reported based on configuration.
     private func shouldReport(_ usage: SymbolUsage) -> Bool {
@@ -262,7 +278,7 @@ public struct IndexStoreBasedDetector: Sendable {
             detectVariables: configuration.detectVariables,
             detectFunctions: configuration.detectFunctions,
             detectTypes: configuration.detectTypes,
-            detectParameters: configuration.detectParameters
+            detectParameters: configuration.detectParameters,
         )
         return filter.shouldReport(usage.kind.toDeclarationKind())
     }
@@ -278,16 +294,17 @@ public struct IndexStoreBasedDetector: Sendable {
             return "'\(usage.name)' is only referenced within its own definition"
         }
 
-        let kindName: String
-        switch usage.kind {
-        case .class: kindName = "class"
-        case .struct: kindName = "struct"
-        case .enum: kindName = "enum"
-        case .protocol: kindName = "protocol"
-        case .function, .method: kindName = "function"
-        case .property, .variable: kindName = "variable"
-        case .parameter: kindName = "parameter"
-        default: kindName = "symbol"
+        let kindName = switch usage.kind {
+        case .class: "class"
+        case .struct: "struct"
+        case .enum: "enum"
+        case .protocol: "protocol"
+        case .function,
+             .method: "function"
+        case .property,
+             .variable: "variable"
+        case .parameter: "parameter"
+        default: "symbol"
         }
 
         return "Consider removing unused \(kindName) '\(usage.name)'"

@@ -7,10 +7,51 @@
 
 import Foundation
 
-// MARK: - Concurrency Configuration
+// MARK: - ConcurrencyConfiguration
 
 /// Configuration for parallel processing in analysis operations.
 public struct ConcurrencyConfiguration: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        maxConcurrentFiles: Int? = nil,
+        maxConcurrentTasks: Int? = nil,
+        enableParallelProcessing: Bool = true,
+        batchSize: Int = 100,
+    ) {
+        let processorCount = ProcessInfo.processInfo.activeProcessorCount
+        self.maxConcurrentFiles = maxConcurrentFiles ?? processorCount
+        self.maxConcurrentTasks = maxConcurrentTasks ?? processorCount * 2
+        self.enableParallelProcessing = enableParallelProcessing
+        self.batchSize = batchSize
+    }
+
+    // MARK: Public
+
+    /// Default configuration based on system capabilities.
+    public static let `default` = ConcurrencyConfiguration()
+
+    /// Single-threaded configuration (for debugging or testing).
+    public static let serial = ConcurrencyConfiguration(
+        maxConcurrentFiles: 1,
+        maxConcurrentTasks: 1,
+        enableParallelProcessing: false,
+    )
+
+    /// High-throughput configuration for powerful machines.
+    public static let highThroughput = ConcurrencyConfiguration(
+        maxConcurrentFiles: ProcessInfo.processInfo.activeProcessorCount * 2,
+        maxConcurrentTasks: ProcessInfo.processInfo.activeProcessorCount * 4,
+        batchSize: 200,
+    )
+
+    /// Conservative configuration for memory-constrained environments.
+    public static let conservative = ConcurrencyConfiguration(
+        maxConcurrentFiles: max(2, ProcessInfo.processInfo.activeProcessorCount / 2),
+        maxConcurrentTasks: ProcessInfo.processInfo.activeProcessorCount,
+        batchSize: 50,
+    )
+
     /// Maximum number of files to process concurrently.
     public let maxConcurrentFiles: Int
 
@@ -22,54 +63,23 @@ public struct ConcurrencyConfiguration: Sendable {
 
     /// Chunk size for batching operations.
     public let batchSize: Int
-
-    public init(
-        maxConcurrentFiles: Int? = nil,
-        maxConcurrentTasks: Int? = nil,
-        enableParallelProcessing: Bool = true,
-        batchSize: Int = 100
-    ) {
-        let processorCount = ProcessInfo.processInfo.activeProcessorCount
-        self.maxConcurrentFiles = maxConcurrentFiles ?? processorCount
-        self.maxConcurrentTasks = maxConcurrentTasks ?? processorCount * 2
-        self.enableParallelProcessing = enableParallelProcessing
-        self.batchSize = batchSize
-    }
-
-    /// Default configuration based on system capabilities.
-    public static let `default` = ConcurrencyConfiguration()
-
-    /// Single-threaded configuration (for debugging or testing).
-    public static let serial = ConcurrencyConfiguration(
-        maxConcurrentFiles: 1,
-        maxConcurrentTasks: 1,
-        enableParallelProcessing: false
-    )
-
-    /// High-throughput configuration for powerful machines.
-    public static let highThroughput = ConcurrencyConfiguration(
-        maxConcurrentFiles: ProcessInfo.processInfo.activeProcessorCount * 2,
-        maxConcurrentTasks: ProcessInfo.processInfo.activeProcessorCount * 4,
-        batchSize: 200
-    )
-
-    /// Conservative configuration for memory-constrained environments.
-    public static let conservative = ConcurrencyConfiguration(
-        maxConcurrentFiles: max(2, ProcessInfo.processInfo.activeProcessorCount / 2),
-        maxConcurrentTasks: ProcessInfo.processInfo.activeProcessorCount,
-        batchSize: 50
-    )
 }
 
-// MARK: - Async Semaphore
+// MARK: - AsyncSemaphore
 
 /// A simple async semaphore for limiting concurrent operations.
 public actor AsyncSemaphore {
-    private var count: Int
-    private var waiters: [CheckedContinuation<Void, Never>] = []
+    // MARK: Lifecycle
 
     public init(value: Int) {
-        self.count = value
+        count = value
+    }
+
+    // MARK: Public
+
+    /// Current number of available permits.
+    public var available: Int {
+        count
     }
 
     /// Wait to acquire a permit.
@@ -103,17 +113,16 @@ public actor AsyncSemaphore {
         return false
     }
 
-    /// Current number of available permits.
-    public var available: Int {
-        count
-    }
+    // MARK: Private
+
+    private var count: Int
+    private var waiters: [CheckedContinuation<Void, Never>] = []
 }
 
-// MARK: - Parallel Processing Utilities
+// MARK: - ParallelProcessor
 
 /// Utilities for parallel file processing with concurrency limits.
 public enum ParallelProcessor {
-
     /// Process items in parallel with a concurrency limit using batching.
     ///
     /// - Parameters:
@@ -124,7 +133,7 @@ public enum ParallelProcessor {
     public static func map<T, R: Sendable>(
         _ items: [T],
         maxConcurrency: Int,
-        operation: @Sendable @escaping (T) async throws -> R
+        operation: @Sendable @escaping (T) async throws -> R,
     ) async throws -> [R] where T: Sendable {
         guard !items.isEmpty else { return [] }
 
@@ -154,7 +163,7 @@ public enum ParallelProcessor {
 
         for batchStart in stride(from: 0, to: items.count, by: batchSize) {
             let batchEnd = min(batchStart + batchSize, items.count)
-            let batch = Array(items[batchStart..<batchEnd])
+            let batch = Array(items[batchStart ..< batchEnd])
 
             try await withThrowingTaskGroup(of: (Int, R).self) { group in
                 for (localIndex, item) in batch.enumerated() {
@@ -171,7 +180,7 @@ public enum ParallelProcessor {
             }
         }
 
-        return allResults.compactMap { $0 }
+        return allResults.compactMap(\.self)
     }
 
     /// Process items in parallel, collecting only successful results.
@@ -184,7 +193,7 @@ public enum ParallelProcessor {
     public static func compactMap<T, R: Sendable>(
         _ items: [T],
         maxConcurrency: Int,
-        operation: @Sendable @escaping (T) async -> R?
+        operation: @Sendable @escaping (T) async -> R?,
     ) async -> [R] where T: Sendable {
         guard !items.isEmpty else { return [] }
 
@@ -194,7 +203,7 @@ public enum ParallelProcessor {
         let batchSize = max(1, maxConcurrency)
         for batchStart in stride(from: 0, to: items.count, by: batchSize) {
             let batchEnd = min(batchStart + batchSize, items.count)
-            let batch = Array(items[batchStart..<batchEnd])
+            let batch = Array(items[batchStart ..< batchEnd])
 
             await withTaskGroup(of: R?.self) { group in
                 for item in batch {
@@ -223,7 +232,7 @@ public enum ParallelProcessor {
     public static func forEach<T>(
         _ items: [T],
         maxConcurrency: Int,
-        operation: @Sendable @escaping (T) async throws -> Void
+        operation: @Sendable @escaping (T) async throws -> Void,
     ) async throws where T: Sendable {
         guard !items.isEmpty else { return }
 
@@ -231,7 +240,7 @@ public enum ParallelProcessor {
         let batchSize = max(1, maxConcurrency)
         for batchStart in stride(from: 0, to: items.count, by: batchSize) {
             let batchEnd = min(batchStart + batchSize, items.count)
-            let batch = Array(items[batchStart..<batchEnd])
+            let batch = Array(items[batchStart ..< batchEnd])
 
             try await withThrowingTaskGroup(of: Void.self) { group in
                 for item in batch {

@@ -5,16 +5,17 @@
 //  Tests for near-clone (Type-2) detection with variable renaming.
 //
 
-import Foundation
-import Testing
 @testable import DuplicationDetector
+import Foundation
+import SwiftParser
 @testable import SwiftStaticAnalysisCore
 import SwiftSyntax
-import SwiftParser
+import Testing
+
+// MARK: - NearCloneTests
 
 @Suite("Near Clone Detection Tests")
 struct NearCloneTests {
-
     // MARK: - Variable Renaming Detection
 
     @Test("Detect clones with renamed variables")
@@ -238,9 +239,10 @@ struct NearCloneTests {
     }
 }
 
+// MARK: - JaccardSimilarityTests
+
 @Suite("Jaccard Similarity Tests")
 struct JaccardSimilarityTests {
-
     @Test("Calculate Jaccard similarity correctly")
     func calculateJaccard() {
         // Jaccard similarity = |A ∩ B| / |A ∪ B|

@@ -6,13 +6,28 @@
 //
 
 import Foundation
-import SwiftSyntax
 import SwiftStaticAnalysisCore
+import SwiftSyntax
 
 // MARK: - Semantic Clone Detector
 
 /// Detects semantic clones using AST fingerprinting.
 public struct SemanticCloneDetector: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        minimumNodes: Int = 10,
+        minimumSimilarity: Double = 0.7,
+        normalizeResultBuilders: Bool = true,
+    ) {
+        self.minimumNodes = minimumNodes
+        self.minimumSimilarity = minimumSimilarity
+        self.normalizeResultBuilders = normalizeResultBuilders
+        parser = SwiftFileParser()
+    }
+
+    // MARK: Public
+
     /// Minimum number of AST nodes to consider.
     public let minimumNodes: Int
 
@@ -21,20 +36,6 @@ public struct SemanticCloneDetector: Sendable {
 
     /// Whether to normalize result builder closures (SwiftUI views).
     public let normalizeResultBuilders: Bool
-
-    /// The file parser.
-    private let parser: SwiftFileParser
-
-    public init(
-        minimumNodes: Int = 10,
-        minimumSimilarity: Double = 0.7,
-        normalizeResultBuilders: Bool = true
-    ) {
-        self.minimumNodes = minimumNodes
-        self.minimumSimilarity = minimumSimilarity
-        self.normalizeResultBuilders = normalizeResultBuilders
-        self.parser = SwiftFileParser()
-    }
 
     /// Detect semantic clones from pre-collected fingerprinted nodes.
     ///
@@ -60,7 +61,7 @@ public struct SemanticCloneDetector: Sendable {
                         startLine: node.startLine,
                         endLine: node.endLine,
                         tokenCount: node.tokenCount,
-                        codeSnippet: ""
+                        codeSnippet: "",
                     )
                 }
 
@@ -72,7 +73,7 @@ public struct SemanticCloneDetector: Sendable {
                             type: .semantic,
                             clones: clones,
                             similarity: similarity,
-                            fingerprint: String(hash)
+                            fingerprint: String(hash),
                         ))
                     }
                 }
@@ -93,7 +94,7 @@ public struct SemanticCloneDetector: Sendable {
                 file: file,
                 tree: tree,
                 minimumNodes: minimumNodes,
-                normalizeResultBuilders: normalizeResultBuilders
+                normalizeResultBuilders: normalizeResultBuilders,
             )
             visitor.walk(tree)
             allNodes.append(contentsOf: visitor.fingerprintedNodes)
@@ -118,7 +119,7 @@ public struct SemanticCloneDetector: Sendable {
                         startLine: node.startLine,
                         endLine: node.endLine,
                         tokenCount: node.tokenCount,
-                        codeSnippet: ""
+                        codeSnippet: "",
                     )
                 }
 
@@ -130,7 +131,7 @@ public struct SemanticCloneDetector: Sendable {
                             type: .semantic,
                             clones: clones,
                             similarity: similarity,
-                            fingerprint: String(hash)
+                            fingerprint: String(hash),
                         ))
                     }
                 }
@@ -139,6 +140,11 @@ public struct SemanticCloneDetector: Sendable {
 
         return cloneGroups.deduplicated()
     }
+
+    // MARK: Private
+
+    /// The file parser.
+    private let parser: SwiftFileParser
 
     /// Verify fingerprint matches are actual semantic clones.
     private func verifySemanticClones(_ nodes: [FingerprintedNode]) -> [[FingerprintedNode]] {
@@ -199,8 +205,8 @@ public struct SemanticCloneDetector: Sendable {
         var totalSimilarity = 0.0
         var comparisons = 0
 
-        for i in 0..<group.count {
-            for j in (i + 1)..<group.count {
+        for i in 0 ..< group.count {
+            for j in (i + 1) ..< group.count {
                 let sim = fingerprintSimilarity(group[i].fingerprint, group[j].fingerprint)
                 totalSimilarity += sim
                 comparisons += 1

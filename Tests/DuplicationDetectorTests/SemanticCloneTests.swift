@@ -5,16 +5,17 @@
 //  Tests for semantic clone (Type-3/Type-4) detection.
 //
 
-import Foundation
-import Testing
 @testable import DuplicationDetector
+import Foundation
+import SwiftParser
 @testable import SwiftStaticAnalysisCore
 import SwiftSyntax
-import SwiftParser
+import Testing
+
+// MARK: - SemanticCloneTests
 
 @Suite("Semantic Clone Detection Tests")
 struct SemanticCloneTests {
-
     // MARK: - AST Fingerprinting
 
     @Test("Fingerprint function bodies")
@@ -187,7 +188,7 @@ struct SemanticCloneTests {
         let clones = detector.detect(in: visitor.fingerprintedNodes)
 
         // These should be grouped as semantic clones
-        if clones.count > 0 {
+        if !clones.isEmpty {
             #expect(clones.first?.clones.count ?? 0 >= 2)
         }
     }
@@ -233,16 +234,17 @@ struct SemanticCloneTests {
     }
 }
 
+// MARK: - ASTFingerprintUnitTests
+
 @Suite("ASTFingerprint Tests")
 struct ASTFingerprintUnitTests {
-
     @Test("Fingerprint initialization")
     func fingerprintInit() {
         let fp = ASTFingerprint(
             hash: 12345,
             depth: 5,
             nodeCount: 20,
-            rootKind: "FunctionDeclSyntax"
+            rootKind: "FunctionDeclSyntax",
         )
 
         #expect(fp.hash == 12345)
@@ -260,7 +262,7 @@ struct ASTFingerprintUnitTests {
             startLine: 1,
             endLine: 10,
             startColumn: 1,
-            tokenCount: 50
+            tokenCount: 50,
         )
 
         #expect(node.file == "test.swift")
@@ -280,7 +282,7 @@ struct ASTFingerprintUnitTests {
             startLine: 5,
             endLine: 15,
             startColumn: 1,
-            tokenCount: 100
+            tokenCount: 100,
         )
 
         // Line count should be endLine - startLine + 1

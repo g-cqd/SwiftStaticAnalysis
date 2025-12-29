@@ -7,13 +7,12 @@
 
 import SwiftUI
 
-// MARK: - Type-1 Clones (Exact)
+// MARK: - UserListView
+
 // These views have IDENTICAL structure and should be detected as exact clones
 
 struct UserListView: View {
-    @State private var items: [String] = []
-    @State private var isLoading: Bool = false
-    @State private var errorMessage: String?
+    // MARK: Internal
 
     var body: some View {
         NavigationView {
@@ -36,6 +35,12 @@ struct UserListView: View {
         }
     }
 
+    // MARK: Private
+
+    @State private var items: [String] = []
+    @State private var isLoading: Bool = false
+    @State private var errorMessage: String?
+
     private func loadData() {
         isLoading = true
         // Simulate API call
@@ -46,10 +51,10 @@ struct UserListView: View {
     }
 }
 
+// MARK: - ProductListView
+
 struct ProductListView: View {
-    @State private var items: [String] = []
-    @State private var isLoading: Bool = false
-    @State private var errorMessage: String?
+    // MARK: Internal
 
     var body: some View {
         NavigationView {
@@ -72,6 +77,12 @@ struct ProductListView: View {
         }
     }
 
+    // MARK: Private
+
+    @State private var items: [String] = []
+    @State private var isLoading: Bool = false
+    @State private var errorMessage: String?
+
     private func loadData() {
         isLoading = true
         // Simulate API call
@@ -82,10 +93,10 @@ struct ProductListView: View {
     }
 }
 
+// MARK: - OrderListView
+
 struct OrderListView: View {
-    @State private var items: [String] = []
-    @State private var isLoading: Bool = false
-    @State private var errorMessage: String?
+    // MARK: Internal
 
     var body: some View {
         NavigationView {
@@ -108,6 +119,12 @@ struct OrderListView: View {
         }
     }
 
+    // MARK: Private
+
+    @State private var items: [String] = []
+    @State private var isLoading: Bool = false
+    @State private var errorMessage: String?
+
     private func loadData() {
         isLoading = true
         // Simulate API call
@@ -118,13 +135,12 @@ struct OrderListView: View {
     }
 }
 
-// MARK: - Type-2 Clones (Near - Renamed Identifiers)
+// MARK: - CustomerDetailView
+
 // These views have the same structure but different variable names
 
 struct CustomerDetailView: View {
-    @State private var customer: CustomerModel?
-    @State private var loading: Bool = false
-    @State private var error: String?
+    // MARK: Internal
 
     var body: some View {
         ScrollView {
@@ -141,6 +157,12 @@ struct CustomerDetailView: View {
         }
     }
 
+    // MARK: Private
+
+    @State private var customer: CustomerModel?
+    @State private var loading: Bool = false
+    @State private var error: String?
+
     private func fetchCustomer() async {
         loading = true
         // API call
@@ -148,10 +170,10 @@ struct CustomerDetailView: View {
     }
 }
 
+// MARK: - VendorDetailView
+
 struct VendorDetailView: View {
-    @State private var vendor: VendorModel?
-    @State private var isLoading: Bool = false
-    @State private var errorMsg: String?
+    // MARK: Internal
 
     var body: some View {
         ScrollView {
@@ -168,6 +190,12 @@ struct VendorDetailView: View {
         }
     }
 
+    // MARK: Private
+
+    @State private var vendor: VendorModel?
+    @State private var isLoading: Bool = false
+    @State private var errorMsg: String?
+
     private func fetchVendor() async {
         isLoading = true
         // API call
@@ -175,10 +203,10 @@ struct VendorDetailView: View {
     }
 }
 
+// MARK: - EmployeeDetailView
+
 struct EmployeeDetailView: View {
-    @State private var employee: EmployeeModel?
-    @State private var loadingState: Bool = false
-    @State private var errorText: String?
+    // MARK: Internal
 
     var body: some View {
         ScrollView {
@@ -195,6 +223,12 @@ struct EmployeeDetailView: View {
         }
     }
 
+    // MARK: Private
+
+    @State private var employee: EmployeeModel?
+    @State private var loadingState: Bool = false
+    @State private var errorText: String?
+
     private func fetchEmployee() async {
         loadingState = true
         // API call
@@ -202,28 +236,46 @@ struct EmployeeDetailView: View {
     }
 }
 
-// MARK: - Supporting Types (stubs for compilation)
+// MARK: - CustomerModel
 
 struct CustomerModel {}
+
+// MARK: - VendorModel
+
 struct VendorModel {}
+
+// MARK: - EmployeeModel
+
 struct EmployeeModel {}
+
+// MARK: - ErrorView
 
 struct ErrorView: View {
     let message: String
+
     var body: some View { Text(message) }
 }
 
+// MARK: - CustomerInfoSection
+
 struct CustomerInfoSection: View {
     let customer: CustomerModel
+
     var body: some View { Text("Customer") }
 }
 
+// MARK: - VendorInfoSection
+
 struct VendorInfoSection: View {
     let vendor: VendorModel
+
     var body: some View { Text("Vendor") }
 }
 
+// MARK: - EmployeeInfoSection
+
 struct EmployeeInfoSection: View {
     let employee: EmployeeModel
+
     var body: some View { Text("Employee") }
 }

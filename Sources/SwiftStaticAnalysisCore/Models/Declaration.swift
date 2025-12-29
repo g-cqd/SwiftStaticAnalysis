@@ -5,7 +5,7 @@
 
 import Foundation
 
-// MARK: - Declaration Kind
+// MARK: - DeclarationKind
 
 /// The kind of declaration.
 ///
@@ -33,7 +33,7 @@ public enum DeclarationKind: String, Sendable, Codable, CaseIterable {
     case enumCase
 }
 
-// MARK: - Access Level
+// MARK: - AccessLevel
 
 /// Swift access level modifiers.
 /// Intentionally exhaustive for API completeness. // swa:ignore-unused-cases
@@ -41,9 +41,17 @@ public enum AccessLevel: String, Sendable, Codable, Comparable {
     case `private`
     case `fileprivate`
     case `internal`
-    case `package`
+    case package
     case `public`
-    case `open`
+    case open
+
+    // MARK: Public
+
+    public static func < (lhs: AccessLevel, rhs: AccessLevel) -> Bool {
+        lhs.rank < rhs.rank
+    }
+
+    // MARK: Private
 
     private var rank: Int {
         switch self {
@@ -55,46 +63,84 @@ public enum AccessLevel: String, Sendable, Codable, Comparable {
         case .open: 5
         }
     }
-
-    public static func < (lhs: AccessLevel, rhs: AccessLevel) -> Bool {
-        lhs.rank < rhs.rank
-    }
 }
 
-// MARK: - Declaration Modifiers
+// MARK: - DeclarationModifiers
 
 /// Modifiers that can be applied to declarations.
 public struct DeclarationModifiers: OptionSet, Sendable, Codable, Hashable {
-    public let rawValue: UInt32
+    // MARK: Lifecycle
 
     public init(rawValue: UInt32) {
         self.rawValue = rawValue
     }
 
+    // MARK: Public
+
     public static let `static` = DeclarationModifiers(rawValue: 1 << 0)
     public static let `class` = DeclarationModifiers(rawValue: 1 << 1)
-    public static let `final` = DeclarationModifiers(rawValue: 1 << 2)
-    public static let `override` = DeclarationModifiers(rawValue: 1 << 3)
-    public static let `mutating` = DeclarationModifiers(rawValue: 1 << 4)
-    public static let `nonmutating` = DeclarationModifiers(rawValue: 1 << 5)
-    public static let `lazy` = DeclarationModifiers(rawValue: 1 << 6)
-    public static let `weak` = DeclarationModifiers(rawValue: 1 << 7)
-    public static let `unowned` = DeclarationModifiers(rawValue: 1 << 8)
-    public static let `optional` = DeclarationModifiers(rawValue: 1 << 9)
-    public static let `required` = DeclarationModifiers(rawValue: 1 << 10)
-    public static let `convenience` = DeclarationModifiers(rawValue: 1 << 11)
-    public static let `async` = DeclarationModifiers(rawValue: 1 << 12)
+    public static let final = DeclarationModifiers(rawValue: 1 << 2)
+    public static let override = DeclarationModifiers(rawValue: 1 << 3)
+    public static let mutating = DeclarationModifiers(rawValue: 1 << 4)
+    public static let nonmutating = DeclarationModifiers(rawValue: 1 << 5)
+    public static let lazy = DeclarationModifiers(rawValue: 1 << 6)
+    public static let weak = DeclarationModifiers(rawValue: 1 << 7)
+    public static let unowned = DeclarationModifiers(rawValue: 1 << 8)
+    public static let optional = DeclarationModifiers(rawValue: 1 << 9)
+    public static let required = DeclarationModifiers(rawValue: 1 << 10)
+    public static let convenience = DeclarationModifiers(rawValue: 1 << 11)
+    public static let async = DeclarationModifiers(rawValue: 1 << 12)
     public static let `throws` = DeclarationModifiers(rawValue: 1 << 13)
     public static let `rethrows` = DeclarationModifiers(rawValue: 1 << 14)
-    public static let `nonisolated` = DeclarationModifiers(rawValue: 1 << 15)
-    public static let `consuming` = DeclarationModifiers(rawValue: 1 << 16)
-    public static let `borrowing` = DeclarationModifiers(rawValue: 1 << 17)
+    public static let nonisolated = DeclarationModifiers(rawValue: 1 << 15)
+    public static let consuming = DeclarationModifiers(rawValue: 1 << 16)
+    public static let borrowing = DeclarationModifiers(rawValue: 1 << 17)
+
+    public let rawValue: UInt32
 }
 
 // MARK: - Declaration
 
 /// Represents a declaration in Swift source code.
 public struct Declaration: Sendable, Hashable, Codable {
+    // MARK: Lifecycle
+
+    public init(
+        name: String,
+        kind: DeclarationKind,
+        accessLevel: AccessLevel = .internal,
+        modifiers: DeclarationModifiers = [],
+        location: SourceLocation,
+        range: SourceRange,
+        scope: ScopeID,
+        typeAnnotation: String? = nil,
+        genericParameters: [String] = [],
+        documentation: String? = nil,
+        propertyWrappers: [PropertyWrapperInfo] = [],
+        swiftUIInfo: SwiftUITypeInfo? = nil,
+        conformances: [String] = [],
+        attributes: [String] = [],
+        ignoreDirectives: Set<String> = [],
+    ) {
+        self.name = name
+        self.kind = kind
+        self.accessLevel = accessLevel
+        self.modifiers = modifiers
+        self.location = location
+        self.range = range
+        self.scope = scope
+        self.typeAnnotation = typeAnnotation
+        self.genericParameters = genericParameters
+        self.documentation = documentation
+        self.propertyWrappers = propertyWrappers
+        self.swiftUIInfo = swiftUIInfo
+        self.conformances = conformances
+        self.attributes = attributes
+        self.ignoreDirectives = ignoreDirectives
+    }
+
+    // MARK: Public
+
     /// The declared name.
     public let name: String
 
@@ -139,77 +185,43 @@ public struct Declaration: Sendable, Hashable, Codable {
 
     /// Ignore directive categories from comments (e.g., "unused", "unused_cases", "all").
     public let ignoreDirectives: Set<String>
-
-    public init(
-        name: String,
-        kind: DeclarationKind,
-        accessLevel: AccessLevel = .internal,
-        modifiers: DeclarationModifiers = [],
-        location: SourceLocation,
-        range: SourceRange,
-        scope: ScopeID,
-        typeAnnotation: String? = nil,
-        genericParameters: [String] = [],
-        documentation: String? = nil,
-        propertyWrappers: [PropertyWrapperInfo] = [],
-        swiftUIInfo: SwiftUITypeInfo? = nil,
-        conformances: [String] = [],
-        attributes: [String] = [],
-        ignoreDirectives: Set<String> = []
-    ) {
-        self.name = name
-        self.kind = kind
-        self.accessLevel = accessLevel
-        self.modifiers = modifiers
-        self.location = location
-        self.range = range
-        self.scope = scope
-        self.typeAnnotation = typeAnnotation
-        self.genericParameters = genericParameters
-        self.documentation = documentation
-        self.propertyWrappers = propertyWrappers
-        self.swiftUIInfo = swiftUIInfo
-        self.conformances = conformances
-        self.attributes = attributes
-        self.ignoreDirectives = ignoreDirectives
-    }
 }
 
 // MARK: - Declaration SwiftUI Extensions
 
-extension Declaration {
+public extension Declaration {
     /// Whether this declaration has SwiftUI property wrappers.
-    public var hasSwiftUIPropertyWrapper: Bool {
+    var hasSwiftUIPropertyWrapper: Bool {
         propertyWrappers.contains { $0.kind.isSwiftUI }
     }
 
     /// Whether this declaration's property wrappers imply usage.
-    public var hasImplicitUsageWrapper: Bool {
+    var hasImplicitUsageWrapper: Bool {
         propertyWrappers.contains { $0.kind.impliesUsage }
     }
 
     /// Whether this is a SwiftUI View type.
-    public var isSwiftUIView: Bool {
+    var isSwiftUIView: Bool {
         swiftUIInfo?.isView ?? false
     }
 
     /// Whether this is a SwiftUI App entry point.
-    public var isSwiftUIApp: Bool {
+    var isSwiftUIApp: Bool {
         swiftUIInfo?.isApp ?? false
     }
 
     /// Whether this is a SwiftUI preview.
-    public var isSwiftUIPreview: Bool {
+    var isSwiftUIPreview: Bool {
         swiftUIInfo?.isPreview ?? false
     }
 
     /// Whether this declaration's body property is implicitly used.
-    public var hasImplicitBody: Bool {
+    var hasImplicitBody: Bool {
         swiftUIInfo?.hasImplicitBody ?? false
     }
 
     /// The primary property wrapper kind (if any).
-    public var primaryPropertyWrapper: PropertyWrapperKind? {
+    var primaryPropertyWrapper: PropertyWrapperKind? {
         propertyWrappers.first?.kind
     }
 
@@ -218,7 +230,7 @@ extension Declaration {
     /// - Parameter category: The category to check (e.g., "unused", "unused_cases").
     ///                       If nil, checks for "all" directive.
     /// - Returns: True if this declaration should be ignored for the category.
-    public func hasIgnoreDirective(for category: String? = nil) -> Bool {
+    func hasIgnoreDirective(for category: String? = nil) -> Bool {
         if ignoreDirectives.contains("all") {
             return true
         }
@@ -229,17 +241,23 @@ extension Declaration {
     }
 
     /// Whether this declaration should be ignored for unused code detection.
-    public var shouldIgnoreUnused: Bool {
+    var shouldIgnoreUnused: Bool {
         hasIgnoreDirective(for: "unused") ||
-        hasIgnoreDirective(for: "unused_code") ||
-        (kind == .enumCase && hasIgnoreDirective(for: "unused_cases"))
+            hasIgnoreDirective(for: "unused_code") ||
+            (kind == .enumCase && hasIgnoreDirective(for: "unused_cases"))
     }
 }
 
-// MARK: - Declaration Index
+// MARK: - DeclarationIndex
 
 /// Index of declarations for fast lookup.
 public struct DeclarationIndex: Sendable {
+    // MARK: Lifecycle
+
+    public init() {}
+
+    // MARK: Public
+
     /// All declarations.
     public private(set) var declarations: [Declaration] = []
 
@@ -254,8 +272,6 @@ public struct DeclarationIndex: Sendable {
 
     /// Declarations indexed by scope.
     public private(set) var byScope: [ScopeID: [Declaration]] = [:]
-
-    public init() {}
 
     /// Add a declaration to the index.
     public mutating func add(_ declaration: Declaration) {
@@ -287,7 +303,7 @@ public struct DeclarationIndex: Sendable {
     }
 }
 
-// MARK: - CustomStringConvertible
+// MARK: - Declaration + CustomStringConvertible
 
 extension Declaration: CustomStringConvertible {
     public var description: String {

@@ -6,13 +6,24 @@
 //
 
 import Foundation
-import SwiftSyntax
 import SwiftStaticAnalysisCore
+import SwiftSyntax
 
-// MARK: - AST Fingerprint
+// MARK: - ASTFingerprint
 
 /// A structural fingerprint of an AST subtree.
 public struct ASTFingerprint: Sendable, Hashable {
+    // MARK: Lifecycle
+
+    public init(hash: UInt64, depth: Int, nodeCount: Int, rootKind: String) {
+        self.hash = hash
+        self.depth = depth
+        self.nodeCount = nodeCount
+        self.rootKind = rootKind
+    }
+
+    // MARK: Public
+
     /// The hash of the structure.
     public let hash: UInt64
 
@@ -24,19 +35,32 @@ public struct ASTFingerprint: Sendable, Hashable {
 
     /// The syntax kind at the root.
     public let rootKind: String
-
-    public init(hash: UInt64, depth: Int, nodeCount: Int, rootKind: String) {
-        self.hash = hash
-        self.depth = depth
-        self.nodeCount = nodeCount
-        self.rootKind = rootKind
-    }
 }
 
-// MARK: - Fingerprinted Node
+// MARK: - FingerprintedNode
 
 /// An AST node with its fingerprint and location.
 public struct FingerprintedNode: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        file: String,
+        fingerprint: ASTFingerprint,
+        startLine: Int,
+        endLine: Int,
+        startColumn: Int,
+        tokenCount: Int,
+    ) {
+        self.file = file
+        self.fingerprint = fingerprint
+        self.startLine = startLine
+        self.endLine = endLine
+        self.startColumn = startColumn
+        self.tokenCount = tokenCount
+    }
+
+    // MARK: Public
+
     /// The file containing this node.
     public let file: String
 
@@ -54,59 +78,35 @@ public struct FingerprintedNode: Sendable {
 
     /// Token count (approximate).
     public let tokenCount: Int
-
-    public init(
-        file: String,
-        fingerprint: ASTFingerprint,
-        startLine: Int,
-        endLine: Int,
-        startColumn: Int,
-        tokenCount: Int
-    ) {
-        self.file = file
-        self.fingerprint = fingerprint
-        self.startLine = startLine
-        self.endLine = endLine
-        self.startColumn = startColumn
-        self.tokenCount = tokenCount
-    }
 }
 
-// MARK: - AST Fingerprint Visitor
+// MARK: - ASTFingerprintVisitor
 
 /// Computes structural fingerprints for function and closure bodies.
 public final class ASTFingerprintVisitor: SyntaxVisitor {
-    /// Collected fingerprinted nodes.
-    public private(set) var fingerprintedNodes: [FingerprintedNode] = []
-
-    /// Source location converter.
-    private let converter: SourceLocationConverter
-
-    /// File path.
-    private let file: String
-
-    /// Minimum nodes to consider.
-    private let minimumNodes: Int
-
-    /// Result builder analyzer for normalizing SwiftUI views.
-    private let resultBuilderAnalyzer: ResultBuilderAnalyzer?
-
-    /// Whether to normalize result builder closures.
-    public let normalizeResultBuilders: Bool
+    // MARK: Lifecycle
 
     public init(
         file: String,
         tree: SourceFileSyntax,
         minimumNodes: Int = 10,
-        normalizeResultBuilders: Bool = true
+        normalizeResultBuilders: Bool = true,
     ) {
         self.file = file
-        self.converter = SourceLocationConverter(fileName: file, tree: tree)
+        converter = SourceLocationConverter(fileName: file, tree: tree)
         self.minimumNodes = minimumNodes
         self.normalizeResultBuilders = normalizeResultBuilders
-        self.resultBuilderAnalyzer = normalizeResultBuilders ? ResultBuilderAnalyzer() : nil
+        resultBuilderAnalyzer = normalizeResultBuilders ? ResultBuilderAnalyzer() : nil
         super.init(viewMode: .sourceAccurate)
     }
+
+    // MARK: Public
+
+    /// Collected fingerprinted nodes.
+    public private(set) var fingerprintedNodes: [FingerprintedNode] = []
+
+    /// Whether to normalize result builder closures.
+    public let normalizeResultBuilders: Bool
 
     // MARK: - Function Declarations
 
@@ -142,6 +142,20 @@ public final class ASTFingerprintVisitor: SyntaxVisitor {
         return .visitChildren
     }
 
+    // MARK: Private
+
+    /// Source location converter.
+    private let converter: SourceLocationConverter
+
+    /// File path.
+    private let file: String
+
+    /// Minimum nodes to consider.
+    private let minimumNodes: Int
+
+    /// Result builder analyzer for normalizing SwiftUI views.
+    private let resultBuilderAnalyzer: ResultBuilderAnalyzer?
+
     // MARK: - Fingerprinting
 
     private func fingerprintCodeBlock(_ block: CodeBlockSyntax) {
@@ -158,19 +172,18 @@ public final class ASTFingerprintVisitor: SyntaxVisitor {
             startLine: startLoc.line,
             endLine: endLoc.line,
             startColumn: startLoc.column,
-            tokenCount: countTokens(in: block)
+            tokenCount: countTokens(in: block),
         ))
     }
 
     private func fingerprintClosure(_ closure: ClosureExprSyntax) {
         // Check if this is a result builder closure and compute appropriate fingerprint
-        let result: ASTFingerprint
-        if let analyzer = resultBuilderAnalyzer,
-           let normalized = analyzer.normalizeClosure(closure) {
+        let result: ASTFingerprint = if let analyzer = resultBuilderAnalyzer,
+                                        let normalized = analyzer.normalizeClosure(closure) {
             // Use normalized fingerprint for result builder closures
-            result = computeNormalizedFingerprint(for: normalized)
+            computeNormalizedFingerprint(for: normalized)
         } else {
-            result = computeFingerprint(for: Syntax(closure))
+            computeFingerprint(for: Syntax(closure))
         }
 
         guard result.nodeCount >= minimumNodes else { return }
@@ -184,7 +197,7 @@ public final class ASTFingerprintVisitor: SyntaxVisitor {
             startLine: startLoc.line,
             endLine: endLoc.line,
             startColumn: startLoc.column,
-            tokenCount: countTokens(in: closure)
+            tokenCount: countTokens(in: closure),
         ))
     }
 
@@ -211,7 +224,7 @@ public final class ASTFingerprintVisitor: SyntaxVisitor {
             hash: hasher.finalHash(),
             depth: maxDepth,
             nodeCount: nodeCount,
-            rootKind: "NormalizedResultBuilder"
+            rootKind: "NormalizedResultBuilder",
         )
     }
 
@@ -219,7 +232,7 @@ public final class ASTFingerprintVisitor: SyntaxVisitor {
     private func hashNormalizedStatement(
         _ statement: NormalizedStatement,
         hasher: inout FingerprintHasher,
-        depth: Int
+        depth: Int,
     ) -> FingerprintHasher.Stats {
         var stats = FingerprintHasher.Stats(depth: depth, nodeCount: 1)
 
@@ -245,12 +258,12 @@ public final class ASTFingerprintVisitor: SyntaxVisitor {
             hash: hasher.finalHash(),
             depth: stats.depth,
             nodeCount: stats.nodeCount,
-            rootKind: "\(node.kind)"
+            rootKind: "\(node.kind)",
         )
     }
 
     /// Count tokens in a syntax node.
-    private func countTokens<T: SyntaxProtocol>(in node: T) -> Int {
+    private func countTokens(in node: some SyntaxProtocol) -> Int {
         var count = 0
         for _ in node.tokens(viewMode: .sourceAccurate) {
             count += 1
@@ -259,12 +272,11 @@ public final class ASTFingerprintVisitor: SyntaxVisitor {
     }
 }
 
-// MARK: - Fingerprint Hasher
+// MARK: - FingerprintHasher
 
 /// Computes a structural hash of an AST.
 struct FingerprintHasher {
-    private var hash: UInt64 = 0
-    private let prime: UInt64 = 1_000_000_007
+    // MARK: Internal
 
     struct Stats {
         var depth: Int = 0
@@ -289,6 +301,11 @@ struct FingerprintHasher {
         hash = (hash &* 31 &+ strHash) % prime
     }
 
+    // MARK: Private
+
+    private var hash: UInt64 = 0
+    private let prime: UInt64 = 1_000_000_007
+
     private mutating func hashNode(_ node: Syntax, depth: Int, stats: inout Stats) {
         stats.nodeCount += 1
         stats.depth = max(stats.depth, depth)
@@ -302,7 +319,7 @@ struct FingerprintHasher {
         }
 
         // Add closing marker for this level
-        hash = (hash &* 31 &+ 0xDEADBEEF) % prime
+        hash = (hash &* 31 &+ 0xDEAD_BEEF) % prime
     }
 
     private func computeStringHash(_ str: String) -> UInt64 {

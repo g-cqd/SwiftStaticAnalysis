@@ -8,10 +8,22 @@
 
 import Foundation
 
-// MARK: - Normalized Token
+// MARK: - NormalizedToken
 
 /// A normalized token for near-clone detection.
 public struct NormalizedToken: Sendable, Hashable {
+    // MARK: Lifecycle
+
+    public init(normalized: String, original: String, kind: TokenKind, line: Int, column: Int) {
+        self.normalized = normalized
+        self.original = original
+        self.kind = kind
+        self.line = line
+        self.column = column
+    }
+
+    // MARK: Public
+
     /// The normalized representation.
     public let normalized: String
 
@@ -26,20 +38,22 @@ public struct NormalizedToken: Sendable, Hashable {
 
     /// Column number.
     public let column: Int
-
-    public init(normalized: String, original: String, kind: TokenKind, line: Int, column: Int) {
-        self.normalized = normalized
-        self.original = original
-        self.kind = kind
-        self.line = line
-        self.column = column
-    }
 }
 
-// MARK: - Normalized Sequence
+// MARK: - NormalizedSequence
 
 /// A sequence of normalized tokens.
 public struct NormalizedSequence: Sendable, TokenSequenceProtocol {
+    // MARK: Lifecycle
+
+    public init(file: String, tokens: [NormalizedToken], sourceLines: [String]) {
+        self.file = file
+        self.tokens = tokens
+        self.sourceLines = sourceLines
+    }
+
+    // MARK: Public
+
     /// The source file path.
     public let file: String
 
@@ -52,15 +66,9 @@ public struct NormalizedSequence: Sendable, TokenSequenceProtocol {
     /// Number of tokens in the sequence.
     public var tokenCount: Int { tokens.count }
 
-    public init(file: String, tokens: [NormalizedToken], sourceLines: [String]) {
-        self.file = file
-        self.tokens = tokens
-        self.sourceLines = sourceLines
-    }
-
     /// Get the normalized token texts for hashing.
     public var normalizedTexts: [String] {
-        tokens.map { $0.normalized }
+        tokens.map(\.normalized)
     }
 
     /// Extract a code snippet for the given line range.
@@ -68,14 +76,30 @@ public struct NormalizedSequence: Sendable, TokenSequenceProtocol {
         let start = max(0, startLine - 1)
         let end = min(sourceLines.count, endLine)
         guard start < end else { return "" }
-        return sourceLines[start..<end].joined(separator: "\n")
+        return sourceLines[start ..< end].joined(separator: "\n")
     }
 }
 
-// MARK: - Token Normalizer
+// MARK: - TokenNormalizer
 
 /// Normalizes tokens for near-clone detection.
 public struct TokenNormalizer: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        normalizeIdentifiers: Bool = true,
+        normalizeLiterals: Bool = true,
+        normalizeClosureParams: Bool = true,
+        preservedIdentifiers: Set<String> = [],
+    ) {
+        self.normalizeIdentifiers = normalizeIdentifiers
+        self.normalizeLiterals = normalizeLiterals
+        self.normalizeClosureParams = normalizeClosureParams
+        self.preservedIdentifiers = preservedIdentifiers
+    }
+
+    // MARK: Public
+
     /// Placeholder for identifiers.
     public static let identifierPlaceholder = "$ID"
 
@@ -87,6 +111,19 @@ public struct TokenNormalizer: Sendable {
 
     /// Placeholder for closure shorthand parameters ($0, $1, etc.).
     public static let shorthandParamPlaceholder = "$PARAM"
+
+    /// Default normalizer with common Swift keywords preserved.
+    public static let `default` = TokenNormalizer(
+        preservedIdentifiers: [
+            // Common type names
+            "String", "Int", "Double", "Float", "Bool", "Array", "Dictionary",
+            "Set", "Optional", "Result", "Error", "Void", "Any", "AnyObject",
+            // Common identifiers
+            "self", "Self", "super", "nil", "true", "false",
+            // Common function names
+            "print", "fatalError", "precondition", "assert",
+        ],
+    )
 
     /// Whether to normalize identifiers.
     public var normalizeIdentifiers: Bool
@@ -100,31 +137,6 @@ public struct TokenNormalizer: Sendable {
     /// Identifiers to preserve (not normalize).
     public var preservedIdentifiers: Set<String>
 
-    public init(
-        normalizeIdentifiers: Bool = true,
-        normalizeLiterals: Bool = true,
-        normalizeClosureParams: Bool = true,
-        preservedIdentifiers: Set<String> = []
-    ) {
-        self.normalizeIdentifiers = normalizeIdentifiers
-        self.normalizeLiterals = normalizeLiterals
-        self.normalizeClosureParams = normalizeClosureParams
-        self.preservedIdentifiers = preservedIdentifiers
-    }
-
-    /// Default normalizer with common Swift keywords preserved.
-    public static let `default` = TokenNormalizer(
-        preservedIdentifiers: [
-            // Common type names
-            "String", "Int", "Double", "Float", "Bool", "Array", "Dictionary",
-            "Set", "Optional", "Result", "Error", "Void", "Any", "AnyObject",
-            // Common identifiers
-            "self", "Self", "super", "nil", "true", "false",
-            // Common function names
-            "print", "fatalError", "precondition", "assert",
-        ]
-    )
-
     /// Normalize a token sequence.
     public func normalize(_ sequence: TokenSequence) -> NormalizedSequence {
         let normalizedTokens = sequence.tokens.map { token -> NormalizedToken in
@@ -134,26 +146,28 @@ public struct TokenNormalizer: Sendable {
                 original: token.text,
                 kind: token.kind,
                 line: token.line,
-                column: token.column
+                column: token.column,
             )
         }
 
         return NormalizedSequence(
             file: sequence.file,
             tokens: normalizedTokens,
-            sourceLines: sequence.sourceLines
+            sourceLines: sequence.sourceLines,
         )
     }
+
+    // MARK: Private
 
     /// Normalize a single token.
     private func normalizeToken(_ token: TokenInfo) -> String {
         switch token.kind {
         case .identifier:
             // Check for closure shorthand parameters ($0, $1, etc.)
-            if normalizeClosureParams && isShorthandParameter(token.text) {
+            if normalizeClosureParams, isShorthandParameter(token.text) {
                 return Self.shorthandParamPlaceholder
             }
-            if normalizeIdentifiers && !preservedIdentifiers.contains(token.text) {
+            if normalizeIdentifiers, !preservedIdentifiers.contains(token.text) {
                 return Self.identifierPlaceholder
             }
             return token.text
@@ -164,7 +178,10 @@ public struct TokenNormalizer: Sendable {
             }
             return token.text
 
-        case .keyword, .operator, .punctuation, .unknown:
+        case .keyword,
+             .operator,
+             .punctuation,
+             .unknown:
             return token.text
         }
     }
@@ -173,7 +190,7 @@ public struct TokenNormalizer: Sendable {
     private func isShorthandParameter(_ text: String) -> Bool {
         guard text.hasPrefix("$") else { return false }
         let rest = text.dropFirst()
-        return rest.allSatisfy { $0.isNumber }
+        return rest.allSatisfy(\.isNumber)
     }
 
     /// Classify a literal and return appropriate placeholder.

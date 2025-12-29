@@ -10,7 +10,7 @@
 
 import Foundation
 
-// MARK: - LCP Array
+// MARK: - LCPArray
 
 /// Longest Common Prefix array for efficient repeat detection.
 ///
@@ -18,11 +18,7 @@ import Foundation
 /// between `suffixArray[i-1]` and `suffixArray[i]`. This enables finding
 /// all repeated substrings by scanning for values >= threshold.
 public struct LCPArray: Sendable {
-    /// The LCP values. `lcp[i]` = LCP of SA[i-1] and SA[i]. lcp[0] is always 0.
-    public let array: [Int]
-
-    /// The suffix array this LCP array corresponds to.
-    public let suffixArray: SuffixArray
+    // MARK: Lifecycle
 
     /// Creates an LCP array from a suffix array and the original tokens.
     ///
@@ -33,8 +29,16 @@ public struct LCPArray: Sendable {
     ///   - tokens: The original token array (as integers).
     public init(suffixArray: SuffixArray, tokens: [Int]) {
         self.suffixArray = suffixArray
-        self.array = LCPArrayBuilder.build(suffixArray: suffixArray, tokens: tokens)
+        array = LCPArrayBuilder.build(suffixArray: suffixArray, tokens: tokens)
     }
+
+    // MARK: Public
+
+    /// The LCP values. `lcp[i]` = LCP of SA[i-1] and SA[i]. lcp[0] is always 0.
+    public let array: [Int]
+
+    /// The suffix array this LCP array corresponds to.
+    public let suffixArray: SuffixArray
 
     /// Get the LCP value at index i.
     public subscript(i: Int) -> Int {
@@ -45,7 +49,7 @@ public struct LCPArray: Sendable {
     /// These represent repeated substrings of at least `threshold` tokens.
     public func findRepeatsAboveThreshold(_ threshold: Int) -> [Int] {
         var positions: [Int] = []
-        for i in 1..<array.count {
+        for i in 1 ..< array.count {
             if array[i] >= threshold {
                 positions.append(i)
             }
@@ -54,7 +58,7 @@ public struct LCPArray: Sendable {
     }
 }
 
-// MARK: - Kasai's Algorithm
+// MARK: - LCPArrayBuilder
 
 /// Builder for LCP arrays using Kasai's algorithm.
 ///
@@ -73,7 +77,7 @@ enum LCPArrayBuilder {
         // Build inverse suffix array (rank array)
         // rank[i] = position of suffix starting at i in the sorted suffix array
         var rank = [Int](repeating: 0, count: n)
-        for i in 0..<n {
+        for i in 0 ..< n {
             rank[sa[i]] = i
         }
 
@@ -81,7 +85,7 @@ enum LCPArrayBuilder {
         var lcp = [Int](repeating: 0, count: n)
         var h = 0 // Current LCP length
 
-        for i in 0..<n {
+        for i in 0 ..< n {
             let r = rank[i] // Position of suffix[i] in SA
 
             if r > 0 {
@@ -89,7 +93,7 @@ enum LCPArrayBuilder {
                 let j = sa[r - 1]
 
                 // Compare suffix[i] and suffix[j] starting from position h
-                while i + h < n && j + h < n && tokens[i + h] == tokens[j + h] {
+                while i + h < n, j + h < n, tokens[i + h] == tokens[j + h] {
                     h += 1
                 }
 
@@ -106,20 +110,24 @@ enum LCPArrayBuilder {
     }
 }
 
-// MARK: - Repeat Detection
+// MARK: - DetectedRepeat
 
 /// A detected repeat (clone candidate) from LCP array analysis.
 public struct DetectedRepeat: Sendable, Hashable {
-    /// Starting positions of all occurrences in the original token array.
-    public let positions: [Int]
-
-    /// Length of the repeated substring (in tokens).
-    public let length: Int
+    // MARK: Lifecycle
 
     public init(positions: [Int], length: Int) {
         self.positions = positions.sorted()
         self.length = length
     }
+
+    // MARK: Public
+
+    /// Starting positions of all occurrences in the original token array.
+    public let positions: [Int]
+
+    /// Length of the repeated substring (in tokens).
+    public let length: Int
 
     /// Number of occurrences.
     public var occurrences: Int { positions.count }
@@ -150,14 +158,14 @@ extension LCPArray {
                 var minLcp = array[i]
 
                 // Extend region while LCP stays >= minLength
-                while regionEnd + 1 < array.count && array[regionEnd + 1] >= minLength {
+                while regionEnd + 1 < array.count, array[regionEnd + 1] >= minLength {
                     regionEnd += 1
                     minLcp = min(minLcp, array[regionEnd])
                 }
 
                 // Collect all positions in this region
                 var positions: [Int] = []
-                for j in regionStart...regionEnd {
+                for j in regionStart ... regionEnd {
                     positions.append(sa[j])
                 }
 
@@ -229,7 +237,7 @@ extension LCPArray {
             var j = i + 1
 
             // Extend while in same or higher LCP region
-            while j < n && array[j] >= minLength {
+            while j < n, array[j] >= minLength {
                 positions.append(sa[j])
                 minLcp = min(minLcp, array[j])
                 j += 1
@@ -239,7 +247,7 @@ extension LCPArray {
             let group = RepeatGroup(
                 positions: positions,
                 length: minLcp,
-                suffixArrayIndices: Array((i - 1)..<j)
+                suffixArrayIndices: Array((i - 1) ..< j),
             )
             groups.append(group)
 
@@ -275,10 +283,20 @@ extension LCPArray {
     }
 }
 
-// MARK: - Repeat Group
+// MARK: - RepeatGroup
 
 /// A group of positions sharing a common repeated substring.
 public struct RepeatGroup: Sendable {
+    // MARK: Lifecycle
+
+    public init(positions: [Int], length: Int, suffixArrayIndices: [Int]) {
+        self.positions = positions.sorted()
+        self.length = length
+        self.suffixArrayIndices = suffixArrayIndices
+    }
+
+    // MARK: Public
+
     /// Starting positions of all occurrences.
     public let positions: [Int]
 
@@ -287,12 +305,6 @@ public struct RepeatGroup: Sendable {
 
     /// Indices in the suffix array where these positions appear.
     public let suffixArrayIndices: [Int]
-
-    public init(positions: [Int], length: Int, suffixArrayIndices: [Int]) {
-        self.positions = positions.sorted()
-        self.length = length
-        self.suffixArrayIndices = suffixArrayIndices
-    }
 
     /// Number of occurrences.
     public var occurrences: Int { positions.count }

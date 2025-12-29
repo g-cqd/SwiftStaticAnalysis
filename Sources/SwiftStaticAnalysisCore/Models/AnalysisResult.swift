@@ -5,10 +5,28 @@
 
 import Foundation
 
-// MARK: - Analysis Result
+// MARK: - AnalysisResult
 
 /// Complete result of analyzing a codebase.
 public struct AnalysisResult: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        files: [String],
+        declarations: DeclarationIndex,
+        references: ReferenceIndex,
+        scopes: ScopeTree,
+        statistics: AnalysisStatistics,
+    ) {
+        self.files = files
+        self.declarations = declarations
+        self.references = references
+        self.scopes = scopes
+        self.statistics = statistics
+    }
+
+    // MARK: Public
+
     /// All files analyzed.
     public let files: [String]
 
@@ -23,26 +41,32 @@ public struct AnalysisResult: Sendable {
 
     /// Analysis statistics.
     public let statistics: AnalysisStatistics
-
-    public init(
-        files: [String],
-        declarations: DeclarationIndex,
-        references: ReferenceIndex,
-        scopes: ScopeTree,
-        statistics: AnalysisStatistics
-    ) {
-        self.files = files
-        self.declarations = declarations
-        self.references = references
-        self.scopes = scopes
-        self.statistics = statistics
-    }
 }
 
-// MARK: - Analysis Statistics
+// MARK: - AnalysisStatistics
 
 /// Statistics about the analysis.
 public struct AnalysisStatistics: Sendable, Codable {
+    // MARK: Lifecycle
+
+    public init(
+        fileCount: Int,
+        totalLines: Int,
+        declarationCount: Int,
+        referenceCount: Int,
+        declarationsByKind: [String: Int],
+        analysisTime: TimeInterval,
+    ) {
+        self.fileCount = fileCount
+        self.totalLines = totalLines
+        self.declarationCount = declarationCount
+        self.referenceCount = referenceCount
+        self.declarationsByKind = declarationsByKind
+        self.analysisTime = analysisTime
+    }
+
+    // MARK: Public
+
     /// Number of files analyzed.
     public let fileCount: Int
 
@@ -60,28 +84,30 @@ public struct AnalysisStatistics: Sendable, Codable {
 
     /// Time taken for analysis in seconds.
     public let analysisTime: TimeInterval
-
-    public init(
-        fileCount: Int,
-        totalLines: Int,
-        declarationCount: Int,
-        referenceCount: Int,
-        declarationsByKind: [String: Int],
-        analysisTime: TimeInterval
-    ) {
-        self.fileCount = fileCount
-        self.totalLines = totalLines
-        self.declarationCount = declarationCount
-        self.referenceCount = referenceCount
-        self.declarationsByKind = declarationsByKind
-        self.analysisTime = analysisTime
-    }
 }
 
-// MARK: - File Analysis Result
+// MARK: - FileAnalysisResult
 
 /// Result of analyzing a single file.
 public struct FileAnalysisResult: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        file: String,
+        declarations: [Declaration],
+        references: [Reference],
+        scopes: [Scope],
+        lineCount: Int,
+    ) {
+        self.file = file
+        self.declarations = declarations
+        self.references = references
+        self.scopes = scopes
+        self.lineCount = lineCount
+    }
+
+    // MARK: Public
+
     /// The file path.
     public let file: String
 
@@ -96,23 +122,9 @@ public struct FileAnalysisResult: Sendable {
 
     /// Number of lines.
     public let lineCount: Int
-
-    public init(
-        file: String,
-        declarations: [Declaration],
-        references: [Reference],
-        scopes: [Scope],
-        lineCount: Int
-    ) {
-        self.file = file
-        self.declarations = declarations
-        self.references = references
-        self.scopes = scopes
-        self.lineCount = lineCount
-    }
 }
 
-// MARK: - Analysis Error
+// MARK: - AnalysisError
 
 /// Errors that can occur during analysis.
 public enum AnalysisError: Error, Sendable {
@@ -122,17 +134,22 @@ public enum AnalysisError: Error, Sendable {
     case ioError(String)
 }
 
+// MARK: LocalizedError
+
 extension AnalysisError: LocalizedError {
     public var errorDescription: String? {
         switch self {
-        case .fileNotFound(let path):
-            return "File not found: \(path)"
-        case .parseError(let file, let message):
-            return "Parse error in \(file): \(message)"
-        case .invalidPath(let path):
-            return "Invalid path: \(path)"
-        case .ioError(let message):
-            return "I/O error: \(message)"
+        case let .fileNotFound(path):
+            "File not found: \(path)"
+
+        case let .parseError(file, message):
+            "Parse error in \(file): \(message)"
+
+        case let .invalidPath(path):
+            "Invalid path: \(path)"
+
+        case let .ioError(message):
+            "I/O error: \(message)"
         }
     }
 }

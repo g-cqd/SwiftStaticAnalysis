@@ -6,12 +6,13 @@
 //
 
 import Foundation
-import Testing
 @testable import SwiftStaticAnalysisCore
+import Testing
+
+// MARK: - DiagnosticModelTests
 
 @Suite("Diagnostic Model Tests")
 struct DiagnosticModelTests {
-
     @Test("Diagnostic Xcode format")
     func diagnosticXcodeFormat() {
         let diagnostic = Diagnostic(
@@ -19,7 +20,7 @@ struct DiagnosticModelTests {
             line: 42,
             column: 5,
             severity: .warning,
-            message: "Unused variable 'foo'"
+            message: "Unused variable 'foo'",
         )
 
         let expected = "/path/to/file.swift:42:5: warning: Unused variable 'foo'"
@@ -33,7 +34,7 @@ struct DiagnosticModelTests {
             line: 50,
             column: 1,
             severity: .note,
-            message: "Related declaration here"
+            message: "Related declaration here",
         )
 
         let diagnostic = Diagnostic(
@@ -42,7 +43,7 @@ struct DiagnosticModelTests {
             column: 5,
             severity: .warning,
             message: "Duplicate code detected",
-            notes: [note]
+            notes: [note],
         )
 
         let formatted = diagnostic.xcodeFormatWithNotes
@@ -57,7 +58,7 @@ struct DiagnosticModelTests {
             line: 42,
             column: 5,
             severity: .warning,
-            message: "Message"
+            message: "Message",
         )
 
         let d2 = Diagnostic(
@@ -65,7 +66,7 @@ struct DiagnosticModelTests {
             line: 42,
             column: 5,
             severity: .warning,
-            message: "Message"
+            message: "Message",
         )
 
         let d3 = Diagnostic(
@@ -73,7 +74,7 @@ struct DiagnosticModelTests {
             line: 42,
             column: 5,
             severity: .error,
-            message: "Message"
+            message: "Message",
         )
 
         #expect(d1.uniqueKey == d2.uniqueKey)
@@ -109,9 +110,10 @@ struct DiagnosticModelTests {
     }
 }
 
+// MARK: - DiagnosticDeduplicationTests
+
 @Suite("Diagnostic Deduplication Tests")
 struct DiagnosticDeduplicationTests {
-
     @Test("Deduplicate exact duplicates")
     func deduplicateExactDuplicates() {
         let diagnostics = [
@@ -166,13 +168,13 @@ struct DiagnosticDeduplicationTests {
     @Test("Apply per-file limit")
     func applyPerFileLimit() {
         var diagnostics: [Diagnostic] = []
-        for i in 1...10 {
+        for i in 1 ... 10 {
             diagnostics.append(Diagnostic(
                 file: "a.swift",
                 line: i,
                 column: 1,
                 severity: .warning,
-                message: "Warning \(i)"
+                message: "Warning \(i)",
             ))
         }
 
@@ -203,9 +205,10 @@ struct DiagnosticDeduplicationTests {
     }
 }
 
+// MARK: - XcodeFormatterTests
+
 @Suite("Xcode Formatter Tests")
 struct XcodeFormatterTests {
-
     @Test("Format single diagnostic")
     func formatSingleDiagnostic() {
         let diagnostic = Diagnostic(
@@ -213,7 +216,7 @@ struct XcodeFormatterTests {
             line: 42,
             column: 5,
             severity: .warning,
-            message: "Unused variable 'foo'"
+            message: "Unused variable 'foo'",
         )
 
         let formatter = XcodeFormatter()
@@ -230,7 +233,7 @@ struct XcodeFormatterTests {
             column: 5,
             severity: .warning,
             message: "Unused variable",
-            ruleID: "unused-var"
+            ruleID: "unused-var",
         )
 
         let config = XcodeFormatterConfiguration(includeRuleID: true)
@@ -248,7 +251,7 @@ struct XcodeFormatterTests {
             column: 5,
             severity: .warning,
             message: "Duplicate code",
-            category: .duplication
+            category: .duplication,
         )
 
         let config = XcodeFormatterConfiguration(includeCategory: true)
@@ -283,7 +286,7 @@ struct XcodeFormatterTests {
             line: 50,
             column: 1,
             severity: .note,
-            message: "Also appears here"
+            message: "Also appears here",
         )
 
         let diagnostic = Diagnostic(
@@ -292,7 +295,7 @@ struct XcodeFormatterTests {
             column: 5,
             severity: .warning,
             message: "Duplicate code",
-            notes: [note]
+            notes: [note],
         )
 
         let formatter = XcodeFormatter()
@@ -305,9 +308,10 @@ struct XcodeFormatterTests {
     }
 }
 
+// MARK: - DiagnosticConversionTests
+
 @Suite("Diagnostic Conversion Tests")
 struct DiagnosticConversionTests {
-
     @Test("Create diagnostic from unused code")
     func createDiagnosticFromUnusedCode() {
         let declaration = Declaration(
@@ -316,15 +320,15 @@ struct DiagnosticConversionTests {
             location: SourceLocation(file: "test.swift", line: 10, column: 5, offset: 100),
             range: SourceRange(
                 start: SourceLocation(file: "test.swift", line: 10, column: 5, offset: 100),
-                end: SourceLocation(file: "test.swift", line: 10, column: 20, offset: 115)
+                end: SourceLocation(file: "test.swift", line: 10, column: 20, offset: 115),
             ),
-            scope: .global
+            scope: .global,
         )
 
         let diagnostic = Diagnostic.fromUnusedCode(
             declaration: declaration,
             reason: "neverReferenced",
-            suggestion: "Consider removing unused variable 'unusedVar'"
+            suggestion: "Consider removing unused variable 'unusedVar'",
         )
 
         #expect(diagnostic.file == "test.swift")
@@ -345,7 +349,7 @@ struct DiagnosticConversionTests {
 
         let diagnostics = Diagnostic.fromCloneGroup(
             clones: clones,
-            cloneType: "exact"
+            cloneType: "exact",
         )
 
         #expect(diagnostics.count == 1)

@@ -5,22 +5,26 @@
 
 import Foundation
 
-// MARK: - Scope Identifier
+// MARK: - ScopeID
 
 /// Unique identifier for a lexical scope.
 public struct ScopeID: Sendable, Hashable, Codable {
-    /// The underlying identifier.
-    public let id: String
+    // MARK: Lifecycle
 
     public init(_ id: String) {
         self.id = id
     }
 
+    // MARK: Public
+
     /// The global/file scope.
     public static let global = ScopeID("global")
+
+    /// The underlying identifier.
+    public let id: String
 }
 
-// MARK: - Scope Kind
+// MARK: - ScopeKind
 
 /// The kind of lexical scope.
 /// Intentionally exhaustive to cover all Swift scope types. // swa:ignore-unused-cases
@@ -46,6 +50,24 @@ public enum ScopeKind: String, Sendable, Codable {
 
 /// Represents a lexical scope in the source code.
 public struct Scope: Sendable, Hashable, Codable {
+    // MARK: Lifecycle
+
+    public init(
+        id: ScopeID,
+        kind: ScopeKind,
+        name: String? = nil,
+        parent: ScopeID? = nil,
+        location: SourceLocation,
+    ) {
+        self.id = id
+        self.kind = kind
+        self.name = name
+        self.parent = parent
+        self.location = location
+    }
+
+    // MARK: Public
+
     /// Unique identifier for this scope.
     public let id: ScopeID
 
@@ -60,33 +82,23 @@ public struct Scope: Sendable, Hashable, Codable {
 
     /// Location where the scope begins.
     public let location: SourceLocation
-
-    public init(
-        id: ScopeID,
-        kind: ScopeKind,
-        name: String? = nil,
-        parent: ScopeID? = nil,
-        location: SourceLocation
-    ) {
-        self.id = id
-        self.kind = kind
-        self.name = name
-        self.parent = parent
-        self.location = location
-    }
 }
 
-// MARK: - Scope Tree
+// MARK: - ScopeTree
 
 /// A tree structure for tracking scope hierarchy.
 public struct ScopeTree: Sendable {
+    // MARK: Lifecycle
+
+    public init() {}
+
+    // MARK: Public
+
     /// All scopes indexed by ID.
     public private(set) var scopes: [ScopeID: Scope] = [:]
 
     /// Children of each scope.
     public private(set) var children: [ScopeID: [ScopeID]] = [:]
-
-    public init() {}
 
     /// Add a scope to the tree.
     public mutating func add(_ scope: Scope) {

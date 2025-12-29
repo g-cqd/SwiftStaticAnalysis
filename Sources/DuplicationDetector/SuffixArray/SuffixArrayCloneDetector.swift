@@ -9,7 +9,7 @@
 import Foundation
 import SwiftStaticAnalysisCore
 
-// MARK: - Suffix Array Clone Detector
+// MARK: - SuffixArrayCloneDetector
 
 /// Detects code clones using suffix array and LCP array analysis.
 ///
@@ -17,20 +17,21 @@ import SwiftStaticAnalysisCore
 /// code sequences. Unlike hash-based approaches, it cannot produce false
 /// positives and finds ALL repeats above the minimum threshold.
 public struct SuffixArrayCloneDetector: Sendable {
+    // MARK: Lifecycle
+
+    public init(minimumTokens: Int = 50, normalizeForType2: Bool = false) {
+        self.minimumTokens = minimumTokens
+        self.normalizeForType2 = normalizeForType2
+        normalizer = .default
+    }
+
+    // MARK: Public
+
     /// Minimum number of tokens to consider as a clone.
     public let minimumTokens: Int
 
     /// Whether to normalize tokens for Type-2 detection.
     public let normalizeForType2: Bool
-
-    /// Token normalizer for Type-2 detection.
-    private let normalizer: TokenNormalizer
-
-    public init(minimumTokens: Int = 50, normalizeForType2: Bool = false) {
-        self.minimumTokens = minimumTokens
-        self.normalizeForType2 = normalizeForType2
-        self.normalizer = .default
-    }
 
     /// Detect clones across multiple token sequences.
     ///
@@ -58,7 +59,7 @@ public struct SuffixArrayCloneDetector: Sendable {
             repeatGroups: repeatGroups,
             tokenInfos: tokenInfos,
             fileBoundaries: fileBoundaries,
-            sequences: sequences
+            sequences: sequences,
         )
     }
 
@@ -89,9 +90,14 @@ public struct SuffixArrayCloneDetector: Sendable {
             repeatGroups: repeatGroups,
             tokenInfos: tokenInfos,
             fileBoundaries: fileBoundaries,
-            sequences: normalizedSequences
+            sequences: normalizedSequences,
         )
     }
+
+    // MARK: Private
+
+    /// Token normalizer for Type-2 detection.
+    private let normalizer: TokenNormalizer
 
     // MARK: - Stream Building
 
@@ -100,7 +106,7 @@ public struct SuffixArrayCloneDetector: Sendable {
     /// Tokens are converted to integers, and sentinel values are inserted
     /// between files to prevent cross-file matches.
     private func buildConcatenatedStream(
-        _ sequences: [TokenSequence]
+        _ sequences: [TokenSequence],
     ) -> (tokens: [Int], infos: [TokenStreamInfo], boundaries: [FileBoundary]) {
         buildStream(from: sequences) { seq, index in
             (seq.tokens[index].text, seq.tokens[index].text, seq.tokens[index].line, seq.tokens[index].column)
@@ -109,7 +115,7 @@ public struct SuffixArrayCloneDetector: Sendable {
 
     /// Build concatenated stream from normalized sequences.
     private func buildNormalizedStream(
-        _ sequences: [NormalizedSequence]
+        _ sequences: [NormalizedSequence],
     ) -> (tokens: [Int], infos: [TokenStreamInfo], boundaries: [FileBoundary]) {
         buildStream(from: sequences) { seq, index in
             (seq.tokens[index].normalized, seq.tokens[index].original, seq.tokens[index].line, seq.tokens[index].column)
@@ -119,9 +125,9 @@ public struct SuffixArrayCloneDetector: Sendable {
     /// Generic stream building helper.
     private func buildStream<S: Collection>(
         from sequences: S,
-        tokenAccessor: (S.Element, Int) -> (text: String, original: String, line: Int, column: Int)
+        tokenAccessor: (S.Element, Int) -> (text: String, original: String, line: Int, column: Int),
     ) -> (tokens: [Int], infos: [TokenStreamInfo], boundaries: [FileBoundary])
-    where S.Element: TokenSequenceProtocol {
+        where S.Element: TokenSequenceProtocol {
         var tokens: [Int] = []
         var infos: [TokenStreamInfo] = []
         var boundaries: [FileBoundary] = []
@@ -133,10 +139,10 @@ public struct SuffixArrayCloneDetector: Sendable {
             boundaries.append(FileBoundary(
                 fileIndex: fileIndex,
                 file: sequence.file,
-                startIndex: startIndex
+                startIndex: startIndex,
             ))
 
-            for tokenIdx in 0..<sequence.tokenCount {
+            for tokenIdx in 0 ..< sequence.tokenCount {
                 let (text, original, line, column) = tokenAccessor(sequence, tokenIdx)
                 let tokenId: Int
                 if let existingId = tokenIdMap[text] {
@@ -153,7 +159,7 @@ public struct SuffixArrayCloneDetector: Sendable {
                     tokenIndex: infos.count,
                     line: line,
                     column: column,
-                    originalText: original
+                    originalText: original,
                 ))
             }
 
@@ -166,7 +172,7 @@ public struct SuffixArrayCloneDetector: Sendable {
                 tokenIndex: infos.count,
                 line: -1,
                 column: -1,
-                originalText: "<SEP>"
+                originalText: "<SEP>",
             ))
         }
 
@@ -180,7 +186,7 @@ public struct SuffixArrayCloneDetector: Sendable {
         repeatGroups: [RepeatGroup],
         tokenInfos: [TokenStreamInfo],
         fileBoundaries: [FileBoundary],
-        sequences: [TokenSequence]
+        sequences: [TokenSequence],
     ) -> [CloneGroup] {
         var cloneGroups: [CloneGroup] = []
 
@@ -198,7 +204,7 @@ public struct SuffixArrayCloneDetector: Sendable {
                     position: pos,
                     length: group.length,
                     tokenInfos: tokenInfos,
-                    sequences: sequences
+                    sequences: sequences,
                 )
             }
 
@@ -214,7 +220,7 @@ public struct SuffixArrayCloneDetector: Sendable {
                     startLine: loc.startLine,
                     endLine: loc.endLine,
                     tokenCount: group.length,
-                    codeSnippet: "" // Filled in later
+                    codeSnippet: "", // Filled in later
                 )
             }
 
@@ -222,14 +228,14 @@ public struct SuffixArrayCloneDetector: Sendable {
             let fingerprint = generateFingerprint(
                 position: validPositions[0],
                 length: min(group.length, 20),
-                tokenInfos: tokenInfos
+                tokenInfos: tokenInfos,
             )
 
             cloneGroups.append(CloneGroup(
                 type: .exact,
                 clones: clones,
                 similarity: 1.0,
-                fingerprint: fingerprint
+                fingerprint: fingerprint,
             ))
         }
 
@@ -242,7 +248,7 @@ public struct SuffixArrayCloneDetector: Sendable {
         repeatGroups: [RepeatGroup],
         tokenInfos: [TokenStreamInfo],
         fileBoundaries: [FileBoundary],
-        sequences: [NormalizedSequence]
+        sequences: [NormalizedSequence],
     ) -> [CloneGroup] {
         var cloneGroups: [CloneGroup] = []
 
@@ -258,7 +264,7 @@ public struct SuffixArrayCloneDetector: Sendable {
                     position: pos,
                     length: group.length,
                     tokenInfos: tokenInfos,
-                    sequences: sequences
+                    sequences: sequences,
                 )
             }
 
@@ -272,14 +278,14 @@ public struct SuffixArrayCloneDetector: Sendable {
                     startLine: loc.startLine,
                     endLine: loc.endLine,
                     tokenCount: group.length,
-                    codeSnippet: ""
+                    codeSnippet: "",
                 )
             }
 
             let fingerprint = generateFingerprint(
                 position: validPositions[0],
                 length: min(group.length, 20),
-                tokenInfos: tokenInfos
+                tokenInfos: tokenInfos,
             )
 
             // Determine if this is exact or near clone based on normalization
@@ -289,7 +295,7 @@ public struct SuffixArrayCloneDetector: Sendable {
                 type: cloneType,
                 clones: clones,
                 similarity: 1.0,
-                fingerprint: fingerprint
+                fingerprint: fingerprint,
             ))
         }
 
@@ -314,7 +320,7 @@ public struct SuffixArrayCloneDetector: Sendable {
         position: Int,
         length: Int,
         tokenInfos: [TokenStreamInfo],
-        sequences: [TokenSequence]
+        sequences: [TokenSequence],
     ) -> CloneLocation? {
         guard isValidPosition(position, length: length, tokenInfos: tokenInfos) else { return nil }
 
@@ -328,7 +334,7 @@ public struct SuffixArrayCloneDetector: Sendable {
             startLine: startInfo.line,
             endLine: endInfo.line,
             startPosition: position,
-            endPosition: position + length - 1
+            endPosition: position + length - 1,
         )
     }
 
@@ -337,7 +343,7 @@ public struct SuffixArrayCloneDetector: Sendable {
         position: Int,
         length: Int,
         tokenInfos: [TokenStreamInfo],
-        sequences: [NormalizedSequence]
+        sequences: [NormalizedSequence],
     ) -> CloneLocation? {
         guard isValidPosition(position, length: length, tokenInfos: tokenInfos) else { return nil }
 
@@ -351,7 +357,7 @@ public struct SuffixArrayCloneDetector: Sendable {
             startLine: startInfo.line,
             endLine: endInfo.line,
             startPosition: position,
-            endPosition: position + length - 1
+            endPosition: position + length - 1,
         )
     }
 
@@ -395,10 +401,10 @@ public struct SuffixArrayCloneDetector: Sendable {
     private func generateFingerprint(
         position: Int,
         length: Int,
-        tokenInfos: [TokenStreamInfo]
+        tokenInfos: [TokenStreamInfo],
     ) -> String {
         var parts: [String] = []
-        for i in position..<min(position + length, tokenInfos.count) {
+        for i in position ..< min(position + length, tokenInfos.count) {
             parts.append(tokenInfos[i].originalText)
         }
         return parts.joined(separator: " ").hashValue.description
@@ -425,7 +431,7 @@ public struct SuffixArrayCloneDetector: Sendable {
     }
 }
 
-// MARK: - Supporting Types
+// MARK: - TokenStreamInfo
 
 /// Information about a token in the concatenated stream.
 struct TokenStreamInfo: Sendable {
@@ -436,12 +442,16 @@ struct TokenStreamInfo: Sendable {
     let originalText: String
 }
 
+// MARK: - FileBoundary
+
 /// File boundary in the concatenated stream.
 struct FileBoundary: Sendable {
     let fileIndex: Int
     let file: String
     let startIndex: Int
 }
+
+// MARK: - CloneLocation
 
 /// Location of a clone occurrence.
 struct CloneLocation: Sendable {

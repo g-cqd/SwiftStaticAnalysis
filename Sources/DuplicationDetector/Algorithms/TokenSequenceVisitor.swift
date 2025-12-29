@@ -6,13 +6,24 @@
 //
 
 import Foundation
-import SwiftSyntax
 import SwiftStaticAnalysisCore
+import SwiftSyntax
 
-// MARK: - Token Info
+// MARK: - TokenInfo
 
 /// Represents a token with its location information.
 public struct TokenInfo: Sendable, Hashable {
+    // MARK: Lifecycle
+
+    public init(kind: TokenKind, text: String, line: Int, column: Int) {
+        self.kind = kind
+        self.text = text
+        self.line = line
+        self.column = column
+    }
+
+    // MARK: Public
+
     /// The token kind.
     public let kind: TokenKind
 
@@ -24,16 +35,9 @@ public struct TokenInfo: Sendable, Hashable {
 
     /// Column number (1-based).
     public let column: Int
-
-    public init(kind: TokenKind, text: String, line: Int, column: Int) {
-        self.kind = kind
-        self.text = text
-        self.line = line
-        self.column = column
-    }
 }
 
-// MARK: - Token Kind
+// MARK: - TokenKind
 
 /// Simplified token kinds for clone detection.
 public enum TokenKind: String, Sendable, Hashable {
@@ -45,7 +49,7 @@ public enum TokenKind: String, Sendable, Hashable {
     case unknown
 }
 
-// MARK: - Token Sequence Protocol
+// MARK: - TokenSequenceProtocol
 
 /// Protocol for token sequences used in stream building.
 public protocol TokenSequenceProtocol: Sendable {
@@ -55,10 +59,20 @@ public protocol TokenSequenceProtocol: Sendable {
     var tokenCount: Int { get }
 }
 
-// MARK: - Token Sequence
+// MARK: - TokenSequence
 
 /// A sequence of tokens from a source file.
 public struct TokenSequence: Sendable, TokenSequenceProtocol {
+    // MARK: Lifecycle
+
+    public init(file: String, tokens: [TokenInfo], sourceLines: [String]) {
+        self.file = file
+        self.tokens = tokens
+        self.sourceLines = sourceLines
+    }
+
+    // MARK: Public
+
     /// The source file path.
     public let file: String
 
@@ -71,26 +85,24 @@ public struct TokenSequence: Sendable, TokenSequenceProtocol {
     /// Number of tokens in the sequence.
     public var tokenCount: Int { tokens.count }
 
-    public init(file: String, tokens: [TokenInfo], sourceLines: [String]) {
-        self.file = file
-        self.tokens = tokens
-        self.sourceLines = sourceLines
-    }
-
     /// Extract a code snippet for the given line range.
     public func snippet(startLine: Int, endLine: Int) -> String {
         let start = max(0, startLine - 1)
         let end = min(sourceLines.count, endLine)
         guard start < end else { return "" }
-        return sourceLines[start..<end].joined(separator: "\n")
+        return sourceLines[start ..< end].joined(separator: "\n")
     }
 }
 
-// MARK: - Token Sequence Extractor
+// MARK: - TokenSequenceExtractor
 
 /// Extracts tokens from Swift source files.
 public struct TokenSequenceExtractor: Sendable {
+    // MARK: Lifecycle
+
     public init() {}
+
+    // MARK: Public
 
     /// Extract token sequence from a parsed syntax tree.
     public func extract(from tree: SourceFileSyntax, file: String, source: String) -> TokenSequence {
@@ -107,44 +119,68 @@ public struct TokenSequenceExtractor: Sendable {
                 kind: kind,
                 text: token.text,
                 line: location.line,
-                column: location.column
+                column: location.column,
             ))
         }
 
         return TokenSequence(file: file, tokens: tokens, sourceLines: sourceLines)
     }
 
+    // MARK: Private
+
     /// Classify a Swift syntax token into our simplified categories.
     private func classifyToken(_ token: TokenSyntax) -> TokenKind {
         switch token.tokenKind {
         // Keywords
         case .keyword:
-            return .keyword
+            .keyword
 
         // Identifiers
-        case .identifier, .dollarIdentifier:
-            return .identifier
+        case .dollarIdentifier,
+             .identifier:
+            .identifier
 
         // Literals
-        case .integerLiteral, .floatLiteral, .stringSegment,
-             .regexLiteralPattern, .regexSlash:
-            return .literal
+        case .floatLiteral,
+             .integerLiteral,
+             .regexLiteralPattern,
+             .regexSlash,
+             .stringSegment:
+            .literal
 
         // Operators
-        case .binaryOperator, .prefixOperator, .postfixOperator,
-             .equal, .arrow, .exclamationMark,
-             .infixQuestionMark, .postfixQuestionMark:
-            return .operator
+        case .arrow,
+             .binaryOperator,
+             .equal,
+             .exclamationMark,
+             .infixQuestionMark,
+             .postfixOperator,
+             .postfixQuestionMark,
+             .prefixOperator:
+            .operator
 
         // Punctuation
-        case .leftParen, .rightParen, .leftBrace, .rightBrace,
-             .leftSquare, .rightSquare, .leftAngle, .rightAngle,
-             .comma, .colon, .semicolon, .period, .ellipsis,
-             .atSign, .pound, .backslash, .backtick:
-            return .punctuation
+        case .atSign,
+             .backslash,
+             .backtick,
+             .colon,
+             .comma,
+             .ellipsis,
+             .leftAngle,
+             .leftBrace,
+             .leftParen,
+             .leftSquare,
+             .period,
+             .pound,
+             .rightAngle,
+             .rightBrace,
+             .rightParen,
+             .rightSquare,
+             .semicolon:
+            .punctuation
 
         default:
-            return .unknown
+            .unknown
         }
     }
 }

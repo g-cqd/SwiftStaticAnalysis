@@ -12,13 +12,29 @@
 //
 
 import Foundation
-import SwiftSyntax
 import SwiftStaticAnalysisCore
+import SwiftSyntax
 
-// MARK: - Dead Store
+// MARK: - DeadStore
 
 /// Represents an assignment to a variable that is never read.
 public struct DeadStore: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        variable: String,
+        location: SwiftStaticAnalysisCore.SourceLocation,
+        assignedValue: String? = nil,
+        suggestion: String = "Consider removing this assignment",
+    ) {
+        self.variable = variable
+        self.location = location
+        self.assignedValue = assignedValue
+        self.suggestion = suggestion
+    }
+
+    // MARK: Public
+
     /// The variable being assigned.
     public let variable: String
 
@@ -30,24 +46,30 @@ public struct DeadStore: Sendable {
 
     /// Suggested fix.
     public let suggestion: String
-
-    public init(
-        variable: String,
-        location: SwiftStaticAnalysisCore.SourceLocation,
-        assignedValue: String? = nil,
-        suggestion: String = "Consider removing this assignment"
-    ) {
-        self.variable = variable
-        self.location = location
-        self.assignedValue = assignedValue
-        self.suggestion = suggestion
-    }
 }
 
-// MARK: - Live Variable Result
+// MARK: - LiveVariableResult
 
 /// Results from live variable analysis.
 public struct LiveVariableResult: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        cfg: ControlFlowGraph,
+        deadStores: [DeadStore],
+        unusedVariables: Set<String>,
+        liveIn: [BlockID: Set<String>],
+        liveOut: [BlockID: Set<String>],
+    ) {
+        self.cfg = cfg
+        self.deadStores = deadStores
+        self.unusedVariables = unusedVariables
+        self.liveIn = liveIn
+        self.liveOut = liveOut
+    }
+
+    // MARK: Public
+
     /// The analyzed CFG.
     public let cfg: ControlFlowGraph
 
@@ -62,29 +84,40 @@ public struct LiveVariableResult: Sendable {
 
     /// Live-out sets for each block.
     public let liveOut: [BlockID: Set<String>]
-
-    public init(
-        cfg: ControlFlowGraph,
-        deadStores: [DeadStore],
-        unusedVariables: Set<String>,
-        liveIn: [BlockID: Set<String>],
-        liveOut: [BlockID: Set<String>]
-    ) {
-        self.cfg = cfg
-        self.deadStores = deadStores
-        self.unusedVariables = unusedVariables
-        self.liveIn = liveIn
-        self.liveOut = liveOut
-    }
 }
 
-// MARK: - Live Variable Analysis
+// MARK: - LiveVariableAnalysis
 
 /// Performs backward data flow analysis to find live variables.
 public struct LiveVariableAnalysis: Sendable {
+    // MARK: Lifecycle
+
+    public init(configuration: Configuration = .default) {
+        self.configuration = configuration
+    }
+
+    // MARK: Public
 
     /// Configuration for the analysis.
     public struct Configuration: Sendable {
+        // MARK: Lifecycle
+
+        public init(
+            maxIterations: Int = 1000,
+            detectDeadStores: Bool = true,
+            interProcedural: Bool = false,
+            ignoredVariables: Set<String> = ["_"],
+        ) {
+            self.maxIterations = maxIterations
+            self.detectDeadStores = detectDeadStores
+            self.interProcedural = interProcedural
+            self.ignoredVariables = ignoredVariables
+        }
+
+        // MARK: Public
+
+        public static let `default` = Configuration()
+
         /// Maximum iterations for fixed-point computation.
         public var maxIterations: Int
 
@@ -96,26 +129,6 @@ public struct LiveVariableAnalysis: Sendable {
 
         /// Variables to ignore in analysis.
         public var ignoredVariables: Set<String>
-
-        public init(
-            maxIterations: Int = 1000,
-            detectDeadStores: Bool = true,
-            interProcedural: Bool = false,
-            ignoredVariables: Set<String> = ["_"]
-        ) {
-            self.maxIterations = maxIterations
-            self.detectDeadStores = detectDeadStores
-            self.interProcedural = interProcedural
-            self.ignoredVariables = ignoredVariables
-        }
-
-        public static let `default` = Configuration()
-    }
-
-    private let configuration: Configuration
-
-    public init(configuration: Configuration = .default) {
-        self.configuration = configuration
     }
 
     /// Analyze a control flow graph for live variables.
@@ -142,7 +155,7 @@ public struct LiveVariableAnalysis: Sendable {
             deadStores: deadStores,
             unusedVariables: unusedVars,
             liveIn: liveIn,
-            liveOut: liveOut
+            liveOut: liveOut,
         )
     }
 
@@ -150,7 +163,7 @@ public struct LiveVariableAnalysis: Sendable {
     public func analyzeFunction(
         _ function: FunctionDeclSyntax,
         file: String,
-        tree: SourceFileSyntax
+        tree: SourceFileSyntax,
     ) -> LiveVariableResult {
         let builder = CFGBuilder(file: file, tree: tree)
         let cfg = builder.buildCFG(from: function)
@@ -161,18 +174,22 @@ public struct LiveVariableAnalysis: Sendable {
     public func analyzeClosure(
         _ closure: ClosureExprSyntax,
         file: String,
-        tree: SourceFileSyntax
+        tree: SourceFileSyntax,
     ) -> LiveVariableResult {
         let builder = CFGBuilder(file: file, tree: tree)
         let cfg = builder.buildCFG(from: closure)
         return analyze(cfg)
     }
 
+    // MARK: Private
+
+    private let configuration: Configuration
+
     // MARK: - Worklist Algorithm
 
     /// Compute live variables using iterative worklist algorithm.
     private func computeLiveVariables(
-        _ cfg: inout ControlFlowGraph
+        _ cfg: inout ControlFlowGraph,
     ) -> (liveIn: [BlockID: Set<String>], liveOut: [BlockID: Set<String>]) {
         var liveIn: [BlockID: Set<String>] = [:]
         var liveOut: [BlockID: Set<String>] = [:]
@@ -187,7 +204,7 @@ public struct LiveVariableAnalysis: Sendable {
         var worklist = Set(cfg.blockOrder)
         var iterations = 0
 
-        while !worklist.isEmpty && iterations < configuration.maxIterations {
+        while !worklist.isEmpty, iterations < configuration.maxIterations {
             iterations += 1
 
             let blockID = worklist.removeFirst()
@@ -231,7 +248,7 @@ public struct LiveVariableAnalysis: Sendable {
     /// Find assignments to variables that are not live after the assignment.
     private func findDeadStores(
         cfg: ControlFlowGraph,
-        liveOut: [BlockID: Set<String>]
+        liveOut: [BlockID: Set<String>],
     ) -> [DeadStore] {
         var deadStores: [DeadStore] = []
 
@@ -260,7 +277,7 @@ public struct LiveVariableAnalysis: Sendable {
                                 variable: definedVar,
                                 location: statement.location,
                                 assignedValue: extractAssignedValue(statement),
-                                suggestion: "Variable '\(definedVar)' is assigned but never read"
+                                suggestion: "Variable '\(definedVar)' is assigned but never read",
                             ))
                         }
                     }
@@ -290,7 +307,7 @@ public struct LiveVariableAnalysis: Sendable {
     /// Find variables that are defined but never used anywhere.
     private func findUnusedVariables(
         cfg: ControlFlowGraph,
-        liveIn: [BlockID: Set<String>]
+        liveIn: [BlockID: Set<String>],
     ) -> Set<String> {
         // Collect all defined variables
         var allDefined = Set<String>()
@@ -314,16 +331,16 @@ public struct LiveVariableAnalysis: Sendable {
 
 // MARK: - Statement-Level Analysis
 
-extension LiveVariableAnalysis {
+public extension LiveVariableAnalysis {
     /// Compute live variables at each statement in a block.
     ///
     /// - Parameters:
     ///   - block: The basic block to analyze.
     ///   - liveAtExit: Variables live at block exit.
     /// - Returns: Array of (statement, liveBeforeStatement) pairs.
-    public func computeStatementLiveness(
+    func computeStatementLiveness(
         block: BasicBlock,
-        liveAtExit: Set<String>
+        liveAtExit: Set<String>,
     ) -> [(statement: CFGStatement, liveBefore: Set<String>)] {
         var result: [(CFGStatement, Set<String>)] = []
         var live = liveAtExit
@@ -345,16 +362,16 @@ extension LiveVariableAnalysis {
 
 // MARK: - Multi-Function Analysis
 
-extension LiveVariableAnalysis {
+public extension LiveVariableAnalysis {
     /// Analyze all functions in a source file.
     ///
     /// - Parameters:
     ///   - file: Path to the Swift source file.
     ///   - tree: Parsed syntax tree.
     /// - Returns: Array of results for each function/closure.
-    public func analyzeFile(
+    func analyzeFile(
         file: String,
-        tree: SourceFileSyntax
+        tree: SourceFileSyntax,
     ) -> [LiveVariableResult] {
         var results: [LiveVariableResult] = []
 
@@ -375,17 +392,21 @@ extension LiveVariableAnalysis {
     }
 }
 
-// MARK: - Function Collector
+// MARK: - FunctionCollector
 
 /// Collects function declarations from a syntax tree.
 private final class FunctionCollector: SyntaxVisitor {
-    var functions: [FunctionDeclSyntax] = []
-    var initializers: [InitializerDeclSyntax] = []
-    var closures: [ClosureExprSyntax] = []
+    // MARK: Lifecycle
 
     init() {
         super.init(viewMode: .sourceAccurate)
     }
+
+    // MARK: Internal
+
+    var functions: [FunctionDeclSyntax] = []
+    var initializers: [InitializerDeclSyntax] = []
+    var closures: [ClosureExprSyntax] = []
 
     override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
         functions.append(node)
@@ -405,9 +426,9 @@ private final class FunctionCollector: SyntaxVisitor {
 
 // MARK: - Debug Output
 
-extension LiveVariableResult {
+public extension LiveVariableResult {
     /// Generate a debug string showing liveness information.
-    public func debugDescription() -> String {
+    func debugDescription() -> String {
         var output = "Live Variable Analysis Results:\n"
         output += "================================\n\n"
 

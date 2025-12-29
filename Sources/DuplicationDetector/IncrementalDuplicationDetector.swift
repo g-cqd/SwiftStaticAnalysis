@@ -8,7 +8,7 @@
 import Foundation
 import SwiftStaticAnalysisCore
 
-// MARK: - Incremental Duplication Result
+// MARK: - IncrementalDuplicationResult
 
 /// Result of incremental duplication detection.
 public struct IncrementalDuplicationResult: Sendable {
@@ -28,45 +28,33 @@ public struct IncrementalDuplicationResult: Sendable {
     }
 }
 
-// MARK: - Incremental Duplication Detector
+// MARK: - IncrementalDuplicationDetector
 
 /// Actor-based incremental duplication detector with caching.
 public actor IncrementalDuplicationDetector {
+    // MARK: Lifecycle
+
+    // MARK: - Initialization
+
+    public init(
+        configuration: DuplicationConfiguration = .incremental(),
+        concurrency: ConcurrencyConfiguration = .default,
+    ) {
+        self.configuration = configuration
+        self.concurrency = concurrency
+        tokenCache = TokenSequenceCache(cacheDirectory: configuration.cacheDirectory)
+        changeDetector = ChangeDetector()
+        parser = SwiftFileParser()
+        engine = DuplicationEngine(configuration: configuration, concurrency: concurrency)
+    }
+
+    // MARK: Public
 
     /// Configuration for detection.
     public let configuration: DuplicationConfiguration
 
     /// Concurrency configuration.
     public let concurrency: ConcurrencyConfiguration
-
-    /// Token sequence cache.
-    private let tokenCache: TokenSequenceCache
-
-    /// Change detector for file change detection.
-    private let changeDetector: ChangeDetector
-
-    /// File parser.
-    private let parser: SwiftFileParser
-
-    /// The shared duplication engine.
-    private let engine: DuplicationEngine
-
-    /// Whether the cache has been initialized.
-    private var isInitialized: Bool = false
-
-    // MARK: - Initialization
-
-    public init(
-        configuration: DuplicationConfiguration = .incremental(),
-        concurrency: ConcurrencyConfiguration = .default
-    ) {
-        self.configuration = configuration
-        self.concurrency = concurrency
-        self.tokenCache = TokenSequenceCache(cacheDirectory: configuration.cacheDirectory)
-        self.changeDetector = ChangeDetector()
-        self.parser = SwiftFileParser()
-        self.engine = DuplicationEngine(configuration: configuration, concurrency: concurrency)
-    }
 
     /// Initialize by loading cache from disk.
     public func initialize() async throws {
@@ -126,7 +114,7 @@ public actor IncrementalDuplicationDetector {
 
             let newSequences = try await ParallelProcessor.map(
                 filesToAnalyze,
-                maxConcurrency: concurrency.maxConcurrentFiles
+                maxConcurrency: concurrency.maxConcurrentFiles,
             ) { [parser] file -> TokenSequence in
                 let tree = try await parser.parse(file)
                 let source = try String(contentsOfFile: file, encoding: .utf8)
@@ -153,9 +141,33 @@ public actor IncrementalDuplicationDetector {
         return IncrementalDuplicationResult(
             cloneGroups: groupsWithSnippets,
             analyzedFiles: filesToAnalyze,
-            cachedFiles: cachedFiles
+            cachedFiles: cachedFiles,
         )
     }
+
+    // MARK: - Statistics
+
+    /// Get cache statistics.
+    public func cacheStatistics() async -> TokenSequenceCache.Statistics {
+        await tokenCache.statistics()
+    }
+
+    // MARK: Private
+
+    /// Token sequence cache.
+    private let tokenCache: TokenSequenceCache
+
+    /// Change detector for file change detection.
+    private let changeDetector: ChangeDetector
+
+    /// File parser.
+    private let parser: SwiftFileParser
+
+    /// The shared duplication engine.
+    private let engine: DuplicationEngine
+
+    /// Whether the cache has been initialized.
+    private var isInitialized: Bool = false
 
     // MARK: - Private Helpers
 
@@ -170,12 +182,5 @@ public actor IncrementalDuplicationDetector {
         }
 
         return hashes
-    }
-
-    // MARK: - Statistics
-
-    /// Get cache statistics.
-    public func cacheStatistics() async -> TokenSequenceCache.Statistics {
-        await tokenCache.statistics()
     }
 }

@@ -5,12 +5,12 @@
 //  Tests for Phase E: IndexStoreDB Deep Integration
 //
 
-import Testing
 import Foundation
-@testable import UnusedCodeDetector
 import SwiftStaticAnalysisCore
+import Testing
+@testable import UnusedCodeDetector
 
-// MARK: - Index Symbol Node Tests
+// MARK: - IndexSymbolNodeTests
 
 @Suite("IndexSymbolNode Tests")
 struct IndexSymbolNodeTests {
@@ -21,7 +21,7 @@ struct IndexSymbolNodeTests {
             name: "TestClass",
             kind: .class,
             definitionFile: "/path/to/file.swift",
-            definitionLine: 10
+            definitionLine: 10,
         )
 
         #expect(node.usr == "s:test:TestClass")
@@ -41,7 +41,7 @@ struct IndexSymbolNodeTests {
             name: "main",
             kind: .function,
             isRoot: true,
-            rootReason: .mainFunction
+            rootReason: .mainFunction,
         )
 
         #expect(node.isRoot == true)
@@ -54,7 +54,7 @@ struct IndexSymbolNodeTests {
             usr: "s:Foundation:String",
             name: "String",
             kind: .struct,
-            isExternal: true
+            isExternal: true,
         )
 
         #expect(node.isExternal == true)
@@ -83,7 +83,7 @@ struct IndexSymbolNodeTests {
     }
 }
 
-// MARK: - Index Dependency Edge Tests
+// MARK: - IndexDependencyEdgeTests
 
 @Suite("IndexDependencyEdge Tests")
 struct IndexDependencyEdgeTests {
@@ -92,7 +92,7 @@ struct IndexDependencyEdgeTests {
         let edge = IndexDependencyEdge(
             fromUSR: "s:caller",
             toUSR: "s:callee",
-            kind: .call
+            kind: .call,
         )
 
         #expect(edge.fromUSR == "s:caller")
@@ -121,14 +121,14 @@ struct IndexDependencyEdgeTests {
             .write,
             .extensionOf,
             .containedBy,
-            .override
+            .override,
         ]
 
         #expect(kinds.count == 9)
     }
 }
 
-// MARK: - Index Graph Configuration Tests
+// MARK: - IndexGraphConfigurationTests
 
 @Suite("IndexGraphConfiguration Tests")
 struct IndexGraphConfigurationTests {
@@ -148,7 +148,7 @@ struct IndexGraphConfigurationTests {
             treatTestsAsRoot: false,
             treatProtocolRequirementsAsRoot: false,
             includeCrossModuleEdges: false,
-            trackProtocolWitnesses: false
+            trackProtocolWitnesses: false,
         )
 
         #expect(config.treatTestsAsRoot == false)
@@ -158,7 +158,7 @@ struct IndexGraphConfigurationTests {
     }
 }
 
-// MARK: - Index Store Status Tests
+// MARK: - IndexStoreStatusTests
 
 @Suite("IndexStoreStatus Tests")
 struct IndexStoreStatusTests {
@@ -174,7 +174,7 @@ struct IndexStoreStatusTests {
     func staleStatus() {
         let status = IndexStoreStatus.stale(
             path: "/path/to/index",
-            staleFiles: ["file1.swift", "file2.swift"]
+            staleFiles: ["file1.swift", "file2.swift"],
         )
 
         #expect(status.isUsable == true)
@@ -198,7 +198,7 @@ struct IndexStoreStatusTests {
     }
 }
 
-// MARK: - Fallback Reason Tests
+// MARK: - FallbackReasonTests
 
 @Suite("FallbackReason Tests")
 struct FallbackReasonTests {
@@ -216,7 +216,7 @@ struct FallbackReasonTests {
     }
 }
 
-// MARK: - Fallback Configuration Tests
+// MARK: - FallbackConfigurationTests
 
 @Suite("FallbackConfiguration Tests")
 struct FallbackConfigurationTests {
@@ -254,7 +254,7 @@ struct FallbackConfigurationTests {
     }
 }
 
-// MARK: - Build Result Tests
+// MARK: - BuildResultTests
 
 @Suite("BuildResult Tests")
 struct BuildResultTests {
@@ -264,7 +264,7 @@ struct BuildResultTests {
             success: true,
             output: "Build successful",
             duration: 5.5,
-            indexStorePath: "/path/to/index"
+            indexStorePath: "/path/to/index",
         )
 
         #expect(result.success == true)
@@ -279,7 +279,7 @@ struct BuildResultTests {
             success: false,
             output: "Build failed: error",
             duration: 1.0,
-            indexStorePath: nil
+            indexStorePath: nil,
         )
 
         #expect(result.success == false)
@@ -287,7 +287,7 @@ struct BuildResultTests {
     }
 }
 
-// MARK: - UnusedCodeConfiguration IndexStore Tests
+// MARK: - UnusedCodeConfigurationIndexStoreTests
 
 @Suite("UnusedCodeConfiguration IndexStore Tests")
 struct UnusedCodeConfigurationIndexStoreTests {
@@ -322,7 +322,7 @@ struct UnusedCodeConfigurationIndexStoreTests {
             mode: .indexStore,
             autoBuild: true,
             hybridMode: true,
-            warnOnStaleIndex: false
+            warnOnStaleIndex: false,
         )
 
         #expect(config.mode == .indexStore)
@@ -332,7 +332,7 @@ struct UnusedCodeConfigurationIndexStoreTests {
     }
 }
 
-// MARK: - Index Graph Report Tests
+// MARK: - IndexGraphReportTests
 
 @Suite("IndexGraphReport Tests")
 struct IndexGraphReportTests {
@@ -346,7 +346,7 @@ struct IndexGraphReportTests {
             externalCount: 10,
             edgeCount: 200,
             unreachableByKind: [.function: 5, .class: 3, .variable: 2],
-            rootsByReason: [.mainFunction: 1, .testMethod: 9]
+            rootsByReason: [.mainFunction: 1, .testMethod: 9],
         )
 
         #expect(report.totalSymbols == 100)
@@ -371,7 +371,7 @@ struct IndexGraphReportTests {
             externalCount: 50,
             edgeCount: 0,
             unreachableByKind: [:],
-            rootsByReason: [:]
+            rootsByReason: [:],
         )
 
         // When all symbols are external, reachability is 100%
@@ -379,7 +379,7 @@ struct IndexGraphReportTests {
     }
 }
 
-// MARK: - IndexStorePathFinder Tests
+// MARK: - IndexStorePathFinderTests
 
 @Suite("IndexStorePathFinder Tests")
 struct IndexStorePathFinderTests {
@@ -401,7 +401,7 @@ struct IndexStorePathFinderTests {
     }
 }
 
-// MARK: - IndexStoreReader Tests
+// MARK: - IndexStoreReaderTests
 
 @Suite("IndexStoreReader Tests")
 struct IndexStoreReaderTests {
@@ -415,7 +415,7 @@ struct IndexStoreReaderTests {
     }
 }
 
-// MARK: - IndexedSymbol Tests
+// MARK: - IndexedSymbolTests
 
 @Suite("IndexedSymbol Tests")
 struct IndexedSymbolTests {
@@ -425,7 +425,7 @@ struct IndexedSymbolTests {
             usr: "s:Test:MyClass",
             name: "MyClass",
             kind: .class,
-            isSystem: false
+            isSystem: false,
         )
 
         #expect(symbol.usr == "s:Test:MyClass")
@@ -439,14 +439,14 @@ struct IndexedSymbolTests {
         let kinds: [IndexedSymbolKind] = [
             .class, .struct, .enum, .protocol, .extension,
             .function, .method, .property, .variable, .parameter,
-            .typealias, .module, .unknown
+            .typealias, .module, .unknown,
         ]
 
         #expect(kinds.count == 13)
     }
 }
 
-// MARK: - IndexedOccurrence Tests
+// MARK: - IndexedOccurrenceTests
 
 @Suite("IndexedOccurrence Tests")
 struct IndexedOccurrenceTests {
@@ -458,7 +458,7 @@ struct IndexedOccurrenceTests {
             file: "/path/to/file.swift",
             line: 10,
             column: 5,
-            roles: [.definition, .declaration]
+            roles: [.definition, .declaration],
         )
 
         #expect(occurrence.symbol.name == "test")
@@ -470,7 +470,7 @@ struct IndexedOccurrenceTests {
     }
 }
 
-// MARK: - IndexedSymbolRoles Tests
+// MARK: - IndexedSymbolRolesTests
 
 @Suite("IndexedSymbolRoles Tests")
 struct IndexedSymbolRolesTests {
@@ -508,7 +508,7 @@ struct IndexedSymbolRolesTests {
             .write,
             .call,
             .dynamic,
-            .implicit
+            .implicit,
         ]
 
         // Combine all roles
@@ -524,7 +524,7 @@ struct IndexedSymbolRolesTests {
     }
 }
 
-// MARK: - SymbolUsage Tests
+// MARK: - SymbolUsageTests
 
 @Suite("SymbolUsage Tests")
 struct SymbolUsageTests {
@@ -537,7 +537,7 @@ struct SymbolUsageTests {
             definitionLocation: nil,
             referenceCount: 0,
             onlySelfReferenced: false,
-            isTestSymbol: false
+            isTestSymbol: false,
         )
 
         #expect(usage.isUnused == true)
@@ -552,7 +552,7 @@ struct SymbolUsageTests {
             definitionLocation: nil,
             referenceCount: 5,
             onlySelfReferenced: false,
-            isTestSymbol: false
+            isTestSymbol: false,
         )
 
         #expect(usage.isUnused == false)
@@ -567,7 +567,7 @@ struct SymbolUsageTests {
             definitionLocation: nil,
             referenceCount: 3,
             onlySelfReferenced: true,
-            isTestSymbol: false
+            isTestSymbol: false,
         )
 
         #expect(usage.isUnused == false)
@@ -583,14 +583,14 @@ struct SymbolUsageTests {
             definitionLocation: nil,
             referenceCount: 0,
             onlySelfReferenced: false,
-            isTestSymbol: true
+            isTestSymbol: true,
         )
 
         #expect(usage.isTestSymbol == true)
     }
 }
 
-// MARK: - Index Based Dependency Graph Tests
+// MARK: - IndexBasedDependencyGraphTests
 
 @Suite("IndexBasedDependencyGraph Tests")
 struct IndexBasedDependencyGraphTests {
@@ -607,7 +607,7 @@ struct IndexBasedDependencyGraphTests {
     func graphConfiguration() {
         let config = IndexGraphConfiguration(
             treatTestsAsRoot: false,
-            treatProtocolRequirementsAsRoot: false
+            treatProtocolRequirementsAsRoot: false,
         )
         let graph = IndexBasedDependencyGraph(analysisFiles: ["/test.swift"], configuration: config)
 
@@ -643,7 +643,7 @@ struct IndexBasedDependencyGraphTests {
     }
 }
 
-// MARK: - Fallback Manager Tests
+// MARK: - IndexStoreFallbackManagerTests
 
 @Suite("IndexStoreFallbackManager Tests")
 struct IndexStoreFallbackManagerTests {
@@ -669,7 +669,7 @@ struct IndexStoreFallbackManagerTests {
         let manager = IndexStoreFallbackManager()
         let status = manager.checkIndexStoreStatus(
             projectRoot: "/non/existent/path",
-            sourceFiles: []
+            sourceFiles: [],
         )
 
         #expect(status.isUsable == false)

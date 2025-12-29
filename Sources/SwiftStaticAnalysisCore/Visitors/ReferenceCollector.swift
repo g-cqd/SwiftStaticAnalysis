@@ -13,24 +13,19 @@ import SwiftSyntax
 /// This visitor traverses the AST and extracts all references
 /// to identifiers, tracking the context in which they appear.
 public final class ReferenceCollector: ScopeTrackingVisitor {
+    // MARK: Public
+
     /// Collected references.
     public private(set) var references: [Reference] = []
 
-    /// Stack tracking the current reference context.
-    private var contextStack: [ReferenceContext] = [.unknown]
-
-    private var currentContext: ReferenceContext {
-        contextStack.last ?? .unknown
-    }
-
     // MARK: - Identifier Expressions
 
-    public override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
         let reference = Reference(
             identifier: node.baseName.text,
             location: location(of: node),
             scope: currentScope,
-            context: currentContext
+            context: currentContext,
         )
         references.append(reference)
 
@@ -39,7 +34,7 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
 
     // MARK: - Member Access
 
-    public override func visit(_ node: MemberAccessExprSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: MemberAccessExprSyntax) -> SyntaxVisitorContinueKind {
         // Track base as member access base
         if let base = node.base {
             contextStack.append(.memberAccessBase)
@@ -52,7 +47,7 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
             identifier: node.declName.baseName.text,
             location: location(of: node.declName),
             scope: currentScope,
-            context: .memberAccessMember
+            context: .memberAccessMember,
         )
         references.append(reference)
 
@@ -61,7 +56,7 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
 
     // MARK: - Function Calls
 
-    public override func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: FunctionCallExprSyntax) -> SyntaxVisitorContinueKind {
         // Track the called expression
         contextStack.append(.call)
         walk(node.calledExpression)
@@ -87,18 +82,18 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
 
     // MARK: - Type Annotations
 
-    public override func visit(_ node: TypeAnnotationSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: TypeAnnotationSyntax) -> SyntaxVisitorContinueKind {
         contextStack.append(.typeAnnotation)
         defer { contextStack.removeLast() }
         return .visitChildren
     }
 
-    public override func visit(_ node: IdentifierTypeSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: IdentifierTypeSyntax) -> SyntaxVisitorContinueKind {
         let reference = Reference(
             identifier: node.name.text,
             location: location(of: node),
             scope: currentScope,
-            context: currentContext == .unknown ? .typeAnnotation : currentContext
+            context: currentContext == .unknown ? .typeAnnotation : currentContext,
         )
         references.append(reference)
 
@@ -112,7 +107,7 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
         return .skipChildren
     }
 
-    public override func visit(_ node: MemberTypeSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: MemberTypeSyntax) -> SyntaxVisitorContinueKind {
         // Track qualified type: Foo.Bar
         walk(node.baseType)
 
@@ -122,7 +117,7 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
             scope: currentScope,
             context: .typeAnnotation,
             isQualified: true,
-            qualifier: node.baseType.description.trimmingCharacters(in: .whitespaces)
+            qualifier: node.baseType.description.trimmingCharacters(in: .whitespaces),
         )
         references.append(reference)
 
@@ -131,7 +126,7 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
 
     // MARK: - Inheritance
 
-    public override func visit(_ node: InheritedTypeSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: InheritedTypeSyntax) -> SyntaxVisitorContinueKind {
         contextStack.append(.inheritance)
         defer { contextStack.removeLast() }
         return .visitChildren
@@ -139,7 +134,7 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
 
     // MARK: - Generic Constraints
 
-    public override func visit(_ node: GenericWhereClauseSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: GenericWhereClauseSyntax) -> SyntaxVisitorContinueKind {
         contextStack.append(.genericConstraint)
         defer { contextStack.removeLast() }
         return .visitChildren
@@ -147,7 +142,7 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
 
     // MARK: - Assignments
 
-    public override func visit(_ node: InfixOperatorExprSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: InfixOperatorExprSyntax) -> SyntaxVisitorContinueKind {
         // Check if this is an assignment
         if let op = node.operator.as(BinaryOperatorExprSyntax.self),
            op.operator.text == "=" {
@@ -169,20 +164,20 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
 
     // MARK: - Pattern Matching
 
-    public override func visit(_ node: ExpressionPatternSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: ExpressionPatternSyntax) -> SyntaxVisitorContinueKind {
         contextStack.append(.pattern)
         defer { contextStack.removeLast() }
         return .visitChildren
     }
 
-    public override func visit(_ node: IdentifierPatternSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: IdentifierPatternSyntax) -> SyntaxVisitorContinueKind {
         // This is a binding, not a reference
-        return .skipChildren
+        .skipChildren
     }
 
     // MARK: - Key Paths
 
-    public override func visit(_ node: KeyPathExprSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: KeyPathExprSyntax) -> SyntaxVisitorContinueKind {
         contextStack.append(.keyPath)
         defer { contextStack.removeLast() }
         return .visitChildren
@@ -190,7 +185,7 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
 
     // MARK: - Attributes
 
-    public override func visit(_ node: AttributeSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: AttributeSyntax) -> SyntaxVisitorContinueKind {
         contextStack.append(.attribute)
         defer { contextStack.removeLast() }
 
@@ -199,7 +194,7 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
                 identifier: identifier.name.text,
                 location: location(of: identifier),
                 scope: currentScope,
-                context: .attribute
+                context: .attribute,
             )
             references.append(reference)
         }
@@ -207,17 +202,9 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
         return .visitChildren
     }
 
-    // MARK: - Closures
-
-    public override func visit(_ node: ClosureExprSyntax) -> SyntaxVisitorContinueKind {
-        // Closure parameters create new bindings, not references
-        // but captured variables are references
-        return super.visit(node)
-    }
-
     // MARK: - Conditional Binding
 
-    public override func visit(_ node: OptionalBindingConditionSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: OptionalBindingConditionSyntax) -> SyntaxVisitorContinueKind {
         // The pattern is a binding
         // The initializer is read context
         if let initializer = node.initializer {
@@ -227,5 +214,14 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
         }
 
         return .skipChildren
+    }
+
+    // MARK: Private
+
+    /// Stack tracking the current reference context.
+    private var contextStack: [ReferenceContext] = [.unknown]
+
+    private var currentContext: ReferenceContext {
+        contextStack.last ?? .unknown
     }
 }

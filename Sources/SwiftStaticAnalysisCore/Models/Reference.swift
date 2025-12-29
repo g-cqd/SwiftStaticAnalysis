@@ -5,7 +5,7 @@
 
 import Foundation
 
-// MARK: - Reference Context
+// MARK: - ReferenceContext
 
 /// The context in which an identifier is referenced.
 public enum ReferenceContext: String, Sendable, Codable {
@@ -53,6 +53,26 @@ public enum ReferenceContext: String, Sendable, Codable {
 
 /// Represents a reference to an identifier in source code.
 public struct Reference: Sendable, Hashable, Codable {
+    // MARK: Lifecycle
+
+    public init(
+        identifier: String,
+        location: SourceLocation,
+        scope: ScopeID,
+        context: ReferenceContext,
+        isQualified: Bool = false,
+        qualifier: String? = nil,
+    ) {
+        self.identifier = identifier
+        self.location = location
+        self.scope = scope
+        self.context = context
+        self.isQualified = isQualified
+        self.qualifier = qualifier
+    }
+
+    // MARK: Public
+
     /// The referenced identifier.
     public let identifier: String
 
@@ -70,28 +90,18 @@ public struct Reference: Sendable, Hashable, Codable {
 
     /// The qualifier if qualified (e.g., `Module` in `Module.Type`).
     public let qualifier: String?
-
-    public init(
-        identifier: String,
-        location: SourceLocation,
-        scope: ScopeID,
-        context: ReferenceContext,
-        isQualified: Bool = false,
-        qualifier: String? = nil
-    ) {
-        self.identifier = identifier
-        self.location = location
-        self.scope = scope
-        self.context = context
-        self.isQualified = isQualified
-        self.qualifier = qualifier
-    }
 }
 
-// MARK: - Reference Index
+// MARK: - ReferenceIndex
 
 /// Index of references for fast lookup.
 public struct ReferenceIndex: Sendable {
+    // MARK: Lifecycle
+
+    public init() {}
+
+    // MARK: Public
+
     /// All references.
     public private(set) var references: [Reference] = []
 
@@ -107,7 +117,10 @@ public struct ReferenceIndex: Sendable {
     /// References indexed by scope.
     public private(set) var byScope: [ScopeID: [Reference]] = [:]
 
-    public init() {}
+    /// Get all unique referenced identifiers.
+    public var uniqueIdentifiers: Set<String> {
+        Set(byIdentifier.keys)
+    }
 
     /// Add a reference to the index.
     public mutating func add(_ reference: Reference) {
@@ -137,14 +150,9 @@ public struct ReferenceIndex: Sendable {
     public func find(inScope scope: ScopeID) -> [Reference] {
         byScope[scope] ?? []
     }
-
-    /// Get all unique referenced identifiers.
-    public var uniqueIdentifiers: Set<String> {
-        Set(byIdentifier.keys)
-    }
 }
 
-// MARK: - CustomStringConvertible
+// MARK: - Reference + CustomStringConvertible
 
 extension Reference: CustomStringConvertible {
     public var description: String {

@@ -8,10 +8,26 @@
 
 import Foundation
 
-// MARK: - Cache Data
+// MARK: - CacheData
 
 /// Codable structure for persisting cache to disk.
 public struct CacheData: Codable, Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        fileStates: [String: FileState],
+        declarations: [String: [CachedDeclaration]],
+        references: [String: [CachedReference]],
+    ) {
+        version = Self.formatVersion
+        self.fileStates = fileStates
+        self.declarations = declarations
+        self.references = references
+        timestamp = Date()
+    }
+
+    // MARK: Public
+
     /// Cache format version for migration support.
     public static let formatVersion = 1
 
@@ -29,36 +45,13 @@ public struct CacheData: Codable, Sendable {
 
     /// Timestamp when cache was created.
     public let timestamp: Date
-
-    public init(
-        fileStates: [String: FileState],
-        declarations: [String: [CachedDeclaration]],
-        references: [String: [CachedReference]]
-    ) {
-        self.version = Self.formatVersion
-        self.fileStates = fileStates
-        self.declarations = declarations
-        self.references = references
-        self.timestamp = Date()
-    }
 }
 
-// MARK: - Cached Declaration
+// MARK: - CachedDeclaration
 
 /// Lightweight declaration data for caching.
 public struct CachedDeclaration: Codable, Sendable, Hashable {
-    public let name: String
-    public let kind: String
-    public let file: String
-    public let line: Int
-    public let column: Int
-    public let offset: Int
-    public let accessLevel: String
-    public let modifiers: UInt32
-    public let scopeID: String
-    public let typeAnnotation: String?
-    public let documentation: String?
-    public let conformances: [String]
+    // MARK: Lifecycle
 
     public init(
         name: String,
@@ -72,7 +65,7 @@ public struct CachedDeclaration: Codable, Sendable, Hashable {
         scopeID: String,
         typeAnnotation: String?,
         documentation: String?,
-        conformances: [String]
+        conformances: [String],
     ) {
         self.name = name
         self.kind = kind
@@ -90,34 +83,41 @@ public struct CachedDeclaration: Codable, Sendable, Hashable {
 
     /// Create from a Declaration.
     public init(from declaration: Declaration) {
-        self.name = declaration.name
-        self.kind = declaration.kind.rawValue
-        self.file = declaration.location.file
-        self.line = declaration.location.line
-        self.column = declaration.location.column
-        self.offset = declaration.location.offset
-        self.accessLevel = declaration.accessLevel.rawValue
-        self.modifiers = declaration.modifiers.rawValue
-        self.scopeID = declaration.scope.id
-        self.typeAnnotation = declaration.typeAnnotation
-        self.documentation = declaration.documentation
-        self.conformances = declaration.conformances
+        name = declaration.name
+        kind = declaration.kind.rawValue
+        file = declaration.location.file
+        line = declaration.location.line
+        column = declaration.location.column
+        offset = declaration.location.offset
+        accessLevel = declaration.accessLevel.rawValue
+        modifiers = declaration.modifiers.rawValue
+        scopeID = declaration.scope.id
+        typeAnnotation = declaration.typeAnnotation
+        documentation = declaration.documentation
+        conformances = declaration.conformances
     }
-}
 
-// MARK: - Cached Reference
+    // MARK: Public
 
-/// Lightweight reference data for caching.
-public struct CachedReference: Codable, Sendable, Hashable {
-    public let identifier: String
+    public let name: String
+    public let kind: String
     public let file: String
     public let line: Int
     public let column: Int
     public let offset: Int
+    public let accessLevel: String
+    public let modifiers: UInt32
     public let scopeID: String
-    public let context: String
-    public let isQualified: Bool
-    public let qualifier: String?
+    public let typeAnnotation: String?
+    public let documentation: String?
+    public let conformances: [String]
+}
+
+// MARK: - CachedReference
+
+/// Lightweight reference data for caching.
+public struct CachedReference: Codable, Sendable, Hashable {
+    // MARK: Lifecycle
 
     public init(
         identifier: String,
@@ -128,7 +128,7 @@ public struct CachedReference: Codable, Sendable, Hashable {
         scopeID: String,
         context: String,
         isQualified: Bool,
-        qualifier: String?
+        qualifier: String?,
     ) {
         self.identifier = identifier
         self.file = file
@@ -143,40 +143,35 @@ public struct CachedReference: Codable, Sendable, Hashable {
 
     /// Create from a Reference.
     public init(from reference: Reference) {
-        self.identifier = reference.identifier
-        self.file = reference.location.file
-        self.line = reference.location.line
-        self.column = reference.location.column
-        self.offset = reference.location.offset
-        self.scopeID = reference.scope.id
-        self.context = reference.context.rawValue
-        self.isQualified = reference.isQualified
-        self.qualifier = reference.qualifier
+        identifier = reference.identifier
+        file = reference.location.file
+        line = reference.location.line
+        column = reference.location.column
+        offset = reference.location.offset
+        scopeID = reference.scope.id
+        context = reference.context.rawValue
+        isQualified = reference.isQualified
+        qualifier = reference.qualifier
     }
+
+    // MARK: Public
+
+    public let identifier: String
+    public let file: String
+    public let line: Int
+    public let column: Int
+    public let offset: Int
+    public let scopeID: String
+    public let context: String
+    public let isQualified: Bool
+    public let qualifier: String?
 }
 
-// MARK: - Analysis Cache
+// MARK: - AnalysisCache
 
 /// Actor-based persistent cache for analysis results.
 public actor AnalysisCache {
-
-    /// Location of the cache file.
-    private let cacheURL: URL
-
-    /// File states for change detection.
-    private var fileStates: [String: FileState] = [:]
-
-    /// Cached declarations by file.
-    private var declarations: [String: [CachedDeclaration]] = [:]
-
-    /// Cached references by file.
-    private var references: [String: [CachedReference]] = [:]
-
-    /// Whether the cache has unsaved changes.
-    private var isDirty: Bool = false
-
-    /// Whether the cache has been loaded.
-    private var isLoaded: Bool = false
+    // MARK: Lifecycle
 
     // MARK: - Initialization
 
@@ -187,14 +182,26 @@ public actor AnalysisCache {
     public init(cacheDirectory: URL? = nil) {
         let directory = cacheDirectory ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent(".swiftanalysis")
-        self.cacheURL = directory.appendingPathComponent("analysis_cache.json")
+        cacheURL = directory.appendingPathComponent("analysis_cache.json")
     }
 
     /// Create a cache at a specific file path.
     ///
     /// - Parameter cacheFile: Path to the cache file.
     public init(cacheFile: URL) {
-        self.cacheURL = cacheFile
+        cacheURL = cacheFile
+    }
+
+    // MARK: Public
+
+    // MARK: - Statistics
+
+    /// Cache statistics.
+    public struct Statistics: Sendable {
+        public let fileCount: Int
+        public let declarationCount: Int
+        public let referenceCount: Int
+        public let cacheSize: Int64?
     }
 
     // MARK: - Persistence
@@ -218,11 +225,11 @@ public actor AnalysisCache {
             return
         }
 
-        self.fileStates = cached.fileStates
-        self.declarations = cached.declarations
-        self.references = cached.references
-        self.isDirty = false
-        self.isLoaded = true
+        fileStates = cached.fileStates
+        declarations = cached.declarations
+        references = cached.references
+        isDirty = false
+        isLoaded = true
     }
 
     /// Save cache to disk.
@@ -234,7 +241,7 @@ public actor AnalysisCache {
         let cacheData = CacheData(
             fileStates: fileStates,
             declarations: declarations,
-            references: references
+            references: references,
         )
 
         let encoder = JSONEncoder()
@@ -311,7 +318,7 @@ public actor AnalysisCache {
 
     /// Get all cached declarations.
     public func getAllDeclarations() -> [CachedDeclaration] {
-        declarations.values.flatMap { $0 }
+        declarations.values.flatMap(\.self)
     }
 
     /// Set declarations for a file.
@@ -354,7 +361,7 @@ public actor AnalysisCache {
 
     /// Get all cached references.
     public func getAllReferences() -> [CachedReference] {
-        references.values.flatMap { $0 }
+        references.values.flatMap(\.self)
     }
 
     /// Set references for a file.
@@ -410,38 +417,47 @@ public actor AnalysisCache {
         file: String,
         state: FileState,
         declarations decls: [Declaration],
-        references refs: [Reference]
+        references refs: [Reference],
     ) {
         setFileState(state, for: file)
         setDeclarations(decls, for: file)
         setReferences(refs, for: file)
     }
 
-    // MARK: - Statistics
-
-    /// Cache statistics.
-    public struct Statistics: Sendable {
-        public let fileCount: Int
-        public let declarationCount: Int
-        public let referenceCount: Int
-        public let cacheSize: Int64?
-    }
-
     /// Get cache statistics.
     public func statistics() -> Statistics {
-        let cacheSize: Int64?
-        if let attrs = try? FileManager.default.attributesOfItem(atPath: cacheURL.path),
-           let size = attrs[.size] as? Int64 {
-            cacheSize = size
+        let cacheSize: Int64? = if let attrs = try? FileManager.default.attributesOfItem(atPath: cacheURL.path),
+                                   let size = attrs[.size] as? Int64 {
+            size
         } else {
-            cacheSize = nil
+            nil
         }
 
         return Statistics(
             fileCount: fileStates.count,
             declarationCount: declarations.values.reduce(0) { $0 + $1.count },
             referenceCount: references.values.reduce(0) { $0 + $1.count },
-            cacheSize: cacheSize
+            cacheSize: cacheSize,
         )
     }
+
+    // MARK: Private
+
+    /// Location of the cache file.
+    private let cacheURL: URL
+
+    /// File states for change detection.
+    private var fileStates: [String: FileState] = [:]
+
+    /// Cached declarations by file.
+    private var declarations: [String: [CachedDeclaration]] = [:]
+
+    /// Cached references by file.
+    private var references: [String: [CachedReference]] = [:]
+
+    /// Whether the cache has unsaved changes.
+    private var isDirty: Bool = false
+
+    /// Whether the cache has been loaded.
+    private var isLoaded: Bool = false
 }

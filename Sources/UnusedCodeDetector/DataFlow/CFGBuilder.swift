@@ -8,27 +8,45 @@
 //
 
 import Foundation
-import SwiftSyntax
 import SwiftStaticAnalysisCore
+import SwiftSyntax
 
-// MARK: - CFG Types
+// MARK: - BlockID
 
 /// A unique identifier for a basic block.
 public struct BlockID: Hashable, Sendable, CustomStringConvertible {
-    public let value: String
+    // MARK: Lifecycle
 
     public init(_ value: String) {
         self.value = value
     }
 
-    public var description: String { value }
+    // MARK: Public
 
     public static let entry = BlockID("entry")
     public static let exit = BlockID("exit")
+
+    public let value: String
+
+    public var description: String { value }
 }
+
+// MARK: - CFGStatement
 
 /// Represents a statement in the CFG with its source location.
 public struct CFGStatement: Sendable {
+    // MARK: Lifecycle
+
+    public init(syntax: Syntax, location: SwiftStaticAnalysisCore.SourceLocation, uses: Set<String>,
+                defs: Set<String>) {
+        self.syntax = syntax
+        self.location = location
+        self.uses = uses
+        self.defs = defs
+    }
+
+    // MARK: Public
+
     /// The syntax node.
     public let syntax: Syntax
 
@@ -40,14 +58,9 @@ public struct CFGStatement: Sendable {
 
     /// Extracted variable definitions (variables written).
     public let defs: Set<String>
-
-    public init(syntax: Syntax, location: SwiftStaticAnalysisCore.SourceLocation, uses: Set<String>, defs: Set<String>) {
-        self.syntax = syntax
-        self.location = location
-        self.uses = uses
-        self.defs = defs
-    }
 }
+
+// MARK: - Terminator
 
 /// A terminator instruction for a basic block.
 public enum Terminator: Sendable {
@@ -79,8 +92,28 @@ public enum Terminator: Sendable {
     case unreachable
 }
 
+// MARK: - BasicBlock
+
 /// A basic block in the control flow graph.
 public struct BasicBlock: Identifiable, Sendable {
+    // MARK: Lifecycle
+
+    public init(id: BlockID) {
+        self.id = id
+        statements = []
+        terminator = nil
+        successors = []
+        predecessors = []
+        use = []
+        def = []
+        liveIn = []
+        liveOut = []
+        isLoopHeader = false
+        loopID = nil
+    }
+
+    // MARK: Public
+
     /// Unique identifier.
     public let id: BlockID
 
@@ -113,24 +146,29 @@ public struct BasicBlock: Identifiable, Sendable {
 
     /// The loop ID if this block is in a loop.
     public var loopID: String?
-
-    public init(id: BlockID) {
-        self.id = id
-        self.statements = []
-        self.terminator = nil
-        self.successors = []
-        self.predecessors = []
-        self.use = []
-        self.def = []
-        self.liveIn = []
-        self.liveOut = []
-        self.isLoopHeader = false
-        self.loopID = nil
-    }
 }
+
+// MARK: - ControlFlowGraph
 
 /// Control Flow Graph for a function.
 public struct ControlFlowGraph: Sendable {
+    // MARK: Lifecycle
+
+    public init(functionName: String, file: String) {
+        self.functionName = functionName
+        self.file = file
+        entryBlock = .entry
+        exitBlock = .exit
+        blocks = [
+            .entry: BasicBlock(id: .entry),
+            .exit: BasicBlock(id: .exit),
+        ]
+        blockOrder = [.entry]
+        reversePostOrder = []
+    }
+
+    // MARK: Public
+
     /// All basic blocks indexed by ID.
     public var blocks: [BlockID: BasicBlock]
 
@@ -152,17 +190,14 @@ public struct ControlFlowGraph: Sendable {
     /// Reverse postorder for efficient iteration.
     public var reversePostOrder: [BlockID]
 
-    public init(functionName: String, file: String) {
-        self.functionName = functionName
-        self.file = file
-        self.entryBlock = .entry
-        self.exitBlock = .exit
-        self.blocks = [
-            .entry: BasicBlock(id: .entry),
-            .exit: BasicBlock(id: .exit),
-        ]
-        self.blockOrder = [.entry]
-        self.reversePostOrder = []
+    /// Get all blocks in reverse postorder (for forward analysis).
+    public var blocksInReversePostOrder: [BasicBlock] {
+        reversePostOrder.compactMap { blocks[$0] }
+    }
+
+    /// Get all blocks in postorder (for backward analysis).
+    public var blocksInPostOrder: [BasicBlock] {
+        reversePostOrder.reversed().compactMap { blocks[$0] }
     }
 
     /// Get a block by ID.
@@ -202,22 +237,53 @@ public struct ControlFlowGraph: Sendable {
         dfs(entryBlock)
         reversePostOrder = postOrder.reversed()
     }
-
-    /// Get all blocks in reverse postorder (for forward analysis).
-    public var blocksInReversePostOrder: [BasicBlock] {
-        reversePostOrder.compactMap { blocks[$0] }
-    }
-
-    /// Get all blocks in postorder (for backward analysis).
-    public var blocksInPostOrder: [BasicBlock] {
-        reversePostOrder.reversed().compactMap { blocks[$0] }
-    }
 }
 
-// MARK: - CFG Builder
+// MARK: - CFGBuilder
 
 /// Builds a Control Flow Graph from Swift function declarations.
 public final class CFGBuilder: SyntaxVisitor {
+    // MARK: Lifecycle
+
+    public init(file: String, tree: SourceFileSyntax) {
+        self.file = file
+        converter = SourceLocationConverter(fileName: file, tree: tree)
+        cfg = ControlFlowGraph(functionName: "", file: file)
+        currentBlockID = .entry
+        super.init(viewMode: .sourceAccurate)
+    }
+
+    // MARK: Public
+
+    /// Build CFG for a function declaration.
+    public func buildCFG(from function: FunctionDeclSyntax) -> ControlFlowGraph {
+        resetAndBuild(name: function.name.text) {
+            if let body = function.body {
+                self.processCodeBlock(body)
+            }
+        }
+    }
+
+    /// Build CFG for an initializer declaration.
+    public func buildCFG(from initializer: InitializerDeclSyntax) -> ControlFlowGraph {
+        resetAndBuild(name: "init") {
+            if let body = initializer.body {
+                self.processCodeBlock(body)
+            }
+        }
+    }
+
+    /// Build CFG for a closure expression.
+    public func buildCFG(from closure: ClosureExprSyntax) -> ControlFlowGraph {
+        resetAndBuild(name: "<closure>") {
+            for statement in closure.statements {
+                self.processStatement(statement.item)
+            }
+        }
+    }
+
+    // MARK: Private
+
     /// Source location converter.
     private let converter: SourceLocationConverter
 
@@ -241,41 +307,6 @@ public final class CFGBuilder: SyntaxVisitor {
 
     /// Pending block connections.
     private var pendingConnections: [(from: BlockID, to: BlockID)] = []
-
-    public init(file: String, tree: SourceFileSyntax) {
-        self.file = file
-        self.converter = SourceLocationConverter(fileName: file, tree: tree)
-        self.cfg = ControlFlowGraph(functionName: "", file: file)
-        self.currentBlockID = .entry
-        super.init(viewMode: .sourceAccurate)
-    }
-
-    /// Build CFG for a function declaration.
-    public func buildCFG(from function: FunctionDeclSyntax) -> ControlFlowGraph {
-        return resetAndBuild(name: function.name.text) {
-            if let body = function.body {
-                self.processCodeBlock(body)
-            }
-        }
-    }
-
-    /// Build CFG for an initializer declaration.
-    public func buildCFG(from initializer: InitializerDeclSyntax) -> ControlFlowGraph {
-        return resetAndBuild(name: "init") {
-            if let body = initializer.body {
-                self.processCodeBlock(body)
-            }
-        }
-    }
-
-    /// Build CFG for a closure expression.
-    public func buildCFG(from closure: ClosureExprSyntax) -> ControlFlowGraph {
-        return resetAndBuild(name: "<closure>") {
-            for statement in closure.statements {
-                self.processStatement(statement.item)
-            }
-        }
-    }
 
     /// Shared logic for building CFG.
     private func resetAndBuild(name: String, bodyProcessor: () -> Void) -> ControlFlowGraph {
@@ -332,11 +363,13 @@ public final class CFGBuilder: SyntaxVisitor {
 
     private func processStatement(_ item: CodeBlockItemSyntax.Item) {
         switch item {
-        case .stmt(let stmt):
+        case let .stmt(stmt):
             processStmt(stmt)
-        case .decl(let decl):
+
+        case let .decl(decl):
             processDecl(decl)
-        case .expr(let expr):
+
+        case let .expr(expr):
             addStatementToCurrentBlock(Syntax(expr))
         }
     }
@@ -394,7 +427,7 @@ public final class CFGBuilder: SyntaxVisitor {
         cfg.blocks[currentBlockID]?.terminator = .conditionalBranch(
             condition: conditionText,
             trueTarget: thenBlock,
-            falseTarget: elseBlock
+            falseTarget: elseBlock,
         )
         cfg.addEdge(from: currentBlockID, to: thenBlock)
         cfg.addEdge(from: currentBlockID, to: elseBlock)
@@ -411,9 +444,10 @@ public final class CFGBuilder: SyntaxVisitor {
         switchToBlock(elseBlock)
         if let elseBody = ifStmt.elseBody {
             switch elseBody {
-            case .codeBlock(let block):
+            case let .codeBlock(block):
                 processCodeBlock(block)
-            case .ifExpr(let elseIf):
+
+            case let .ifExpr(elseIf):
                 processIfStatement(elseIf)
             }
         }
@@ -435,7 +469,7 @@ public final class CFGBuilder: SyntaxVisitor {
         cfg.blocks[currentBlockID]?.terminator = .conditionalBranch(
             condition: conditionText,
             trueTarget: continueBlock,
-            falseTarget: elseBlock
+            falseTarget: elseBlock,
         )
         cfg.addEdge(from: currentBlockID, to: continueBlock)
         cfg.addEdge(from: currentBlockID, to: elseBlock)
@@ -472,7 +506,7 @@ public final class CFGBuilder: SyntaxVisitor {
         cfg.blocks[headerBlock]?.terminator = .conditionalBranch(
             condition: "for \(forStmt.pattern.description) in \(forStmt.sequence.description)",
             trueTarget: bodyBlock,
-            falseTarget: exitBlock
+            falseTarget: exitBlock,
         )
         cfg.addEdge(from: headerBlock, to: bodyBlock)
         cfg.addEdge(from: headerBlock, to: exitBlock)
@@ -512,7 +546,7 @@ public final class CFGBuilder: SyntaxVisitor {
         cfg.blocks[headerBlock]?.terminator = .conditionalBranch(
             condition: conditionText,
             trueTarget: bodyBlock,
-            falseTarget: exitBlock
+            falseTarget: exitBlock,
         )
         cfg.addEdge(from: headerBlock, to: bodyBlock)
         cfg.addEdge(from: headerBlock, to: exitBlock)
@@ -559,7 +593,7 @@ public final class CFGBuilder: SyntaxVisitor {
         cfg.blocks[conditionBlock]?.terminator = .conditionalBranch(
             condition: conditionText,
             trueTarget: bodyBlock,
-            falseTarget: exitBlock
+            falseTarget: exitBlock,
         )
         cfg.addEdge(from: conditionBlock, to: bodyBlock)
         cfg.addEdge(from: conditionBlock, to: exitBlock)
@@ -579,7 +613,7 @@ public final class CFGBuilder: SyntaxVisitor {
         // Create blocks for each case
         for caseItem in switchStmt.cases {
             switch caseItem {
-            case .switchCase(let switchCase):
+            case let .switchCase(switchCase):
                 let caseBlock = newBlock()
                 if let label = switchCase.label.as(SwitchCaseLabelSyntax.self) {
                     let pattern = label.caseItems.description
@@ -598,7 +632,7 @@ public final class CFGBuilder: SyntaxVisitor {
         cfg.blocks[currentBlockID]?.terminator = .switch(
             expression: switchStmt.subject.description,
             cases: caseBlocks,
-            default: defaultBlock
+            default: defaultBlock,
         )
 
         for (_, target) in caseBlocks {
@@ -612,7 +646,7 @@ public final class CFGBuilder: SyntaxVisitor {
         var prevCaseBlock: BlockID?
         for caseItem in switchStmt.cases {
             switch caseItem {
-            case .switchCase(let switchCase):
+            case let .switchCase(switchCase):
                 let caseBlock: BlockID
                 if let label = switchCase.label.as(SwitchCaseLabelSyntax.self) {
                     let pattern = label.caseItems.description
@@ -649,7 +683,7 @@ public final class CFGBuilder: SyntaxVisitor {
         addStatementToCurrentBlock(Syntax(returnStmt))
         cfg.addEdge(from: currentBlockID, to: .exit)
         cfg.blocks[currentBlockID]?.terminator = .return(
-            expression: returnStmt.expression?.description
+            expression: returnStmt.expression?.description,
         )
     }
 
@@ -657,7 +691,7 @@ public final class CFGBuilder: SyntaxVisitor {
         addStatementToCurrentBlock(Syntax(throwStmt))
         cfg.addEdge(from: currentBlockID, to: .exit)
         cfg.blocks[currentBlockID]?.terminator = .throw(
-            expression: throwStmt.expression.description
+            expression: throwStmt.expression.description,
         )
     }
 
@@ -665,15 +699,14 @@ public final class CFGBuilder: SyntaxVisitor {
         addStatementToCurrentBlock(Syntax(breakStmt))
 
         // Find target based on label or innermost loop/switch
-        let target: BlockID?
-        if let label = breakStmt.label {
-            target = loopStack.first { $0.id == label.text }?.exit ?? switchStack.last
+        let target: BlockID? = if let label = breakStmt.label {
+            loopStack.first { $0.id == label.text }?.exit ?? switchStack.last
         } else if !switchStack.isEmpty {
-            target = switchStack.last
+            switchStack.last
         } else if let loop = loopStack.last {
-            target = loop.exit
+            loop.exit
         } else {
-            target = nil
+            nil
         }
 
         if let target = target {
@@ -685,11 +718,10 @@ public final class CFGBuilder: SyntaxVisitor {
     private func processContinueStatement(_ continueStmt: ContinueStmtSyntax) {
         addStatementToCurrentBlock(Syntax(continueStmt))
 
-        let target: BlockID?
-        if let label = continueStmt.label {
-            target = loopStack.first { $0.id == label.text }?.header
+        let target: BlockID? = if let label = continueStmt.label {
+            loopStack.first { $0.id == label.text }?.header
         } else {
-            target = loopStack.last?.header
+            loopStack.last?.header
         }
 
         if let target = target {
@@ -733,7 +765,7 @@ public final class CFGBuilder: SyntaxVisitor {
             file: file,
             line: loc.line,
             column: loc.column,
-            offset: 0
+            offset: 0,
         )
 
         let extractor = UseDefExtractor()
@@ -743,7 +775,7 @@ public final class CFGBuilder: SyntaxVisitor {
             syntax: syntax,
             location: location,
             uses: extractor.uses,
-            defs: extractor.defs
+            defs: extractor.defs,
         )
 
         cfg.blocks[currentBlockID]?.statements.append(statement)
@@ -777,16 +809,20 @@ public final class CFGBuilder: SyntaxVisitor {
     }
 }
 
-// MARK: - Use/Def Extractor
+// MARK: - UseDefExtractor
 
 /// Extracts variable uses and definitions from syntax.
 private final class UseDefExtractor: SyntaxVisitor {
-    var uses = Set<String>()
-    var defs = Set<String>()
+    // MARK: Lifecycle
 
     init() {
         super.init(viewMode: .sourceAccurate)
     }
+
+    // MARK: Internal
+
+    var uses = Set<String>()
+    var defs = Set<String>()
 
     // Variable references (reads)
     override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
@@ -835,19 +871,19 @@ private final class UseDefExtractor: SyntaxVisitor {
 
     // Closure capture
     override func visit(_ node: ClosureCaptureSpecifierSyntax) -> SyntaxVisitorContinueKind {
-        return .skipChildren // Don't descend into closures
+        .skipChildren // Don't descend into closures
     }
 
     override func visit(_ node: ClosureExprSyntax) -> SyntaxVisitorContinueKind {
-        return .skipChildren // Don't descend into closures
+        .skipChildren // Don't descend into closures
     }
 }
 
 // MARK: - CFG Utilities
 
-extension ControlFlowGraph {
+public extension ControlFlowGraph {
     /// Print the CFG for debugging.
-    public func debugPrint() -> String {
+    func debugPrint() -> String {
         var output = "CFG for \(functionName):\n"
 
         for id in blockOrder {

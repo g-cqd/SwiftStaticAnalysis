@@ -5,10 +5,10 @@
 //  Tests for unused code filtering to reduce false positives.
 //
 
-import Testing
 import Foundation
-@testable import UnusedCodeDetector
 @testable import SwiftStaticAnalysisCore
+import Testing
+@testable import UnusedCodeDetector
 
 // MARK: - Helper Functions
 
@@ -16,7 +16,7 @@ private func makeDeclaration(
     name: String,
     kind: DeclarationKind = .function,
     file: String = "test.swift",
-    line: Int = 1
+    line: Int = 1,
 ) -> Declaration {
     let location = SourceLocation(file: file, line: line, column: 1, offset: 0)
     let range = SourceRange(start: location, end: location)
@@ -27,7 +27,7 @@ private func makeDeclaration(
         modifiers: [],
         location: location,
         range: range,
-        scope: .global
+        scope: .global,
     )
 }
 
@@ -35,21 +35,20 @@ private func makeUnusedCode(
     name: String,
     kind: DeclarationKind = .function,
     file: String = "test.swift",
-    line: Int = 1
+    line: Int = 1,
 ) -> UnusedCode {
     let decl = makeDeclaration(name: name, kind: kind, file: file, line: line)
     return UnusedCode(
         declaration: decl,
         reason: .neverReferenced,
-        confidence: .medium
+        confidence: .medium,
     )
 }
 
-// MARK: - Filter Configuration Tests
+// MARK: - FilterConfigurationTests
 
 @Suite("Filter Configuration Tests")
 struct FilterConfigurationTests {
-
     @Test("Default configuration has no exclusions")
     func defaultConfig() {
         let config = UnusedCodeFilterConfiguration()
@@ -96,11 +95,10 @@ struct FilterConfigurationTests {
     }
 }
 
-// MARK: - Backticked Identifier Tests
+// MARK: - BacktickedIdentifierTests
 
 @Suite("Backticked Identifier Detection Tests")
 struct BacktickedIdentifierTests {
-
     @Test("Detects backticked identifier")
     func detectsBackticked() {
         #expect(UnusedCodeFilter.isBacktickedIdentifier("`class`") == true)
@@ -122,11 +120,10 @@ struct BacktickedIdentifierTests {
     }
 }
 
-// MARK: - Test Suite Name Tests
+// MARK: - TestSuiteNameTests
 
 @Suite("Test Suite Name Detection Tests")
 struct TestSuiteNameTests {
-
     @Test("Detects test suite names ending with Tests")
     func detectsTestsEnding() {
         #expect(UnusedCodeFilter.isTestSuiteName("MyClassTests") == true)
@@ -149,11 +146,10 @@ struct TestSuiteNameTests {
     }
 }
 
-// MARK: - Glob Pattern Matching Tests
+// MARK: - GlobPatternMatchingTests
 
 @Suite("Glob Pattern Matching Tests")
 struct GlobPatternMatchingTests {
-
     @Test("Matches single star wildcard")
     func matchesSingleStar() {
         #expect(UnusedCodeFilter.matchesGlobPattern("/src/file.swift", pattern: "/src/*.swift") == true)
@@ -208,11 +204,10 @@ struct GlobPatternMatchingTests {
     }
 }
 
-// MARK: - Should Exclude Tests
+// MARK: - ShouldExcludeTests
 
 @Suite("Should Exclude Tests")
 struct ShouldExcludeTests {
-
     @Test("Excludes imports when configured")
     func excludesImports() {
         let config = UnusedCodeFilterConfiguration(excludeImports: true)
@@ -305,7 +300,7 @@ struct ShouldExcludeTests {
         let config = UnusedCodeFilterConfiguration(
             excludeImports: true,
             excludeDeinit: true,
-            excludeTestSuites: true
+            excludeTestSuites: true,
         )
         let filter = UnusedCodeFilter(configuration: config)
 
@@ -323,16 +318,15 @@ struct ShouldExcludeTests {
     }
 }
 
-// MARK: - Filter Method Tests
+// MARK: - FilterMethodTests
 
 @Suite("Filter Method Tests")
 struct FilterMethodTests {
-
     @Test("Filters out excluded items")
     func filtersExcludedItems() {
         let config = UnusedCodeFilterConfiguration(
             excludeImports: true,
-            excludeTestSuites: true
+            excludeTestSuites: true,
         )
         let filter = UnusedCodeFilter(configuration: config)
 
@@ -340,7 +334,7 @@ struct FilterMethodTests {
             makeUnusedCode(name: "Foundation", kind: .import),
             makeUnusedCode(name: "myFunction"),
             makeUnusedCode(name: "MyTests", kind: .struct),
-            makeUnusedCode(name: "helper")
+            makeUnusedCode(name: "helper"),
         ]
 
         let filtered = filter.filter(items)
@@ -363,7 +357,7 @@ struct FilterMethodTests {
         let items = [
             makeUnusedCode(name: "Foundation", kind: .import),
             makeUnusedCode(name: "myFunction"),
-            makeUnusedCode(name: "deinit")
+            makeUnusedCode(name: "deinit"),
         ]
 
         let filtered = filter.filter(items)
@@ -377,7 +371,7 @@ struct FilterMethodTests {
 
         let items = [
             makeUnusedCode(name: "Foundation", kind: .import),
-            makeUnusedCode(name: "UIKit", kind: .import)
+            makeUnusedCode(name: "UIKit", kind: .import),
         ]
 
         let filtered = filter.filter(items)
@@ -385,18 +379,17 @@ struct FilterMethodTests {
     }
 }
 
-// MARK: - Array Extension Tests
+// MARK: - ArrayExtensionTests
 
 @Suite("Array Extension Tests")
 struct ArrayExtensionTests {
-
     @Test("Filtered with configuration works")
     func filteredWithConfiguration() {
         let config = UnusedCodeFilterConfiguration(excludeImports: true)
 
         let items = [
             makeUnusedCode(name: "Foundation", kind: .import),
-            makeUnusedCode(name: "myFunction")
+            makeUnusedCode(name: "myFunction"),
         ]
 
         let filtered = items.filtered(with: config)
@@ -411,7 +404,7 @@ struct ArrayExtensionTests {
             makeUnusedCode(name: "deinit"),
             makeUnusedCode(name: "`class`", kind: .enumCase),
             makeUnusedCode(name: "MyTests", kind: .struct),
-            makeUnusedCode(name: "realFunction")
+            makeUnusedCode(name: "realFunction"),
         ]
 
         let filtered = items.filteredWithSensibleDefaults()
@@ -420,11 +413,10 @@ struct ArrayExtensionTests {
     }
 }
 
-// MARK: - Integration Tests
+// MARK: - FilterIntegrationTests
 
 @Suite("Filter Integration Tests")
 struct FilterIntegrationTests {
-
     @Test("Production configuration filters test fixtures")
     func productionFiltersFixtures() {
         let config = UnusedCodeFilterConfiguration.production()
@@ -433,7 +425,7 @@ struct FilterIntegrationTests {
         let items = [
             makeUnusedCode(name: "unused", file: "/project/Tests/Fixtures/Sample.swift"),
             makeUnusedCode(name: "helper", file: "/project/Tests/SomeTests.swift"),
-            makeUnusedCode(name: "main", file: "/project/Sources/Main.swift")
+            makeUnusedCode(name: "main", file: "/project/Sources/Main.swift"),
         ]
 
         let filtered = filter.filter(items)
@@ -449,25 +441,25 @@ struct FilterIntegrationTests {
             excludeBacktickedEnumCases: true,
             excludeTestSuites: true,
             excludePathPatterns: ["**/Fixtures/**"],
-            excludeNamePatterns: ["^_.*"]  // Exclude names starting with underscore
+            excludeNamePatterns: ["^_.*"], // Exclude names starting with underscore
         )
         let filter = UnusedCodeFilter(configuration: config)
 
         let items = [
-            makeUnusedCode(name: "Foundation", kind: .import),                          // excluded: import
-            makeUnusedCode(name: "deinit"),                                              // excluded: deinit
-            makeUnusedCode(name: "`class`", kind: .enumCase),                           // excluded: backticked
-            makeUnusedCode(name: "MyClassTests", kind: .struct),                        // excluded: test suite
-            makeUnusedCode(name: "fixture", file: "/project/Fixtures/F.swift"),         // excluded: path
-            makeUnusedCode(name: "_privateHelper"),                                      // excluded: name pattern
-            makeUnusedCode(name: "validFunction"),                                       // KEPT
-            makeUnusedCode(name: "ValidClass", kind: .class)                            // KEPT
+            makeUnusedCode(name: "Foundation", kind: .import), // excluded: import
+            makeUnusedCode(name: "deinit"), // excluded: deinit
+            makeUnusedCode(name: "`class`", kind: .enumCase), // excluded: backticked
+            makeUnusedCode(name: "MyClassTests", kind: .struct), // excluded: test suite
+            makeUnusedCode(name: "fixture", file: "/project/Fixtures/F.swift"), // excluded: path
+            makeUnusedCode(name: "_privateHelper"), // excluded: name pattern
+            makeUnusedCode(name: "validFunction"), // KEPT
+            makeUnusedCode(name: "ValidClass", kind: .class), // KEPT
         ]
 
         let filtered = filter.filter(items)
         #expect(filtered.count == 2)
 
-        let names = Set(filtered.map { $0.declaration.name })
+        let names = Set(filtered.map(\.declaration.name))
         #expect(names.contains("validFunction"))
         #expect(names.contains("ValidClass"))
     }

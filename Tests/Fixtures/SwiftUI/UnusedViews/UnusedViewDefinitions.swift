@@ -8,7 +8,7 @@
 
 import SwiftUI
 
-// MARK: - Completely Unused Views
+// MARK: - OrphanedView
 
 /// This view is defined but never instantiated anywhere - SHOULD be flagged
 struct OrphanedView: View {
@@ -17,29 +17,41 @@ struct OrphanedView: View {
     }
 }
 
+// MARK: - UnusedComplexView
+
 /// Another unused view with complex structure - SHOULD be flagged
 struct UnusedComplexView: View {
-    @State private var value: Int = 0
+    // MARK: Internal
 
     var body: some View {
         VStack {
             Text("Complex but unused")
-            ForEach(0..<10) { i in
+            ForEach(0 ..< 10) { i in
                 Text("Item \(i)")
             }
         }
     }
+
+    // MARK: Private
+
+    @State private var value: Int = 0
 }
+
+// MARK: - UnusedConfigurableView
 
 /// Unused view with custom initializer - SHOULD be flagged
 struct UnusedConfigurableView: View {
-    let title: String
-    let subtitle: String
+    // MARK: Lifecycle
 
     init(title: String, subtitle: String = "Default") {
         self.title = title
         self.subtitle = subtitle
     }
+
+    // MARK: Internal
+
+    let title: String
+    let subtitle: String
 
     var body: some View {
         VStack {
@@ -49,7 +61,7 @@ struct UnusedConfigurableView: View {
     }
 }
 
-// MARK: - Used Views (for comparison)
+// MARK: - UsedHeaderView
 
 /// This view IS used by MainContentView - should NOT be flagged
 struct UsedHeaderView: View {
@@ -61,6 +73,8 @@ struct UsedHeaderView: View {
     }
 }
 
+// MARK: - UsedFooterView
+
 /// This view IS used by MainContentView - should NOT be flagged
 struct UsedFooterView: View {
     var body: some View {
@@ -68,6 +82,8 @@ struct UsedFooterView: View {
             .font(.caption)
     }
 }
+
+// MARK: - MainContentView
 
 /// Main view that uses other views
 struct MainContentView: View {
@@ -80,7 +96,7 @@ struct MainContentView: View {
     }
 }
 
-// MARK: - Unused View Modifiers
+// MARK: - UnusedModifier
 
 /// Custom modifier that is never applied - SHOULD be flagged
 struct UnusedModifier: ViewModifier {
@@ -90,6 +106,8 @@ struct UnusedModifier: ViewModifier {
             .background(Color.gray)
     }
 }
+
+// MARK: - UsedModifier
 
 /// Custom modifier that IS used - should NOT be flagged
 struct UsedModifier: ViewModifier {
@@ -113,6 +131,8 @@ extension View {
     }
 }
 
+// MARK: - StyledView
+
 struct StyledView: View {
     var body: some View {
         Text("Styled")
@@ -120,7 +140,7 @@ struct StyledView: View {
     }
 }
 
-// MARK: - Unused Preview Providers
+// MARK: - OrphanedPreview_Previews
 
 /// Preview that is never shown (no matching view) - edge case
 struct OrphanedPreview_Previews: PreviewProvider {

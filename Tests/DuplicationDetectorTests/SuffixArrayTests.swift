@@ -5,15 +5,14 @@
 //  Tests for suffix array implementation and clone detection.
 //
 
-import Testing
-import Foundation
 @testable import DuplicationDetector
+import Foundation
+import Testing
 
-// MARK: - Suffix Array Construction Tests
+// MARK: - SuffixArrayConstructionTests
 
 @Suite("Suffix Array Construction Tests")
 struct SuffixArrayConstructionTests {
-
     @Test("Empty input produces empty suffix array")
     func emptyInput() {
         let sa = SuffixArray(tokens: [])
@@ -58,7 +57,7 @@ struct SuffixArrayConstructionTests {
         #expect(sa.array.count == 6)
 
         // Verify suffix ordering is correct
-        for i in 0..<(sa.array.count - 1) {
+        for i in 0 ..< (sa.array.count - 1) {
             let suffix1 = Array(tokens[sa.array[i]...])
             let suffix2 = Array(tokens[sa.array[i + 1]...])
             #expect(suffix1.lexicographicallyPrecedes(suffix2) || suffix1 == suffix2)
@@ -83,7 +82,7 @@ struct SuffixArrayConstructionTests {
     func largeArray() {
         // Test with a larger input to verify O(n) performance
         var tokens: [Int] = []
-        for i in 0..<1000 {
+        for i in 0 ..< 1000 {
             tokens.append(i % 100 + 1)
         }
 
@@ -96,11 +95,10 @@ struct SuffixArrayConstructionTests {
     }
 }
 
-// MARK: - Suffix Array Search Tests
+// MARK: - SuffixArraySearchTests
 
 @Suite("Suffix Array Search Tests")
 struct SuffixArraySearchTests {
-
     @Test("Search finds exact pattern")
     func searchExactPattern() {
         let tokens = [1, 2, 3, 1, 2, 3, 4]
@@ -142,11 +140,10 @@ struct SuffixArraySearchTests {
     }
 }
 
-// MARK: - LCP Array Tests
+// MARK: - LCPArrayTests
 
 @Suite("LCP Array Tests")
 struct LCPArrayTests {
-
     @Test("Empty LCP array")
     func emptyLCP() {
         let sa = SuffixArray(tokens: [])
@@ -196,7 +193,7 @@ struct LCPArrayTests {
 
         // Should find the repeated [1,2,3,4,5] pattern
         #expect(!repeats.isEmpty)
-        let maxRepeat = repeats.max(by: { $0.length < $1.length })
+        let maxRepeat = repeats.max { $0.length < $1.length }
         #expect(maxRepeat?.length == 5)
         #expect(maxRepeat?.occurrences == 2)
     }
@@ -217,11 +214,10 @@ struct LCPArrayTests {
     }
 }
 
-// MARK: - Suffix Array Clone Detector Tests
+// MARK: - SuffixArrayCloneDetectorTests
 
 @Suite("Suffix Array Clone Detector Tests")
 struct SuffixArrayCloneDetectorTests {
-
     @Test("Detector initialization")
     func detectorInit() {
         let detector = SuffixArrayCloneDetector(minimumTokens: 30)
@@ -240,7 +236,7 @@ struct SuffixArrayCloneDetectorTests {
     func detectBelowThreshold() {
         let detector = SuffixArrayCloneDetector(minimumTokens: 100)
 
-        let tokens = (0..<50).map { TokenInfo(kind: .identifier, text: "t\($0)", line: $0, column: 0) }
+        let tokens = (0 ..< 50).map { TokenInfo(kind: .identifier, text: "t\($0)", line: $0, column: 0) }
         let sequence = TokenSequence(file: "test.swift", tokens: tokens, sourceLines: [])
 
         let result = detector.detect(in: [sequence])
@@ -248,11 +244,10 @@ struct SuffixArrayCloneDetectorTests {
     }
 }
 
-// MARK: - Duplication Detector Algorithm Tests
+// MARK: - DuplicationDetectorAlgorithmTests
 
 @Suite("Duplication Detector Algorithm Tests")
 struct DuplicationDetectorAlgorithmTests {
-
     @Test("Default configuration uses rolling hash")
     func defaultAlgorithm() {
         let config = DuplicationConfiguration()
@@ -272,18 +267,17 @@ struct DuplicationDetectorAlgorithmTests {
         let config = DuplicationConfiguration(
             minimumTokens: 25,
             cloneTypes: [.exact],
-            algorithm: .suffixArray
+            algorithm: .suffixArray,
         )
         #expect(config.algorithm == .suffixArray)
         #expect(config.minimumTokens == 25)
     }
 }
 
-// MARK: - SA-IS Algorithm Correctness Tests
+// MARK: - SAISCorrectnessTests
 
 @Suite("SA-IS Algorithm Correctness Tests")
 struct SAISCorrectnessTests {
-
     @Test("Suffix array is a permutation")
     func suffixArrayPermutation() {
         let tokens = [3, 1, 4, 1, 5, 9, 2, 6]
@@ -291,7 +285,7 @@ struct SAISCorrectnessTests {
 
         // Check that SA is a permutation of [0, n-1]
         let sorted = sa.array.sorted()
-        #expect(sorted == Array(0..<tokens.count))
+        #expect(sorted == Array(0 ..< tokens.count))
     }
 
     @Test("Suffixes are lexicographically sorted")
@@ -300,14 +294,14 @@ struct SAISCorrectnessTests {
         let sa = SuffixArray(tokens: tokens)
 
         // Verify each adjacent pair is in correct order
-        for i in 0..<(sa.array.count - 1) {
+        for i in 0 ..< (sa.array.count - 1) {
             let suffix1 = Array(tokens[sa.array[i]...])
             let suffix2 = Array(tokens[sa.array[i + 1]...])
 
             let isOrdered = suffix1.lexicographicallyPrecedes(suffix2) ||
-                           suffix1.starts(with: suffix2) ||
-                           suffix2.starts(with: suffix1)
-            #expect(isOrdered, "Suffixes at SA[\(i)] and SA[\(i+1)] are not properly ordered")
+                suffix1.starts(with: suffix2) ||
+                suffix2.starts(with: suffix1)
+            #expect(isOrdered, "Suffixes at SA[\(i)] and SA[\(i + 1)] are not properly ordered")
         }
     }
 
@@ -319,7 +313,7 @@ struct SAISCorrectnessTests {
         // For all-same elements, SA should be [9,8,7,6,5,4,3,2,1,0]
         // (shortest suffix first)
         #expect(sa.array.count == 10)
-        for i in 0..<10 {
+        for i in 0 ..< 10 {
             #expect(sa.array[i] == 9 - i)
         }
     }
@@ -343,11 +337,10 @@ struct SAISCorrectnessTests {
     }
 }
 
-// MARK: - LCP Correctness Tests
+// MARK: - LCPCorrectnessTests
 
 @Suite("LCP Correctness Tests")
 struct LCPCorrectnessTests {
-
     @Test("LCP values are correct")
     func lcpValuesCorrect() {
         let tokens = [1, 2, 1, 2, 1]
@@ -355,20 +348,20 @@ struct LCPCorrectnessTests {
         let lcp = LCPArray(suffixArray: sa, tokens: tokens)
 
         // Verify LCP values by computing them directly
-        for i in 1..<lcp.array.count {
+        for i in 1 ..< lcp.array.count {
             let pos1 = sa.array[i - 1]
             let pos2 = sa.array[i]
 
             // Compute expected LCP
             var expectedLCP = 0
-            while pos1 + expectedLCP < tokens.count &&
-                  pos2 + expectedLCP < tokens.count &&
+            while pos1 + expectedLCP < tokens.count,
+                  pos2 + expectedLCP < tokens.count,
                   tokens[pos1 + expectedLCP] == tokens[pos2 + expectedLCP] {
                 expectedLCP += 1
             }
 
             #expect(lcp.array[i] == expectedLCP,
-                   "LCP[\(i)] should be \(expectedLCP) but got \(lcp.array[i])")
+                    "LCP[\(i)] should be \(expectedLCP) but got \(lcp.array[i])")
         }
     }
 
@@ -379,7 +372,7 @@ struct LCPCorrectnessTests {
         let lcp = LCPArray(suffixArray: sa, tokens: tokens)
 
         // Adjacent suffixes have no common prefix
-        for i in 1..<lcp.array.count {
+        for i in 1 ..< lcp.array.count {
             #expect(lcp.array[i] == 0)
         }
     }
@@ -396,15 +389,14 @@ struct LCPCorrectnessTests {
     }
 }
 
-// MARK: - Integration Tests
+// MARK: - SuffixArrayIntegrationTests
 
 @Suite("Suffix Array Integration Tests")
 struct SuffixArrayIntegrationTests {
-
     @Test("End-to-end clone detection")
     func endToEndCloneDetection() {
         // Create two token sequences with a shared pattern
-        let sharedPattern = (0..<20).map { TokenInfo(kind: .identifier, text: "shared\($0)", line: $0, column: 0) }
+        let sharedPattern = (0 ..< 20).map { TokenInfo(kind: .identifier, text: "shared\($0)", line: $0, column: 0) }
 
         var tokens1 = [TokenInfo(kind: .identifier, text: "unique1", line: 0, column: 0)]
         tokens1.append(contentsOf: sharedPattern)
@@ -435,33 +427,33 @@ struct SuffixArrayIntegrationTests {
         // Create 10 sequences with some repeated patterns
         var sequences: [TokenSequence] = []
 
-        for fileIdx in 0..<10 {
+        for fileIdx in 0 ..< 10 {
             var tokens: [TokenInfo] = []
 
             // Add some unique tokens
-            for i in 0..<100 {
+            for i in 0 ..< 100 {
                 tokens.append(TokenInfo(
                     kind: .identifier,
                     text: "file\(fileIdx)_token\(i)",
                     line: i,
-                    column: 0
+                    column: 0,
                 ))
             }
 
             // Add a shared pattern (same across all files)
-            for i in 0..<50 {
+            for i in 0 ..< 50 {
                 tokens.append(TokenInfo(
                     kind: .identifier,
                     text: "shared_token\(i)",
                     line: 100 + i,
-                    column: 0
+                    column: 0,
                 ))
             }
 
             sequences.append(TokenSequence(
                 file: "file\(fileIdx).swift",
                 tokens: tokens,
-                sourceLines: []
+                sourceLines: [],
             ))
         }
 

@@ -11,13 +11,36 @@
 //
 
 import Foundation
-import SwiftSyntax
 import SwiftParser
+import SwiftSyntax
 
-// MARK: - Zero-Copy Parser Configuration
+// MARK: - ZeroCopyParserConfiguration
 
 /// Configuration for zero-copy parsing.
 public struct ZeroCopyParserConfiguration: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        mmapThreshold: Int = 4096,
+        arenaBlockSize: Int = 65536,
+        computeLineRanges: Bool = true,
+    ) {
+        self.mmapThreshold = mmapThreshold
+        self.arenaBlockSize = arenaBlockSize
+        self.computeLineRanges = computeLineRanges
+    }
+
+    // MARK: Public
+
+    public static let `default` = ZeroCopyParserConfiguration()
+
+    /// High-performance configuration for large codebases.
+    public static let highPerformance = ZeroCopyParserConfiguration(
+        mmapThreshold: 1024,
+        arenaBlockSize: 262_144,
+        computeLineRanges: true,
+    )
+
     /// Minimum file size to use memory mapping (smaller files use regular I/O).
     public let mmapThreshold: Int
 
@@ -26,28 +49,9 @@ public struct ZeroCopyParserConfiguration: Sendable {
 
     /// Whether to pre-compute line ranges.
     public let computeLineRanges: Bool
-
-    public init(
-        mmapThreshold: Int = 4096,
-        arenaBlockSize: Int = 65536,
-        computeLineRanges: Bool = true
-    ) {
-        self.mmapThreshold = mmapThreshold
-        self.arenaBlockSize = arenaBlockSize
-        self.computeLineRanges = computeLineRanges
-    }
-
-    public static let `default` = ZeroCopyParserConfiguration()
-
-    /// High-performance configuration for large codebases.
-    public static let highPerformance = ZeroCopyParserConfiguration(
-        mmapThreshold: 1024,
-        arenaBlockSize: 262144,
-        computeLineRanges: true
-    )
 }
 
-// MARK: - Zero-Copy Parsed File
+// MARK: - ZeroCopyParsedFile
 
 /// Result of parsing a file with zero-copy methods.
 public struct ZeroCopyParsedFile: Sendable {
@@ -96,7 +100,7 @@ public struct ZeroCopyParsedFile: Sendable {
             let length = tokens.length(at: index)
             let start = source.utf8.index(source.utf8.startIndex, offsetBy: offset)
             let end = source.utf8.index(start, offsetBy: length)
-            return String(source.utf8[start..<end])
+            return String(source.utf8[start ..< end])
         }
         return nil
     }
@@ -117,30 +121,30 @@ public struct ZeroCopyParsedFile: Sendable {
         } else if let source = sourceString {
             let startIdx = source.utf8.index(source.utf8.startIndex, offsetBy: startOffset)
             let endIdx = source.utf8.index(startIdx, offsetBy: length)
-            return String(source.utf8[startIdx..<endIdx]) ?? ""
+            return String(source.utf8[startIdx ..< endIdx]) ?? ""
         }
         return ""
     }
 }
 
-// MARK: - Zero-Copy Parser
+// MARK: - ZeroCopyParser
 
 /// Parser that uses memory-mapped I/O and SoA storage for optimal performance.
 public actor ZeroCopyParser {
-    /// Configuration.
-    public let configuration: ZeroCopyParserConfiguration
-
-    /// Cache of parsed files.
-    private var cache: [String: CachedZeroCopyParse] = [:]
-
-    /// Cache entry.
-    private struct CachedZeroCopyParse {
-        let parsedFile: ZeroCopyParsedFile
-        let modificationDate: Date
-    }
+    // MARK: Lifecycle
 
     public init(configuration: ZeroCopyParserConfiguration = .default) {
         self.configuration = configuration
+    }
+
+    // MARK: Public
+
+    /// Configuration.
+    public let configuration: ZeroCopyParserConfiguration
+
+    /// Number of cached files.
+    public var cacheSize: Int {
+        cache.count
     }
 
     // MARK: - Parsing
@@ -162,21 +166,19 @@ public actor ZeroCopyParser {
         let attrs = try FileManager.default.attributesOfItem(atPath: path)
         let fileSize = (attrs[.size] as? Int) ?? 0
 
-        let parsedFile: ZeroCopyParsedFile
-
-        if fileSize >= configuration.mmapThreshold {
+        let parsedFile: ZeroCopyParsedFile = if fileSize >= configuration.mmapThreshold {
             // Use memory-mapped I/O
-            parsedFile = try parseMemoryMapped(path: path)
+            try parseMemoryMapped(path: path)
         } else {
             // Use regular I/O for small files
-            parsedFile = try parseRegular(path: path)
+            try parseRegular(path: path)
         }
 
         // Cache result
         let modDate = try fileModificationDate(path)
         cache[path] = CachedZeroCopyParse(
             parsedFile: parsedFile,
-            modificationDate: modDate
+            modificationDate: modDate,
         )
 
         return parsedFile
@@ -186,7 +188,7 @@ public actor ZeroCopyParser {
     public func parseAll(_ paths: [String]) async throws -> [ZeroCopyParsedFile] {
         var results: [ZeroCopyParsedFile] = []
         for path in paths {
-            results.append(try parse(path))
+            try results.append(parse(path))
         }
         return results
     }
@@ -195,6 +197,29 @@ public actor ZeroCopyParser {
     public func extractTokens(_ path: String) throws -> SoATokenStorage {
         try parse(path).tokens
     }
+
+    // MARK: - Cache Management
+
+    /// Clear the parse cache.
+    public func clearCache() {
+        cache.removeAll()
+    }
+
+    /// Invalidate cache for a specific file.
+    public func invalidateCache(for path: String) {
+        cache.removeValue(forKey: path)
+    }
+
+    // MARK: Private
+
+    /// Cache entry.
+    private struct CachedZeroCopyParse {
+        let parsedFile: ZeroCopyParsedFile
+        let modificationDate: Date
+    }
+
+    /// Cache of parsed files.
+    private var cache: [String: CachedZeroCopyParse] = [:]
 
     // MARK: - Private Implementation
 
@@ -217,7 +242,7 @@ public actor ZeroCopyParser {
             sourceString: nil,
             tokens: tokens,
             syntaxTree: syntax,
-            lineRanges: lineRanges
+            lineRanges: lineRanges,
         )
     }
 
@@ -231,7 +256,7 @@ public actor ZeroCopyParser {
         let tokens = extractTokensToSoA(from: syntax, source: source)
 
         // Compute line ranges
-        var lineRanges: [(Int, Int)]? = nil
+        var lineRanges: [(Int, Int)]?
         if configuration.computeLineRanges {
             lineRanges = computeLineRanges(from: source)
         }
@@ -242,7 +267,7 @@ public actor ZeroCopyParser {
             sourceString: source,
             tokens: tokens,
             syntaxTree: syntax,
-            lineRanges: lineRanges
+            lineRanges: lineRanges,
         )
     }
 
@@ -260,7 +285,7 @@ public actor ZeroCopyParser {
                 offset: position.utf8Offset,
                 length: token.text.utf8.count,
                 line: location.line,
-                column: location.column
+                column: location.column,
             )
         }
 
@@ -270,23 +295,46 @@ public actor ZeroCopyParser {
     private func classifyToken(_ token: TokenSyntax) -> TokenKindByte {
         switch token.tokenKind {
         case .keyword:
-            return .keyword
-        case .identifier, .dollarIdentifier:
-            return .identifier
-        case .integerLiteral, .floatLiteral, .stringSegment,
-             .regexLiteralPattern, .regexSlash:
-            return .literal
-        case .binaryOperator, .prefixOperator, .postfixOperator,
-             .equal, .arrow, .exclamationMark,
-             .infixQuestionMark, .postfixQuestionMark:
-            return .operator
-        case .leftParen, .rightParen, .leftBrace, .rightBrace,
-             .leftSquare, .rightSquare, .leftAngle, .rightAngle,
-             .comma, .colon, .semicolon, .period, .ellipsis,
-             .atSign, .pound, .backslash, .backtick:
-            return .punctuation
+            .keyword
+        case .dollarIdentifier,
+             .identifier:
+            .identifier
+        case .floatLiteral,
+             .integerLiteral,
+             .regexLiteralPattern,
+             .regexSlash,
+             .stringSegment:
+            .literal
+        case .arrow,
+             .binaryOperator,
+             .equal,
+             .exclamationMark,
+             .infixQuestionMark,
+             .postfixOperator,
+             .postfixQuestionMark,
+             .prefixOperator:
+            .operator
+        case .atSign,
+             .backslash,
+             .backtick,
+             .colon,
+             .comma,
+             .ellipsis,
+             .leftAngle,
+             .leftBrace,
+             .leftParen,
+             .leftSquare,
+             .period,
+             .pound,
+             .rightAngle,
+             .rightBrace,
+             .rightParen,
+             .rightSquare,
+             .semicolon:
+            .punctuation
+
         default:
-            return .unknown
+            .unknown
         }
     }
 
@@ -313,35 +361,22 @@ public actor ZeroCopyParser {
         let attrs = try FileManager.default.attributesOfItem(atPath: path)
         return (attrs[.modificationDate] as? Date) ?? Date.distantPast
     }
-
-    // MARK: - Cache Management
-
-    /// Clear the parse cache.
-    public func clearCache() {
-        cache.removeAll()
-    }
-
-    /// Invalidate cache for a specific file.
-    public func invalidateCache(for path: String) {
-        cache.removeValue(forKey: path)
-    }
-
-    /// Number of cached files.
-    public var cacheSize: Int {
-        cache.count
-    }
 }
 
-// MARK: - Batch Token Extraction
+// MARK: - BatchTokenExtractor
 
 /// Batch extractor for efficient multi-file token extraction.
 public struct BatchTokenExtractor: Sendable {
-    /// Configuration.
-    public let configuration: ZeroCopyParserConfiguration
+    // MARK: Lifecycle
 
     public init(configuration: ZeroCopyParserConfiguration = .default) {
         self.configuration = configuration
     }
+
+    // MARK: Public
+
+    /// Configuration.
+    public let configuration: ZeroCopyParserConfiguration
 
     /// Extract tokens from multiple files into a single MultiFileSoAStorage.
     ///
@@ -367,7 +402,7 @@ public struct BatchTokenExtractor: Sendable {
     /// - Returns: Combined storage with all tokens.
     public func extractParallel(
         from paths: [String],
-        maxConcurrency: Int = 8
+        maxConcurrency: Int = 8,
     ) async throws -> MultiFileSoAStorage {
         // Parse files in parallel with concurrency limiting
         let parsed = try await withThrowingTaskGroup(of: (String, SoATokenStorage).self) { group in

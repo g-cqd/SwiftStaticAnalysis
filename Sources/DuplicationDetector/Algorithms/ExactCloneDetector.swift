@@ -6,35 +6,27 @@
 //
 
 import Foundation
-import SwiftSyntax
 import SwiftStaticAnalysisCore
+import SwiftSyntax
 
-// MARK: - Rolling Hash
+// MARK: - RollingHash
 
 /// Rabin-Karp rolling hash implementation.
 struct RollingHash: Sendable {
-    /// Large prime for modulo operations.
-    private static let prime: UInt64 = 1_000_000_007
-
-    /// Base for polynomial rolling hash.
-    private static let base: UInt64 = 31
-
-    /// Precomputed power of base^windowSize mod prime.
-    private let highestPower: UInt64
-
-    /// Window size (number of tokens).
-    private let windowSize: Int
+    // MARK: Lifecycle
 
     init(windowSize: Int) {
         self.windowSize = windowSize
 
         // Precompute base^(windowSize-1) mod prime
         var power: UInt64 = 1
-        for _ in 0..<(windowSize - 1) {
+        for _ in 0 ..< (windowSize - 1) {
             power = (power &* Self.base) % Self.prime
         }
-        self.highestPower = power
+        highestPower = power
     }
+
+    // MARK: Internal
 
     /// Compute initial hash for a window of tokens.
     func initialHash(_ tokens: [String]) -> UInt64 {
@@ -64,6 +56,20 @@ struct RollingHash: Sendable {
         return newHash
     }
 
+    // MARK: Private
+
+    /// Large prime for modulo operations.
+    private static let prime: UInt64 = 1_000_000_007
+
+    /// Base for polynomial rolling hash.
+    private static let base: UInt64 = 31
+
+    /// Precomputed power of base^windowSize mod prime.
+    private let highestPower: UInt64
+
+    /// Window size (number of tokens).
+    private let windowSize: Int
+
     /// Hash a single token string.
     private func tokenHash(_ token: String) -> UInt64 {
         var hash: UInt64 = 0
@@ -74,7 +80,7 @@ struct RollingHash: Sendable {
     }
 }
 
-// MARK: - Token Window
+// MARK: - TokenWindow
 
 /// A window of tokens with its hash and location.
 struct TokenWindow: Sendable, GroupableWindow {
@@ -91,20 +97,21 @@ struct TokenWindow: Sendable, GroupableWindow {
     }
 }
 
-// MARK: - Exact Clone Detector
+// MARK: - ExactCloneDetector
 
 /// Detects exact code clones using rolling hash.
 public struct ExactCloneDetector: Sendable {
-    /// Minimum number of tokens to consider.
-    public let minimumTokens: Int
-
-    /// Token sequence extractor.
-    private let extractor: TokenSequenceExtractor
+    // MARK: Lifecycle
 
     public init(minimumTokens: Int = 50) {
         self.minimumTokens = minimumTokens
-        self.extractor = TokenSequenceExtractor()
+        extractor = TokenSequenceExtractor()
     }
+
+    // MARK: Public
+
+    /// Minimum number of tokens to consider.
+    public let minimumTokens: Int
 
     /// Detect exact clones across multiple token sequences.
     public func detect(in sequences: [TokenSequence]) -> [CloneGroup] {
@@ -134,7 +141,7 @@ public struct ExactCloneDetector: Sendable {
                         startLine: window.startLine,
                         endLine: window.endLine,
                         tokenCount: minimumTokens,
-                        codeSnippet: "" // Will be filled in by caller
+                        codeSnippet: "", // Will be filled in by caller
                     )
                 }
 
@@ -143,7 +150,7 @@ public struct ExactCloneDetector: Sendable {
                         type: .exact,
                         clones: clones,
                         similarity: 1.0,
-                        fingerprint: String(hash)
+                        fingerprint: String(hash),
                     ))
                 }
             }
@@ -153,16 +160,21 @@ public struct ExactCloneDetector: Sendable {
         return cloneGroups.deduplicated()
     }
 
+    // MARK: Private
+
+    /// Token sequence extractor.
+    private let extractor: TokenSequenceExtractor
+
     /// Extract all token windows from a sequence.
     private func extractWindows(
         from sequence: TokenSequence,
-        rollingHash: RollingHash
+        rollingHash: RollingHash,
     ) -> [TokenWindow] {
         guard sequence.tokens.count >= minimumTokens else { return [] }
 
         var windows: [TokenWindow] = []
         let tokens = sequence.tokens
-        let tokenTexts = tokens.map { $0.text }
+        let tokenTexts = tokens.map(\.text)
 
         // Compute initial hash
         var hash = rollingHash.initialHash(Array(tokenTexts.prefix(minimumTokens)))
@@ -175,12 +187,12 @@ public struct ExactCloneDetector: Sendable {
             endIndex: minimumTokens - 1,
             startLine: tokens[0].line,
             endLine: tokens[minimumTokens - 1].line,
-            tokens: Array(tokenTexts.prefix(minimumTokens))
+            tokens: Array(tokenTexts.prefix(minimumTokens)),
         ))
 
         // Roll through remaining windows
         let maxStartIndex = tokens.count - minimumTokens
-        for i in 1...maxStartIndex where maxStartIndex >= 1 {
+        for i in 1 ... maxStartIndex where maxStartIndex >= 1 {
             let outgoing = tokenTexts[i - 1]
             let incoming = tokenTexts[i + minimumTokens - 1]
             hash = rollingHash.roll(hash: hash, outgoing: outgoing, incoming: incoming)
@@ -192,7 +204,7 @@ public struct ExactCloneDetector: Sendable {
                 endIndex: i + minimumTokens - 1,
                 startLine: tokens[i].line,
                 endLine: tokens[i + minimumTokens - 1].line,
-                tokens: Array(tokenTexts[i..<(i + minimumTokens)])
+                tokens: Array(tokenTexts[i ..< (i + minimumTokens)]),
             ))
         }
 

@@ -6,14 +6,15 @@
 //
 
 import Foundation
-import Testing
+import SwiftParser
 @testable import SwiftStaticAnalysisCore
 import SwiftSyntax
-import SwiftParser
+import Testing
+
+// MARK: - DeclarationCollectorTests
 
 @Suite("DeclarationCollector Tests")
 struct DeclarationCollectorTests {
-
     // MARK: - Function Declarations
 
     @Test("Collect function declarations")
@@ -293,9 +294,10 @@ struct DeclarationCollectorTests {
     }
 }
 
+// MARK: - ReferenceCollectorTests
+
 @Suite("ReferenceCollector Tests")
 struct ReferenceCollectorTests {
-
     // MARK: - Identifier References
 
     @Test("Collect identifier references")
@@ -436,9 +438,10 @@ struct ReferenceCollectorTests {
     }
 }
 
+// MARK: - ScopeTrackerTests
+
 @Suite("ScopeTracker Tests")
 struct ScopeTrackerTests {
-
     @Test("Track scope hierarchy")
     func trackScopeHierarchy() {
         let source = """
@@ -476,10 +479,22 @@ struct ScopeTrackerTests {
         let global = Scope(id: .global, kind: .global, location: SourceLocation(file: "test.swift", line: 1, column: 1))
         tree.add(global)
 
-        let func1 = Scope(id: ScopeID("func1"), kind: .function, name: "func1", parent: .global, location: SourceLocation(file: "test.swift", line: 2, column: 1))
+        let func1 = Scope(
+            id: ScopeID("func1"),
+            kind: .function,
+            name: "func1",
+            parent: .global,
+            location: SourceLocation(file: "test.swift", line: 2, column: 1),
+        )
         tree.add(func1)
 
-        let func2 = Scope(id: ScopeID("func2"), kind: .function, name: "func2", parent: ScopeID("func1"), location: SourceLocation(file: "test.swift", line: 3, column: 1))
+        let func2 = Scope(
+            id: ScopeID("func2"),
+            kind: .function,
+            name: "func2",
+            parent: ScopeID("func1"),
+            location: SourceLocation(file: "test.swift", line: 3, column: 1),
+        )
         tree.add(func2)
 
         // Test scope retrieval

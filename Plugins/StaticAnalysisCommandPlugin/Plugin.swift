@@ -1,6 +1,8 @@
 import Foundation
 import PackagePlugin
 
+// MARK: - StaticAnalysisCommandPlugin
+
 /// Command plugin for running static analysis on Swift code.
 ///
 /// Usage:
@@ -11,7 +13,7 @@ import PackagePlugin
 struct StaticAnalysisCommandPlugin: CommandPlugin {
     func performCommand(
         context: PluginContext,
-        arguments: [String]
+        arguments: [String],
     ) async throws {
         // Get the swa tool
         let swaTool = try context.tool(named: "swa")
@@ -25,13 +27,16 @@ struct StaticAnalysisCommandPlugin: CommandPlugin {
         switch analysisType {
         case "unused":
             commands = [("Unused Code", ["unused", context.package.directoryURL.path])]
+
         case "duplicates":
             commands = [("Duplications", ["duplicates", context.package.directoryURL.path])]
+
         case "all":
             commands = [
                 ("Unused Code", ["unused", context.package.directoryURL.path]),
                 ("Duplications", ["duplicates", context.package.directoryURL.path]),
             ]
+
         default:
             print("Unknown analysis type: \(analysisType)")
             print("Available: unused, duplicates, all")
@@ -78,59 +83,62 @@ struct StaticAnalysisCommandPlugin: CommandPlugin {
 // MARK: - Xcode Project Support
 
 #if canImport(XcodeProjectPlugin)
-import XcodeProjectPlugin
+    import XcodeProjectPlugin
 
-extension StaticAnalysisCommandPlugin: XcodeCommandPlugin {
-    func performCommand(
-        context: XcodePluginContext,
-        arguments: [String]
-    ) throws {
-        let swaTool = try context.tool(named: "swa")
+    extension StaticAnalysisCommandPlugin: XcodeCommandPlugin {
+        func performCommand(
+            context: XcodePluginContext,
+            arguments: [String],
+        ) throws {
+            let swaTool = try context.tool(named: "swa")
 
-        var extractor = ArgumentExtractor(arguments)
-        let analysisType = extractor.remainingArguments.first ?? "all"
+            var extractor = ArgumentExtractor(arguments)
+            let analysisType = extractor.remainingArguments.first ?? "all"
 
-        let commands: [(name: String, args: [String])]
-        switch analysisType {
-        case "unused":
-            commands = [("Unused Code", ["unused", context.xcodeProject.directoryURL.path])]
-        case "duplicates":
-            commands = [("Duplications", ["duplicates", context.xcodeProject.directoryURL.path])]
-        case "all":
-            commands = [
-                ("Unused Code", ["unused", context.xcodeProject.directoryURL.path]),
-                ("Duplications", ["duplicates", context.xcodeProject.directoryURL.path]),
-            ]
-        default:
-            print("Unknown analysis type: \(analysisType)")
-            return
-        }
+            let commands: [(name: String, args: [String])]
+            switch analysisType {
+            case "unused":
+                commands = [("Unused Code", ["unused", context.xcodeProject.directoryURL.path])]
 
-        for (name, args) in commands {
-            print("Running \(name) Analysis...")
-            print(String(repeating: "-", count: 50))
+            case "duplicates":
+                commands = [("Duplications", ["duplicates", context.xcodeProject.directoryURL.path])]
 
-            let process = Process()
-            process.executableURL = swaTool.url
-            process.arguments = args
-            process.currentDirectoryURL = context.xcodeProject.directoryURL
+            case "all":
+                commands = [
+                    ("Unused Code", ["unused", context.xcodeProject.directoryURL.path]),
+                    ("Duplications", ["duplicates", context.xcodeProject.directoryURL.path]),
+                ]
 
-            let outputPipe = Pipe()
-            let errorPipe = Pipe()
-            process.standardOutput = outputPipe
-            process.standardError = errorPipe
+            default:
+                print("Unknown analysis type: \(analysisType)")
+                return
+            }
 
-            try process.run()
-            process.waitUntilExit()
+            for (name, args) in commands {
+                print("Running \(name) Analysis...")
+                print(String(repeating: "-", count: 50))
 
-            let output = String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            let errors = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                let process = Process()
+                process.executableURL = swaTool.url
+                process.arguments = args
+                process.currentDirectoryURL = context.xcodeProject.directoryURL
 
-            if !output.isEmpty { print(output) }
-            if !errors.isEmpty { Diagnostics.warning(errors) }
+                let outputPipe = Pipe()
+                let errorPipe = Pipe()
+                process.standardOutput = outputPipe
+                process.standardError = errorPipe
 
-            print()
+                try process.run()
+                process.waitUntilExit()
+
+                let output = String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                let errors = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+
+                if !output.isEmpty { print(output) }
+                if !errors.isEmpty { Diagnostics.warning(errors) }
+
+                print()
+            }
         }
     }
-}
 #endif

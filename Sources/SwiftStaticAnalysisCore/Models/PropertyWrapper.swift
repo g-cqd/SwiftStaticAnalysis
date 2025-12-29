@@ -7,12 +7,13 @@
 
 import Foundation
 
-// MARK: - Property Wrapper Kind
+// MARK: - PropertyWrapperKind
 
 /// Known property wrapper types.
 /// Exhaustive coverage of common property wrappers for framework detection. // swa:ignore-unused-cases
 public enum PropertyWrapperKind: String, Sendable, Codable, CaseIterable {
     // MARK: - SwiftUI State Management
+
     case state = "State"
     case binding = "Binding"
     case environment = "Environment"
@@ -21,66 +22,48 @@ public enum PropertyWrapperKind: String, Sendable, Codable, CaseIterable {
     case observedObject = "ObservedObject"
 
     // MARK: - SwiftUI Persistence
+
     case appStorage = "AppStorage"
     case sceneStorage = "SceneStorage"
 
     // MARK: - SwiftUI Focus
+
     case focusState = "FocusState"
     case focusedValue = "FocusedValue"
     case focusedBinding = "FocusedBinding"
 
     // MARK: - SwiftUI Gestures
+
     case gestureState = "GestureState"
 
     // MARK: - SwiftUI Animation
+
     case namespace = "Namespace"
 
     // MARK: - SwiftData
+
     case query = "Query"
     case attribute = "Attribute"
     case relationship = "Relationship"
 
     // MARK: - Core Data
+
     case fetchRequest = "FetchRequest"
     case sectionedFetchRequest = "SectionedFetchRequest"
 
     // MARK: - Combine
+
     case published = "Published"
 
     // MARK: - Concurrency
+
     case mainActor = "MainActor"
 
     // MARK: - Other Common Wrappers
+
     case unknown = "Unknown"
 
-    /// Whether this property wrapper is SwiftUI-specific.
-    public var isSwiftUI: Bool {
-        switch self {
-        case .state, .binding, .environment, .environmentObject,
-             .stateObject, .observedObject, .appStorage, .sceneStorage,
-             .focusState, .focusedValue, .focusedBinding, .gestureState,
-             .namespace:
-            return true
-        default:
-            return false
-        }
-    }
-
-    /// Whether properties with this wrapper are implicitly used.
-    ///
-    /// SwiftUI property wrappers create synthesized accessors that may not
-    /// be detected as direct references. Properties with these wrappers
-    /// should generally not be flagged as unused.
-    public var impliesUsage: Bool {
-        switch self {
-        case .state, .binding, .stateObject, .observedObject,
-             .environment, .environmentObject, .appStorage, .sceneStorage,
-             .focusState, .gestureState, .namespace, .published:
-            return true
-        default:
-            return false
-        }
-    }
+    // MARK: Lifecycle
 
     /// Initialize from an attribute name string.
     public init(attributeName: String) {
@@ -94,12 +77,73 @@ public enum PropertyWrapperKind: String, Sendable, Codable, CaseIterable {
 
         self = PropertyWrapperKind(rawValue: baseName) ?? .unknown
     }
+
+    // MARK: Public
+
+    /// Whether this property wrapper is SwiftUI-specific.
+    public var isSwiftUI: Bool {
+        switch self {
+        case .appStorage,
+             .binding,
+             .environment,
+             .environmentObject,
+             .focusedBinding,
+             .focusedValue,
+             .focusState,
+             .gestureState,
+             .namespace,
+             .observedObject,
+             .sceneStorage,
+             .state,
+             .stateObject:
+            true
+
+        default:
+            false
+        }
+    }
+
+    /// Whether properties with this wrapper are implicitly used.
+    ///
+    /// SwiftUI property wrappers create synthesized accessors that may not
+    /// be detected as direct references. Properties with these wrappers
+    /// should generally not be flagged as unused.
+    public var impliesUsage: Bool {
+        switch self {
+        case .appStorage,
+             .binding,
+             .environment,
+             .environmentObject,
+             .focusState,
+             .gestureState,
+             .namespace,
+             .observedObject,
+             .published,
+             .sceneStorage,
+             .state,
+             .stateObject:
+            true
+
+        default:
+            false
+        }
+    }
 }
 
-// MARK: - Property Wrapper Info
+// MARK: - PropertyWrapperInfo
 
 /// Information about a property wrapper applied to a declaration.
 public struct PropertyWrapperInfo: Sendable, Codable, Hashable {
+    // MARK: Lifecycle
+
+    public init(kind: PropertyWrapperKind, attributeText: String, arguments: String? = nil) {
+        self.kind = kind
+        self.attributeText = attributeText
+        self.arguments = arguments
+    }
+
+    // MARK: Public
+
     /// The kind of property wrapper.
     public let kind: PropertyWrapperKind
 
@@ -108,12 +152,6 @@ public struct PropertyWrapperInfo: Sendable, Codable, Hashable {
 
     /// Arguments to the wrapper (if any).
     public let arguments: String?
-
-    public init(kind: PropertyWrapperKind, attributeText: String, arguments: String? = nil) {
-        self.kind = kind
-        self.attributeText = attributeText
-        self.arguments = arguments
-    }
 
     /// Parse a property wrapper from attribute text.
     public static func parse(from attributeText: String) -> PropertyWrapperInfo? {
@@ -127,7 +165,7 @@ public struct PropertyWrapperInfo: Sendable, Codable, Hashable {
         var arguments: String?
         if let parenStart = text.firstIndex(of: "("),
            let parenEnd = text.lastIndex(of: ")") {
-            arguments = String(text[text.index(after: parenStart)..<parenEnd])
+            arguments = String(text[text.index(after: parenStart) ..< parenEnd])
             text = String(text[..<parenStart])
         }
 
@@ -141,7 +179,7 @@ public struct PropertyWrapperInfo: Sendable, Codable, Hashable {
     }
 }
 
-// MARK: - SwiftUI Conformance
+// MARK: - SwiftUIConformance
 
 /// SwiftUI protocol conformances that affect analysis.
 /// Exhaustive coverage for SwiftUI framework detection. // swa:ignore-unused-cases
@@ -179,33 +217,55 @@ public enum SwiftUIConformance: String, Sendable, Codable, CaseIterable {
     /// Conforms to SwiftUI.DynamicProperty
     case dynamicProperty = "DynamicProperty"
 
+    // MARK: Public
+
     /// Whether this conformance makes the type an entry point.
     public var isEntryPoint: Bool {
         switch self {
-        case .app, .previewProvider:
-            return true
+        case .app,
+             .previewProvider:
+            true
+
         default:
-            return false
+            false
         }
     }
 
     /// Whether the `body` property is implicitly used.
     public var hasImplicitBody: Bool {
         switch self {
-        case .view, .viewModifier, .app, .scene, .commands,
-             .toolbarContent, .customizableToolbarContent,
-             .tableRowContent, .tableColumnContent:
-            return true
+        case .app,
+             .commands,
+             .customizableToolbarContent,
+             .scene,
+             .tableColumnContent,
+             .tableRowContent,
+             .toolbarContent,
+             .view,
+             .viewModifier:
+            true
+
         default:
-            return false
+            false
         }
     }
 }
 
-// MARK: - SwiftUI Type Info
+// MARK: - SwiftUITypeInfo
 
 /// Additional information for SwiftUI types.
 public struct SwiftUITypeInfo: Sendable, Codable, Hashable {
+    // MARK: Lifecycle
+
+    public init(conformances: Set<SwiftUIConformance>) {
+        self.conformances = conformances
+    }
+
+    // MARK: Public
+
+    /// Empty info for non-SwiftUI types.
+    public static let none = SwiftUITypeInfo(conformances: [])
+
     /// SwiftUI protocol conformances.
     public let conformances: Set<SwiftUIConformance>
 
@@ -228,11 +288,4 @@ public struct SwiftUITypeInfo: Sendable, Codable, Hashable {
     public var hasImplicitBody: Bool {
         conformances.contains { $0.hasImplicitBody }
     }
-
-    public init(conformances: Set<SwiftUIConformance>) {
-        self.conformances = conformances
-    }
-
-    /// Empty info for non-SwiftUI types.
-    public static let none = SwiftUITypeInfo(conformances: [])
 }

@@ -17,10 +17,19 @@
 
 import Foundation
 
-// MARK: - Arena Configuration
+// MARK: - ArenaConfiguration
 
 /// Configuration for arena allocation.
 public struct ArenaConfiguration: Sendable {
+    // MARK: Lifecycle
+
+    public init(blockSize: Int = defaultBlockSize, alignment: Int = 8) {
+        self.blockSize = blockSize
+        self.alignment = alignment
+    }
+
+    // MARK: Public
+
     /// Default block size (64KB).
     public static let defaultBlockSize = 65536
 
@@ -29,17 +38,29 @@ public struct ArenaConfiguration: Sendable {
 
     /// Alignment for allocations.
     public let alignment: Int
-
-    public init(blockSize: Int = defaultBlockSize, alignment: Int = 8) {
-        self.blockSize = blockSize
-        self.alignment = alignment
-    }
 }
 
-// MARK: - Arena Block
+// MARK: - ArenaBlock
 
 /// A contiguous block of memory in the arena.
 final class ArenaBlock: @unchecked Sendable {
+    // MARK: Lifecycle
+
+    init(capacity: Int) {
+        storage = UnsafeMutableRawPointer.allocate(
+            byteCount: capacity,
+            alignment: 8,
+        )
+        self.capacity = capacity
+        offset = 0
+    }
+
+    deinit {
+        storage.deallocate()
+    }
+
+    // MARK: Internal
+
     /// Raw memory storage.
     let storage: UnsafeMutableRawPointer
 
@@ -48,19 +69,6 @@ final class ArenaBlock: @unchecked Sendable {
 
     /// Current offset (bump pointer).
     var offset: Int
-
-    init(capacity: Int) {
-        self.storage = UnsafeMutableRawPointer.allocate(
-            byteCount: capacity,
-            alignment: 8
-        )
-        self.capacity = capacity
-        self.offset = 0
-    }
-
-    deinit {
-        storage.deallocate()
-    }
 
     /// Attempt to allocate memory in this block.
     ///
@@ -105,19 +113,7 @@ final class ArenaBlock: @unchecked Sendable {
 /// arena.reset() // All allocations freed
 /// ```
 public final class Arena: @unchecked Sendable {
-    /// Configuration for this arena.
-    public let configuration: ArenaConfiguration
-
-    /// Active memory blocks.
-    private var blocks: [ArenaBlock] = []
-
-    /// Current active block index.
-    private var currentBlockIndex: Int = -1
-
-    /// Statistics tracking.
-    private var _totalAllocations: Int = 0
-    private var _totalBytesAllocated: Int = 0
-    private var _peakBytesAllocated: Int = 0
+    // MARK: Lifecycle
 
     public init(configuration: ArenaConfiguration = ArenaConfiguration()) {
         self.configuration = configuration
@@ -125,6 +121,36 @@ public final class Arena: @unchecked Sendable {
 
     deinit {
         // Blocks are automatically deallocated via their deinitializers
+    }
+
+    // MARK: Public
+
+    /// Configuration for this arena.
+    public let configuration: ArenaConfiguration
+
+    // MARK: - Statistics
+
+    /// Total number of allocations made.
+    public var totalAllocations: Int { _totalAllocations }
+
+    /// Current bytes allocated.
+    public var totalBytesAllocated: Int { _totalBytesAllocated }
+
+    /// Peak bytes allocated.
+    public var peakBytesAllocated: Int { _peakBytesAllocated }
+
+    /// Number of memory blocks.
+    public var blockCount: Int { blocks.count }
+
+    /// Total capacity across all blocks.
+    public var totalCapacity: Int {
+        blocks.reduce(0) { $0 + $1.capacity }
+    }
+
+    /// Memory utilization percentage.
+    public var utilization: Double {
+        guard totalCapacity > 0 else { return 0 }
+        return Double(_totalBytesAllocated) / Double(totalCapacity) * 100
     }
 
     // MARK: - Allocation
@@ -217,30 +243,18 @@ public final class Arena: @unchecked Sendable {
         _totalBytesAllocated = 0
     }
 
-    // MARK: - Statistics
+    // MARK: Private
 
-    /// Total number of allocations made.
-    public var totalAllocations: Int { _totalAllocations }
+    /// Active memory blocks.
+    private var blocks: [ArenaBlock] = []
 
-    /// Current bytes allocated.
-    public var totalBytesAllocated: Int { _totalBytesAllocated }
+    /// Current active block index.
+    private var currentBlockIndex: Int = -1
 
-    /// Peak bytes allocated.
-    public var peakBytesAllocated: Int { _peakBytesAllocated }
-
-    /// Number of memory blocks.
-    public var blockCount: Int { blocks.count }
-
-    /// Total capacity across all blocks.
-    public var totalCapacity: Int {
-        blocks.reduce(0) { $0 + $1.capacity }
-    }
-
-    /// Memory utilization percentage.
-    public var utilization: Double {
-        guard totalCapacity > 0 else { return 0 }
-        return Double(_totalBytesAllocated) / Double(totalCapacity) * 100
-    }
+    /// Statistics tracking.
+    private var _totalAllocations: Int = 0
+    private var _totalBytesAllocated: Int = 0
+    private var _peakBytesAllocated: Int = 0
 
     private func updateStats(size: Int) {
         _totalAllocations += 1
@@ -249,7 +263,7 @@ public final class Arena: @unchecked Sendable {
     }
 }
 
-// MARK: - Arena Allocator Protocol
+// MARK: - ArenaAllocatable
 
 /// Protocol for types that can be allocated in an arena.
 public protocol ArenaAllocatable {
@@ -257,21 +271,47 @@ public protocol ArenaAllocatable {
     static func allocate(in arena: Arena, count: Int) -> UnsafeMutableBufferPointer<Self>
 }
 
-extension ArenaAllocatable {
-    public static func allocate(in arena: Arena, count: Int) -> UnsafeMutableBufferPointer<Self> {
+public extension ArenaAllocatable {
+    static func allocate(in arena: Arena, count: Int) -> UnsafeMutableBufferPointer<Self> {
         arena.allocate(count: count)
     }
 }
 
+// MARK: - Int + ArenaAllocatable
+
 // Make common types arena-allocatable
 extension Int: ArenaAllocatable {}
+
+// MARK: - Int32 + ArenaAllocatable
+
 extension Int32: ArenaAllocatable {}
+
+// MARK: - Int64 + ArenaAllocatable
+
 extension Int64: ArenaAllocatable {}
+
+// MARK: - UInt + ArenaAllocatable
+
 extension UInt: ArenaAllocatable {}
+
+// MARK: - UInt32 + ArenaAllocatable
+
 extension UInt32: ArenaAllocatable {}
+
+// MARK: - UInt64 + ArenaAllocatable
+
 extension UInt64: ArenaAllocatable {}
+
+// MARK: - Float + ArenaAllocatable
+
 extension Float: ArenaAllocatable {}
+
+// MARK: - Double + ArenaAllocatable
+
 extension Double: ArenaAllocatable {}
+
+// MARK: - Bool + ArenaAllocatable
+
 extension Bool: ArenaAllocatable {}
 
 // MARK: - Scoped Arena
@@ -286,19 +326,19 @@ extension Bool: ArenaAllocatable {}
 ///     // Use data...
 /// } // Arena automatically reset here
 /// ```
-extension Arena {
+public extension Arena {
     /// Execute a closure with a scoped arena that resets after completion.
     ///
     /// - Parameter body: Closure that uses the arena.
     /// - Returns: The result of the closure.
-    public func withScope<T>(_ body: (Arena) throws -> T) rethrows -> T {
+    func withScope<T>(_ body: (Arena) throws -> T) rethrows -> T {
         let startOffset = blocks.isEmpty ? 0 : blocks[max(0, currentBlockIndex)].offset
         let startBlock = currentBlockIndex
 
         defer {
             // Reset to the starting state
-            if startBlock >= 0 && startBlock < blocks.count {
-                for i in (startBlock + 1)..<blocks.count {
+            if startBlock >= 0, startBlock < blocks.count {
+                for i in (startBlock + 1) ..< blocks.count {
                     blocks[i].reset()
                 }
                 blocks[startBlock].offset = startOffset
@@ -312,19 +352,11 @@ extension Arena {
     }
 }
 
-// MARK: - Thread-Local Arena
+// MARK: - ThreadLocalArena
 
 /// Provides a thread-local arena for concurrent use.
 public enum ThreadLocalArena {
-    /// Thread-local storage for arenas.
-    private static let tlsKey: pthread_key_t = {
-        var key: pthread_key_t = 0
-        pthread_key_create(&key) { ptr in
-            // Destructor called when thread exits
-            Unmanaged<Arena>.fromOpaque(ptr).release()
-        }
-        return key
-    }()
+    // MARK: Public
 
     /// Get the arena for the current thread.
     public static var current: Arena {
@@ -341,4 +373,16 @@ public enum ThreadLocalArena {
     public static func reset() {
         current.reset()
     }
+
+    // MARK: Private
+
+    /// Thread-local storage for arenas.
+    private static let tlsKey: pthread_key_t = {
+        var key: pthread_key_t = 0
+        pthread_key_create(&key) { ptr in
+            // Destructor called when thread exits
+            Unmanaged<Arena>.fromOpaque(ptr).release()
+        }
+        return key
+    }()
 }

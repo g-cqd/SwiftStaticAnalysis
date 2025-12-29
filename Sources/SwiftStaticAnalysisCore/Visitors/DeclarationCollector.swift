@@ -13,29 +13,21 @@ import SwiftSyntax
 /// This visitor traverses the AST and extracts all declarations
 /// including functions, variables, types, and imports.
 public final class DeclarationCollector: ScopeTrackingVisitor {
+    // MARK: Public
+
     /// Collected declarations.
     public private(set) var declarations: [Declaration] = []
 
     /// Collected imports.
     public private(set) var imports: [Declaration] = []
 
-    /// Stack of ignore directives from enclosing types (for propagating to members).
-    private var ignoreDirectiveStack: [Set<String>] = []
-
-    /// Current ignore directives from enclosing type.
-    private var currentTypeIgnoreDirectives: Set<String> {
-        ignoreDirectiveStack.last ?? []
-    }
-
-    // MARK: - Functions
-
-    public override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
         let declaration = makeDeclaration(
             name: node.name.text,
             kind: isInTypeContext ? .method : .function,
             modifiers: node.modifiers,
             node: node,
-            documentation: extractDocumentation(from: node)
+            documentation: extractDocumentation(from: node),
         )
         declarations.append(declaration)
 
@@ -45,13 +37,13 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     // MARK: - Initializers
 
-    public override func visit(_ node: InitializerDeclSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: InitializerDeclSyntax) -> SyntaxVisitorContinueKind {
         let declaration = makeDeclaration(
             name: "init",
             kind: .initializer,
             modifiers: node.modifiers,
             node: node,
-            documentation: extractDocumentation(from: node)
+            documentation: extractDocumentation(from: node),
         )
         declarations.append(declaration)
 
@@ -60,12 +52,12 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     // MARK: - Deinitializers
 
-    public override func visit(_ node: DeinitializerDeclSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: DeinitializerDeclSyntax) -> SyntaxVisitorContinueKind {
         let declaration = makeDeclaration(
             name: "deinit",
             kind: .deinitializer,
             modifiers: node.modifiers,
-            node: node
+            node: node,
         )
         declarations.append(declaration)
 
@@ -74,7 +66,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     // MARK: - Variables
 
-    public override func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {
         let isConstant = node.bindingSpecifier.tokenKind == .keyword(.let)
 
         // Extract property wrappers from attributes
@@ -95,7 +87,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
                 node: node,
                 typeAnnotation: typeAnnotation,
                 documentation: extractDocumentation(from: node),
-                propertyWrappers: propertyWrappers
+                propertyWrappers: propertyWrappers,
             )
             declarations.append(declaration)
         }
@@ -105,7 +97,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     // MARK: - Function Parameters
 
-    public override func visit(_ node: FunctionParameterSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: FunctionParameterSyntax) -> SyntaxVisitorContinueKind {
         let name = node.secondName?.text ?? node.firstName.text
         let typeAnnotation = node.type.description.trimmingCharacters(in: .whitespaces)
 
@@ -117,7 +109,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             location: location(of: node),
             range: range(of: node),
             scope: currentScope,
-            typeAnnotation: typeAnnotation
+            typeAnnotation: typeAnnotation,
         )
         declarations.append(declaration)
 
@@ -126,7 +118,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     // MARK: - Types
 
-    public override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
         let genericParams = extractGenericParameters(from: node.genericParameterClause)
         let conformances = extractConformances(from: node.inheritanceClause)
         let swiftUIInfo = extractSwiftUIInfo(from: conformances)
@@ -141,14 +133,14 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             documentation: extractDocumentation(from: node),
             swiftUIInfo: swiftUIInfo,
             conformances: conformances,
-            attributes: attrs
+            attributes: attrs,
         )
         declarations.append(declaration)
 
         return super.visit(node)
     }
 
-    public override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
         let genericParams = extractGenericParameters(from: node.genericParameterClause)
         let conformances = extractConformances(from: node.inheritanceClause)
         let swiftUIInfo = extractSwiftUIInfo(from: conformances)
@@ -163,14 +155,14 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             documentation: extractDocumentation(from: node),
             swiftUIInfo: swiftUIInfo,
             conformances: conformances,
-            attributes: attrs
+            attributes: attrs,
         )
         declarations.append(declaration)
 
         return super.visit(node)
     }
 
-    public override func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind {
         let genericParams = extractGenericParameters(from: node.genericParameterClause)
         let conformances = extractConformances(from: node.inheritanceClause)
         let swiftUIInfo = extractSwiftUIInfo(from: conformances)
@@ -186,7 +178,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             documentation: extractDocumentation(from: node),
             swiftUIInfo: swiftUIInfo,
             conformances: conformances,
-            attributes: attrs
+            attributes: attrs,
         )
         declarations.append(declaration)
 
@@ -196,7 +188,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
         return super.visit(node)
     }
 
-    public override func visitPost(_ node: EnumDeclSyntax) {
+    override public func visitPost(_ node: EnumDeclSyntax) {
         // Pop the ignore directives after visiting children
         if !ignoreDirectiveStack.isEmpty {
             ignoreDirectiveStack.removeLast()
@@ -204,27 +196,27 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
         super.visitPost(node)
     }
 
-    public override func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind {
         let declaration = makeDeclaration(
             name: node.name.text,
             kind: .protocol,
             modifiers: node.modifiers,
             node: node,
-            documentation: extractDocumentation(from: node)
+            documentation: extractDocumentation(from: node),
         )
         declarations.append(declaration)
 
         return super.visit(node)
     }
 
-    public override func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
         let name = node.extendedType.description.trimmingCharacters(in: .whitespaces)
 
         let declaration = makeDeclaration(
             name: name,
             kind: .extension,
             modifiers: node.modifiers,
-            node: node
+            node: node,
         )
         declarations.append(declaration)
 
@@ -233,13 +225,13 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     // MARK: - Type Aliases
 
-    public override func visit(_ node: TypeAliasDeclSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: TypeAliasDeclSyntax) -> SyntaxVisitorContinueKind {
         let declaration = makeDeclaration(
             name: node.name.text,
             kind: .typealias,
             modifiers: node.modifiers,
             node: node,
-            documentation: extractDocumentation(from: node)
+            documentation: extractDocumentation(from: node),
         )
         declarations.append(declaration)
 
@@ -248,13 +240,13 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     // MARK: - Associated Types
 
-    public override func visit(_ node: AssociatedTypeDeclSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: AssociatedTypeDeclSyntax) -> SyntaxVisitorContinueKind {
         let declaration = makeDeclaration(
             name: node.name.text,
             kind: .associatedtype,
             modifiers: node.modifiers,
             node: node,
-            documentation: extractDocumentation(from: node)
+            documentation: extractDocumentation(from: node),
         )
         declarations.append(declaration)
 
@@ -263,7 +255,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     // MARK: - Enum Cases
 
-    public override func visit(_ node: EnumCaseElementSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: EnumCaseElementSyntax) -> SyntaxVisitorContinueKind {
         // Combine case's own ignore directives with inherited enum directives
         var ignoreDirectives = extractIgnoreCategories(from: node)
         ignoreDirectives.formUnion(currentTypeIgnoreDirectives)
@@ -271,12 +263,12 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
         let declaration = Declaration(
             name: node.name.text,
             kind: .enumCase,
-            accessLevel: .internal,  // Inherits from enum
+            accessLevel: .internal, // Inherits from enum
             modifiers: [],
             location: location(of: node),
             range: range(of: node),
             scope: currentScope,
-            ignoreDirectives: ignoreDirectives
+            ignoreDirectives: ignoreDirectives,
         )
         declarations.append(declaration)
 
@@ -285,13 +277,13 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     // MARK: - Subscripts
 
-    public override func visit(_ node: SubscriptDeclSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: SubscriptDeclSyntax) -> SyntaxVisitorContinueKind {
         let declaration = makeDeclaration(
             name: "subscript",
             kind: .subscript,
             modifiers: node.modifiers,
             node: node,
-            documentation: extractDocumentation(from: node)
+            documentation: extractDocumentation(from: node),
         )
         declarations.append(declaration)
 
@@ -300,7 +292,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     // MARK: - Operators
 
-    public override func visit(_ node: OperatorDeclSyntax) -> SyntaxVisitorContinueKind {
+    override public func visit(_ node: OperatorDeclSyntax) -> SyntaxVisitorContinueKind {
         let declaration = Declaration(
             name: node.name.text,
             kind: .operator,
@@ -308,7 +300,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             modifiers: [],
             location: location(of: node),
             range: range(of: node),
-            scope: currentScope
+            scope: currentScope,
         )
         declarations.append(declaration)
 
@@ -317,8 +309,8 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     // MARK: - Imports
 
-    public override func visit(_ node: ImportDeclSyntax) -> SyntaxVisitorContinueKind {
-        let moduleName = node.path.map { $0.name.text }.joined(separator: ".")
+    override public func visit(_ node: ImportDeclSyntax) -> SyntaxVisitorContinueKind {
+        let moduleName = node.path.map(\.name.text).joined(separator: ".")
 
         let declaration = Declaration(
             name: moduleName,
@@ -327,11 +319,21 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             modifiers: [],
             location: location(of: node),
             range: range(of: node),
-            scope: .global
+            scope: .global,
         )
         imports.append(declaration)
 
         return .visitChildren
+    }
+
+    // MARK: Private
+
+    /// Stack of ignore directives from enclosing types (for propagating to members).
+    private var ignoreDirectiveStack: [Set<String>] = []
+
+    /// Current ignore directives from enclosing type.
+    private var currentTypeIgnoreDirectives: Set<String> {
+        ignoreDirectiveStack.last ?? []
     }
 
     // MARK: - Helpers
@@ -340,10 +342,15 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
         let ancestors = tracker.tree.ancestors(of: currentScope)
         return ancestors.contains { scope in
             switch scope.kind {
-            case .class, .struct, .enum, .protocol, .extension:
-                return true
+            case .class,
+                 .enum,
+                 .extension,
+                 .protocol,
+                 .struct:
+                true
+
             default:
-                return false
+                false
             }
         }
     }
@@ -359,7 +366,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
         propertyWrappers: [PropertyWrapperInfo] = [],
         swiftUIInfo: SwiftUITypeInfo? = nil,
         conformances: [String] = [],
-        attributes: [String] = []
+        attributes: [String] = [],
     ) -> Declaration {
         Declaration(
             name: name,
@@ -376,7 +383,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             swiftUIInfo: swiftUIInfo,
             conformances: conformances,
             attributes: attributes,
-            ignoreDirectives: extractIgnoreCategories(from: node)
+            ignoreDirectives: extractIgnoreCategories(from: node),
         )
     }
 
@@ -385,16 +392,22 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             switch modifier.name.tokenKind {
             case .keyword(.private):
                 return .private
+
             case .keyword(.fileprivate):
                 return .fileprivate
+
             case .keyword(.internal):
                 return .internal
+
             case .keyword(.package):
                 return .package
+
             case .keyword(.public):
                 return .public
+
             case .keyword(.open):
                 return .open
+
             default:
                 continue
             }
@@ -409,34 +422,49 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             switch modifier.name.tokenKind {
             case .keyword(.static):
                 result.insert(.static)
+
             case .keyword(.class):
                 result.insert(.class)
+
             case .keyword(.final):
                 result.insert(.final)
+
             case .keyword(.override):
                 result.insert(.override)
+
             case .keyword(.mutating):
                 result.insert(.mutating)
+
             case .keyword(.nonmutating):
                 result.insert(.nonmutating)
+
             case .keyword(.lazy):
                 result.insert(.lazy)
+
             case .keyword(.weak):
                 result.insert(.weak)
+
             case .keyword(.unowned):
                 result.insert(.unowned)
+
             case .keyword(.optional):
                 result.insert(.optional)
+
             case .keyword(.required):
                 result.insert(.required)
+
             case .keyword(.convenience):
                 result.insert(.convenience)
+
             case .keyword(.nonisolated):
                 result.insert(.nonisolated)
+
             case .keyword(.consuming):
                 result.insert(.consuming)
+
             case .keyword(.borrowing):
                 result.insert(.borrowing)
+
             default:
                 continue
             }
@@ -447,16 +475,17 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
 
     private func extractGenericParameters(from clause: GenericParameterClauseSyntax?) -> [String] {
         guard let clause else { return [] }
-        return clause.parameters.map { $0.name.text }
+        return clause.parameters.map(\.name.text)
     }
 
     private func extractDocumentation(from node: some SyntaxProtocol) -> String? {
         // Look for documentation comments in leading trivia
         for piece in node.leadingTrivia {
             switch piece {
-            case .docLineComment(let text):
+            case let .docLineComment(text):
                 return String(text.dropFirst(3)).trimmingCharacters(in: .whitespaces)
-            case .docBlockComment(let text):
+
+            case let .docBlockComment(text):
                 // Remove /** and */
                 var cleaned = text
                 if cleaned.hasPrefix("/**") {
@@ -466,6 +495,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
                     cleaned = String(cleaned.dropLast(2))
                 }
                 return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+
             default:
                 continue
             }
@@ -477,14 +507,16 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
     private func hasIgnoreDirective(in node: some SyntaxProtocol) -> Bool {
         for piece in node.leadingTrivia {
             switch piece {
-            case .lineComment(let text):
+            case let .lineComment(text):
                 if text.contains("swa:ignore") {
                     return true
                 }
-            case .blockComment(let text):
+
+            case let .blockComment(text):
                 if text.contains("swa:ignore") {
                     return true
                 }
+
             default:
                 continue
             }
@@ -496,33 +528,37 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
     /// Returns specific ignore categories if specified (e.g., "swa:ignore unused" or "swa:ignore-unused-cases")
     private func extractIgnoreCategories(from node: some SyntaxProtocol) -> Set<String> {
         var categories = Set<String>()
-        
+
         for piece in node.leadingTrivia {
             let text: String
             switch piece {
-            case .lineComment(let t):
+            case let .lineComment(t):
                 text = t
-            case .blockComment(let t):
+
+            case let .blockComment(t):
                 text = t
-            case .docLineComment(let t):
+
+            case let .docLineComment(t):
                 text = t
-            case .docBlockComment(let t):
+
+            case let .docBlockComment(t):
                 text = t
+
             default:
                 continue
             }
-            
+
             // Look for swa:ignore patterns
             // Supports: // swa:ignore, // swa:ignore unused, // swa:ignore-unused-cases, /* swa:ignore */
             if let range = text.range(of: "swa:ignore") {
                 let afterDirective = text[range.upperBound...]
                     .trimmingCharacters(in: .whitespaces)
-                
+
                 // Check for generic ignore (no category specified)
                 // This includes: empty, newline, end of comment (*/)
-                if afterDirective.isEmpty || 
-                   afterDirective.hasPrefix("\n") ||
-                   afterDirective.hasPrefix("*/") {
+                if afterDirective.isEmpty ||
+                    afterDirective.hasPrefix("\n") ||
+                    afterDirective.hasPrefix("*/") {
                     // Generic ignore - ignore everything
                     categories.insert("all")
                 } else if afterDirective.hasPrefix("-") {
@@ -537,7 +573,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
                 }
             }
         }
-        
+
         return categories
     }
 
@@ -547,18 +583,17 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
         var wrappers: [PropertyWrapperInfo] = []
 
         for element in attributes {
-            guard case .attribute(let attribute) = element else {
+            guard case let .attribute(attribute) = element else {
                 continue
             }
 
             let attributeText = attribute.description.trimmingCharacters(in: .whitespacesAndNewlines)
 
             // Extract the attribute name
-            let attributeName: String
-            if let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self) {
-                attributeName = identifier.name.text
+            let attributeName: String = if let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self) {
+                identifier.name.text
             } else {
-                attributeName = attribute.attributeName.description
+                attribute.attributeName.description
                     .trimmingCharacters(in: .whitespacesAndNewlines)
             }
 
@@ -574,7 +609,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             let wrapper = PropertyWrapperInfo(
                 kind: kind,
                 attributeText: attributeText,
-                arguments: arguments
+                arguments: arguments,
             )
             wrappers.append(wrapper)
         }
@@ -619,16 +654,15 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
         var result: [String] = []
 
         for element in attributes {
-            guard case .attribute(let attribute) = element else {
+            guard case let .attribute(attribute) = element else {
                 continue
             }
 
             // Extract the attribute name
-            let attributeName: String
-            if let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self) {
-                attributeName = identifier.name.text
+            let attributeName: String = if let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self) {
+                identifier.name.text
             } else {
-                attributeName = attribute.attributeName.description
+                attribute.attributeName.description
                     .trimmingCharacters(in: .whitespacesAndNewlines)
             }
 

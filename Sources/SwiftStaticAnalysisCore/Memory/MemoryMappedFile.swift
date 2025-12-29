@@ -18,12 +18,12 @@
 import Foundation
 
 #if canImport(Darwin)
-import Darwin
+    import Darwin
 #elseif canImport(Glibc)
-import Glibc
+    import Glibc
 #endif
 
-// MARK: - Memory Mapped File Error
+// MARK: - MemoryMappedFileError
 
 /// Errors that can occur during memory mapping.
 /// Exhaustive error handling for memory operations. // swa:ignore-unused-cases
@@ -34,7 +34,7 @@ public enum MemoryMappedFileError: Error, Sendable {
     case fileEmpty
 }
 
-// MARK: - Memory Mapped File
+// MARK: - MemoryMappedFile
 
 /// A memory-mapped file for zero-copy read access.
 ///
@@ -52,17 +52,7 @@ public enum MemoryMappedFileError: Error, Sendable {
 /// let text = slice.asString()
 /// ```
 public final class MemoryMappedFile: @unchecked Sendable {
-    /// Path to the mapped file.
-    public let path: String
-
-    /// Size of the file in bytes.
-    public let size: Int
-
-    /// Pointer to the mapped memory.
-    private let data: UnsafeRawPointer
-
-    /// File descriptor (kept open for the mapping).
-    private let fileDescriptor: Int32
+    // MARK: Lifecycle
 
     /// Initialize a memory-mapped file.
     ///
@@ -76,7 +66,7 @@ public final class MemoryMappedFile: @unchecked Sendable {
         guard fd >= 0 else {
             throw MemoryMappedFileError.fileNotFound(path)
         }
-        self.fileDescriptor = fd
+        fileDescriptor = fd
 
         // Get file size
         var statBuf = stat()
@@ -84,7 +74,7 @@ public final class MemoryMappedFile: @unchecked Sendable {
             close(fd)
             throw MemoryMappedFileError.mappingFailed(path, errno)
         }
-        self.size = Int(statBuf.st_size)
+        size = Int(statBuf.st_size)
 
         guard size > 0 else {
             close(fd)
@@ -98,7 +88,7 @@ public final class MemoryMappedFile: @unchecked Sendable {
             PROT_READ,
             MAP_PRIVATE,
             fd,
-            0
+            0,
         )
 
         guard mapped != MAP_FAILED else {
@@ -106,7 +96,7 @@ public final class MemoryMappedFile: @unchecked Sendable {
             throw MemoryMappedFileError.mappingFailed(path, errno)
         }
 
-        self.data = UnsafeRawPointer(mapped!)
+        data = UnsafeRawPointer(mapped!)
 
         // Advise the kernel about our access pattern (sequential)
         madvise(UnsafeMutableRawPointer(mutating: data), size, MADV_SEQUENTIAL)
@@ -115,6 +105,19 @@ public final class MemoryMappedFile: @unchecked Sendable {
     deinit {
         munmap(UnsafeMutableRawPointer(mutating: data), size)
         close(fileDescriptor)
+    }
+
+    // MARK: Public
+
+    /// Path to the mapped file.
+    public let path: String
+
+    /// Size of the file in bytes.
+    public let size: Int
+
+    /// Get the entire file as a slice.
+    public var fullSlice: FileSlice {
+        slice(offset: 0, length: size)
     }
 
     // MARK: - Access
@@ -131,13 +134,8 @@ public final class MemoryMappedFile: @unchecked Sendable {
         return FileSlice(
             base: data.advanced(by: validOffset),
             length: validLength,
-            file: self
+            file: self,
         )
-    }
-
-    /// Get the entire file as a slice.
-    public var fullSlice: FileSlice {
-        slice(offset: 0, length: size)
     }
 
     /// Get a byte at the given offset.
@@ -145,7 +143,7 @@ public final class MemoryMappedFile: @unchecked Sendable {
     /// - Parameter offset: Byte offset.
     /// - Returns: The byte value, or nil if out of range.
     public subscript(offset: Int) -> UInt8? {
-        guard offset >= 0 && offset < size else { return nil }
+        guard offset >= 0, offset < size else { return nil }
         return data.load(fromByteOffset: offset, as: UInt8.self)
     }
 
@@ -163,7 +161,7 @@ public final class MemoryMappedFile: @unchecked Sendable {
         result.withUnsafeMutableBytes { buffer in
             buffer.copyMemory(from: UnsafeRawBufferPointer(
                 start: data.advanced(by: start),
-                count: length
+                count: length,
             ))
         }
         return result
@@ -190,7 +188,7 @@ public final class MemoryMappedFile: @unchecked Sendable {
         var ranges: [(Int, Int)] = []
         var lineStart = 0
 
-        for i in 0..<size {
+        for i in 0 ..< size {
             if data.load(fromByteOffset: i, as: UInt8.self) == 0x0A { // '\n'
                 ranges.append((lineStart, i - lineStart))
                 lineStart = i + 1
@@ -211,7 +209,7 @@ public final class MemoryMappedFile: @unchecked Sendable {
     /// - Returns: The line content as a slice, or nil if out of range.
     public func line(_ lineIndex: Int) -> FileSlice? {
         let ranges = findLineRanges()
-        guard lineIndex >= 0 && lineIndex < ranges.count else { return nil }
+        guard lineIndex >= 0, lineIndex < ranges.count else { return nil }
         let range = ranges[lineIndex]
         return slice(offset: range.offset, length: range.length)
     }
@@ -231,7 +229,7 @@ public final class MemoryMappedFile: @unchecked Sendable {
         madvise(
             UnsafeMutableRawPointer(mutating: data.advanced(by: validOffset)),
             validLength,
-            MADV_WILLNEED
+            MADV_WILLNEED,
         )
     }
 
@@ -248,26 +246,27 @@ public final class MemoryMappedFile: @unchecked Sendable {
         madvise(
             UnsafeMutableRawPointer(mutating: data.advanced(by: validOffset)),
             validLength,
-            MADV_DONTNEED
+            MADV_DONTNEED,
         )
     }
+
+    // MARK: Private
+
+    /// Pointer to the mapped memory.
+    private let data: UnsafeRawPointer
+
+    /// File descriptor (kept open for the mapping).
+    private let fileDescriptor: Int32
 }
 
-// MARK: - File Slice
+// MARK: - FileSlice
 
 /// A zero-copy slice of a memory-mapped file.
 ///
 /// Slices reference the underlying mapped memory without copying.
 /// They are lightweight and can be created freely.
 public struct FileSlice: @unchecked Sendable {
-    /// Pointer to the start of the slice.
-    private let base: UnsafeRawPointer
-
-    /// Length of the slice in bytes.
-    public let length: Int
-
-    /// Reference to the parent file (keeps mapping alive).
-    private let file: MemoryMappedFile
+    // MARK: Lifecycle
 
     init(base: UnsafeRawPointer, length: Int, file: MemoryMappedFile) {
         self.base = base
@@ -275,12 +274,17 @@ public struct FileSlice: @unchecked Sendable {
         self.file = file
     }
 
+    // MARK: Public
+
+    /// Length of the slice in bytes.
+    public let length: Int
+
     /// Check if the slice is empty.
     public var isEmpty: Bool { length == 0 }
 
     /// Get a byte at the given offset.
     public subscript(offset: Int) -> UInt8? {
-        guard offset >= 0 && offset < length else { return nil }
+        guard offset >= 0, offset < length else { return nil }
         return base.load(fromByteOffset: offset, as: UInt8.self)
     }
 
@@ -291,7 +295,7 @@ public struct FileSlice: @unchecked Sendable {
         return FileSlice(
             base: base.advanced(by: validOffset),
             length: validLength,
-            file: file
+            file: file,
         )
     }
 
@@ -300,7 +304,7 @@ public struct FileSlice: @unchecked Sendable {
         guard length > 0 else { return "" }
         let buffer = UnsafeBufferPointer(
             start: base.assumingMemoryBound(to: UInt8.self),
-            count: length
+            count: length,
         )
         return String(decoding: buffer, as: UTF8.self)
     }
@@ -335,22 +339,41 @@ public struct FileSlice: @unchecked Sendable {
     /// Hash the slice contents.
     public func hash() -> UInt64 {
         // FNV-1a hash
-        var hash: UInt64 = 14695981039346656037
-        for i in 0..<length {
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for i in 0 ..< length {
             let byte = base.load(fromByteOffset: i, as: UInt8.self)
             hash ^= UInt64(byte)
-            hash = hash &* 1099511628211
+            hash = hash &* 1_099_511_628_211
         }
         return hash
     }
+
+    // MARK: Private
+
+    /// Pointer to the start of the slice.
+    private let base: UnsafeRawPointer
+
+    /// Reference to the parent file (keeps mapping alive).
+    private let file: MemoryMappedFile
 }
 
-// MARK: - Token Slice
+// MARK: - TokenSlice
 
 /// A slice-based token representation using offsets into a memory-mapped file.
 ///
 /// This allows tokens to reference source text without copying strings.
 public struct TokenSlice: Sendable, Hashable {
+    // MARK: Lifecycle
+
+    public init(offset: Int, length: Int, line: Int, column: Int) {
+        self.offset = offset
+        self.length = length
+        self.line = line
+        self.column = column
+    }
+
+    // MARK: Public
+
     /// Offset in the source file.
     public let offset: Int
 
@@ -363,13 +386,6 @@ public struct TokenSlice: Sendable, Hashable {
     /// Column number (1-based).
     public let column: Int
 
-    public init(offset: Int, length: Int, line: Int, column: Int) {
-        self.offset = offset
-        self.length = length
-        self.line = line
-        self.column = column
-    }
-
     /// Get the token text from a memory-mapped file.
     public func text(from file: MemoryMappedFile) -> String? {
         file.slice(offset: offset, length: length).asString()
@@ -381,13 +397,24 @@ public struct TokenSlice: Sendable, Hashable {
     }
 }
 
-// MARK: - Slice-Based Token Sequence
+// MARK: - SliceBasedTokenSequence
 
 /// A token sequence using slices instead of copied strings.
 ///
 /// This provides the same interface as TokenSequence but stores only
 /// offsets, reducing memory usage significantly for large files.
 public struct SliceBasedTokenSequence: Sendable {
+    // MARK: Lifecycle
+
+    public init(file: String, source: MemoryMappedFile, tokens: [TokenSlice], kinds: [UInt8]) {
+        self.file = file
+        self.source = source
+        self.tokens = tokens
+        self.kinds = kinds
+    }
+
+    // MARK: Public
+
     /// The source file path.
     public let file: String
 
@@ -400,19 +427,12 @@ public struct SliceBasedTokenSequence: Sendable {
     /// Token kinds in order (parallel array).
     public let kinds: [UInt8]
 
-    public init(file: String, source: MemoryMappedFile, tokens: [TokenSlice], kinds: [UInt8]) {
-        self.file = file
-        self.source = source
-        self.tokens = tokens
-        self.kinds = kinds
-    }
-
     /// Number of tokens.
     public var count: Int { tokens.count }
 
     /// Get text for a token at index.
     public func text(at index: Int) -> String? {
-        guard index >= 0 && index < tokens.count else { return nil }
+        guard index >= 0, index < tokens.count else { return nil }
         return tokens[index].text(from: source)
     }
 
@@ -423,7 +443,7 @@ public struct SliceBasedTokenSequence: Sendable {
         let start = max(0, startLine - 1)
         let end = min(lineRanges.count, endLine)
 
-        guard start < end && start < lineRanges.count else { return nil }
+        guard start < end, start < lineRanges.count else { return nil }
 
         let startOffset = lineRanges[start].offset
         let endRange = lineRanges[end - 1]

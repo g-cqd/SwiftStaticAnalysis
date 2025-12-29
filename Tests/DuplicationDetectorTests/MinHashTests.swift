@@ -5,15 +5,14 @@
 //  Comprehensive tests for MinHash, LSH, and shingle-based clone detection.
 //
 
-import Testing
-import Foundation
 @testable import DuplicationDetector
+import Foundation
+import Testing
 
-// MARK: - Shingle Generator Tests
+// MARK: - ShingleGeneratorTests
 
 @Suite("Shingle Generator Tests")
 struct ShingleGeneratorTests {
-
     @Test("Basic shingle generation")
     func basicShingleGeneration() {
         let generator = ShingleGenerator(shingleSize: 3, normalize: false)
@@ -50,8 +49,8 @@ struct ShingleGeneratorTests {
         let shingles2 = generator.generate(tokens: tokens2, kinds: kinds2)
 
         // After normalization, both should produce same shingle hashes
-        let hashes1 = Set(shingles1.map { $0.hash })
-        let hashes2 = Set(shingles2.map { $0.hash })
+        let hashes1 = Set(shingles1.map(\.hash))
+        let hashes2 = Set(shingles2.map(\.hash))
 
         #expect(hashes1 == hashes2)
     }
@@ -102,7 +101,7 @@ struct ShingleGeneratorTests {
     func differentShingleSizes() {
         let tokens = ["a", "b", "c", "d", "e", "f"]
 
-        for size in 1...5 {
+        for size in 1 ... 5 {
             let generator = ShingleGenerator(shingleSize: size, normalize: false)
             let shingles = generator.generate(tokens: tokens, kinds: nil)
             #expect(shingles.count == tokens.count - size + 1)
@@ -110,11 +109,10 @@ struct ShingleGeneratorTests {
     }
 }
 
-// MARK: - MinHash Signature Tests
+// MARK: - MinHashSignatureTests
 
 @Suite("MinHash Signature Tests")
 struct MinHashSignatureTests {
-
     @Test("Identical sets have similarity 1.0")
     func identicalSetsSimilarity() {
         let generator = MinHashGenerator(numHashes: 100)
@@ -143,9 +141,9 @@ struct MinHashSignatureTests {
     @Test("Partial overlap similarity estimation")
     func partialOverlapSimilarity() {
         let generator = MinHashGenerator(numHashes: 256)
-        let common: Set<UInt64> = Set(1...50)
-        let unique1: Set<UInt64> = Set(51...100)
-        let unique2: Set<UInt64> = Set(101...150)
+        let common: Set<UInt64> = Set(1 ... 50)
+        let unique1: Set<UInt64> = Set(51 ... 100)
+        let unique2: Set<UInt64> = Set(101 ... 150)
 
         let hashes1 = common.union(unique1) // 100 elements, 50 in common
         let hashes2 = common.union(unique2) // 100 elements, 50 in common
@@ -194,11 +192,10 @@ struct MinHashSignatureTests {
     }
 }
 
-// MARK: - MinHash Accuracy Tests
+// MARK: - MinHashAccuracyTests
 
 @Suite("MinHash Accuracy Tests")
 struct MinHashAccuracyTests {
-
     @Test("Similarity estimation accuracy at various thresholds")
     func similarityEstimationAccuracy() {
         let generator = MinHashGenerator(numHashes: 256)
@@ -209,9 +206,9 @@ struct MinHashAccuracyTests {
             let totalSize = Int(Double(overlapSize) / targetSim)
             let uniquePerSet = (totalSize - overlapSize) / 2
 
-            let common: Set<UInt64> = Set((0..<overlapSize).map { UInt64($0) })
-            let unique1: Set<UInt64> = Set((1000..<(1000 + uniquePerSet)).map { UInt64($0) })
-            let unique2: Set<UInt64> = Set((2000..<(2000 + uniquePerSet)).map { UInt64($0) })
+            let common: Set<UInt64> = Set((0 ..< overlapSize).map { UInt64($0) })
+            let unique1: Set<UInt64> = Set((1000 ..< (1000 + uniquePerSet)).map { UInt64($0) })
+            let unique2: Set<UInt64> = Set((2000 ..< (2000 + uniquePerSet)).map { UInt64($0) })
 
             let hashes1 = common.union(unique1)
             let hashes2 = common.union(unique2)
@@ -233,9 +230,9 @@ struct MinHashAccuracyTests {
         let overlapRatio = 0.6
 
         let overlapSize = Int(Double(size) * overlapRatio)
-        let common: Set<UInt64> = Set((0..<overlapSize).map { UInt64($0) })
-        let unique1: Set<UInt64> = Set((size..<(2 * size - overlapSize)).map { UInt64($0) })
-        let unique2: Set<UInt64> = Set(((2 * size)..<(3 * size - overlapSize)).map { UInt64($0) })
+        let common: Set<UInt64> = Set((0 ..< overlapSize).map { UInt64($0) })
+        let unique1: Set<UInt64> = Set((size ..< (2 * size - overlapSize)).map { UInt64($0) })
+        let unique2: Set<UInt64> = Set(((2 * size) ..< (3 * size - overlapSize)).map { UInt64($0) })
 
         let hashes1 = common.union(unique1)
         let hashes2 = common.union(unique2)
@@ -250,11 +247,10 @@ struct MinHashAccuracyTests {
     }
 }
 
-// MARK: - LSH Index Tests
+// MARK: - LSHIndexTests
 
 @Suite("LSH Index Tests")
 struct LSHIndexTests {
-
     @Test("Optimal bands and rows calculation")
     func optimalBandsAndRows() {
         // Test that optimal parameters produce reasonable thresholds
@@ -271,7 +267,7 @@ struct LSHIndexTests {
     @Test("Insert and query")
     func insertAndQuery() {
         let generator = MinHashGenerator(numHashes: 64)
-        let hashes: Set<UInt64> = Set((0..<100).map { UInt64($0) })
+        let hashes: Set<UInt64> = Set((0 ..< 100).map { UInt64($0) })
         let sig1 = generator.computeSignature(for: hashes, documentId: 1)
         let sig2 = generator.computeSignature(for: hashes, documentId: 2)
 
@@ -289,13 +285,13 @@ struct LSHIndexTests {
         let generator = MinHashGenerator(numHashes: 64)
 
         // Create 3 similar documents
-        let common: Set<UInt64> = Set((0..<50).map { UInt64($0) })
+        let common: Set<UInt64> = Set((0 ..< 50).map { UInt64($0) })
         let sig1 = generator.computeSignature(for: common.union([100, 101]), documentId: 1)
         let sig2 = generator.computeSignature(for: common.union([200, 201]), documentId: 2)
         let sig3 = generator.computeSignature(for: common.union([300, 301]), documentId: 3)
 
         // Create 1 dissimilar document
-        let dissimilar: Set<UInt64> = Set((1000..<1100).map { UInt64($0) })
+        let dissimilar: Set<UInt64> = Set((1000 ..< 1100).map { UInt64($0) })
         let sig4 = generator.computeSignature(for: dissimilar, documentId: 4)
 
         var index = LSHIndex(signatureSize: 64, threshold: 0.5)
@@ -316,9 +312,9 @@ struct LSHIndexTests {
     func queryWithSimilarity() {
         let generator = MinHashGenerator(numHashes: 128)
 
-        let base: Set<UInt64> = Set((0..<100).map { UInt64($0) })
-        let similar: Set<UInt64> = base.union(Set((100..<120).map { UInt64($0) }))
-        let dissimilar: Set<UInt64> = Set((1000..<1100).map { UInt64($0) })
+        let base: Set<UInt64> = Set((0 ..< 100).map { UInt64($0) })
+        let similar: Set<UInt64> = base.union(Set((100 ..< 120).map { UInt64($0) }))
+        let dissimilar: Set<UInt64> = Set((1000 ..< 1100).map { UInt64($0) })
 
         let sigBase = generator.computeSignature(for: base, documentId: 0)
         let sigSimilar = generator.computeSignature(for: similar, documentId: 1)
@@ -338,11 +334,10 @@ struct LSHIndexTests {
     }
 }
 
-// MARK: - LSH Pipeline Tests
+// MARK: - LSHPipelineTests
 
 @Suite("LSH Pipeline Tests")
 struct LSHPipelineTests {
-
     @Test("Find similar pairs in documents")
     func findSimilarPairs() {
         let pipeline = LSHPipeline(numHashes: 128, threshold: 0.5)
@@ -359,15 +354,15 @@ struct LSHPipelineTests {
 
         let doc1 = ShingledDocument(
             file: "file1.swift", startLine: 1, endLine: 1, tokenCount: tokens1.count,
-            shingleHashes: Set(shingles1.map { $0.hash }), shingles: shingles1, id: 1
+            shingleHashes: Set(shingles1.map(\.hash)), shingles: shingles1, id: 1,
         )
         let doc2 = ShingledDocument(
             file: "file2.swift", startLine: 1, endLine: 1, tokenCount: tokens2.count,
-            shingleHashes: Set(shingles2.map { $0.hash }), shingles: shingles2, id: 2
+            shingleHashes: Set(shingles2.map(\.hash)), shingles: shingles2, id: 2,
         )
         let doc3 = ShingledDocument(
             file: "file3.swift", startLine: 1, endLine: 1, tokenCount: tokens3.count,
-            shingleHashes: Set(shingles3.map { $0.hash }), shingles: shingles3, id: 3
+            shingleHashes: Set(shingles3.map(\.hash)), shingles: shingles3, id: 3,
         )
 
         let pairs = pipeline.findSimilarPairs([doc1, doc2, doc3], verifyWithExact: true)
@@ -377,11 +372,10 @@ struct LSHPipelineTests {
     }
 }
 
-// MARK: - Document Pair Tests
+// MARK: - DocumentPairTests
 
 @Suite("Document Pair Tests")
 struct DocumentPairTests {
-
     @Test("Document pair normalization")
     func normalization() {
         let pair1 = DocumentPair(id1: 1, id2: 2)
@@ -402,18 +396,17 @@ struct DocumentPairTests {
     }
 }
 
-// MARK: - MinHash Clone Detector Tests
+// MARK: - MinHashCloneDetectorTests
 
 @Suite("MinHash Clone Detector Tests")
 struct MinHashCloneDetectorTests {
-
     @Test("Detector initialization")
     func detectorInitialization() {
         let detector = MinHashCloneDetector(
             minimumTokens: 30,
             shingleSize: 4,
             numHashes: 64,
-            minimumSimilarity: 0.6
+            minimumSimilarity: 0.6,
         )
 
         #expect(detector.minimumTokens == 30)
@@ -436,14 +429,14 @@ struct MinHashCloneDetectorTests {
             minimumTokens: 10,
             shingleSize: 3,
             numHashes: 64,
-            minimumSimilarity: 0.4
+            minimumSimilarity: 0.4,
         )
 
         // Create token sequences that should be similar
-        let tokens1: [TokenInfo] = (0..<20).map { i in
+        let tokens1: [TokenInfo] = (0 ..< 20).map { i in
             TokenInfo(kind: .identifier, text: "token\(i % 5)", line: i / 5 + 1, column: 0)
         }
-        let tokens2: [TokenInfo] = (0..<20).map { i in
+        let tokens2: [TokenInfo] = (0 ..< 20).map { i in
             TokenInfo(kind: .identifier, text: "token\(i % 5)", line: i / 5 + 1, column: 0)
         }
 
@@ -457,11 +450,10 @@ struct MinHashCloneDetectorTests {
     }
 }
 
-// MARK: - Fast Similarity Checker Tests
+// MARK: - FastSimilarityCheckerTests
 
 @Suite("Fast Similarity Checker Tests")
 struct FastSimilarityCheckerTests {
-
     @Test("Identical sequences have similarity 1.0")
     func identicalSequences() {
         let checker = FastSimilarityChecker(shingleSize: 3, numHashes: 128)
@@ -493,9 +485,29 @@ struct FastSimilarityCheckerTests {
         let checker = FastSimilarityChecker(shingleSize: 2, numHashes: 128)
         // Same structure, different identifier names (should normalize to same)
         let tokens1 = ["func", "calculate", "(", "value", ")", "{", "return", "value", "}"]
-        let kinds1: [TokenKind] = [.keyword, .identifier, .punctuation, .identifier, .punctuation, .punctuation, .keyword, .identifier, .punctuation]
+        let kinds1: [TokenKind] = [
+            .keyword,
+            .identifier,
+            .punctuation,
+            .identifier,
+            .punctuation,
+            .punctuation,
+            .keyword,
+            .identifier,
+            .punctuation,
+        ]
         let tokens2 = ["func", "compute", "(", "input", ")", "{", "return", "input", "}"]
-        let kinds2: [TokenKind] = [.keyword, .identifier, .punctuation, .identifier, .punctuation, .punctuation, .keyword, .identifier, .punctuation]
+        let kinds2: [TokenKind] = [
+            .keyword,
+            .identifier,
+            .punctuation,
+            .identifier,
+            .punctuation,
+            .punctuation,
+            .keyword,
+            .identifier,
+            .punctuation,
+        ]
 
         let similarity = checker.exactSimilarity(tokens1, kinds1: kinds1, tokens2, kinds2: kinds2)
 
@@ -510,10 +522,50 @@ struct FastSimilarityCheckerTests {
                        "func", "b", "(", ")", "{", "let", "y", "=", "2", "}"]
         let tokens2 = ["func", "c", "(", ")", "{", "let", "z", "=", "3", "}",
                        "class", "D", "{", "var", "w", ":", "Int", "=", "4", "}"]
-        let kinds1: [TokenKind] = [.keyword, .identifier, .punctuation, .punctuation, .punctuation, .keyword, .identifier, .operator, .literal, .punctuation,
-                                   .keyword, .identifier, .punctuation, .punctuation, .punctuation, .keyword, .identifier, .operator, .literal, .punctuation]
-        let kinds2: [TokenKind] = [.keyword, .identifier, .punctuation, .punctuation, .punctuation, .keyword, .identifier, .operator, .literal, .punctuation,
-                                   .keyword, .identifier, .punctuation, .keyword, .identifier, .punctuation, .keyword, .operator, .literal, .punctuation]
+        let kinds1: [TokenKind] = [
+            .keyword,
+            .identifier,
+            .punctuation,
+            .punctuation,
+            .punctuation,
+            .keyword,
+            .identifier,
+            .operator,
+            .literal,
+            .punctuation,
+            .keyword,
+            .identifier,
+            .punctuation,
+            .punctuation,
+            .punctuation,
+            .keyword,
+            .identifier,
+            .operator,
+            .literal,
+            .punctuation,
+        ]
+        let kinds2: [TokenKind] = [
+            .keyword,
+            .identifier,
+            .punctuation,
+            .punctuation,
+            .punctuation,
+            .keyword,
+            .identifier,
+            .operator,
+            .literal,
+            .punctuation,
+            .keyword,
+            .identifier,
+            .punctuation,
+            .keyword,
+            .identifier,
+            .punctuation,
+            .keyword,
+            .operator,
+            .literal,
+            .punctuation,
+        ]
 
         let estimated = checker.estimateSimilarity(tokens1, kinds1: kinds1, tokens2, kinds2: kinds2)
         let exact = checker.exactSimilarity(tokens1, kinds1: kinds1, tokens2, kinds2: kinds2)
@@ -522,11 +574,10 @@ struct FastSimilarityCheckerTests {
     }
 }
 
-// MARK: - Weighted MinHash Tests
+// MARK: - WeightedMinHashTests
 
 @Suite("Weighted MinHash Tests")
 struct WeightedMinHashTests {
-
     @Test("Weighted signature for identical counts")
     func weightedSignature() {
         let generator = WeightedMinHashGenerator(numHashes: 64)
@@ -558,11 +609,10 @@ struct WeightedMinHashTests {
     }
 }
 
-// MARK: - Integration Tests
+// MARK: - MinHashIntegrationTests
 
 @Suite("MinHash Integration Tests")
 struct MinHashIntegrationTests {
-
     @Test("End-to-end clone detection")
     func endToEndCloneDetection() {
         // Create a realistic scenario with similar code blocks
@@ -574,33 +624,35 @@ struct MinHashIntegrationTests {
             "func", "calculate", "(", "value", ":", "Int", ")", "->", "Int", "{",
             "let", "result", "=", "value", "*", "2",
             "return", "result",
-            "}"
+            "}",
         ]
         let funcKinds1: [TokenKind] = [
-            .keyword, .identifier, .punctuation, .identifier, .punctuation, .keyword, .punctuation, .operator, .keyword, .punctuation,
+            .keyword, .identifier, .punctuation, .identifier, .punctuation, .keyword, .punctuation, .operator, .keyword,
+            .punctuation,
             .keyword, .identifier, .operator, .identifier, .operator, .literal,
             .keyword, .identifier,
-            .punctuation
+            .punctuation,
         ]
 
         let funcTokens2 = [
             "func", "compute", "(", "input", ":", "Int", ")", "->", "Int", "{",
             "let", "output", "=", "input", "*", "3",
             "return", "output",
-            "}"
+            "}",
         ]
         let funcKinds2: [TokenKind] = [
-            .keyword, .identifier, .punctuation, .identifier, .punctuation, .keyword, .punctuation, .operator, .keyword, .punctuation,
+            .keyword, .identifier, .punctuation, .identifier, .punctuation, .keyword, .punctuation, .operator, .keyword,
+            .punctuation,
             .keyword, .identifier, .operator, .identifier, .operator, .literal,
             .keyword, .identifier,
-            .punctuation
+            .punctuation,
         ]
 
         let shingles1 = shingleGen.generate(tokens: funcTokens1, kinds: funcKinds1)
         let shingles2 = shingleGen.generate(tokens: funcTokens2, kinds: funcKinds2)
 
-        let hashes1 = Set(shingles1.map { $0.hash })
-        let hashes2 = Set(shingles2.map { $0.hash })
+        let hashes1 = Set(shingles1.map(\.hash))
+        let hashes2 = Set(shingles2.map(\.hash))
 
         // With normalization, these should be very similar
         let exact = MinHashGenerator.exactJaccardSimilarity(hashes1, hashes2)
@@ -622,14 +674,13 @@ struct MinHashIntegrationTests {
         // Create 10 documents, 3 of which are near-duplicates
         var documents: [ShingledDocument] = []
 
-        for i in 0..<10 {
-            let tokens: [String]
-            if i < 3 {
+        for i in 0 ..< 10 {
+            let tokens: [String] = if i < 3 {
                 // Near-duplicates: same base with small variation
-                tokens = ["common", "tokens", "here", "variant\(i)"]
+                ["common", "tokens", "here", "variant\(i)"]
             } else {
                 // Unique documents
-                tokens = ["unique", "document", "number", "\(i)", "extra\(i)"]
+                ["unique", "document", "number", "\(i)", "extra\(i)"]
             }
 
             let shingles = shingleGen.generate(tokens: tokens, kinds: nil)
@@ -637,9 +688,9 @@ struct MinHashIntegrationTests {
                 file: "file\(i).swift",
                 startLine: 1, endLine: 1,
                 tokenCount: tokens.count,
-                shingleHashes: Set(shingles.map { $0.hash }),
+                shingleHashes: Set(shingles.map(\.hash)),
                 shingles: shingles,
-                id: i
+                id: i,
             ))
         }
 
@@ -657,11 +708,10 @@ struct MinHashIntegrationTests {
     }
 }
 
-// MARK: - Exact Jaccard Tests
+// MARK: - ExactJaccardTests
 
 @Suite("Exact Jaccard Similarity Tests")
 struct ExactJaccardTests {
-
     @Test("Empty sets have zero similarity")
     func emptySets() {
         let empty: Set<UInt64> = []
@@ -705,27 +755,26 @@ struct ExactJaccardTests {
     }
 }
 
-// MARK: - Batch Processing Tests
+// MARK: - BatchProcessingTests
 
 @Suite("Batch Processing Tests")
 struct BatchProcessingTests {
-
     @Test("Batch compute signatures")
     func batchComputeSignatures() {
         let generator = MinHashGenerator(numHashes: 64)
         let shingleGen = ShingleGenerator(shingleSize: 2, normalize: false)
 
         var documents: [ShingledDocument] = []
-        for i in 0..<5 {
+        for i in 0 ..< 5 {
             let tokens = ["token\(i)", "token\(i + 1)", "token\(i + 2)"]
             let shingles = shingleGen.generate(tokens: tokens, kinds: nil)
             documents.append(ShingledDocument(
                 file: "file\(i).swift",
                 startLine: 1, endLine: 1,
                 tokenCount: tokens.count,
-                shingleHashes: Set(shingles.map { $0.hash }),
+                shingleHashes: Set(shingles.map(\.hash)),
                 shingles: shingles,
-                id: i
+                id: i,
             ))
         }
 
@@ -742,7 +791,7 @@ struct BatchProcessingTests {
         let generator = MinHashGenerator(numHashes: 64)
 
         // Create 3 similar signatures
-        let common: Set<UInt64> = Set((0..<50).map { UInt64($0) })
+        let common: Set<UInt64> = Set((0 ..< 50).map { UInt64($0) })
         let sig1 = generator.computeSignature(for: common.union([100]), documentId: 1)
         let sig2 = generator.computeSignature(for: common.union([200]), documentId: 2)
         let sig3 = generator.computeSignature(for: common.union([300]), documentId: 3)
@@ -750,7 +799,7 @@ struct BatchProcessingTests {
         let pairs = generator.computePairwiseSimilarities([sig1, sig2, sig3], threshold: 0.5)
 
         // Should find pairs with high similarity
-        #expect(pairs.count >= 0) // May vary based on hash function
+        #expect(!pairs.isEmpty) // May vary based on hash function
         for pair in pairs {
             #expect(pair.similarity >= 0.5)
         }

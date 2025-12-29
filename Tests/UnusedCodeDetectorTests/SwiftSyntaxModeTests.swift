@@ -6,13 +6,14 @@
 //
 
 import Foundation
+@testable import SwiftStaticAnalysisCore
 import Testing
 @testable import UnusedCodeDetector
-@testable import SwiftStaticAnalysisCore
+
+// MARK: - SwiftSyntaxModeTests
 
 @Suite("SwiftSyntax Mode Unused Code Tests")
 struct SwiftSyntaxModeTests {
-
     // MARK: - Basic Detection
 
     @Test("Detect unused private functions")
@@ -56,7 +57,7 @@ struct SwiftSyntaxModeTests {
 
         let config = UnusedCodeConfiguration(
             detectVariables: true,
-            ignorePublicAPI: false
+            ignorePublicAPI: false,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -77,7 +78,7 @@ struct SwiftSyntaxModeTests {
 
         let config = UnusedCodeConfiguration(
             detectTypes: true,
-            ignorePublicAPI: false
+            ignorePublicAPI: false,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -102,7 +103,7 @@ struct SwiftSyntaxModeTests {
         """
 
         let config = UnusedCodeConfiguration(
-            ignorePublicAPI: true
+            ignorePublicAPI: true,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -126,7 +127,7 @@ struct SwiftSyntaxModeTests {
 
         let config = UnusedCodeConfiguration(
             ignorePublicAPI: false,
-            minimumConfidence: .low
+            minimumConfidence: .low,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -148,7 +149,7 @@ struct SwiftSyntaxModeTests {
 
         let config = UnusedCodeConfiguration(
             ignorePublicAPI: false,
-            minimumConfidence: .low
+            minimumConfidence: .low,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -176,7 +177,7 @@ struct SwiftSyntaxModeTests {
 
         let config = UnusedCodeConfiguration(
             ignorePublicAPI: false,
-            minimumConfidence: .high
+            minimumConfidence: .high,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -200,7 +201,7 @@ struct SwiftSyntaxModeTests {
 
         let config = UnusedCodeConfiguration(
             detectVariables: false,
-            detectFunctions: true
+            detectFunctions: true,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -224,7 +225,7 @@ struct SwiftSyntaxModeTests {
         let config = UnusedCodeConfiguration(
             detectVariables: true,
             detectFunctions: false,
-            ignorePublicAPI: false
+            ignorePublicAPI: false,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -293,11 +294,10 @@ struct SwiftSyntaxModeTests {
     }
 }
 
-// MARK: - False Positive Prevention Tests
+// MARK: - FalsePositivePreventionTests
 
 @Suite("False Positive Prevention Tests")
 struct FalsePositivePreventionTests {
-
     @Test("Private method called within same type is not unused")
     func privateMethodCalledWithinSameType() async throws {
         let source = """
@@ -314,7 +314,7 @@ struct FalsePositivePreventionTests {
 
         let config = UnusedCodeConfiguration(
             detectFunctions: true,
-            ignorePublicAPI: false
+            ignorePublicAPI: false,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -339,7 +339,7 @@ struct FalsePositivePreventionTests {
 
         let config = UnusedCodeConfiguration(
             detectVariables: true,
-            ignorePublicAPI: false
+            ignorePublicAPI: false,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -370,7 +370,7 @@ struct FalsePositivePreventionTests {
 
         let config = UnusedCodeConfiguration(
             detectVariables: true,
-            ignorePublicAPI: false
+            ignorePublicAPI: false,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -403,7 +403,7 @@ struct FalsePositivePreventionTests {
         let config = UnusedCodeConfiguration(
             detectTypes: true,
             ignorePublicAPI: false,
-            minimumConfidence: .low
+            minimumConfidence: .low,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -439,7 +439,7 @@ struct FalsePositivePreventionTests {
 
         let config = UnusedCodeConfiguration(
             detectFunctions: true,
-            ignorePublicAPI: false
+            ignorePublicAPI: false,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -475,7 +475,7 @@ struct FalsePositivePreventionTests {
 
         let config = UnusedCodeConfiguration(
             detectVariables: true,
-            ignorePublicAPI: false
+            ignorePublicAPI: false,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -489,11 +489,10 @@ struct FalsePositivePreventionTests {
     }
 }
 
-// MARK: - Detection with Fixtures
+// MARK: - UnusedCodeFixtureTests
 
 @Suite("Unused Code Fixture Tests")
 struct UnusedCodeFixtureTests {
-
     @Test("Detect unused code in IndirectReferences fixture")
     func detectInIndirectReferencesFixture() async throws {
         let fixturesPath = URL(fileURLWithPath: #filePath)
@@ -514,7 +513,7 @@ struct UnusedCodeFixtureTests {
         let config = UnusedCodeConfiguration(
             detectVariables: true,
             detectFunctions: true,
-            ignorePublicAPI: false
+            ignorePublicAPI: false,
         )
         let detector = UnusedCodeDetector(configuration: config)
         let result = try await detector.detectFromSource(source, file: fixturesPath.path)

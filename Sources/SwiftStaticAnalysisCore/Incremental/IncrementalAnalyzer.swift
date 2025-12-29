@@ -8,10 +8,35 @@
 
 import Foundation
 
-// MARK: - Incremental Analysis Configuration
+// MARK: - IncrementalConfiguration
 
 /// Configuration for incremental analysis.
 public struct IncrementalConfiguration: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        cacheDirectory: URL? = nil,
+        trackDependencies: Bool = true,
+        changeDetection: ChangeDetector.Configuration = .default,
+        concurrency: ConcurrencyConfiguration = .default,
+    ) {
+        self.cacheDirectory = cacheDirectory ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent(".swiftanalysis")
+        self.trackDependencies = trackDependencies
+        self.changeDetection = changeDetection
+        self.concurrency = concurrency
+    }
+
+    // MARK: Public
+
+    public static let `default` = IncrementalConfiguration()
+
+    /// Configuration that disables caching (always full analysis).
+    public static let disabled = IncrementalConfiguration(
+        cacheDirectory: URL(fileURLWithPath: "/dev/null"),
+        trackDependencies: false,
+    )
+
     /// Directory for cache files.
     public let cacheDirectory: URL
 
@@ -23,30 +48,9 @@ public struct IncrementalConfiguration: Sendable {
 
     /// Concurrency configuration for parallel processing.
     public let concurrency: ConcurrencyConfiguration
-
-    public init(
-        cacheDirectory: URL? = nil,
-        trackDependencies: Bool = true,
-        changeDetection: ChangeDetector.Configuration = .default,
-        concurrency: ConcurrencyConfiguration = .default
-    ) {
-        self.cacheDirectory = cacheDirectory ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent(".swiftanalysis")
-        self.trackDependencies = trackDependencies
-        self.changeDetection = changeDetection
-        self.concurrency = concurrency
-    }
-
-    public static let `default` = IncrementalConfiguration()
-
-    /// Configuration that disables caching (always full analysis).
-    public static let disabled = IncrementalConfiguration(
-        cacheDirectory: URL(fileURLWithPath: "/dev/null"),
-        trackDependencies: false
-    )
 }
 
-// MARK: - Incremental Analysis Result
+// MARK: - IncrementalAnalysisResult
 
 /// Result of incremental analysis.
 public struct IncrementalAnalysisResult: Sendable {
@@ -77,37 +81,31 @@ public struct IncrementalAnalysisResult: Sendable {
     }
 }
 
-// MARK: - Incremental Analyzer
+// MARK: - IncrementalAnalyzer
 
 /// Performs incremental analysis by detecting changes and using cached results.
 public actor IncrementalAnalyzer {
-
-    /// Configuration.
-    private let configuration: IncrementalConfiguration
-
-    /// Analysis cache.
-    private let cache: AnalysisCache
-
-    /// Dependency tracker.
-    private let dependencyTracker: DependencyTracker
-
-    /// Change detector.
-    private let changeDetector: ChangeDetector
-
-    /// File parser.
-    private let parser: SwiftFileParser
-
-    /// Whether caches have been loaded.
-    private var isInitialized: Bool = false
+    // MARK: Lifecycle
 
     // MARK: - Initialization
 
     public init(configuration: IncrementalConfiguration = .default) {
         self.configuration = configuration
-        self.cache = AnalysisCache(cacheDirectory: configuration.cacheDirectory)
-        self.dependencyTracker = DependencyTracker(cacheDirectory: configuration.cacheDirectory)
-        self.changeDetector = ChangeDetector(configuration: configuration.changeDetection)
-        self.parser = SwiftFileParser()
+        cache = AnalysisCache(cacheDirectory: configuration.cacheDirectory)
+        dependencyTracker = DependencyTracker(cacheDirectory: configuration.cacheDirectory)
+        changeDetector = ChangeDetector(configuration: configuration.changeDetection)
+        parser = SwiftFileParser()
+    }
+
+    // MARK: Public
+
+    // MARK: - Diagnostics
+
+    /// Diagnostic information about incremental analysis state.
+    public struct Diagnostics: Sendable {
+        public let cacheStats: AnalysisCache.Statistics
+        public let dependencyStats: DependencyTracker.Statistics
+        public let cacheDirectory: URL
     }
 
     /// Initialize caches by loading from disk.
@@ -144,14 +142,14 @@ public actor IncrementalAnalyzer {
         let previousState = await cache.getFileStates()
         let changes = await changeDetector.detectChanges(
             currentFiles: files,
-            previousState: previousState
+            previousState: previousState,
         )
 
         // Step 2: Determine files to analyze
         var filesToAnalyze = Set(changes.filesToAnalyze)
 
         // Add transitively affected files if tracking dependencies
-        if configuration.trackDependencies && !filesToAnalyze.isEmpty {
+        if configuration.trackDependencies, !filesToAnalyze.isEmpty {
             let affected = await dependencyTracker.getAffectedFiles(changedFiles: filesToAnalyze)
             filesToAnalyze.formUnion(affected.intersection(Set(files)))
         }
@@ -179,7 +177,7 @@ public actor IncrementalAnalyzer {
                     file: cached.file,
                     line: cached.line,
                     column: cached.column,
-                    offset: cached.offset
+                    offset: cached.offset,
                 )
                 return Declaration(
                     name: cached.name,
@@ -191,7 +189,7 @@ public actor IncrementalAnalyzer {
                     scope: ScopeID(cached.scopeID),
                     typeAnnotation: cached.typeAnnotation,
                     documentation: cached.documentation,
-                    conformances: cached.conformances
+                    conformances: cached.conformances,
                 )
             })
 
@@ -202,12 +200,12 @@ public actor IncrementalAnalyzer {
                         file: cached.file,
                         line: cached.line,
                         column: cached.column,
-                        offset: cached.offset
+                        offset: cached.offset,
                     ),
                     scope: ScopeID(cached.scopeID),
                     context: ReferenceContext(rawValue: cached.context) ?? .unknown,
                     isQualified: cached.isQualified,
-                    qualifier: cached.qualifier
+                    qualifier: cached.qualifier,
                 )
             })
         }
@@ -222,7 +220,7 @@ public actor IncrementalAnalyzer {
         if !filesToAnalyzeArray.isEmpty {
             let results = try await ParallelProcessor.map(
                 filesToAnalyzeArray,
-                maxConcurrency: configuration.concurrency.maxConcurrentFiles
+                maxConcurrency: configuration.concurrency.maxConcurrentFiles,
             ) { [parser] file -> FileAnalysisResult in
                 let syntax = try await parser.parse(file)
                 let lineCount = await parser.lineCount(for: file) ?? 0
@@ -238,7 +236,7 @@ public actor IncrementalAnalyzer {
                     declarations: declCollector.declarations + declCollector.imports,
                     references: refCollector.references,
                     scopes: Array(declCollector.tracker.tree.scopes.values),
-                    lineCount: lineCount
+                    lineCount: lineCount,
                 )
             }
 
@@ -255,7 +253,7 @@ public actor IncrementalAnalyzer {
                         file: result.file,
                         state: state,
                         declarations: result.declarations,
-                        references: result.references
+                        references: result.references,
                     )
                 }
 
@@ -269,11 +267,11 @@ public actor IncrementalAnalyzer {
                     let extractor = DependencyExtractor(declarationIndex: declarationIndex)
                     let dependencies = extractor.extractDependencies(
                         from: result.references,
-                        in: result.file
+                        in: result.file,
                     )
                     await dependencyTracker.updateDependencies(
                         for: result.file,
-                        newDependencies: dependencies
+                        newDependencies: dependencies,
                     )
                 }
             }
@@ -320,7 +318,7 @@ public actor IncrementalAnalyzer {
             declarationCount: declarationIndex.declarations.count,
             referenceCount: referenceIndex.references.count,
             declarationsByKind: declarationsByKind,
-            analysisTime: analysisTime
+            analysisTime: analysisTime,
         )
 
         let analysisResult = AnalysisResult(
@@ -328,7 +326,7 @@ public actor IncrementalAnalyzer {
             declarations: declarationIndex,
             references: referenceIndex,
             scopes: scopeTree,
-            statistics: statistics
+            statistics: statistics,
         )
 
         return IncrementalAnalysisResult(
@@ -336,7 +334,7 @@ public actor IncrementalAnalyzer {
             analyzedFiles: filesToAnalyzeArray,
             cachedFiles: cachedFiles,
             changes: changes,
-            timeSavedMs: timeSaved
+            timeSavedMs: timeSaved,
         )
     }
 
@@ -363,23 +361,34 @@ public actor IncrementalAnalyzer {
         await dependencyTracker.statistics()
     }
 
-    // MARK: - Diagnostics
-
-    /// Diagnostic information about incremental analysis state.
-    public struct Diagnostics: Sendable {
-        public let cacheStats: AnalysisCache.Statistics
-        public let dependencyStats: DependencyTracker.Statistics
-        public let cacheDirectory: URL
-    }
-
     /// Get diagnostic information.
     public func diagnostics() async -> Diagnostics {
-        Diagnostics(
-            cacheStats: await cache.statistics(),
-            dependencyStats: await dependencyTracker.statistics(),
-            cacheDirectory: configuration.cacheDirectory
+        await Diagnostics(
+            cacheStats: cache.statistics(),
+            dependencyStats: dependencyTracker.statistics(),
+            cacheDirectory: configuration.cacheDirectory,
         )
     }
+
+    // MARK: Private
+
+    /// Configuration.
+    private let configuration: IncrementalConfiguration
+
+    /// Analysis cache.
+    private let cache: AnalysisCache
+
+    /// Dependency tracker.
+    private let dependencyTracker: DependencyTracker
+
+    /// Change detector.
+    private let changeDetector: ChangeDetector
+
+    /// File parser.
+    private let parser: SwiftFileParser
+
+    /// Whether caches have been loaded.
+    private var isInitialized: Bool = false
 }
 
 // FileAnalysisResult is defined in Models/AnalysisResult.swift

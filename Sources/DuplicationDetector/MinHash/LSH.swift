@@ -15,27 +15,27 @@
 
 import Foundation
 
-// MARK: - LSH Query Protocol
+// MARK: - LSHQueryable
 
 /// Protocol for LSH indices that can query for similar documents.
 public protocol LSHQueryable: Sendable {
     /// Query for candidate documents similar to the given signature.
     func query(_ signature: MinHashSignature) -> Set<Int>
-    
+
     /// Get the signature for a document ID.
     func signature(for documentId: Int) -> MinHashSignature?
 }
 
-extension LSHQueryable {
+public extension LSHQueryable {
     /// Query and rank results by similarity.
     ///
     /// - Parameters:
     ///   - signature: The query signature.
     ///   - threshold: Minimum similarity to include.
     /// - Returns: Array of (documentId, similarity) pairs, sorted by similarity.
-    public func queryWithSimilarity(
+    func queryWithSimilarity(
         _ signature: MinHashSignature,
-        threshold: Double = 0.0
+        threshold: Double = 0.0,
     ) -> [(documentId: Int, similarity: Double)] {
         let candidates = query(signature)
 
@@ -52,21 +52,11 @@ extension LSHQueryable {
     }
 }
 
-// MARK: - LSH Index
+// MARK: - LSHIndex
 
 /// Locality Sensitive Hashing index for efficient similarity search.
 public struct LSHIndex: Sendable, LSHQueryable {
-    /// Number of bands.
-    public let bands: Int
-
-    /// Rows per band.
-    public let rows: Int
-
-    /// Hash buckets for each band. buckets[band][hash] = [documentIds].
-    private var buckets: [[UInt64: [Int]]]
-
-    /// All indexed signatures.
-    private var signatures: [Int: MinHashSignature]
+    // MARK: Lifecycle
 
     /// Create an LSH index with given parameters.
     ///
@@ -81,8 +71,8 @@ public struct LSHIndex: Sendable, LSHQueryable {
     public init(bands: Int, rows: Int) {
         self.bands = bands
         self.rows = rows
-        self.buckets = Array(repeating: [:], count: bands)
-        self.signatures = [:]
+        buckets = Array(repeating: [:], count: bands)
+        signatures = [:]
     }
 
     /// Create an LSH index optimized for a target similarity threshold.
@@ -92,11 +82,19 @@ public struct LSHIndex: Sendable, LSHQueryable {
     ///   - threshold: Target Jaccard similarity threshold (0.0 to 1.0).
     public init(signatureSize: Int, threshold: Double) {
         let (b, r) = Self.optimalBandsAndRows(signatureSize: signatureSize, threshold: threshold)
-        self.bands = b
-        self.rows = r
-        self.buckets = Array(repeating: [:], count: b)
-        self.signatures = [:]
+        bands = b
+        rows = r
+        buckets = Array(repeating: [:], count: b)
+        signatures = [:]
     }
+
+    // MARK: Public
+
+    /// Number of bands.
+    public let bands: Int
+
+    /// Rows per band.
+    public let rows: Int
 
     /// Compute optimal bands and rows for a given threshold.
     ///
@@ -109,16 +107,16 @@ public struct LSHIndex: Sendable, LSHQueryable {
     /// - Returns: Tuple of (bands, rows).
     public static func optimalBandsAndRows(
         signatureSize: Int,
-        threshold: Double
+        threshold: Double,
     ) -> (bands: Int, rows: Int) {
         var bestBands = 1
         var bestRows = signatureSize
         var bestError = Double.infinity
 
         // Search for b, r such that n = b * r and threshold ≈ (1/b)^(1/r)
-        for b in 1...signatureSize {
+        for b in 1 ... signatureSize {
             let r = signatureSize / b
-            guard r > 0 && b * r <= signatureSize else { continue }
+            guard r > 0, b * r <= signatureSize else { continue }
 
             // Threshold where P(candidate) = 0.5
             let t = pow(1.0 / Double(b), 1.0 / Double(r))
@@ -143,7 +141,7 @@ public struct LSHIndex: Sendable, LSHQueryable {
         signatures[signature.documentId] = signature
 
         // Hash each band
-        for band in 0..<bands {
+        for band in 0 ..< bands {
             let bandHash = hashBand(signature: signature, band: band)
             buckets[band][bandHash, default: []].append(signature.documentId)
         }
@@ -162,11 +160,11 @@ public struct LSHIndex: Sendable, LSHQueryable {
     public func findCandidatePairs() -> Set<DocumentPair> {
         var candidates = Set<DocumentPair>()
 
-        for band in 0..<bands {
+        for band in 0 ..< bands {
             for (_, docIds) in buckets[band] {
                 // All pairs in the same bucket are candidates
-                for i in 0..<docIds.count {
-                    for j in (i + 1)..<docIds.count {
+                for i in 0 ..< docIds.count {
+                    for j in (i + 1) ..< docIds.count {
                         let pair = DocumentPair(id1: docIds[i], id2: docIds[j])
                         candidates.insert(pair)
                     }
@@ -186,7 +184,7 @@ public struct LSHIndex: Sendable, LSHQueryable {
 
         var candidates = Set<Int>()
 
-        for band in 0..<bands {
+        for band in 0 ..< bands {
             let bandHash = hashBand(signature: signature, band: band)
             if let docIds = buckets[band][bandHash] {
                 candidates.formUnion(docIds)
@@ -204,6 +202,14 @@ public struct LSHIndex: Sendable, LSHQueryable {
         signatures[documentId]
     }
 
+    // MARK: Private
+
+    /// Hash buckets for each band. buckets[band][hash] = [documentIds].
+    private var buckets: [[UInt64: [Int]]]
+
+    /// All indexed signatures.
+    private var signatures: [Int: MinHashSignature]
+
     // MARK: - Private Helpers
 
     /// Hash a band of the signature.
@@ -212,10 +218,10 @@ public struct LSHIndex: Sendable, LSHQueryable {
         let end = min(start + rows, signature.values.count)
 
         // FNV-1a hash of the band values
-        var hash: UInt64 = 14695981039346656037
-        let prime: UInt64 = 1099511628211
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        let prime: UInt64 = 1_099_511_628_211
 
-        for i in start..<end {
+        for i in start ..< end {
             hash ^= signature.values[i]
             hash = hash &* prime
         }
@@ -224,12 +230,11 @@ public struct LSHIndex: Sendable, LSHQueryable {
     }
 }
 
-// MARK: - Document Pair
+// MARK: - DocumentPair
 
 /// A pair of document IDs.
 public struct DocumentPair: Sendable, Hashable {
-    public let id1: Int
-    public let id2: Int
+    // MARK: Lifecycle
 
     public init(id1: Int, id2: Int) {
         // Normalize order for consistent hashing
@@ -241,12 +246,27 @@ public struct DocumentPair: Sendable, Hashable {
             self.id2 = id1
         }
     }
+
+    // MARK: Public
+
+    public let id1: Int
+    public let id2: Int
 }
 
-// MARK: - Similar Pair Result
+// MARK: - SimilarPair
 
 /// Result of LSH similarity search.
 public struct SimilarPair: Sendable {
+    // MARK: Lifecycle
+
+    public init(documentId1: Int, documentId2: Int, similarity: Double) {
+        self.documentId1 = min(documentId1, documentId2)
+        self.documentId2 = max(documentId1, documentId2)
+        self.similarity = similarity
+    }
+
+    // MARK: Public
+
     /// First document ID.
     public let documentId1: Int
 
@@ -255,18 +275,28 @@ public struct SimilarPair: Sendable {
 
     /// Estimated Jaccard similarity.
     public let similarity: Double
-
-    public init(documentId1: Int, documentId2: Int, similarity: Double) {
-        self.documentId1 = min(documentId1, documentId2)
-        self.documentId2 = max(documentId1, documentId2)
-        self.similarity = similarity
-    }
 }
 
-// MARK: - LSH Pipeline
+// MARK: - LSHPipeline
 
 /// Complete LSH pipeline for finding similar documents.
 public struct LSHPipeline: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        numHashes: Int = 128,
+        threshold: Double = 0.5,
+        seed: UInt64 = 42,
+    ) {
+        minHashGenerator = MinHashGenerator(numHashes: numHashes, seed: seed)
+        let (b, r) = LSHIndex.optimalBandsAndRows(signatureSize: numHashes, threshold: threshold)
+        bands = b
+        rows = r
+        self.threshold = threshold
+    }
+
+    // MARK: Public
+
     /// MinHash generator.
     public let minHashGenerator: MinHashGenerator
 
@@ -277,18 +307,6 @@ public struct LSHPipeline: Sendable {
     /// Similarity threshold.
     public let threshold: Double
 
-    public init(
-        numHashes: Int = 128,
-        threshold: Double = 0.5,
-        seed: UInt64 = 42
-    ) {
-        self.minHashGenerator = MinHashGenerator(numHashes: numHashes, seed: seed)
-        let (b, r) = LSHIndex.optimalBandsAndRows(signatureSize: numHashes, threshold: threshold)
-        self.bands = b
-        self.rows = r
-        self.threshold = threshold
-    }
-
     /// Find similar pairs among documents.
     ///
     /// - Parameters:
@@ -297,7 +315,7 @@ public struct LSHPipeline: Sendable {
     /// - Returns: Array of similar pairs above threshold.
     public func findSimilarPairs(
         _ documents: [ShingledDocument],
-        verifyWithExact: Bool = false
+        verifyWithExact: Bool = false,
     ) -> [SimilarPair] {
         // Compute signatures
         let signatures = minHashGenerator.computeSignatures(for: documents)
@@ -318,18 +336,18 @@ public struct LSHPipeline: Sendable {
             guard let sig1 = index.signature(for: pair.id1),
                   let sig2 = index.signature(for: pair.id2) else { continue }
 
-            let similarity: Double
-            if verifyWithExact, let doc1 = documentMap[pair.id1], let doc2 = documentMap[pair.id2] {
-                similarity = MinHashGenerator.exactJaccardSimilarity(doc1, doc2)
+            let similarity: Double = if verifyWithExact, let doc1 = documentMap[pair.id1],
+                                        let doc2 = documentMap[pair.id2] {
+                MinHashGenerator.exactJaccardSimilarity(doc1, doc2)
             } else {
-                similarity = sig1.estimateSimilarity(with: sig2)
+                sig1.estimateSimilarity(with: sig2)
             }
 
             if similarity >= threshold {
                 results.append(SimilarPair(
                     documentId1: pair.id1,
                     documentId2: pair.id2,
-                    similarity: similarity
+                    similarity: similarity,
                 ))
             }
         }
@@ -338,7 +356,7 @@ public struct LSHPipeline: Sendable {
     }
 }
 
-// MARK: - Multi-Probe LSH
+// MARK: - MultiProbeLSH
 
 /// Multi-probe LSH for improved recall without increasing index size.
 ///
@@ -350,14 +368,37 @@ public struct LSHPipeline: Sendable {
 /// buckets. By probing nearby buckets (obtained by perturbing hash values),
 /// we can find additional candidates without increasing index size.
 public struct MultiProbeLSH: Sendable, LSHQueryable {
-    /// Base LSH index.
-    private var baseIndex: LSHIndex
+    // MARK: Lifecycle
 
-    /// Number of bands.
-    public var bands: Int { baseIndex.bands }
+    public init(bands: Int, rows: Int, probesPerBand: Int = 2) {
+        baseIndex = LSHIndex(bands: bands, rows: rows)
+        self.probesPerBand = probesPerBand
+        totalProbes = bands * probesPerBand
+        signatures = [:]
 
-    /// Rows per band.
-    public var rows: Int { baseIndex.rows }
+        // Pre-compute perturbation vectors
+        perturbationVectors = Self.generatePerturbationVectors(
+            bands: bands,
+            rows: rows,
+            probesPerBand: probesPerBand,
+        )
+    }
+
+    /// Create from an existing LSH index.
+    public init(index: LSHIndex, probesPerBand: Int = 2) {
+        baseIndex = index
+        self.probesPerBand = probesPerBand
+        totalProbes = index.bands * probesPerBand
+        signatures = [:]
+
+        perturbationVectors = Self.generatePerturbationVectors(
+            bands: index.bands,
+            rows: index.rows,
+            probesPerBand: probesPerBand,
+        )
+    }
+
+    // MARK: Public
 
     /// Number of probes per band.
     public let probesPerBand: Int
@@ -365,39 +406,11 @@ public struct MultiProbeLSH: Sendable, LSHQueryable {
     /// Total number of additional probes.
     public let totalProbes: Int
 
-    /// Perturbation vectors for each probe.
-    private let perturbationVectors: [PerturbationVector]
+    /// Number of bands.
+    public var bands: Int { baseIndex.bands }
 
-    /// All indexed signatures (for similarity computation).
-    private var signatures: [Int: MinHashSignature]
-
-    public init(bands: Int, rows: Int, probesPerBand: Int = 2) {
-        self.baseIndex = LSHIndex(bands: bands, rows: rows)
-        self.probesPerBand = probesPerBand
-        self.totalProbes = bands * probesPerBand
-        self.signatures = [:]
-
-        // Pre-compute perturbation vectors
-        self.perturbationVectors = Self.generatePerturbationVectors(
-            bands: bands,
-            rows: rows,
-            probesPerBand: probesPerBand
-        )
-    }
-
-    /// Create from an existing LSH index.
-    public init(index: LSHIndex, probesPerBand: Int = 2) {
-        self.baseIndex = index
-        self.probesPerBand = probesPerBand
-        self.totalProbes = index.bands * probesPerBand
-        self.signatures = [:]
-
-        self.perturbationVectors = Self.generatePerturbationVectors(
-            bands: index.bands,
-            rows: index.rows,
-            probesPerBand: probesPerBand
-        )
-    }
+    /// Rows per band.
+    public var rows: Int { baseIndex.rows }
 
     /// Index a signature.
     public mutating func insert(_ signature: MinHashSignature) {
@@ -470,7 +483,7 @@ public struct MultiProbeLSH: Sendable, LSHQueryable {
                 results.append(SimilarPair(
                     documentId1: pair.id1,
                     documentId2: pair.id2,
-                    similarity: similarity
+                    similarity: similarity,
                 ))
             }
         }
@@ -478,12 +491,59 @@ public struct MultiProbeLSH: Sendable, LSHQueryable {
         return results.sorted { $0.similarity > $1.similarity }
     }
 
+    // MARK: Private
+
+    /// Base LSH index.
+    private var baseIndex: LSHIndex
+
+    /// Perturbation vectors for each probe.
+    private let perturbationVectors: [PerturbationVector]
+
+    /// All indexed signatures (for similarity computation).
+    private var signatures: [Int: MinHashSignature]
+
+    /// Generate perturbation vectors for multi-probe.
+    ///
+    /// Perturbation vectors modify specific positions in the signature
+    /// to probe nearby hash buckets.
+    private static func generatePerturbationVectors(
+        bands: Int,
+        rows: Int,
+        probesPerBand: Int,
+    ) -> [PerturbationVector] {
+        var vectors: [PerturbationVector] = []
+
+        for band in 0 ..< bands {
+            let bandStart = band * rows
+
+            for probe in 0 ..< probesPerBand {
+                var deltas: [(index: Int, delta: UInt64)] = []
+
+                // For each probe, perturb positions within the band
+                // Use different perturbation strategies for each probe
+                for row in 0 ..< min(probe + 1, rows) {
+                    let index = bandStart + row
+                    // Use incrementing deltas for variety
+                    let delta = UInt64(probe + 1)
+                    deltas.append((index, delta))
+                }
+
+                vectors.append(PerturbationVector(
+                    band: band,
+                    deltas: deltas,
+                ))
+            }
+        }
+
+        return vectors
+    }
+
     // MARK: - Private Helpers
 
     /// Query with a perturbed signature.
     private func queryWithPerturbation(
         _ signature: MinHashSignature,
-        perturbation: PerturbationVector
+        perturbation: PerturbationVector,
     ) -> Set<Int> {
         // Apply perturbation to create modified signature
         let perturbedSignature = applyPerturbation(signature, perturbation: perturbation)
@@ -495,7 +555,7 @@ public struct MultiProbeLSH: Sendable, LSHQueryable {
     /// Apply a perturbation vector to a signature.
     private func applyPerturbation(
         _ signature: MinHashSignature,
-        perturbation: PerturbationVector
+        perturbation: PerturbationVector,
     ) -> MinHashSignature {
         var values = signature.values
 
@@ -509,45 +569,9 @@ public struct MultiProbeLSH: Sendable, LSHQueryable {
 
         return MinHashSignature(values: values, documentId: signature.documentId)
     }
-
-    /// Generate perturbation vectors for multi-probe.
-    ///
-    /// Perturbation vectors modify specific positions in the signature
-    /// to probe nearby hash buckets.
-    private static func generatePerturbationVectors(
-        bands: Int,
-        rows: Int,
-        probesPerBand: Int
-    ) -> [PerturbationVector] {
-        var vectors: [PerturbationVector] = []
-
-        for band in 0..<bands {
-            let bandStart = band * rows
-
-            for probe in 0..<probesPerBand {
-                var deltas: [(index: Int, delta: UInt64)] = []
-
-                // For each probe, perturb positions within the band
-                // Use different perturbation strategies for each probe
-                for row in 0..<min(probe + 1, rows) {
-                    let index = bandStart + row
-                    // Use incrementing deltas for variety
-                    let delta = UInt64(probe + 1)
-                    deltas.append((index, delta))
-                }
-
-                vectors.append(PerturbationVector(
-                    band: band,
-                    deltas: deltas
-                ))
-            }
-        }
-
-        return vectors
-    }
 }
 
-// MARK: - Perturbation Vector
+// MARK: - PerturbationVector
 
 /// A perturbation vector for multi-probe LSH.
 struct PerturbationVector: Sendable {
@@ -560,16 +584,16 @@ struct PerturbationVector: Sendable {
 
 // MARK: - LSH Index Extension for Multi-Probe Support
 
-extension LSHIndex {
+public extension LSHIndex {
     /// Query with multiple probes for improved recall.
     ///
     /// - Parameters:
     ///   - signature: The query signature.
     ///   - probes: Number of additional probes per band.
     /// - Returns: Set of candidate document IDs.
-    public func queryMultiProbe(
+    func queryMultiProbe(
         _ signature: MinHashSignature,
-        probes: Int = 3
+        probes: Int = 3,
     ) -> Set<Int> {
         guard signature.values.count >= bands * rows else { return [] }
 
@@ -597,10 +621,10 @@ extension LSHIndex {
     ///   - probes: Number of additional probes per band.
     ///   - threshold: Minimum similarity to include.
     /// - Returns: Array of (documentId, similarity) pairs, sorted by similarity.
-    public func queryMultiProbeWithSimilarity(
+    func queryMultiProbeWithSimilarity(
         _ signature: MinHashSignature,
         probes: Int = 3,
-        threshold: Double = 0.0
+        threshold: Double = 0.0,
     ) -> [(documentId: Int, similarity: Double)] {
         let candidates = queryMultiProbe(signature, probes: probes)
 
@@ -619,11 +643,11 @@ extension LSHIndex {
     /// Generate perturbation signatures for multi-probe.
     private func generatePerturbations(
         _ signature: MinHashSignature,
-        count: Int
+        count: Int,
     ) -> [MinHashSignature] {
         var perturbations: [MinHashSignature] = []
 
-        for bandIndex in 0..<min(count, bands) {
+        for bandIndex in 0 ..< min(count, bands) {
             var perturbed = signature.values
             // Perturb one value in this band
             let offset = bandIndex * rows
@@ -632,7 +656,7 @@ extension LSHIndex {
             }
             perturbations.append(MinHashSignature(
                 values: perturbed,
-                documentId: signature.documentId
+                documentId: signature.documentId,
             ))
 
             // Also try subtracting
@@ -642,7 +666,7 @@ extension LSHIndex {
             }
             perturbations.append(MinHashSignature(
                 values: perturbed2,
-                documentId: signature.documentId
+                documentId: signature.documentId,
             ))
         }
 
@@ -650,10 +674,28 @@ extension LSHIndex {
     }
 }
 
-// MARK: - Multi-Probe LSH Pipeline
+// MARK: - MultiProbeLSHPipeline
 
 /// Complete multi-probe LSH pipeline for finding similar documents.
 public struct MultiProbeLSHPipeline: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        numHashes: Int = 128,
+        threshold: Double = 0.5,
+        probesPerBand: Int = 2,
+        seed: UInt64 = 42,
+    ) {
+        minHashGenerator = MinHashGenerator(numHashes: numHashes, seed: seed)
+        let (b, r) = LSHIndex.optimalBandsAndRows(signatureSize: numHashes, threshold: threshold)
+        bands = b
+        rows = r
+        self.probesPerBand = probesPerBand
+        self.threshold = threshold
+    }
+
+    // MARK: Public
+
     /// MinHash generator.
     public let minHashGenerator: MinHashGenerator
 
@@ -669,20 +711,6 @@ public struct MultiProbeLSHPipeline: Sendable {
     /// Similarity threshold.
     public let threshold: Double
 
-    public init(
-        numHashes: Int = 128,
-        threshold: Double = 0.5,
-        probesPerBand: Int = 2,
-        seed: UInt64 = 42
-    ) {
-        self.minHashGenerator = MinHashGenerator(numHashes: numHashes, seed: seed)
-        let (b, r) = LSHIndex.optimalBandsAndRows(signatureSize: numHashes, threshold: threshold)
-        self.bands = b
-        self.rows = r
-        self.probesPerBand = probesPerBand
-        self.threshold = threshold
-    }
-
     /// Find similar pairs using multi-probe LSH.
     ///
     /// - Parameters:
@@ -691,7 +719,7 @@ public struct MultiProbeLSHPipeline: Sendable {
     /// - Returns: Array of similar pairs above threshold.
     public func findSimilarPairs(
         _ documents: [ShingledDocument],
-        verifyWithExact: Bool = false
+        verifyWithExact: Bool = false,
     ) -> [SimilarPair] {
         // Compute signatures
         let signatures = minHashGenerator.computeSignatures(for: documents)
@@ -716,7 +744,7 @@ public struct MultiProbeLSHPipeline: Sendable {
                     return SimilarPair(
                         documentId1: pair.documentId1,
                         documentId2: pair.documentId2,
-                        similarity: exactSimilarity
+                        similarity: exactSimilarity,
                     )
                 }
                 return nil
@@ -734,7 +762,7 @@ public struct MultiProbeLSHPipeline: Sendable {
     /// - Returns: Array of (documentId, similarity) pairs.
     public func findSimilar(
         to query: ShingledDocument,
-        in documents: [ShingledDocument]
+        in documents: [ShingledDocument],
     ) -> [(documentId: Int, similarity: Double)] {
         // Compute signatures
         var allDocs = documents

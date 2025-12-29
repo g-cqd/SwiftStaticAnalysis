@@ -10,13 +10,14 @@ import Foundation
 // MARK: - Product API
 
 public struct ProductAPI {
-    private let baseURL: String
-    private let session: URLSession
+    // MARK: Lifecycle
 
     public init(baseURL: String = "https://api.example.com", session: URLSession = .shared) {
         self.baseURL = baseURL
         self.session = session
     }
+
+    // MARK: Public
 
     // MARK: - CRUD Operations (Duplicated Pattern - CLONE)
 
@@ -29,7 +30,7 @@ public struct ProductAPI {
             throw NetworkError.invalidResponse
         }
 
-        guard (200...299).contains(httpResponse.statusCode) else {
+        guard (200 ... 299).contains(httpResponse.statusCode) else {
             throw NetworkError.serverError(httpResponse.statusCode)
         }
 
@@ -47,7 +48,7 @@ public struct ProductAPI {
             throw NetworkError.invalidResponse
         }
 
-        guard (200...299).contains(httpResponse.statusCode) else {
+        guard (200 ... 299).contains(httpResponse.statusCode) else {
             throw NetworkError.serverError(httpResponse.statusCode)
         }
 
@@ -72,7 +73,7 @@ public struct ProductAPI {
             throw NetworkError.invalidResponse
         }
 
-        guard (200...299).contains(httpResponse.statusCode) else {
+        guard (200 ... 299).contains(httpResponse.statusCode) else {
             throw NetworkError.serverError(httpResponse.statusCode)
         }
 
@@ -97,7 +98,7 @@ public struct ProductAPI {
             throw NetworkError.invalidResponse
         }
 
-        guard (200...299).contains(httpResponse.statusCode) else {
+        guard (200 ... 299).contains(httpResponse.statusCode) else {
             throw NetworkError.serverError(httpResponse.statusCode)
         }
 
@@ -117,8 +118,13 @@ public struct ProductAPI {
             throw NetworkError.invalidResponse
         }
 
-        guard (200...299).contains(httpResponse.statusCode) else {
+        guard (200 ... 299).contains(httpResponse.statusCode) else {
             throw NetworkError.serverError(httpResponse.statusCode)
         }
     }
+
+    // MARK: Private
+
+    private let baseURL: String
+    private let session: URLSession
 }

@@ -7,19 +7,33 @@
 
 import Foundation
 
+@_exported import SwiftParser
+
 // Re-export SwiftSyntax types commonly needed by consumers
 @_exported import SwiftSyntax
-@_exported import SwiftParser
 
 // MARK: - Module Exports
 
 // Models
 public typealias SourceLocationConverter = SwiftSyntax.SourceLocationConverter
 
-// MARK: - Static Analyzer
+// MARK: - StaticAnalyzer
 
 /// Main entry point for analyzing Swift source files.
 public struct StaticAnalyzer: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        configuration: AnalyzerConfiguration = .default,
+        concurrency: ConcurrencyConfiguration = .default,
+    ) {
+        parser = SwiftFileParser()
+        self.configuration = configuration
+        self.concurrency = concurrency
+    }
+
+    // MARK: Public
+
     /// The file parser.
     public let parser: SwiftFileParser
 
@@ -28,15 +42,6 @@ public struct StaticAnalyzer: Sendable {
 
     /// Concurrency configuration.
     public let concurrency: ConcurrencyConfiguration
-
-    public init(
-        configuration: AnalyzerConfiguration = .default,
-        concurrency: ConcurrencyConfiguration = .default
-    ) {
-        self.parser = SwiftFileParser()
-        self.configuration = configuration
-        self.concurrency = concurrency
-    }
 
     /// Analyze a single Swift file.
     ///
@@ -59,7 +64,7 @@ public struct StaticAnalyzer: Sendable {
             declarations: declCollector.declarations + declCollector.imports,
             references: refCollector.references,
             scopes: Array(declCollector.tracker.tree.scopes.values),
-            lineCount: lineCount
+            lineCount: lineCount,
         )
     }
 
@@ -105,7 +110,7 @@ public struct StaticAnalyzer: Sendable {
             declarationCount: declarationIndex.declarations.count,
             referenceCount: referenceIndex.references.count,
             declarationsByKind: declarationsByKind,
-            analysisTime: 0
+            analysisTime: 0,
         )
 
         return AnalysisResult(
@@ -113,7 +118,7 @@ public struct StaticAnalyzer: Sendable {
             declarations: declarationIndex,
             references: referenceIndex,
             scopes: scopeTree,
-            statistics: statistics
+            statistics: statistics,
         )
     }
 
@@ -127,9 +132,9 @@ public struct StaticAnalyzer: Sendable {
         // Analyze files in parallel with concurrency limits
         let results = try await ParallelProcessor.map(
             filePaths,
-            maxConcurrency: concurrency.maxConcurrentFiles
+            maxConcurrency: concurrency.maxConcurrentFiles,
         ) { path in
-            try await self.analyzeFile(path)
+            try await analyzeFile(path)
         }
 
         // Aggregate results (sequential - fast operation)
@@ -162,7 +167,7 @@ public struct StaticAnalyzer: Sendable {
             declarationCount: declarationIndex.declarations.count,
             referenceCount: referenceIndex.references.count,
             declarationsByKind: declarationsByKind,
-            analysisTime: Date().timeIntervalSince(startTime)
+            analysisTime: Date().timeIntervalSince(startTime),
         )
 
         return AnalysisResult(
@@ -170,15 +175,32 @@ public struct StaticAnalyzer: Sendable {
             declarations: declarationIndex,
             references: referenceIndex,
             scopes: scopeTree,
-            statistics: statistics
+            statistics: statistics,
         )
     }
 }
 
-// MARK: - Analyzer Configuration
+// MARK: - AnalyzerConfiguration
 
 /// Configuration for the static analyzer.
 public struct AnalyzerConfiguration: Sendable {
+    // MARK: Lifecycle
+
+    public init(
+        includePrivate: Bool = true,
+        includeImports: Bool = true,
+        extractDocumentation: Bool = true,
+    ) {
+        self.includePrivate = includePrivate
+        self.includeImports = includeImports
+        self.extractDocumentation = extractDocumentation
+    }
+
+    // MARK: Public
+
+    /// Default configuration.
+    public static let `default` = AnalyzerConfiguration()
+
     /// Whether to include private declarations.
     public var includePrivate: Bool
 
@@ -187,17 +209,4 @@ public struct AnalyzerConfiguration: Sendable {
 
     /// Whether to extract documentation comments.
     public var extractDocumentation: Bool
-
-    public init(
-        includePrivate: Bool = true,
-        includeImports: Bool = true,
-        extractDocumentation: Bool = true
-    ) {
-        self.includePrivate = includePrivate
-        self.includeImports = includeImports
-        self.extractDocumentation = extractDocumentation
-    }
-
-    /// Default configuration.
-    public static let `default` = AnalyzerConfiguration()
 }

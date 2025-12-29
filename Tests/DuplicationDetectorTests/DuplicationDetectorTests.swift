@@ -3,11 +3,13 @@
 //  SwiftStaticAnalysis
 //
 
-import Testing
 @testable import DuplicationDetector
+import SwiftParser
 @testable import SwiftStaticAnalysisCore
 import SwiftSyntax
-import SwiftParser
+import Testing
+
+// MARK: - DuplicationDetectorTests
 
 @Suite("DuplicationDetector Tests")
 struct DuplicationDetectorTests {
@@ -25,7 +27,7 @@ struct DuplicationDetectorTests {
             startLine: 10,
             endLine: 20,
             tokenCount: 50,
-            codeSnippet: "func test() { }"
+            codeSnippet: "func test() { }",
         )
 
         #expect(clone.file == "test.swift")
@@ -45,11 +47,11 @@ struct DuplicationDetectorTests {
             type: .exact,
             clones: clones,
             similarity: 1.0,
-            fingerprint: "abc123"
+            fingerprint: "abc123",
         )
 
         #expect(group.occurrences == 2)
-        #expect(group.duplicatedLines == 20)  // 10 + 10
+        #expect(group.duplicatedLines == 20) // 10 + 10
     }
 
     @Test("DuplicationConfiguration defaults")
@@ -65,7 +67,7 @@ struct DuplicationDetectorTests {
     func detectorInit() {
         let config = DuplicationConfiguration(
             minimumTokens: 30,
-            cloneTypes: [.exact, .near]
+            cloneTypes: [.exact, .near],
         )
 
         let detector = DuplicationDetector(configuration: config)
@@ -87,7 +89,7 @@ struct DuplicationDetectorTests {
         let report = DuplicationReport(
             filesAnalyzed: 10,
             totalLines: 1000,
-            cloneGroups: [group]
+            cloneGroups: [group],
         )
 
         #expect(report.duplicatedLines == 20)
@@ -95,7 +97,7 @@ struct DuplicationDetectorTests {
     }
 }
 
-// MARK: - Token Extraction Tests
+// MARK: - TokenExtractionTests
 
 @Suite("Token Extraction Tests")
 struct TokenExtractionTests {
@@ -112,10 +114,10 @@ struct TokenExtractionTests {
         let sequence = extractor.extract(from: tree, file: "test.swift", source: source)
 
         #expect(sequence.file == "test.swift")
-        #expect(sequence.tokens.count > 0)
+        #expect(!sequence.tokens.isEmpty)
 
         // Should have func, hello, (, ), {, print, (, "world", ), }
-        let tokenTexts = sequence.tokens.map { $0.text }
+        let tokenTexts = sequence.tokens.map(\.text)
         #expect(tokenTexts.contains("func"))
         #expect(tokenTexts.contains("hello"))
         #expect(tokenTexts.contains("print"))
@@ -128,16 +130,16 @@ struct TokenExtractionTests {
         let extractor = TokenSequenceExtractor()
         let sequence = extractor.extract(from: tree, file: "test.swift", source: source)
 
-        let kinds = Dictionary(grouping: sequence.tokens, by: { $0.kind })
+        let kinds = Dictionary(grouping: sequence.tokens) { $0.kind }
 
-        #expect(kinds[.keyword]?.contains(where: { $0.text == "let" }) == true)
-        #expect(kinds[.identifier]?.contains(where: { $0.text == "x" }) == true)
-        #expect(kinds[.literal]?.contains(where: { $0.text == "42" }) == true)
-        #expect(kinds[.operator]?.contains(where: { $0.text == "+" }) == true)
+        #expect(kinds[.keyword]?.contains { $0.text == "let" } == true)
+        #expect(kinds[.identifier]?.contains { $0.text == "x" } == true)
+        #expect(kinds[.literal]?.contains { $0.text == "42" } == true)
+        #expect(kinds[.operator]?.contains { $0.text == "+" } == true)
     }
 }
 
-// MARK: - Token Normalizer Tests
+// MARK: - TokenNormalizerTests
 
 @Suite("Token Normalizer Tests")
 struct TokenNormalizerTests {
@@ -151,7 +153,7 @@ struct TokenNormalizerTests {
         let normalizer = TokenNormalizer.default
         let normalized = normalizer.normalize(sequence)
 
-        let normalizedTexts = normalized.tokens.map { $0.normalized }
+        let normalizedTexts = normalized.tokens.map(\.normalized)
 
         // Identifiers should be normalized to $ID (except preserved ones)
         #expect(normalizedTexts.contains(TokenNormalizer.identifierPlaceholder))
@@ -169,7 +171,7 @@ struct TokenNormalizerTests {
         let normalizer = TokenNormalizer(normalizeLiterals: true)
         let normalized = normalizer.normalize(sequence)
 
-        let normalizedTexts = normalized.tokens.map { $0.normalized }
+        let normalizedTexts = normalized.tokens.map(\.normalized)
 
         // Numeric literal should be normalized
         #expect(normalizedTexts.contains(TokenNormalizer.numberPlaceholder))
@@ -185,14 +187,14 @@ struct TokenNormalizerTests {
         let normalizer = TokenNormalizer.default
         let normalized = normalizer.normalize(sequence)
 
-        let normalizedTexts = normalized.tokens.map { $0.normalized }
+        let normalizedTexts = normalized.tokens.map(\.normalized)
 
         // String is a preserved identifier
         #expect(normalizedTexts.contains("String"))
     }
 }
 
-// MARK: - Exact Clone Detector Tests
+// MARK: - ExactCloneDetectorTests
 
 @Suite("Exact Clone Detector Tests")
 struct ExactCloneDetectorTests {
@@ -210,7 +212,7 @@ struct ExactCloneDetectorTests {
     }
 }
 
-// MARK: - Near Clone Detector Tests
+// MARK: - NearCloneDetectorTests
 
 @Suite("Near Clone Detector Tests")
 struct NearCloneDetectorTests {
@@ -222,7 +224,7 @@ struct NearCloneDetectorTests {
     }
 }
 
-// MARK: - Semantic Clone Detector Tests
+// MARK: - SemanticCloneDetectorTests
 
 @Suite("Semantic Clone Detector Tests")
 struct SemanticCloneDetectorTests {
@@ -234,7 +236,7 @@ struct SemanticCloneDetectorTests {
     }
 }
 
-// MARK: - AST Fingerprint Tests
+// MARK: - ASTFingerprintTests
 
 @Suite("AST Fingerprint Tests")
 struct ASTFingerprintTests {
@@ -244,7 +246,7 @@ struct ASTFingerprintTests {
             hash: 12345,
             depth: 5,
             nodeCount: 20,
-            rootKind: "CodeBlockSyntax"
+            rootKind: "CodeBlockSyntax",
         )
 
         #expect(fp.hash == 12345)
@@ -262,7 +264,7 @@ struct ASTFingerprintTests {
             startLine: 1,
             endLine: 10,
             startColumn: 1,
-            tokenCount: 50
+            tokenCount: 50,
         )
 
         #expect(node.file == "test.swift")

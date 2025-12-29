@@ -9,12 +9,12 @@
 //  - ReachingDefinitionsAnalysis: Forward data flow for definitions
 //
 
-import Testing
 import Foundation
-import SwiftSyntax
 import SwiftParser
-@testable import UnusedCodeDetector
 @testable import SwiftStaticAnalysisCore
+import SwiftSyntax
+import Testing
+@testable import UnusedCodeDetector
 
 // MARK: - Test Helpers
 
@@ -40,11 +40,10 @@ private func buildCFG(from source: String, functionName: String = "test") -> Con
     return builder.buildCFG(from: function)
 }
 
-// MARK: - CFG Builder Tests
+// MARK: - CFGBuilderTests
 
 @Suite("CFG Builder Tests")
 struct CFGBuilderTests {
-
     @Test("Empty function creates minimal CFG")
     func emptyFunction() {
         let source = """
@@ -135,7 +134,7 @@ struct CFGBuilderTests {
         }
 
         // Should have loop header marked
-        let loopHeaders = cfg.blocks.values.filter { $0.isLoopHeader }
+        let loopHeaders = cfg.blocks.values.filter(\.isLoopHeader)
         #expect(loopHeaders.count >= 1)
     }
 
@@ -154,7 +153,7 @@ struct CFGBuilderTests {
             return
         }
 
-        let loopHeaders = cfg.blocks.values.filter { $0.isLoopHeader }
+        let loopHeaders = cfg.blocks.values.filter(\.isLoopHeader)
         #expect(loopHeaders.count >= 1)
     }
 
@@ -173,7 +172,7 @@ struct CFGBuilderTests {
             return
         }
 
-        let loopHeaders = cfg.blocks.values.filter { $0.isLoopHeader }
+        let loopHeaders = cfg.blocks.values.filter(\.isLoopHeader)
         #expect(loopHeaders.count >= 1)
     }
 
@@ -184,8 +183,10 @@ struct CFGBuilderTests {
             switch value {
             case 1:
                 let x = 1
+
             case 2:
                 let y = 2
+
             default:
                 let z = 0
             }
@@ -308,11 +309,10 @@ struct CFGBuilderTests {
     }
 }
 
-// MARK: - Live Variable Analysis Tests
+// MARK: - LiveVariableAnalysisTests
 
 @Suite("Live Variable Analysis Tests")
 struct LiveVariableAnalysisTests {
-
     @Test("Empty function has no dead stores")
     func emptyFunctionNoDeadStores() {
         let source = """
@@ -459,11 +459,10 @@ struct LiveVariableAnalysisTests {
     }
 }
 
-// MARK: - SCCP Analysis Tests
+// MARK: - SCCPAnalysisTests
 
 @Suite("SCCP Analysis Tests")
 struct SCCPAnalysisTests {
-
     @Test("Constant integer is propagated")
     func constantIntegerPropagated() {
         let source = """
@@ -600,7 +599,7 @@ struct SCCPAnalysisTests {
 
         // Code after return may be in unreachable block
         // This depends on how the CFG is built
-        #expect(result.unreachableBlocks.isEmpty || result.unreachableBlocks.count >= 0)
+        #expect(result.unreachableBlocks.isEmpty || result.unreachableBlocks.isEmpty)
     }
 
     @Test("Executable edges are tracked")
@@ -667,11 +666,10 @@ struct SCCPAnalysisTests {
     }
 }
 
-// MARK: - Reaching Definitions Analysis Tests
+// MARK: - ReachingDefinitionsAnalysisTests
 
 @Suite("Reaching Definitions Analysis Tests")
 struct ReachingDefinitionsAnalysisTests {
-
     @Test("Single definition reaches use")
     func singleDefinitionReachesUse() {
         let source = """
@@ -820,11 +818,10 @@ struct ReachingDefinitionsAnalysisTests {
     }
 }
 
-// MARK: - Combined Data Flow Analysis Tests
+// MARK: - CombinedDataFlowAnalysisTests
 
 @Suite("Combined Data Flow Analysis Tests")
 struct CombinedDataFlowAnalysisTests {
-
     @Test("Combined analysis runs both analyses")
     func combinedAnalysisRunsBoth() {
         let source = """
@@ -864,15 +861,14 @@ struct CombinedDataFlowAnalysisTests {
         let deadStores = combined.findAllDeadStores(cfg)
 
         // First assignment to x should be dead
-        #expect(deadStores.count >= 0) // May or may not detect depending on granularity
+        #expect(deadStores.isEmpty) // May or may not detect depending on granularity
     }
 }
 
-// MARK: - CFG Edge Tests
+// MARK: - CFGEdgeTests
 
 @Suite("CFG Edge Tests")
 struct CFGEdgeTests {
-
     @Test("CFG edge equality")
     func edgeEquality() {
         let edge1 = CFGEdge(from: .entry, to: .exit)
@@ -896,11 +892,10 @@ struct CFGEdgeTests {
     }
 }
 
-// MARK: - Block ID Tests
+// MARK: - BlockIDTests
 
 @Suite("Block ID Tests")
 struct BlockIDTests {
-
     @Test("Block ID equality")
     func blockIDEquality() {
         let id1 = BlockID("block_1")
@@ -924,11 +919,10 @@ struct BlockIDTests {
     }
 }
 
-// MARK: - Constant Value Tests
+// MARK: - ConstantValueTests
 
 @Suite("Constant Value Tests")
 struct ConstantValueTests {
-
     @Test("Integer constant description")
     func intConstantDescription() {
         let value = ConstantValue.int(42)
@@ -962,11 +956,10 @@ struct ConstantValueTests {
     }
 }
 
-// MARK: - Lattice Value Tests
+// MARK: - LatticeValueTests
 
 @Suite("Lattice Value Tests")
 struct LatticeValueTests {
-
     @Test("Lattice value descriptions")
     func latticeValueDescriptions() {
         #expect(LatticeValue.top.description == "⊤")
@@ -988,11 +981,10 @@ struct LatticeValueTests {
     }
 }
 
-// MARK: - Definition Site Tests
+// MARK: - DefinitionSiteTests
 
 @Suite("Definition Site Tests")
 struct DefinitionSiteTests {
-
     @Test("Definition site creation")
     func definitionSiteCreation() {
         let location = SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0)
@@ -1002,7 +994,7 @@ struct DefinitionSiteTests {
             statementIndex: 0,
             location: location,
             value: "1",
-            isInitial: false
+            isInitial: false,
         )
 
         #expect(def.variable == "x")
@@ -1022,7 +1014,7 @@ struct DefinitionSiteTests {
             block: .entry,
             statementIndex: 0,
             location: location,
-            value: "1"
+            value: "1",
         )
 
         #expect(defs.count == 1)
@@ -1033,7 +1025,7 @@ struct DefinitionSiteTests {
             block: .entry,
             statementIndex: 1,
             location: location,
-            value: "2"
+            value: "2",
         )
 
         #expect(defs.count == 1)
@@ -1041,11 +1033,10 @@ struct DefinitionSiteTests {
     }
 }
 
-// MARK: - Dead Store Tests
+// MARK: - DeadStoreTests
 
 @Suite("Dead Store Tests")
 struct DeadStoreTests {
-
     @Test("Dead store creation")
     func deadStoreCreation() {
         let location = SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0)
@@ -1053,7 +1044,7 @@ struct DeadStoreTests {
             variable: "x",
             location: location,
             assignedValue: "1",
-            suggestion: "Remove this"
+            suggestion: "Remove this",
         )
 
         #expect(store.variable == "x")
@@ -1073,11 +1064,10 @@ struct DeadStoreTests {
     }
 }
 
-// MARK: - Dead Branch Tests
+// MARK: - DeadBranchTests
 
 @Suite("Dead Branch Tests")
 struct DeadBranchTests {
-
     @Test("Dead branch creation")
     func deadBranchCreation() {
         let location = SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0)
@@ -1085,7 +1075,7 @@ struct DeadBranchTests {
             location: location,
             condition: "true",
             deadBranch: .falseBranch,
-            conditionValue: "true"
+            conditionValue: "true",
         )
 
         #expect(branch.condition == "true")
@@ -1094,11 +1084,10 @@ struct DeadBranchTests {
     }
 }
 
-// MARK: - Debug Output Tests
+// MARK: - DebugOutputTests
 
 @Suite("Debug Output Tests")
 struct DebugOutputTests {
-
     @Test("CFG debug print")
     func cfgDebugPrint() {
         let source = """
@@ -1174,11 +1163,10 @@ struct DebugOutputTests {
     }
 }
 
-// MARK: - Configuration Tests
+// MARK: - DataFlowConfigurationTests
 
 @Suite("DataFlow Configuration Tests")
 struct DataFlowConfigurationTests {
-
     @Test("Live variable analysis default config")
     func liveVariableDefaultConfig() {
         let config = LiveVariableAnalysis.Configuration.default
