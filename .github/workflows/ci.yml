@@ -24,6 +24,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  security-events: write
 
 env:
   XCODE_PATH: /Applications/Xcode_26.1.1.app
@@ -43,6 +44,12 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
+
+      - name: Install Linting Tools
+        run: |
+          brew install swiftlint swiftformat || true
+          echo "SwiftLint version: $(swiftlint version || echo 'not installed')"
+          echo "SwiftFormat version: $(swiftformat --version || echo 'not installed')"
 
       - name: Cache SPM Dependencies
         id: cache
@@ -79,6 +86,9 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
 
+      - name: Install Linting Tools
+        run: brew install swiftlint swiftformat || true
+
       - name: Restore SPM Cache
         uses: actions/cache@v4
         with:
@@ -103,6 +113,9 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
 
+      - name: Install Linting Tools
+        run: brew install swiftlint swiftformat || true
+
       - name: Restore SPM Cache
         uses: actions/cache@v4
         with:
@@ -116,7 +129,9 @@ jobs:
       - name: Check for Warnings
         run: |
           swift build 2>&1 | tee build.log
-          if grep -q "warning:" build.log; then
+          # Filter out SwiftLint/SwiftFormat availability warnings
+          grep -v "SwiftLint not available\|SwiftFormat not available" build.log > filtered.log || true
+          if grep -q "warning:" filtered.log; then
             echo "::warning::Build produced warnings"
           fi
 
@@ -147,6 +162,47 @@ jobs:
             --format text
 
   # ============================================================================
+  # STAGE 2b: Security Analysis (CodeQL)
+  # ============================================================================
+  codeql:
+    name: CodeQL Analysis
+    runs-on: macos-15
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s ${{ env.XCODE_PATH }}
+
+      - name: Install Linting Tools
+        run: brew install swiftlint swiftformat || true
+
+      - name: Restore SPM Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Developer/Xcode/DerivedData
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: swift
+          build-mode: manual
+
+      - name: Build for CodeQL
+        run: swift build -c release --arch arm64
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:swift"
+
+  # ============================================================================
   # STAGE 3: Documentation (only on main branch or tags)
   # ============================================================================
   docs:
@@ -160,6 +216,9 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
+
+      - name: Install Linting Tools
+        run: brew install swiftlint swiftformat || true
 
       - name: Restore SPM Cache
         uses: actions/cache@v4
@@ -267,6 +326,9 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
+
+      - name: Install Linting Tools
+        run: brew install swiftlint swiftformat || true
 
       - name: Restore SPM Cache
         uses: actions/cache@v4
