@@ -337,6 +337,18 @@ extension Array where Element == CloneGroup {
 
 // MARK: - Clone Detection Utilities
 
+/// Protocol for windows that can be grouped by the clone detection algorithm.
+public protocol GroupableWindow {
+    /// The file this window is from.
+    var file: String { get }
+    /// Start index in the file.
+    var startIndex: Int { get }
+    /// End index in the file.
+    var endIndex: Int { get }
+    /// Check if this window matches another for grouping purposes.
+    func matches(_ other: Self) -> Bool
+}
+
 /// Shared utilities for clone detection algorithms.
 public enum CloneDetectionUtilities {
     /// Check if two code windows overlap significantly.
@@ -371,5 +383,51 @@ public enum CloneDetectionUtilities {
         let union = set1.union(set2).count
 
         return union > 0 ? Double(intersection) / Double(union) : 0
+    }
+
+    /// Group matching windows, skipping overlapping windows in the same file.
+    ///
+    /// - Parameters:
+    ///   - windows: Array of windows to group.
+    ///   - overlapThreshold: Minimum overlap to skip (typically minimumTokens / 2).
+    /// - Returns: Groups of matching windows (groups with < 2 windows are excluded).
+    public static func groupMatchingWindows<W: GroupableWindow>(
+        _ windows: [W],
+        overlapThreshold: Int
+    ) -> [[W]] {
+        var groups: [[W]] = []
+        var used = Set<Int>()
+
+        for (i, window1) in windows.enumerated() {
+            guard !used.contains(i) else { continue }
+
+            var group = [window1]
+            used.insert(i)
+
+            for (j, window2) in windows.enumerated() where j > i && !used.contains(j) {
+                // Skip if same file and overlapping
+                if window1.file == window2.file {
+                    if hasSignificantOverlap(
+                        start1: window1.startIndex, end1: window1.endIndex,
+                        start2: window2.startIndex, end2: window2.endIndex,
+                        threshold: overlapThreshold
+                    ) {
+                        continue
+                    }
+                }
+
+                // Verify windows match
+                if window1.matches(window2) {
+                    group.append(window2)
+                    used.insert(j)
+                }
+            }
+
+            if group.count >= 2 {
+                groups.append(group)
+            }
+        }
+
+        return groups
     }
 }

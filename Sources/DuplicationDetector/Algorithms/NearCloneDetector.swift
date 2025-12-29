@@ -13,7 +13,7 @@ import SwiftStaticAnalysisCore
 // MARK: - Normalized Window
 
 /// A window of normalized tokens with its hash.
-struct NormalizedWindow: Sendable {
+struct NormalizedWindow: Sendable, GroupableWindow {
     let file: String
     let hash: UInt64
     let startIndex: Int
@@ -22,6 +22,10 @@ struct NormalizedWindow: Sendable {
     let endLine: Int
     let normalizedTokens: [String]
     let originalTokens: [String]
+
+    func matches(_ other: NormalizedWindow) -> Bool {
+        normalizedTokens == other.normalizedTokens
+    }
 }
 
 // MARK: - Near Clone Detector
@@ -150,40 +154,7 @@ public struct NearCloneDetector: Sendable {
 
     /// Verify normalized matches and group them.
     private func verifyAndGroupNearClones(_ windows: [NormalizedWindow]) -> [[NormalizedWindow]] {
-        var groups: [[NormalizedWindow]] = []
-        var used = Set<Int>()
-
-        for (i, window1) in windows.enumerated() {
-            guard !used.contains(i) else { continue }
-
-            var group = [window1]
-            used.insert(i)
-
-            for (j, window2) in windows.enumerated() where j > i && !used.contains(j) {
-                // Skip if same file and overlapping
-                if window1.file == window2.file {
-                    if CloneDetectionUtilities.hasSignificantOverlap(
-                        start1: window1.startIndex, end1: window1.endIndex,
-                        start2: window2.startIndex, end2: window2.endIndex,
-                        threshold: minimumTokens / 2
-                    ) {
-                        continue
-                    }
-                }
-
-                // Verify normalized tokens match
-                if window1.normalizedTokens == window2.normalizedTokens {
-                    group.append(window2)
-                    used.insert(j)
-                }
-            }
-
-            if group.count >= 2 {
-                groups.append(group)
-            }
-        }
-
-        return groups
+        CloneDetectionUtilities.groupMatchingWindows(windows, overlapThreshold: minimumTokens / 2)
     }
 
     /// Calculate similarity for a group based on original tokens.

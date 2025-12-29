@@ -77,7 +77,7 @@ struct RollingHash: Sendable {
 // MARK: - Token Window
 
 /// A window of tokens with its hash and location.
-struct TokenWindow: Sendable {
+struct TokenWindow: Sendable, GroupableWindow {
     let file: String
     let hash: UInt64
     let startIndex: Int
@@ -85,6 +85,10 @@ struct TokenWindow: Sendable {
     let startLine: Int
     let endLine: Int
     let tokens: [String]
+
+    func matches(_ other: TokenWindow) -> Bool {
+        tokens == other.tokens
+    }
 }
 
 // MARK: - Exact Clone Detector
@@ -197,39 +201,6 @@ public struct ExactCloneDetector: Sendable {
 
     /// Verify hash matches are actual clones (not collisions).
     private func verifyAndGroupClones(_ windows: [TokenWindow]) -> [[TokenWindow]] {
-        var groups: [[TokenWindow]] = []
-        var used = Set<Int>()
-
-        for (i, window1) in windows.enumerated() {
-            guard !used.contains(i) else { continue }
-
-            var group = [window1]
-            used.insert(i)
-
-            for (j, window2) in windows.enumerated() where j > i && !used.contains(j) {
-                // Skip if same file and overlapping
-                if window1.file == window2.file {
-                    if CloneDetectionUtilities.hasSignificantOverlap(
-                        start1: window1.startIndex, end1: window1.endIndex,
-                        start2: window2.startIndex, end2: window2.endIndex,
-                        threshold: minimumTokens / 2
-                    ) {
-                        continue
-                    }
-                }
-
-                // Verify tokens match exactly
-                if window1.tokens == window2.tokens {
-                    group.append(window2)
-                    used.insert(j)
-                }
-            }
-
-            if group.count >= 2 {
-                groups.append(group)
-            }
-        }
-
-        return groups
+        CloneDetectionUtilities.groupMatchingWindows(windows, overlapThreshold: minimumTokens / 2)
     }
 }
