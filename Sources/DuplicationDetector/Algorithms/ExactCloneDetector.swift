@@ -46,7 +46,7 @@ struct RollingHash: Sendable {
         var newHash = hash
         let outContrib = (outHash &* highestPower) % Self.prime
         if newHash >= outContrib {
-            newHash = newHash - outContrib
+            newHash -= outContrib
         } else {
             newHash = Self.prime - (outContrib - newHash)
         }
@@ -92,7 +92,7 @@ struct TokenWindow: Sendable, GroupableWindow {
     let endLine: Int
     let tokens: [String]
 
-    func matches(_ other: TokenWindow) -> Bool {
+    func matches(_ other: Self) -> Bool {
         tokens == other.tokens
     }
 }

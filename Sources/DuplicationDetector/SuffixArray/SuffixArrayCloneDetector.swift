@@ -9,6 +9,25 @@
 import Foundation
 import SwiftStaticAnalysisCore
 
+// MARK: - TokenAccessorResult
+
+/// Result from the token accessor closure.
+struct TokenAccessorResult: Sendable {
+    let text: String
+    let original: String
+    let line: Int
+    let column: Int
+}
+
+// MARK: - TokenStreamResult
+
+/// Result of building a concatenated token stream.
+struct TokenStreamResult: Sendable {
+    let tokens: [Int]
+    let infos: [TokenStreamInfo]
+    let boundaries: [FileBoundary]
+}
+
 // MARK: - SuffixArrayCloneDetector
 
 /// Detects code clones using suffix array and LCP array analysis.
@@ -41,15 +60,15 @@ public struct SuffixArrayCloneDetector: Sendable {
         guard !sequences.isEmpty else { return [] }
 
         // Build concatenated token stream with file boundaries
-        let (tokens, tokenInfos, fileBoundaries) = buildConcatenatedStream(sequences)
+        let streamResult = buildConcatenatedStream(sequences)
 
-        guard tokens.count >= minimumTokens else { return [] }
+        guard streamResult.tokens.count >= minimumTokens else { return [] }
 
         // Build suffix array
-        let suffixArray = SuffixArray(tokens: tokens)
+        let suffixArray = SuffixArray(tokens: streamResult.tokens)
 
         // Build LCP array
-        let lcpArray = LCPArray(suffixArray: suffixArray, tokens: tokens)
+        let lcpArray = LCPArray(suffixArray: suffixArray, tokens: streamResult.tokens)
 
         // Find repeat groups
         let repeatGroups = lcpArray.findRepeatGroups(minLength: minimumTokens)
@@ -57,8 +76,8 @@ public struct SuffixArrayCloneDetector: Sendable {
         // Convert to clone groups with location information
         return convertToCloneGroups(
             repeatGroups: repeatGroups,
-            tokenInfos: tokenInfos,
-            fileBoundaries: fileBoundaries,
+            tokenInfos: streamResult.infos,
+            fileBoundaries: streamResult.boundaries,
             sequences: sequences,
         )
     }
@@ -72,15 +91,15 @@ public struct SuffixArrayCloneDetector: Sendable {
         let normalizedSequences = sequences.map { normalizer.normalize($0) }
 
         // Build concatenated stream from normalized tokens
-        let (tokens, tokenInfos, fileBoundaries) = buildNormalizedStream(normalizedSequences)
+        let streamResult = buildNormalizedStream(normalizedSequences)
 
-        guard tokens.count >= minimumTokens else { return [] }
+        guard streamResult.tokens.count >= minimumTokens else { return [] }
 
         // Build suffix array
-        let suffixArray = SuffixArray(tokens: tokens)
+        let suffixArray = SuffixArray(tokens: streamResult.tokens)
 
         // Build LCP array
-        let lcpArray = LCPArray(suffixArray: suffixArray, tokens: tokens)
+        let lcpArray = LCPArray(suffixArray: suffixArray, tokens: streamResult.tokens)
 
         // Find repeat groups
         let repeatGroups = lcpArray.findRepeatGroups(minLength: minimumTokens)
@@ -88,8 +107,8 @@ public struct SuffixArrayCloneDetector: Sendable {
         // Convert to clone groups
         return convertNormalizedToCloneGroups(
             repeatGroups: repeatGroups,
-            tokenInfos: tokenInfos,
-            fileBoundaries: fileBoundaries,
+            tokenInfos: streamResult.infos,
+            fileBoundaries: streamResult.boundaries,
             sequences: normalizedSequences,
         )
     }
@@ -105,29 +124,31 @@ public struct SuffixArrayCloneDetector: Sendable {
     ///
     /// Tokens are converted to integers, and sentinel values are inserted
     /// between files to prevent cross-file matches.
-    private func buildConcatenatedStream(
-        _ sequences: [TokenSequence],
-    ) -> (tokens: [Int], infos: [TokenStreamInfo], boundaries: [FileBoundary]) {
+    private func buildConcatenatedStream(_ sequences: [TokenSequence]) -> TokenStreamResult {
         buildStream(from: sequences) { seq, index in
-            (seq.tokens[index].text, seq.tokens[index].text, seq.tokens[index].line, seq.tokens[index].column)
+            let token = seq.tokens[index]
+            return TokenAccessorResult(text: token.text, original: token.text, line: token.line, column: token.column)
         }
     }
 
     /// Build concatenated stream from normalized sequences.
-    private func buildNormalizedStream(
-        _ sequences: [NormalizedSequence],
-    ) -> (tokens: [Int], infos: [TokenStreamInfo], boundaries: [FileBoundary]) {
+    private func buildNormalizedStream(_ sequences: [NormalizedSequence]) -> TokenStreamResult {
         buildStream(from: sequences) { seq, index in
-            (seq.tokens[index].normalized, seq.tokens[index].original, seq.tokens[index].line, seq.tokens[index].column)
+            let token = seq.tokens[index]
+            return TokenAccessorResult(
+                text: token.normalized,
+                original: token.original,
+                line: token.line,
+                column: token.column,
+            )
         }
     }
 
     /// Generic stream building helper.
     private func buildStream<S: Collection>(
         from sequences: S,
-        tokenAccessor: (S.Element, Int) -> (text: String, original: String, line: Int, column: Int),
-    ) -> (tokens: [Int], infos: [TokenStreamInfo], boundaries: [FileBoundary])
-        where S.Element: TokenSequenceProtocol {
+        tokenAccessor: (S.Element, Int) -> TokenAccessorResult,
+    ) -> TokenStreamResult where S.Element: TokenSequenceProtocol {
         var tokens: [Int] = []
         var infos: [TokenStreamInfo] = []
         var boundaries: [FileBoundary] = []
@@ -143,13 +164,13 @@ public struct SuffixArrayCloneDetector: Sendable {
             ))
 
             for tokenIdx in 0 ..< sequence.tokenCount {
-                let (text, original, line, column) = tokenAccessor(sequence, tokenIdx)
+                let accessor = tokenAccessor(sequence, tokenIdx)
                 let tokenId: Int
-                if let existingId = tokenIdMap[text] {
+                if let existingId = tokenIdMap[accessor.text] {
                     tokenId = existingId
                 } else {
                     tokenId = nextTokenId
-                    tokenIdMap[text] = tokenId
+                    tokenIdMap[accessor.text] = tokenId
                     nextTokenId += 1
                 }
 
@@ -157,9 +178,9 @@ public struct SuffixArrayCloneDetector: Sendable {
                 infos.append(TokenStreamInfo(
                     fileIndex: fileIndex,
                     tokenIndex: infos.count,
-                    line: line,
-                    column: column,
-                    originalText: original,
+                    line: accessor.line,
+                    column: accessor.column,
+                    originalText: accessor.original,
                 ))
             }
 
@@ -176,7 +197,7 @@ public struct SuffixArrayCloneDetector: Sendable {
             ))
         }
 
-        return (tokens, infos, boundaries)
+        return TokenStreamResult(tokens: tokens, infos: infos, boundaries: boundaries)
     }
 
     // MARK: - Clone Group Conversion

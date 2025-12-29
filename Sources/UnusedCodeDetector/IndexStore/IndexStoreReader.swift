@@ -1,3 +1,4 @@
+// swiftlint:disable vertical_whitespace_between_cases
 //
 //  IndexStoreReader.swift
 //  SwiftStaticAnalysis
@@ -171,14 +172,14 @@ public struct IndexedSymbolRoles: OptionSet, Sendable {
 
     // MARK: Public
 
-    public static let declaration = IndexedSymbolRoles(rawValue: 1 << 0)
-    public static let definition = IndexedSymbolRoles(rawValue: 1 << 1)
-    public static let reference = IndexedSymbolRoles(rawValue: 1 << 2)
-    public static let read = IndexedSymbolRoles(rawValue: 1 << 3)
-    public static let write = IndexedSymbolRoles(rawValue: 1 << 4)
-    public static let call = IndexedSymbolRoles(rawValue: 1 << 5)
-    public static let dynamic = IndexedSymbolRoles(rawValue: 1 << 6)
-    public static let implicit = IndexedSymbolRoles(rawValue: 1 << 7)
+    public static let declaration = Self(rawValue: 1 << 0)
+    public static let definition = Self(rawValue: 1 << 1)
+    public static let reference = Self(rawValue: 1 << 2)
+    public static let read = Self(rawValue: 1 << 3)
+    public static let write = Self(rawValue: 1 << 4)
+    public static let call = Self(rawValue: 1 << 5)
+    public static let dynamic = Self(rawValue: 1 << 6)
+    public static let implicit = Self(rawValue: 1 << 7)
 
     public let rawValue: UInt64
 }
@@ -233,6 +234,7 @@ public final class IndexStoreReader: @unchecked Sendable {
         // Try common locations
         let possiblePaths = [
             // Xcode toolchain
+            // swiftlint:disable:next line_length
             "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libIndexStore.dylib",
             // Swift toolchain
             "/Library/Developer/Toolchains/swift-latest.xctoolchain/usr/lib/libIndexStore.dylib",
@@ -240,10 +242,8 @@ public final class IndexStoreReader: @unchecked Sendable {
             "/Library/Developer/CommandLineTools/usr/lib/libIndexStore.dylib",
         ]
 
-        for path in possiblePaths {
-            if FileManager.default.fileExists(atPath: path) {
-                return path
-            }
+        for path in possiblePaths where FileManager.default.fileExists(atPath: path) {
+            return path
         }
 
         // Fallback to xcrun
@@ -272,6 +272,7 @@ public final class IndexStoreReader: @unchecked Sendable {
         }
 
         // Default fallback
+        // swiftlint:disable:next line_length
         return "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libIndexStore.dylib"
     }
 

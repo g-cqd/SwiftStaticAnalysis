@@ -125,10 +125,8 @@ extension UnusedCodeDetector {
         }
 
         // Add syntax results only if not already present
-        for result in syntaxResults {
-            if resultsByName[result.declaration.name] == nil {
-                resultsByName[result.declaration.name] = result
-            }
+        for result in syntaxResults where resultsByName[result.declaration.name] == nil {
+            resultsByName[result.declaration.name] = result
         }
 
         return Array(resultsByName.values)

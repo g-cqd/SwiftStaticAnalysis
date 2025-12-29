@@ -160,10 +160,10 @@ public struct ChangeDetector: Sendable {
 
         // MARK: Public
 
-        public static let `default` = Configuration()
+        public static let `default` = Self()
 
         /// Strict configuration that always verifies content.
-        public static let strict = Configuration(alwaysVerifyHash: true)
+        public static let strict = Self(alwaysVerifyHash: true)
 
         /// Whether to verify content hash even if modification time is unchanged.
         /// More accurate but slower.

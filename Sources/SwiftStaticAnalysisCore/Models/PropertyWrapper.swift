@@ -75,7 +75,7 @@ public enum PropertyWrapperKind: String, Sendable, Codable, CaseIterable {
         // Handle generic wrappers like State<Int> -> State
         let baseName = name.components(separatedBy: "<").first ?? name
 
-        self = PropertyWrapperKind(rawValue: baseName) ?? .unknown
+        self = Self(rawValue: baseName) ?? .unknown
     }
 
     // MARK: Public
@@ -154,7 +154,7 @@ public struct PropertyWrapperInfo: Sendable, Codable, Hashable {
     public let arguments: String?
 
     /// Parse a property wrapper from attribute text.
-    public static func parse(from attributeText: String) -> PropertyWrapperInfo? {
+    public static func parse(from attributeText: String) -> Self? {
         // Extract the wrapper name
         var text = attributeText
         if text.hasPrefix("@") {
@@ -175,7 +175,7 @@ public struct PropertyWrapperInfo: Sendable, Codable, Hashable {
         }
 
         let kind = PropertyWrapperKind(rawValue: text) ?? .unknown
-        return PropertyWrapperInfo(kind: kind, attributeText: attributeText, arguments: arguments)
+        return Self(kind: kind, attributeText: attributeText, arguments: arguments)
     }
 }
 
@@ -264,7 +264,7 @@ public struct SwiftUITypeInfo: Sendable, Codable, Hashable {
     // MARK: Public
 
     /// Empty info for non-SwiftUI types.
-    public static let none = SwiftUITypeInfo(conformances: [])
+    public static let none = Self(conformances: [])
 
     /// SwiftUI protocol conformances.
     public let conformances: Set<SwiftUIConformance>

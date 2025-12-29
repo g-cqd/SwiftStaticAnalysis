@@ -113,7 +113,7 @@ public struct TokenNormalizer: Sendable {
     public static let shorthandParamPlaceholder = "$PARAM"
 
     /// Default normalizer with common Swift keywords preserved.
-    public static let `default` = TokenNormalizer(
+    public static let `default` = Self(
         preservedIdentifiers: [
             // Common type names
             "String", "Int", "Double", "Float", "Bool", "Array", "Dictionary",

@@ -65,7 +65,7 @@ public struct IndexSymbolNode: Hashable, Sendable {
     /// Whether this is an external (cross-module) symbol.
     public let isExternal: Bool
 
-    public static func == (lhs: IndexSymbolNode, rhs: IndexSymbolNode) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.usr == rhs.usr
     }
 
@@ -220,10 +220,8 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
 
             // Add all targets of outgoing edges
             if let outgoing = edges[current] {
-                for edge in outgoing {
-                    if !visited.contains(edge.toUSR) {
-                        queue.append(edge.toUSR)
-                    }
+                for edge in outgoing where !visited.contains(edge.toUSR) {
+                    queue.append(edge.toUSR)
                 }
             }
         }
@@ -523,7 +521,7 @@ public struct IndexGraphConfiguration: Sendable {
 
     // MARK: Public
 
-    public static let `default` = IndexGraphConfiguration()
+    public static let `default` = Self()
 
     /// Treat test methods as roots.
     public var treatTestsAsRoot: Bool

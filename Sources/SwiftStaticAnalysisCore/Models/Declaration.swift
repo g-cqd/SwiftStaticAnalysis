@@ -47,7 +47,7 @@ public enum AccessLevel: String, Sendable, Codable, Comparable {
 
     // MARK: Public
 
-    public static func < (lhs: AccessLevel, rhs: AccessLevel) -> Bool {
+    public static func < (lhs: Self, rhs: Self) -> Bool {
         lhs.rank < rhs.rank
     }
 
@@ -77,24 +77,24 @@ public struct DeclarationModifiers: OptionSet, Sendable, Codable, Hashable {
 
     // MARK: Public
 
-    public static let `static` = DeclarationModifiers(rawValue: 1 << 0)
-    public static let `class` = DeclarationModifiers(rawValue: 1 << 1)
-    public static let final = DeclarationModifiers(rawValue: 1 << 2)
-    public static let override = DeclarationModifiers(rawValue: 1 << 3)
-    public static let mutating = DeclarationModifiers(rawValue: 1 << 4)
-    public static let nonmutating = DeclarationModifiers(rawValue: 1 << 5)
-    public static let lazy = DeclarationModifiers(rawValue: 1 << 6)
-    public static let weak = DeclarationModifiers(rawValue: 1 << 7)
-    public static let unowned = DeclarationModifiers(rawValue: 1 << 8)
-    public static let optional = DeclarationModifiers(rawValue: 1 << 9)
-    public static let required = DeclarationModifiers(rawValue: 1 << 10)
-    public static let convenience = DeclarationModifiers(rawValue: 1 << 11)
-    public static let async = DeclarationModifiers(rawValue: 1 << 12)
-    public static let `throws` = DeclarationModifiers(rawValue: 1 << 13)
-    public static let `rethrows` = DeclarationModifiers(rawValue: 1 << 14)
-    public static let nonisolated = DeclarationModifiers(rawValue: 1 << 15)
-    public static let consuming = DeclarationModifiers(rawValue: 1 << 16)
-    public static let borrowing = DeclarationModifiers(rawValue: 1 << 17)
+    public static let `static` = Self(rawValue: 1 << 0)
+    public static let `class` = Self(rawValue: 1 << 1)
+    public static let final = Self(rawValue: 1 << 2)
+    public static let override = Self(rawValue: 1 << 3)
+    public static let mutating = Self(rawValue: 1 << 4)
+    public static let nonmutating = Self(rawValue: 1 << 5)
+    public static let lazy = Self(rawValue: 1 << 6)
+    public static let weak = Self(rawValue: 1 << 7)
+    public static let unowned = Self(rawValue: 1 << 8)
+    public static let optional = Self(rawValue: 1 << 9)
+    public static let required = Self(rawValue: 1 << 10)
+    public static let convenience = Self(rawValue: 1 << 11)
+    public static let async = Self(rawValue: 1 << 12)
+    public static let `throws` = Self(rawValue: 1 << 13)
+    public static let `rethrows` = Self(rawValue: 1 << 14)
+    public static let nonisolated = Self(rawValue: 1 << 15)
+    public static let consuming = Self(rawValue: 1 << 16)
+    public static let borrowing = Self(rawValue: 1 << 17)
 
     public let rawValue: UInt32
 }
@@ -234,7 +234,7 @@ public extension Declaration {
         if ignoreDirectives.contains("all") {
             return true
         }
-        if let category = category {
+        if let category {
             return ignoreDirectives.contains(category.lowercased().replacingOccurrences(of: "-", with: "_"))
         }
         return false

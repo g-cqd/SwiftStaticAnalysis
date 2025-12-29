@@ -23,7 +23,7 @@ struct NormalizedWindow: Sendable, GroupableWindow {
     let normalizedTokens: [String]
     let originalTokens: [String]
 
-    func matches(_ other: NormalizedWindow) -> Bool {
+    func matches(_ other: Self) -> Bool {
         normalizedTokens == other.normalizedTokens
     }
 }

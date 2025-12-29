@@ -52,7 +52,7 @@ public struct Diagnostic: Sendable, Codable, Hashable {
         category: DiagnosticCategory = .general,
         ruleID: String? = nil,
         fixIt: FixIt? = nil,
-        notes: [Diagnostic] = [],
+        notes: [Self] = [],
     ) {
         self.file = file
         self.line = line
@@ -88,7 +88,7 @@ public struct Diagnostic: Sendable, Codable, Hashable {
     public let fixIt: FixIt?
 
     /// Related notes (secondary diagnostics).
-    public let notes: [Diagnostic]
+    public let notes: [Self]
 
     /// Unique identifier for deduplication.
     public var uniqueKey: String {
@@ -111,7 +111,7 @@ public struct Diagnostic: Sendable, Codable, Hashable {
         return result
     }
 
-    public static func == (lhs: Diagnostic, rhs: Diagnostic) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.file == rhs.file &&
             lhs.line == rhs.line &&
             lhs.column == rhs.column &&
@@ -130,8 +130,8 @@ public struct Diagnostic: Sendable, Codable, Hashable {
     }
 
     /// Create a copy of this diagnostic with additional notes appended.
-    public func withNotes(_ additionalNotes: [Diagnostic]) -> Diagnostic {
-        Diagnostic(
+    public func withNotes(_ additionalNotes: [Self]) -> Self {
+        Self(
             file: file,
             line: line,
             column: column,
@@ -145,8 +145,8 @@ public struct Diagnostic: Sendable, Codable, Hashable {
     }
 
     /// Create a copy of this diagnostic with a new set of notes.
-    public func replacingNotes(_ newNotes: [Diagnostic]) -> Diagnostic {
-        Diagnostic(
+    public func replacingNotes(_ newNotes: [Self]) -> Self {
+        Self(
             file: file,
             line: line,
             column: column,
@@ -218,50 +218,50 @@ public struct DiagnosticBuilder {
 
     // MARK: Public
 
-    public func file(_ file: String) -> DiagnosticBuilder {
+    public func file(_ file: String) -> Self {
         var copy = self
         copy.file = file
         return copy
     }
 
-    public func location(line: Int, column: Int) -> DiagnosticBuilder {
+    public func location(line: Int, column: Int) -> Self {
         var copy = self
         copy.line = line
         copy.column = column
         return copy
     }
 
-    public func severity(_ severity: DiagnosticSeverity) -> DiagnosticBuilder {
+    public func severity(_ severity: DiagnosticSeverity) -> Self {
         var copy = self
         copy.severity = severity
         return copy
     }
 
-    public func message(_ message: String) -> DiagnosticBuilder {
+    public func message(_ message: String) -> Self {
         var copy = self
         copy.message = message
         return copy
     }
 
-    public func category(_ category: DiagnosticCategory) -> DiagnosticBuilder {
+    public func category(_ category: DiagnosticCategory) -> Self {
         var copy = self
         copy.category = category
         return copy
     }
 
-    public func ruleID(_ ruleID: String) -> DiagnosticBuilder {
+    public func ruleID(_ ruleID: String) -> Self {
         var copy = self
         copy.ruleID = ruleID
         return copy
     }
 
-    public func fixIt(_ fixIt: FixIt) -> DiagnosticBuilder {
+    public func fixIt(_ fixIt: FixIt) -> Self {
         var copy = self
         copy.fixIt = fixIt
         return copy
     }
 
-    public func note(_ note: Diagnostic) -> DiagnosticBuilder {
+    public func note(_ note: Diagnostic) -> Self {
         var copy = self
         copy.notes.append(note)
         return copy

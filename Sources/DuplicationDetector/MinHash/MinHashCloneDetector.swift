@@ -11,6 +11,25 @@
 
 import Foundation
 
+// MARK: - ClonePairInfo
+
+/// Information about a pair of similar documents.
+struct ClonePairInfo: Sendable {
+    let doc1: ShingledDocument
+    let doc2: ShingledDocument
+    let similarity: Double
+}
+
+// MARK: - DocumentLocationInfo
+
+/// Location information for a document.
+struct DocumentLocationInfo: Sendable {
+    let file: String
+    let startLine: Int
+    let endLine: Int
+    let tokenCount: Int
+}
+
 // MARK: - MinHashCloneDetector
 
 /// Detects Type-3 clones using MinHash and LSH.
@@ -89,27 +108,7 @@ public struct MinHashCloneDetector: Sendable {
         let documentMap = Dictionary(uniqueKeysWithValues: allDocuments.map { ($0.id, $0) })
 
         // Verify candidates and build clone groups
-        var clonePairs: [(doc1: ShingledDocument, doc2: ShingledDocument, similarity: Double)] = []
-
-        for pair in candidatePairs {
-            guard let doc1 = documentMap[pair.id1],
-                  let doc2 = documentMap[pair.id2] else { continue }
-
-            // Skip if same file and overlapping lines
-            if doc1.file == doc2.file {
-                let overlaps = !(doc1.endLine < doc2.startLine || doc2.endLine < doc1.startLine)
-                if overlaps {
-                    continue
-                }
-            }
-
-            // Compute exact Jaccard similarity for verification
-            let similarity = MinHashGenerator.exactJaccardSimilarity(doc1, doc2)
-
-            if similarity >= minimumSimilarity {
-                clonePairs.append((doc1, doc2, similarity))
-            }
-        }
+        let clonePairs = verifyCandidatePairs(candidatePairs, documentMap: documentMap)
 
         // Group related clones
         return groupClones(clonePairs)
@@ -146,32 +145,85 @@ public struct MinHashCloneDetector: Sendable {
     private let lshBands: Int
     private let lshRows: Int
 
+    /// Verify candidate pairs and filter by similarity threshold.
+    private func verifyCandidatePairs(
+        _ candidatePairs: Set<DocumentPair>,
+        documentMap: [Int: ShingledDocument],
+    ) -> [ClonePairInfo] {
+        var clonePairs: [ClonePairInfo] = []
+
+        for pair in candidatePairs {
+            guard let doc1 = documentMap[pair.id1],
+                  let doc2 = documentMap[pair.id2] else { continue }
+
+            // Skip if same file and overlapping lines
+            if doc1.file == doc2.file {
+                let overlaps = !(doc1.endLine < doc2.startLine || doc2.endLine < doc1.startLine)
+                if overlaps {
+                    continue
+                }
+            }
+
+            // Compute exact Jaccard similarity for verification
+            let similarity = MinHashGenerator.exactJaccardSimilarity(doc1, doc2)
+
+            if similarity >= minimumSimilarity {
+                clonePairs.append(ClonePairInfo(doc1: doc1, doc2: doc2, similarity: similarity))
+            }
+        }
+
+        return clonePairs
+    }
+
     // MARK: - Private Helpers
 
     /// Group clone pairs into clone groups.
-    private func groupClones(
-        _ pairs: [(doc1: ShingledDocument, doc2: ShingledDocument, similarity: Double)],
-    ) -> [CloneGroup] {
+    private func groupClones(_ pairs: [ClonePairInfo]) -> [CloneGroup] {
         guard !pairs.isEmpty else { return [] }
 
-        // Build adjacency list for transitive closure
-        var adjacency: [Int: Set<Int>] = [:]
-        var documentInfo: [Int: (file: String, startLine: Int, endLine: Int, tokenCount: Int)] = [:]
-
-        for (doc1, doc2, _) in pairs {
-            adjacency[doc1.id, default: []].insert(doc2.id)
-            adjacency[doc2.id, default: []].insert(doc1.id)
-            documentInfo[doc1.id] = (doc1.file, doc1.startLine, doc1.endLine, doc1.tokenCount)
-            documentInfo[doc2.id] = (doc2.file, doc2.startLine, doc2.endLine, doc2.tokenCount)
-        }
+        // Build adjacency list and document info
+        let (adjacency, documentInfo) = buildAdjacencyInfo(from: pairs)
 
         // Find connected components using BFS
+        let groups = findConnectedComponents(adjacency: adjacency)
+
+        // Convert to CloneGroups
+        return convertToCloneGroups(groups, documentInfo: documentInfo, pairs: pairs)
+    }
+
+    /// Build adjacency list and document info from pairs.
+    private func buildAdjacencyInfo(
+        from pairs: [ClonePairInfo],
+    ) -> (adjacency: [Int: Set<Int>], documentInfo: [Int: DocumentLocationInfo]) {
+        var adjacency: [Int: Set<Int>] = [:]
+        var documentInfo: [Int: DocumentLocationInfo] = [:]
+
+        for pair in pairs {
+            adjacency[pair.doc1.id, default: []].insert(pair.doc2.id)
+            adjacency[pair.doc2.id, default: []].insert(pair.doc1.id)
+            documentInfo[pair.doc1.id] = DocumentLocationInfo(
+                file: pair.doc1.file,
+                startLine: pair.doc1.startLine,
+                endLine: pair.doc1.endLine,
+                tokenCount: pair.doc1.tokenCount,
+            )
+            documentInfo[pair.doc2.id] = DocumentLocationInfo(
+                file: pair.doc2.file,
+                startLine: pair.doc2.startLine,
+                endLine: pair.doc2.endLine,
+                tokenCount: pair.doc2.tokenCount,
+            )
+        }
+
+        return (adjacency, documentInfo)
+    }
+
+    /// Find connected components using BFS.
+    private func findConnectedComponents(adjacency: [Int: Set<Int>]) -> [[Int]] {
         var visited = Set<Int>()
         var groups: [[Int]] = []
 
-        for docId in adjacency.keys {
-            guard !visited.contains(docId) else { continue }
-
+        for docId in adjacency.keys where !visited.contains(docId) {
             var component: [Int] = []
             var queue = [docId]
             visited.insert(docId)
@@ -193,8 +245,16 @@ public struct MinHashCloneDetector: Sendable {
             }
         }
 
-        // Convert to CloneGroups
-        return groups.compactMap { component -> CloneGroup? in
+        return groups
+    }
+
+    /// Convert component groups to CloneGroups.
+    private func convertToCloneGroups(
+        _ groups: [[Int]],
+        documentInfo: [Int: DocumentLocationInfo],
+        pairs: [ClonePairInfo],
+    ) -> [CloneGroup] {
+        groups.compactMap { component -> CloneGroup? in
             let clones = component.compactMap { docId -> Clone? in
                 guard let info = documentInfo[docId] else { return nil }
                 return Clone(

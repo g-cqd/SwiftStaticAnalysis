@@ -142,17 +142,17 @@ public struct DuplicationConfiguration: Sendable {
     // MARK: Public
 
     /// Default configuration.
-    public static let `default` = DuplicationConfiguration()
+    public static let `default` = Self()
 
     /// High-performance configuration using suffix array.
-    public static let highPerformance = DuplicationConfiguration(
+    public static let highPerformance = Self(
         minimumTokens: 50,
         cloneTypes: [.exact, .near],
         algorithm: .suffixArray,
     )
 
     /// Configuration for Type-3 clones using MinHash + LSH.
-    public static let type3Detection = DuplicationConfiguration(
+    public static let type3Detection = Self(
         minimumTokens: 50,
         cloneTypes: [.semantic],
         minimumSimilarity: 0.5,
@@ -181,8 +181,8 @@ public struct DuplicationConfiguration: Sendable {
     public var cacheDirectory: URL?
 
     /// Incremental configuration with caching enabled.
-    public static func incremental(cacheDirectory: URL? = nil) -> DuplicationConfiguration {
-        DuplicationConfiguration(
+    public static func incremental(cacheDirectory: URL? = nil) -> Self {
+        Self(
             minimumTokens: 50,
             cloneTypes: [.exact, .near],
             algorithm: .suffixArray,
@@ -279,7 +279,7 @@ public struct DuplicationDetector: Sendable {
         let extractor = TokenSequenceExtractor()
 
         // Use parallel processing with concurrency limits
-        let sequences = try await ParallelProcessor.map(
+        return try await ParallelProcessor.map(
             files,
             maxConcurrency: concurrency.maxConcurrentFiles,
         ) { [parser] file -> TokenSequence in
@@ -287,8 +287,6 @@ public struct DuplicationDetector: Sendable {
             let source = try String(contentsOfFile: file, encoding: .utf8)
             return extractor.extract(from: tree, file: file, source: source)
         }
-
-        return sequences
     }
 }
 
@@ -386,8 +384,10 @@ public enum CloneDetectionUtilities {
     ///   - threshold: Minimum overlap to be considered significant.
     /// - Returns: True if the windows overlap more than the threshold.
     public static func hasSignificantOverlap(
-        start1: Int, end1: Int,
-        start2: Int, end2: Int,
+        start1: Int,
+        end1: Int,
+        start2: Int,
+        end2: Int,
         threshold: Int,
     ) -> Bool {
         let overlap = max(0, min(end1, end2) - max(start1, start2) + 1)
@@ -433,8 +433,10 @@ public enum CloneDetectionUtilities {
                 // Skip if same file and overlapping
                 if window1.file == window2.file {
                     if hasSignificantOverlap(
-                        start1: window1.startIndex, end1: window1.endIndex,
-                        start2: window2.startIndex, end2: window2.endIndex,
+                        start1: window1.startIndex,
+                        end1: window1.endIndex,
+                        start2: window2.startIndex,
+                        end2: window2.endIndex,
                         threshold: overlapThreshold,
                     ) {
                         continue

@@ -297,17 +297,15 @@ public actor IncrementalUnusedCodeDetector {
         let imports = result.declarations.declarations.filter { $0.kind == .import }
         let referencedIdentifiers = Set(result.references.references.map(\.identifier))
 
-        for importDecl in imports {
-            // Simple heuristic: if the import name isn't referenced anywhere
-            // (This is a rough check - real import checking requires type resolution)
-            if !referencedIdentifiers.contains(importDecl.name) {
-                unused.append(UnusedCode(
-                    declaration: importDecl,
-                    reason: .importNotUsed,
-                    confidence: .low, // Low confidence without full type resolution
-                    suggestion: "Consider removing unused import '\(importDecl.name)'",
-                ))
-            }
+        // Simple heuristic: if the import name isn't referenced anywhere
+        // (This is a rough check - real import checking requires type resolution)
+        for importDecl in imports where !referencedIdentifiers.contains(importDecl.name) {
+            unused.append(UnusedCode(
+                declaration: importDecl,
+                reason: .importNotUsed,
+                confidence: .low, // Low confidence without full type resolution
+                suggestion: "Consider removing unused import '\(importDecl.name)'",
+            ))
         }
 
         return unused

@@ -35,10 +35,10 @@ public struct UnusedCodeFilterConfiguration: Sendable {
     // MARK: Public
 
     /// No filtering.
-    public static let none = UnusedCodeFilterConfiguration(respectIgnoreDirectives: false)
+    public static let none = Self(respectIgnoreDirectives: false)
 
     /// Sensible defaults that exclude common false positives.
-    public static let sensibleDefaults = UnusedCodeFilterConfiguration(
+    public static let sensibleDefaults = Self(
         excludeImports: true,
         excludeDeinit: true,
         excludeBacktickedEnumCases: true,
@@ -68,7 +68,7 @@ public struct UnusedCodeFilterConfiguration: Sendable {
     public var respectIgnoreDirectives: Bool
 
     /// Strict filtering for production code only.
-    public static func production(excludeTestPaths: Bool = true) -> UnusedCodeFilterConfiguration {
+    public static func production(excludeTestPaths: Bool = true) -> Self {
         var config = sensibleDefaults
         if excludeTestPaths {
             config.excludePathPatterns = ["**/Tests/**", "**/*Tests.swift", "**/Fixtures/**"]

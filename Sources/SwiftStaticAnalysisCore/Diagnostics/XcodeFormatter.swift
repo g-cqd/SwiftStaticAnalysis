@@ -94,17 +94,17 @@ public struct XcodeFormatterConfiguration: Sendable {
     // MARK: Public
 
     /// Default configuration.
-    public static let `default` = XcodeFormatterConfiguration()
+    public static let `default` = Self()
 
     /// Verbose configuration (includes all metadata).
-    public static let verbose = XcodeFormatterConfiguration(
+    public static let verbose = Self(
         includeRuleID: true,
         includeCategory: true,
         includeFixIts: true,
     )
 
     /// Minimal configuration.
-    public static let minimal = XcodeFormatterConfiguration(
+    public static let minimal = Self(
         includeRuleID: false,
         includeCategory: false,
         includeFixIts: false,

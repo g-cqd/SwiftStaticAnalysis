@@ -29,10 +29,10 @@ public struct IncrementalConfiguration: Sendable {
 
     // MARK: Public
 
-    public static let `default` = IncrementalConfiguration()
+    public static let `default` = Self()
 
     /// Configuration that disables caching (always full analysis).
-    public static let disabled = IncrementalConfiguration(
+    public static let disabled = Self(
         cacheDirectory: URL(fileURLWithPath: "/dev/null"),
         trackDependencies: false,
     )
@@ -133,7 +133,9 @@ public actor IncrementalAnalyzer {
     ///
     /// - Parameter files: Files to analyze.
     /// - Returns: Incremental analysis result.
-    public func analyze(_ files: [String]) async throws -> IncrementalAnalysisResult {
+    public func analyze( // swiftlint:disable:this function_body_length
+        _ files: [String],
+    ) async throws -> IncrementalAnalysisResult {
         try await initialize()
 
         let startTime = Date()

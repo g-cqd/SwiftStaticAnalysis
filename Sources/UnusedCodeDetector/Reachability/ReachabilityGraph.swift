@@ -36,7 +36,7 @@ public struct DeclarationNode: Hashable, Sendable {
     /// Reason this is a root (if applicable).
     public let rootReason: RootReason?
 
-    public static func == (lhs: DeclarationNode, rhs: DeclarationNode) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.id == rhs.id
     }
 
@@ -188,8 +188,11 @@ public final class ReachabilityGraph: @unchecked Sendable {
 
     /// Add a declaration node to the graph.
     @discardableResult
-    public func addNode(_ declaration: Declaration, isRoot: Bool = false,
-                        rootReason: RootReason? = nil) -> DeclarationNode {
+    public func addNode(
+        _ declaration: Declaration,
+        isRoot: Bool = false,
+        rootReason: RootReason? = nil,
+    ) -> DeclarationNode {
         lock.lock()
         defer { lock.unlock() }
 
@@ -270,10 +273,8 @@ public final class ReachabilityGraph: @unchecked Sendable {
 
             // Add all targets of outgoing edges
             if let outgoing = edges[current] {
-                for edge in outgoing {
-                    if !visited.contains(edge.to) {
-                        queue.append(edge.to)
-                    }
+                for edge in outgoing where !visited.contains(edge.to) {
+                    queue.append(edge.to)
                 }
             }
         }
@@ -335,10 +336,8 @@ public final class ReachabilityGraph: @unchecked Sendable {
             visited.insert(current)
 
             if let outgoing = edges[current] {
-                for edge in outgoing {
-                    if !visited.contains(edge.to) {
-                        queue.append((edge.to, path + [edge.to]))
-                    }
+                for edge in outgoing where !visited.contains(edge.to) {
+                    queue.append((edge.to, path + [edge.to]))
                 }
             }
         }
@@ -367,7 +366,7 @@ public final class ReachabilityGraph: @unchecked Sendable {
     private let lock = NSLock()
 
     /// Determine if a declaration should be a root and why.
-    private func determineRootReason(
+    private func determineRootReason( // swiftlint:disable:this cyclomatic_complexity function_body_length
         for declaration: Declaration,
         configuration: RootDetectionConfiguration,
     ) -> RootReason? {
@@ -515,10 +514,10 @@ public struct RootDetectionConfiguration: Sendable {
     // MARK: Public
 
     /// Default configuration.
-    public static let `default` = RootDetectionConfiguration()
+    public static let `default` = Self()
 
     /// Strict configuration (only explicit entry points).
-    public static let strict = RootDetectionConfiguration(
+    public static let strict = Self(
         treatPublicAsRoot: false,
         treatObjcAsRoot: true,
         treatTestsAsRoot: true,

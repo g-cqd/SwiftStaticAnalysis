@@ -204,8 +204,11 @@ public final class Arena: @unchecked Sendable {
     @discardableResult
     public func store<T>(_ value: T) -> UnsafeMutablePointer<T> {
         let buffer = allocate(count: 1) as UnsafeMutableBufferPointer<T>
-        buffer.baseAddress!.initialize(to: value)
-        return buffer.baseAddress!
+        guard let baseAddress = buffer.baseAddress else {
+            fatalError("Arena allocation failed: buffer has no base address")
+        }
+        baseAddress.initialize(to: value)
+        return baseAddress
     }
 
     /// Allocate and copy an array.

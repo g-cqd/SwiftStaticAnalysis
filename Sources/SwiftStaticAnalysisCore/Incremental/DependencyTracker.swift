@@ -144,11 +144,9 @@ public struct DependencyGraph: Codable, Sendable {
             let file = queue.removeFirst()
             affected.insert(file)
 
-            for dependent in getDirectDependents(of: file) {
-                if !visited.contains(dependent) {
-                    visited.insert(dependent)
-                    queue.append(dependent)
-                }
+            for dependent in getDirectDependents(of: file) where !visited.contains(dependent) {
+                visited.insert(dependent)
+                queue.append(dependent)
             }
         }
 

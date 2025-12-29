@@ -29,24 +29,24 @@ public struct ConcurrencyConfiguration: Sendable {
     // MARK: Public
 
     /// Default configuration based on system capabilities.
-    public static let `default` = ConcurrencyConfiguration()
+    public static let `default` = Self()
 
     /// Single-threaded configuration (for debugging or testing).
-    public static let serial = ConcurrencyConfiguration(
+    public static let serial = Self(
         maxConcurrentFiles: 1,
         maxConcurrentTasks: 1,
         enableParallelProcessing: false,
     )
 
     /// High-throughput configuration for powerful machines.
-    public static let highThroughput = ConcurrencyConfiguration(
+    public static let highThroughput = Self(
         maxConcurrentFiles: ProcessInfo.processInfo.activeProcessorCount * 2,
         maxConcurrentTasks: ProcessInfo.processInfo.activeProcessorCount * 4,
         batchSize: 200,
     )
 
     /// Conservative configuration for memory-constrained environments.
-    public static let conservative = ConcurrencyConfiguration(
+    public static let conservative = Self(
         maxConcurrentFiles: max(2, ProcessInfo.processInfo.activeProcessorCount / 2),
         maxConcurrentTasks: ProcessInfo.processInfo.activeProcessorCount,
         batchSize: 50,

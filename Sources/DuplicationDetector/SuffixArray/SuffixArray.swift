@@ -43,21 +43,24 @@ public struct SuffixArray: Sendable {
     ///
     /// - Parameter strings: Array of string tokens.
     /// - Returns: The suffix array and the token-to-ID mapping.
-    public static func fromStrings(_ strings: [String]) -> (SuffixArray, [String: Int]) {
-        // Build alphabet mapping
+    public static func fromStrings(_ strings: [String]) -> (Self, [String: Int]) {
+        // Build alphabet mapping and convert to token IDs in one pass
         var alphabet: [String: Int] = [:]
+        var tokens: [Int] = []
+        tokens.reserveCapacity(strings.count)
         var nextId = 1 // Reserve 0 for sentinel
+
         for s in strings {
-            if alphabet[s] == nil {
+            if let existingId = alphabet[s] {
+                tokens.append(existingId)
+            } else {
                 alphabet[s] = nextId
+                tokens.append(nextId)
                 nextId += 1
             }
         }
 
-        // Convert strings to token IDs
-        let tokens = strings.map { alphabet[$0]! }
-
-        return (SuffixArray(tokens: tokens), alphabet)
+        return (Self(tokens: tokens), alphabet)
     }
 
     /// Get the suffix starting at the i-th position in sorted order.
@@ -120,150 +123,168 @@ enum SAIS {
             return buildSimple(text)
         }
 
-        // Step 1: Classify each suffix as S-type or L-type
-        // S-type: suffix[i] < suffix[i+1] lexicographically
-        // L-type: suffix[i] > suffix[i+1] lexicographically
-        var types = [Bool](repeating: false, count: n) // true = S-type, false = L-type
-        types[n - 1] = true // Last suffix is always S-type (sentinel)
+        // Classify suffixes and find LMS positions
+        let types = classifyTypes(text)
+        let lmsPositions = findLMSPositions(types)
 
-        for i in stride(from: n - 2, through: 0, by: -1) {
-            if text[i] < text[i + 1] {
-                types[i] = true // S-type
-            } else if text[i] > text[i + 1] {
-                types[i] = false // L-type
-            } else {
-                types[i] = types[i + 1] // Same as next
-            }
-        }
+        // Compute bucket boundaries
+        let (bucketHeads, bucketTails) = computeBucketBoundaries(text, alphabetSize: alphabetSize)
 
-        // Step 2: Find LMS (Leftmost S-type) positions
-        // An LMS suffix is an S-type suffix whose predecessor is L-type
-        var lmsPositions: [Int] = []
-        for i in 1 ..< n {
-            if types[i], !types[i - 1] {
-                lmsPositions.append(i)
-            }
-        }
+        // Initial placement and first round of induced sorting
+        var sa = placeLMSSuffixes(text, lmsPositions: lmsPositions, bucketTails: bucketTails)
+        inducedSortLType(sa: &sa, text: text, types: types, bucketHeads: bucketHeads)
+        inducedSortSType(sa: &sa, text: text, types: types, bucketTails: bucketTails)
 
-        // Step 3: Get bucket boundaries
-        var bucketSizes = [Int](repeating: 0, count: alphabetSize)
-        for c in text {
-            bucketSizes[c] += 1
-        }
+        // Assign names to LMS substrings
+        let (lmsNames, name) = assignLMSNames(sa: sa, text: text, types: types)
 
-        var bucketHeads = [Int](repeating: 0, count: alphabetSize)
-        var bucketTails = [Int](repeating: 0, count: alphabetSize)
-        var sum = 0
-        for i in 0 ..< alphabetSize {
-            bucketHeads[i] = sum
-            sum += bucketSizes[i]
-            bucketTails[i] = sum - 1
-        }
-
-        // Step 4: Initial placement of LMS suffixes at bucket tails
-        var sa = [Int](repeating: -1, count: n)
-        var tails = bucketTails // Working copy
-
-        for i in stride(from: lmsPositions.count - 1, through: 0, by: -1) {
-            let pos = lmsPositions[i]
-            let c = text[pos]
-            sa[tails[c]] = pos
-            tails[c] -= 1
-        }
-
-        // Step 5: Induced sort L-type suffixes (left to right)
-        var heads = bucketHeads // Working copy
-        for i in 0 ..< n {
-            let j = sa[i] - 1
-            if sa[i] > 0, !types[j] { // L-type predecessor
-                let c = text[j]
-                sa[heads[c]] = j
-                heads[c] += 1
-            }
-        }
-
-        // Step 6: Induced sort S-type suffixes (right to left)
-        tails = bucketTails // Reset working copy
-        for i in stride(from: n - 1, through: 0, by: -1) {
-            let j = sa[i] - 1
-            if sa[i] > 0, types[j] { // S-type predecessor
-                let c = text[j]
-                sa[tails[c]] = j
-                tails[c] -= 1
-            }
-        }
-
-        // Step 7: Extract sorted LMS substrings and assign names
-        var lmsNames = [Int](repeating: -1, count: n)
-        var name = 0
-        var prevLMS = -1
-
-        for i in 0 ..< n {
-            let pos = sa[i]
-            if pos > 0, types[pos], !types[pos - 1] {
-                // This is an LMS suffix
-                if prevLMS >= 0, !lmsSubstringsEqual(text: text, types: types, i: prevLMS, j: pos) {
-                    name += 1
-                }
-                lmsNames[pos] = name
-                prevLMS = pos
-            }
-        }
-
-        // Step 8: If all LMS substrings have unique names, we're done
-        // Otherwise, recursively sort LMS substrings
+        // If not all LMS substrings have unique names, recursively sort
         let lmsCount = lmsPositions.count
         if name + 1 < lmsCount {
-            // Build reduced string from LMS names
-            var reducedString = [Int](repeating: 0, count: lmsCount)
-            var j = 0
-            for i in 0 ..< n {
-                if lmsNames[i] >= 0 {
-                    reducedString[j] = lmsNames[i]
-                    j += 1
-                }
-            }
-
-            // Recursively build suffix array of reduced string
+            let reducedString = buildReducedString(lmsNames: lmsNames)
             let reducedSA = build(reducedString, alphabetSize: name + 1)
 
-            // Step 9: Use reduced SA to place LMS suffixes in correct order
-            sa = [Int](repeating: -1, count: n)
-            tails = bucketTails
-
-            for i in stride(from: lmsCount - 1, through: 0, by: -1) {
-                let pos = lmsPositions[reducedSA[i]]
-                let c = text[pos]
-                sa[tails[c]] = pos
-                tails[c] -= 1
-            }
-
-            // Step 10: Final induced sort
-            heads = bucketHeads
-            for i in 0 ..< n {
-                let j = sa[i] - 1
-                if sa[i] > 0, !types[j] {
-                    let c = text[j]
-                    sa[heads[c]] = j
-                    heads[c] += 1
-                }
-            }
-
-            tails = bucketTails
-            for i in stride(from: n - 1, through: 0, by: -1) {
-                let j = sa[i] - 1
-                if sa[i] > 0, types[j] {
-                    let c = text[j]
-                    sa[tails[c]] = j
-                    tails[c] -= 1
-                }
-            }
+            // Rebuild SA with correct LMS order
+            sa = placeLMSSuffixesOrdered(
+                text, lmsPositions: lmsPositions, reducedSA: reducedSA, bucketTails: bucketTails,
+            )
+            inducedSortLType(sa: &sa, text: text, types: types, bucketHeads: bucketHeads)
+            inducedSortSType(sa: &sa, text: text, types: types, bucketTails: bucketTails)
         }
 
         return sa
     }
 
     // MARK: Private
+
+    /// Classify each suffix as S-type (true) or L-type (false).
+    private static func classifyTypes(_ text: [Int]) -> [Bool] {
+        let n = text.count
+        var types = [Bool](repeating: false, count: n)
+        types[n - 1] = true // Last suffix is always S-type (sentinel)
+
+        for i in stride(from: n - 2, through: 0, by: -1) {
+            if text[i] < text[i + 1] {
+                types[i] = true
+            } else if text[i] == text[i + 1] {
+                types[i] = types[i + 1]
+            }
+        }
+        return types
+    }
+
+    /// Find LMS (Leftmost S-type) positions.
+    private static func findLMSPositions(_ types: [Bool]) -> [Int] {
+        var positions: [Int] = []
+        for i in 1 ..< types.count where types[i] && !types[i - 1] {
+            positions.append(i)
+        }
+        return positions
+    }
+
+    /// Compute bucket head and tail positions.
+    private static func computeBucketBoundaries(
+        _ text: [Int], alphabetSize: Int,
+    ) -> (heads: [Int], tails: [Int]) {
+        var bucketSizes = [Int](repeating: 0, count: alphabetSize)
+        for c in text {
+            bucketSizes[c] += 1
+        }
+
+        var heads = [Int](repeating: 0, count: alphabetSize)
+        var tails = [Int](repeating: 0, count: alphabetSize)
+        var sum = 0
+        for i in 0 ..< alphabetSize {
+            heads[i] = sum
+            sum += bucketSizes[i]
+            tails[i] = sum - 1
+        }
+        return (heads, tails)
+    }
+
+    /// Place LMS suffixes at bucket tails.
+    private static func placeLMSSuffixes(
+        _ text: [Int], lmsPositions: [Int], bucketTails: [Int],
+    ) -> [Int] {
+        var sa = [Int](repeating: -1, count: text.count)
+        var tails = bucketTails
+        for i in stride(from: lmsPositions.count - 1, through: 0, by: -1) {
+            let pos = lmsPositions[i]
+            let c = text[pos]
+            sa[tails[c]] = pos
+            tails[c] -= 1
+        }
+        return sa
+    }
+
+    /// Place LMS suffixes in order determined by reduced SA.
+    private static func placeLMSSuffixesOrdered(
+        _ text: [Int], lmsPositions: [Int], reducedSA: [Int], bucketTails: [Int],
+    ) -> [Int] {
+        var sa = [Int](repeating: -1, count: text.count)
+        var tails = bucketTails
+        for i in stride(from: lmsPositions.count - 1, through: 0, by: -1) {
+            let pos = lmsPositions[reducedSA[i]]
+            let c = text[pos]
+            sa[tails[c]] = pos
+            tails[c] -= 1
+        }
+        return sa
+    }
+
+    /// Induced sort L-type suffixes (left to right).
+    private static func inducedSortLType(
+        sa: inout [Int], text: [Int], types: [Bool], bucketHeads: [Int],
+    ) {
+        var heads = bucketHeads
+        for i in 0 ..< sa.count where sa[i] > 0 && !types[sa[i] - 1] {
+            let j = sa[i] - 1
+            let c = text[j]
+            sa[heads[c]] = j
+            heads[c] += 1
+        }
+    }
+
+    /// Induced sort S-type suffixes (right to left).
+    private static func inducedSortSType(
+        sa: inout [Int], text: [Int], types: [Bool], bucketTails: [Int],
+    ) {
+        var tails = bucketTails
+        for i in stride(from: sa.count - 1, through: 0, by: -1) where sa[i] > 0 && types[sa[i] - 1] {
+            let j = sa[i] - 1
+            let c = text[j]
+            sa[tails[c]] = j
+            tails[c] -= 1
+        }
+    }
+
+    /// Assign names to sorted LMS substrings.
+    private static func assignLMSNames(
+        sa: [Int], text: [Int], types: [Bool],
+    ) -> (names: [Int], maxName: Int) {
+        let n = text.count
+        var lmsNames = [Int](repeating: -1, count: n)
+        var name = 0
+        var prevLMS = -1
+
+        for i in 0 ..< n {
+            let pos = sa[i]
+            guard pos > 0, types[pos], !types[pos - 1] else { continue }
+
+            if prevLMS >= 0, !lmsSubstringsEqual(text: text, types: types, i: prevLMS, j: pos) {
+                name += 1
+            }
+            lmsNames[pos] = name
+            prevLMS = pos
+        }
+
+        return (lmsNames, name)
+    }
+
+    /// Build reduced string from LMS names.
+    private static func buildReducedString(lmsNames: [Int]) -> [Int] {
+        lmsNames.filter { $0 >= 0 }
+    }
 
     /// Check if two LMS substrings are equal.
     private static func lmsSubstringsEqual(text: [Int], types: [Bool], i: Int, j: Int) -> Bool {

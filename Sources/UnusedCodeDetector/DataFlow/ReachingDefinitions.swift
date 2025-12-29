@@ -191,7 +191,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
 
         // MARK: Public
 
-        public static let `default` = Configuration()
+        public static let `default` = Self()
 
         /// Maximum iterations for fixed-point computation.
         public var maxIterations: Int
@@ -219,8 +219,9 @@ public struct ReachingDefinitionsAnalysis: Sendable {
         var killSets: [BlockID: Set<DefinitionSite>] = [:]
 
         for id in cfg.blockOrder {
+            guard let block = cfg.blocks[id] else { continue }
             let (gen, kill) = computeGenKill(
-                block: cfg.blocks[id]!,
+                block: block,
                 definitions: definitions,
             )
             genSets[id] = gen
@@ -324,7 +325,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
                         $0.statementIndex == index &&
                         $0.variable == variable
                 }
-                if let newDef = newDef {
+                if let newDef {
                     gen.insert(newDef)
                 }
 

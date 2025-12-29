@@ -22,6 +22,29 @@
 
 import Foundation
 
+// MARK: - SoATokenInfo
+
+/// Token information for SoA storage creation.
+public struct SoATokenInfo: Sendable {
+    // MARK: Lifecycle
+
+    public init(kind: TokenKindByte, offset: Int, length: Int, line: Int, column: Int) {
+        self.kind = kind
+        self.offset = offset
+        self.length = length
+        self.line = line
+        self.column = column
+    }
+
+    // MARK: Public
+
+    public let kind: TokenKindByte
+    public let offset: Int
+    public let length: Int
+    public let line: Int
+    public let column: Int
+}
+
 // MARK: - TokenKindByte
 
 /// Compact token kind representation using a single byte.
@@ -34,15 +57,15 @@ public struct TokenKindByte: RawRepresentable, Sendable, Hashable {
 
     // MARK: Public
 
-    public static let keyword = TokenKindByte(rawValue: 0)
-    public static let identifier = TokenKindByte(rawValue: 1)
-    public static let literal = TokenKindByte(rawValue: 2)
-    public static let `operator` = TokenKindByte(rawValue: 3)
-    public static let punctuation = TokenKindByte(rawValue: 4)
-    public static let unknown = TokenKindByte(rawValue: 5)
+    public static let keyword = Self(rawValue: 0)
+    public static let identifier = Self(rawValue: 1)
+    public static let literal = Self(rawValue: 2)
+    public static let `operator` = Self(rawValue: 3)
+    public static let punctuation = Self(rawValue: 4)
+    public static let unknown = Self(rawValue: 5)
 
     /// Marker for file boundaries in cross-file analysis.
-    public static let fileBoundary = TokenKindByte(rawValue: 255)
+    public static let fileBoundary = Self(rawValue: 255)
 
     public let rawValue: UInt8
 }
@@ -483,8 +506,7 @@ public extension SoATokenStorage {
 
 public extension SoATokenStorage {
     /// Create from an array of TokenInfo.
-    static func from(_ tokens: [(kind: TokenKindByte, offset: Int, length: Int, line: Int, column: Int)])
-        -> SoATokenStorage {
+    static func from(_ tokens: [SoATokenInfo]) -> SoATokenStorage {
         var storage = SoATokenStorage(capacity: tokens.count)
         for token in tokens {
             storage.append(

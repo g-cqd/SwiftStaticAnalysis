@@ -558,10 +558,10 @@ struct SoATokenStorageTests {
 
     @Test("Create from array works")
     func createFromArray() {
-        let tokens: [(kind: TokenKindByte, offset: Int, length: Int, line: Int, column: Int)] = [
-            (.keyword, 0, 4, 1, 1),
-            (.identifier, 5, 3, 1, 6),
-            (.punctuation, 8, 1, 1, 9),
+        let tokens: [SoATokenInfo] = [
+            SoATokenInfo(kind: .keyword, offset: 0, length: 4, line: 1, column: 1),
+            SoATokenInfo(kind: .identifier, offset: 5, length: 3, line: 1, column: 6),
+            SoATokenInfo(kind: .punctuation, offset: 8, length: 1, line: 1, column: 9),
         ]
 
         let storage = SoATokenStorage.from(tokens)

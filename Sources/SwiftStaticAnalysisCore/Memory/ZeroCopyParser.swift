@@ -1,3 +1,4 @@
+// swiftlint:disable vertical_whitespace_between_cases
 //
 //  ZeroCopyParser.swift
 //  SwiftStaticAnalysis
@@ -32,10 +33,10 @@ public struct ZeroCopyParserConfiguration: Sendable {
 
     // MARK: Public
 
-    public static let `default` = ZeroCopyParserConfiguration()
+    public static let `default` = Self()
 
     /// High-performance configuration for large codebases.
-    public static let highPerformance = ZeroCopyParserConfiguration(
+    public static let highPerformance = Self(
         mmapThreshold: 1024,
         arenaBlockSize: 262_144,
         computeLineRanges: true,
@@ -342,11 +343,9 @@ public actor ZeroCopyParser {
         var lineStart = 0
         let bytes = Array(source.utf8)
 
-        for (i, byte) in bytes.enumerated() {
-            if byte == 0x0A { // '\n'
-                ranges.append((lineStart, i - lineStart))
-                lineStart = i + 1
-            }
+        for (i, byte) in bytes.enumerated() where byte == 0x0A { // '\n'
+            ranges.append((lineStart, i - lineStart))
+            lineStart = i + 1
         }
 
         if lineStart < bytes.count {

@@ -146,10 +146,8 @@ public struct ClosureNormalizer: Sendable {
         }
 
         // Check for parenthesized closure argument
-        for arg in call.arguments {
-            if arg.expression.is(ClosureExprSyntax.self) {
-                return .parenthesizedArgument
-            }
+        for arg in call.arguments where arg.expression.is(ClosureExprSyntax.self) {
+            return .parenthesizedArgument
         }
 
         return nil
@@ -193,7 +191,7 @@ public struct ClosureNormalizer: Sendable {
                 switch params {
                 case let .simpleInput(identifiers):
                     // { a, b in ... }
-                    for (index, _) in identifiers.enumerated() {
+                    for index in identifiers.indices {
                         parameters.append(NormalizedParameter(
                             normalizedName: "param_\(index)",
                             hasTypeAnnotation: false,
@@ -249,8 +247,11 @@ public struct ClosureNormalizer: Sendable {
             )
         }
 
-        let isSingleExpression = statements.count == 1 &&
-            !statements.first!.item.is(ReturnStmtSyntax.self)
+        let isSingleExpression: Bool = if statements.count == 1, let firstStatement = statements.first {
+            !firstStatement.item.is(ReturnStmtSyntax.self)
+        } else {
+            false
+        }
 
         let kind: NormalizedClosureBody.BodyKind = statements.count == 1 ? .expression : .multiStatement
 

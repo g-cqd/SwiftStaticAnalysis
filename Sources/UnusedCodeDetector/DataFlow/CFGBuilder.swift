@@ -6,6 +6,7 @@
 //  Builds a CFG from Swift function bodies for use in
 //  live variable analysis, reaching definitions, and SCCP.
 //
+// swiftlint:disable file_length
 
 import Foundation
 import SwiftStaticAnalysisCore
@@ -23,8 +24,8 @@ public struct BlockID: Hashable, Sendable, CustomStringConvertible {
 
     // MARK: Public
 
-    public static let entry = BlockID("entry")
-    public static let exit = BlockID("exit")
+    public static let entry = Self("entry")
+    public static let exit = Self("exit")
 
     public let value: String
 
@@ -37,8 +38,12 @@ public struct BlockID: Hashable, Sendable, CustomStringConvertible {
 public struct CFGStatement: Sendable {
     // MARK: Lifecycle
 
-    public init(syntax: Syntax, location: SwiftStaticAnalysisCore.SourceLocation, uses: Set<String>,
-                defs: Set<String>) {
+    public init(
+        syntax: Syntax,
+        location: SwiftStaticAnalysisCore.SourceLocation,
+        uses: Set<String>,
+        defs: Set<String>
+    ) {
         self.syntax = syntax
         self.location = location
         self.uses = uses
@@ -242,7 +247,7 @@ public struct ControlFlowGraph: Sendable {
 // MARK: - CFGBuilder
 
 /// Builds a Control Flow Graph from Swift function declarations.
-public final class CFGBuilder: SyntaxVisitor {
+public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_body_length
     // MARK: Lifecycle
 
     public init(file: String, tree: SourceFileSyntax) {
@@ -435,7 +440,7 @@ public final class CFGBuilder: SyntaxVisitor {
             condition: conditionText,
             trueTarget: thenBlock,
             falseTarget: elseBlock,
-        )
+            )
         cfg.addEdge(from: currentBlockID, to: thenBlock)
         cfg.addEdge(from: currentBlockID, to: elseBlock)
 
@@ -477,7 +482,7 @@ public final class CFGBuilder: SyntaxVisitor {
             condition: conditionText,
             trueTarget: continueBlock,
             falseTarget: elseBlock,
-        )
+            )
         cfg.addEdge(from: currentBlockID, to: continueBlock)
         cfg.addEdge(from: currentBlockID, to: elseBlock)
 
@@ -514,7 +519,7 @@ public final class CFGBuilder: SyntaxVisitor {
             condition: "for \(forStmt.pattern.description) in \(forStmt.sequence.description)",
             trueTarget: bodyBlock,
             falseTarget: exitBlock,
-        )
+            )
         cfg.addEdge(from: headerBlock, to: bodyBlock)
         cfg.addEdge(from: headerBlock, to: exitBlock)
 
@@ -554,7 +559,7 @@ public final class CFGBuilder: SyntaxVisitor {
             condition: conditionText,
             trueTarget: bodyBlock,
             falseTarget: exitBlock,
-        )
+            )
         cfg.addEdge(from: headerBlock, to: bodyBlock)
         cfg.addEdge(from: headerBlock, to: exitBlock)
 
@@ -601,13 +606,14 @@ public final class CFGBuilder: SyntaxVisitor {
             condition: conditionText,
             trueTarget: bodyBlock,
             falseTarget: exitBlock,
-        )
+            )
         cfg.addEdge(from: conditionBlock, to: bodyBlock)
         cfg.addEdge(from: conditionBlock, to: exitBlock)
 
         switchToBlock(exitBlock)
     }
 
+    // swiftlint:disable:next function_body_length
     private func processSwitchStatement(_ switchStmt: SwitchExprSyntax) {
         let exitBlock = newBlock()
         switchStack.append(exitBlock)
@@ -640,12 +646,12 @@ public final class CFGBuilder: SyntaxVisitor {
             expression: switchStmt.subject.description,
             cases: caseBlocks,
             default: defaultBlock,
-        )
+            )
 
         for (_, target) in caseBlocks {
             cfg.addEdge(from: currentBlockID, to: target)
         }
-        if let defaultBlock = defaultBlock {
+        if let defaultBlock {
             cfg.addEdge(from: currentBlockID, to: defaultBlock)
         }
 
@@ -687,7 +693,7 @@ public final class CFGBuilder: SyntaxVisitor {
         cfg.addEdge(from: currentBlockID, to: .exit)
         cfg.blocks[currentBlockID]?.terminator = .return(
             expression: returnStmt.expression?.description,
-        )
+            )
     }
 
     private func processThrowStatement(_ throwStmt: ThrowStmtSyntax) {
@@ -695,7 +701,7 @@ public final class CFGBuilder: SyntaxVisitor {
         cfg.addEdge(from: currentBlockID, to: .exit)
         cfg.blocks[currentBlockID]?.terminator = .throw(
             expression: throwStmt.expression.description,
-        )
+            )
     }
 
     private func processBreakStatement(_ breakStmt: BreakStmtSyntax) {
@@ -712,7 +718,7 @@ public final class CFGBuilder: SyntaxVisitor {
             nil
         }
 
-        if let target = target {
+        if let target {
             cfg.addEdge(from: currentBlockID, to: target)
         }
         cfg.blocks[currentBlockID]?.terminator = .break(target: target)
@@ -727,7 +733,7 @@ public final class CFGBuilder: SyntaxVisitor {
             loopStack.last?.header
         }
 
-        if let target = target {
+        if let target {
             cfg.addEdge(from: currentBlockID, to: target)
         }
         cfg.blocks[currentBlockID]?.terminator = .continue(target: target)
@@ -769,7 +775,7 @@ public final class CFGBuilder: SyntaxVisitor {
             line: loc.line,
             column: loc.column,
             offset: 0,
-        )
+            )
 
         let extractor = UseDefExtractor()
         extractor.walk(syntax)
@@ -779,7 +785,7 @@ public final class CFGBuilder: SyntaxVisitor {
             location: location,
             uses: extractor.uses,
             defs: extractor.defs,
-        )
+            )
 
         cfg.blocks[currentBlockID]?.statements.append(statement)
     }
@@ -796,10 +802,8 @@ public final class CFGBuilder: SyntaxVisitor {
             // Process statements in order
             for statement in block.statements {
                 // Use = variables used before being defined
-                for usedVar in statement.uses {
-                    if !def.contains(usedVar) {
-                        use.insert(usedVar)
-                    }
+                for usedVar in statement.uses where !def.contains(usedVar) {
+                    use.insert(usedVar)
                 }
                 // Def = all variables defined
                 def.formUnion(statement.defs)

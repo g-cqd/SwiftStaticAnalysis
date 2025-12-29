@@ -190,6 +190,7 @@ struct Unused: AsyncParsableCommand {
     @Flag(name: .long, help: "Apply sensible defaults (exclude imports, deinit, enum cases)")
     var sensibleDefaults: Bool = false
 
+    // swiftlint:disable:next function_body_length
     func run() async throws {
         var files = try findSwiftFiles(in: path)
 
@@ -277,10 +278,8 @@ struct Unused: AsyncParsableCommand {
             // Exclude based on path patterns
             if !excludePaths.isEmpty {
                 let filePath = item.declaration.location.file
-                for pattern in excludePaths {
-                    if UnusedCodeFilter.matchesGlobPattern(filePath, pattern: pattern) {
-                        return false
-                    }
+                for pattern in excludePaths where UnusedCodeFilter.matchesGlobPattern(filePath, pattern: pattern) {
+                    return false
                 }
             }
 
@@ -360,7 +359,7 @@ struct CombinedReport: Codable {
 enum OutputFormatter {
     /// Print clone groups in text format.
     static func printCloneGroupsText(_ clones: [CloneGroup], header: String? = nil) {
-        if let header = header {
+        if let header {
             print(header)
         }
         for (index, group) in clones.enumerated() {
@@ -433,10 +432,8 @@ func findSwiftFiles(in path: String) throws -> [String] {
         includingPropertiesForKeys: [.isRegularFileKey],
         options: [.skipsHiddenFiles],
     ) {
-        for case let fileURL as URL in enumerator {
-            if fileURL.pathExtension == "swift" {
-                swiftFiles.append(fileURL.path)
-            }
+        for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
+            swiftFiles.append(fileURL.path)
         }
     }
 

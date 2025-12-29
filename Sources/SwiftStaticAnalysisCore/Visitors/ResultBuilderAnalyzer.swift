@@ -54,9 +54,9 @@ public enum ResultBuilderType: String, Sendable, Codable, CaseIterable {
     }
 
     /// Infer builder type from attribute name.
-    public static func from(attributeName: String) -> ResultBuilderType? {
+    public static func from(attributeName: String) -> Self? {
         // Check if it's a known builder
-        for type in ResultBuilderType.allCases where type != .custom {
+        for type in allCases where type != .custom {
             if attributeName == type.rawValue || attributeName.hasSuffix(".\(type.rawValue)") {
                 return type
             }
@@ -118,7 +118,7 @@ public struct NormalizedStatement: Sendable, Hashable {
     public let normalizedContent: String
 
     /// Child statements (for control flow).
-    public let children: [NormalizedStatement]
+    public let children: [Self]
 }
 
 // MARK: - ResultBuilderContext

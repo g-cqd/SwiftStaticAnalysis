@@ -206,17 +206,17 @@ public struct DeduplicationConfiguration: Sendable {
     // MARK: Public
 
     /// Default configuration.
-    public static let `default` = DeduplicationConfiguration()
+    public static let `default` = Self()
 
     /// Strict deduplication (exact matches only).
-    public static let strict = DeduplicationConfiguration(
+    public static let strict = Self(
         deduplicationLevel: .exact,
         maxDiagnosticsPerFile: nil,
         groupRelatedDiagnostics: false,
     )
 
     /// Lenient deduplication (dedupe by location only).
-    public static let lenient = DeduplicationConfiguration(
+    public static let lenient = Self(
         deduplicationLevel: .location,
         maxDiagnosticsPerFile: 50,
         groupRelatedDiagnostics: true,

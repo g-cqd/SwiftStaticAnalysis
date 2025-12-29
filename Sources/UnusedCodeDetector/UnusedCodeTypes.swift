@@ -43,7 +43,7 @@ public enum Confidence: String, Sendable, Codable, Comparable {
 
     // MARK: Public
 
-    public static func < (lhs: Confidence, rhs: Confidence) -> Bool {
+    public static func < (lhs: Self, rhs: Self) -> Bool {
         lhs.rank < rhs.rank
     }
 

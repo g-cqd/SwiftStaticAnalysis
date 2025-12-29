@@ -333,10 +333,10 @@ public struct DependencyExtractionConfiguration: Sendable {
     // MARK: Public
 
     /// Default configuration.
-    public static let `default` = DependencyExtractionConfiguration()
+    public static let `default` = Self()
 
     /// Strict configuration for finding more unused code.
-    public static let strict = DependencyExtractionConfiguration(
+    public static let strict = Self(
         treatPublicAsRoot: false,
         treatObjcAsRoot: true,
         treatTestsAsRoot: true,

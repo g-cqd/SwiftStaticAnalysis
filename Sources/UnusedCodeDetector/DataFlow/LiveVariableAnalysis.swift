@@ -116,7 +116,7 @@ public struct LiveVariableAnalysis: Sendable {
 
         // MARK: Public
 
-        public static let `default` = Configuration()
+        public static let `default` = Self()
 
         /// Maximum iterations for fixed-point computation.
         public var maxIterations: Int
@@ -323,9 +323,7 @@ public struct LiveVariableAnalysis: Sendable {
         allDefined.subtract(configuration.ignoredVariables)
 
         // Find variables defined but never used
-        let unused = allDefined.subtracting(allUsed)
-
-        return unused
+        return allDefined.subtracting(allUsed)
     }
 }
 

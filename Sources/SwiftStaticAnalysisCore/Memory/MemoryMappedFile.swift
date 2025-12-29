@@ -91,12 +91,12 @@ public final class MemoryMappedFile: @unchecked Sendable {
             0,
         )
 
-        guard mapped != MAP_FAILED else {
+        guard mapped != MAP_FAILED, let mappedPointer = mapped else {
             close(fd)
             throw MemoryMappedFileError.mappingFailed(path, errno)
         }
 
-        data = UnsafeRawPointer(mapped!)
+        data = UnsafeRawPointer(mappedPointer)
 
         // Advise the kernel about our access pattern (sequential)
         madvise(UnsafeMutableRawPointer(mutating: data), size, MADV_SEQUENTIAL)
@@ -188,11 +188,9 @@ public final class MemoryMappedFile: @unchecked Sendable {
         var ranges: [(Int, Int)] = []
         var lineStart = 0
 
-        for i in 0 ..< size {
-            if data.load(fromByteOffset: i, as: UInt8.self) == 0x0A { // '\n'
-                ranges.append((lineStart, i - lineStart))
-                lineStart = i + 1
-            }
+        for i in 0 ..< size where data.load(fromByteOffset: i, as: UInt8.self) == 0x0A { // '\n'
+            ranges.append((lineStart, i - lineStart))
+            lineStart = i + 1
         }
 
         // Handle last line without newline
@@ -289,10 +287,10 @@ public struct FileSlice: @unchecked Sendable {
     }
 
     /// Create a sub-slice.
-    public func subslice(offset: Int, length: Int) -> FileSlice {
+    public func subslice(offset: Int, length: Int) -> Self {
         let validOffset = max(0, min(offset, self.length))
         let validLength = min(length, self.length - validOffset)
-        return FileSlice(
+        return Self(
             base: base.advanced(by: validOffset),
             length: validLength,
             file: file,
@@ -306,6 +304,7 @@ public struct FileSlice: @unchecked Sendable {
             start: base.assumingMemoryBound(to: UInt8.self),
             count: length,
         )
+        // swiftlint:disable:next optional_data_string_conversion
         return String(decoding: buffer, as: UTF8.self)
     }
 
@@ -325,7 +324,7 @@ public struct FileSlice: @unchecked Sendable {
     }
 
     /// Compare with another slice for equality.
-    public func equals(_ other: FileSlice) -> Bool {
+    public func equals(_ other: Self) -> Bool {
         guard length == other.length else { return false }
         return memcmp(base, other.base, length) == 0
     }

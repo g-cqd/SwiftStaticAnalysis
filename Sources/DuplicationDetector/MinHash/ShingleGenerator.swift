@@ -108,7 +108,7 @@ public struct ShingleGenerator: Sendable {
     public func generate(tokens: [String], kinds: [TokenKind]? = nil) -> [Shingle] {
         guard tokens.count >= shingleSize else { return [] }
 
-        let normalizedTokens: [String] = if normalize, let kinds = kinds {
+        let normalizedTokens: [String] = if normalize, let kinds {
             normalizeTokens(tokens, kinds: kinds)
         } else {
             tokens

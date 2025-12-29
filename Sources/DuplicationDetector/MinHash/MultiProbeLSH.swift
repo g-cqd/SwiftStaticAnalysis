@@ -115,10 +115,8 @@ public struct MultiProbeLSH: Sendable, LSHQueryable {
         for (docId, signature) in signatures {
             for perturbation in perturbationVectors {
                 let probedCandidates = queryWithPerturbation(signature, perturbation: perturbation)
-                for candidateId in probedCandidates {
-                    if candidateId != docId {
-                        pairs.insert(DocumentPair(id1: docId, id2: candidateId))
-                    }
+                for candidateId in probedCandidates where candidateId != docId {
+                    pairs.insert(DocumentPair(id1: docId, id2: candidateId))
                 }
             }
         }
@@ -211,11 +209,9 @@ public struct MultiProbeLSH: Sendable, LSHQueryable {
         var values = signature.values
 
         // Apply perturbations
-        for (index, delta) in perturbation.deltas {
-            if index < values.count {
-                // Modify the value by the delta
-                values[index] = values[index] &+ delta
-            }
+        for (index, delta) in perturbation.deltas where index < values.count {
+            // Modify the value by the delta
+            values[index] = values[index] &+ delta
         }
 
         return MinHashSignature(values: values, documentId: signature.documentId)

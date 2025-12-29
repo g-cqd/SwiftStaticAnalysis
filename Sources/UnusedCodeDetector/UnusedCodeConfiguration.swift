@@ -64,28 +64,28 @@ public struct UnusedCodeConfiguration: Sendable {
     // MARK: Public
 
     /// Default configuration.
-    public static let `default` = UnusedCodeConfiguration()
+    public static let `default` = Self()
 
     /// Reachability-based configuration.
-    public static let reachability = UnusedCodeConfiguration(mode: .reachability)
+    public static let reachability = Self(mode: .reachability)
 
     /// IndexStore-based configuration (most accurate).
-    public static let indexStore = UnusedCodeConfiguration(mode: .indexStore)
+    public static let indexStore = Self(mode: .indexStore)
 
     /// IndexStore with auto-build enabled.
-    public static let indexStoreAutoBuild = UnusedCodeConfiguration(
+    public static let indexStoreAutoBuild = Self(
         mode: .indexStore,
         autoBuild: true,
     )
 
     /// Hybrid mode configuration.
-    public static let hybrid = UnusedCodeConfiguration(
+    public static let hybrid = Self(
         mode: .indexStore,
         hybridMode: true,
     )
 
     /// Strict configuration (catches more potential issues).
-    public static let strict = UnusedCodeConfiguration(
+    public static let strict = Self(
         ignorePublicAPI: false,
         mode: .reachability,
         minimumConfidence: .low,
@@ -170,8 +170,8 @@ public struct UnusedCodeConfiguration: Sendable {
     }
 
     /// Incremental configuration with caching enabled.
-    public static func incremental(cacheDirectory: URL? = nil) -> UnusedCodeConfiguration {
-        UnusedCodeConfiguration(
+    public static func incremental(cacheDirectory: URL? = nil) -> Self {
+        Self(
             mode: .reachability,
             useIncremental: true,
             cacheDirectory: cacheDirectory,

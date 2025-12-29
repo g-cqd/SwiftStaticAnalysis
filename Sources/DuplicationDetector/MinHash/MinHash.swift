@@ -41,14 +41,12 @@ public struct MinHashSignature: Sendable, Hashable {
     ///
     /// - Parameter other: Another MinHash signature.
     /// - Returns: Estimated Jaccard similarity (0.0 to 1.0).
-    public func estimateSimilarity(with other: MinHashSignature) -> Double {
+    public func estimateSimilarity(with other: Self) -> Double {
         guard values.count == other.values.count, !values.isEmpty else { return 0 }
 
         var matches = 0
-        for (v1, v2) in zip(values, other.values) {
-            if v1 == v2 {
-                matches += 1
-            }
+        for (v1, v2) in zip(values, other.values) where v1 == v2 {
+            matches += 1
         }
 
         return Double(matches) / Double(values.count)

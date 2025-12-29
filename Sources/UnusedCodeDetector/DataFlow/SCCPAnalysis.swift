@@ -41,7 +41,8 @@ public enum LatticeValue: Sendable, Hashable, CustomStringConvertible {
     }
 
     /// Check if this is a known boolean constant.
-    public var boolValue: Bool? {
+    /// Returns nil if not a boolean constant (valid tri-state: true/false/unknown).
+    public var boolValue: Bool? { // swiftlint:disable:this discouraged_optional_boolean
         if case let .constant(c) = self, case let .bool(b) = c {
             return b
         }
@@ -49,7 +50,7 @@ public enum LatticeValue: Sendable, Hashable, CustomStringConvertible {
     }
 
     /// Meet operation: combines two lattice values.
-    public func meet(_ other: LatticeValue) -> LatticeValue {
+    public func meet(_ other: Self) -> Self {
         switch (self, other) {
         case let (.top, v),
              let (v, .top):
@@ -120,7 +121,7 @@ public struct DeadBranch: Sendable {
         condition: String,
         deadBranch: BranchDirection,
         conditionValue: String,
-    ) {
+        ) {
         self.location = location
         self.condition = condition
         self.deadBranch = deadBranch
@@ -163,8 +164,8 @@ public struct SCCPResult: Sendable {
             variable: String,
             value: ConstantValue,
             location: SwiftStaticAnalysisCore.SourceLocation,
-        )],
-    ) {
+            )],
+        ) {
         self.cfg = cfg
         self.variableValues = variableValues
         self.executableEdges = executableEdges
@@ -195,13 +196,13 @@ public struct SCCPResult: Sendable {
         variable: String,
         value: ConstantValue,
         location: SwiftStaticAnalysisCore.SourceLocation,
-    )]
+        )]
 }
 
 // MARK: - SCCPAnalysis
 
 /// Performs Sparse Conditional Constant Propagation analysis.
-public final class SCCPAnalysis: @unchecked Sendable {
+public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this type_body_length
     // MARK: Lifecycle
 
     public init(configuration: Configuration = .default) {
@@ -219,7 +220,7 @@ public final class SCCPAnalysis: @unchecked Sendable {
             detectDeadBranches: Bool = true,
             trackStrings: Bool = false,
             ignoredVariables: Set<String> = ["_"],
-        ) {
+            ) {
             self.maxIterations = maxIterations
             self.detectDeadBranches = detectDeadBranches
             self.trackStrings = trackStrings
@@ -228,7 +229,7 @@ public final class SCCPAnalysis: @unchecked Sendable {
 
         // MARK: Public
 
-        public static let `default` = Configuration()
+        public static let `default` = Self()
 
         /// Maximum iterations for fixed-point computation.
         public var maxIterations: Int
@@ -294,7 +295,7 @@ public final class SCCPAnalysis: @unchecked Sendable {
             unreachableBlocks: unreachableBlocks,
             deadBranches: deadBranches,
             propagatableConstants: constants,
-        )
+            )
     }
 
     // MARK: Private
@@ -322,7 +323,7 @@ public final class SCCPAnalysis: @unchecked Sendable {
     // MARK: - Block Processing
 
     private func visitBlock(_ blockID: BlockID) {
-        guard let cfg = cfg, let block = cfg.blocks[blockID] else { return }
+        guard let cfg, let block = cfg.blocks[blockID] else { return }
 
         let firstVisit = !visitedBlocks.contains(blockID)
         visitedBlocks.insert(blockID)
@@ -524,7 +525,7 @@ public final class SCCPAnalysis: @unchecked Sendable {
             for (_, target) in cases {
                 cfgWorklist.append(CFGEdge(from: blockID, to: target))
             }
-            if let defaultTarget = defaultTarget {
+            if let defaultTarget {
                 cfgWorklist.append(CFGEdge(from: blockID, to: defaultTarget))
             }
 
@@ -538,12 +539,12 @@ public final class SCCPAnalysis: @unchecked Sendable {
             cfgWorklist.append(CFGEdge(from: blockID, to: target))
 
         case let .break(target):
-            if let target = target {
+            if let target {
                 cfgWorklist.append(CFGEdge(from: blockID, to: target))
             }
 
         case let .continue(target):
-            if let target = target {
+            if let target {
                 cfgWorklist.append(CFGEdge(from: blockID, to: target))
             }
         }
@@ -632,7 +633,7 @@ public final class SCCPAnalysis: @unchecked Sendable {
                             condition: condition,
                             deadBranch: .falseBranch,
                             conditionValue: "true",
-                        ))
+                            ))
                     }
 
                 case .constant(.bool(false)):
@@ -643,7 +644,7 @@ public final class SCCPAnalysis: @unchecked Sendable {
                             condition: condition,
                             deadBranch: .trueBranch,
                             conditionValue: "false",
-                        ))
+                            ))
                     }
 
                 default:
@@ -659,7 +660,7 @@ public final class SCCPAnalysis: @unchecked Sendable {
         variable: String,
         value: ConstantValue,
         location: SwiftStaticAnalysisCore.SourceLocation,
-    )] {
+        )] {
         var constants: [(String, ConstantValue, SwiftStaticAnalysisCore.SourceLocation)] = []
 
         for id in cfg.blockOrder {

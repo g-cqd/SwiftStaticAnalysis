@@ -18,7 +18,7 @@ public struct ScopeID: Sendable, Hashable, Codable {
     // MARK: Public
 
     /// The global/file scope.
-    public static let global = ScopeID("global")
+    public static let global = Self("global")
 
     /// The underlying identifier.
     public let id: String

@@ -12,7 +12,7 @@ import SwiftSyntax
 ///
 /// This visitor traverses the AST and extracts all declarations
 /// including functions, variables, types, and imports.
-public final class DeclarationCollector: ScopeTrackingVisitor {
+public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:disable:this type_body_length
     // MARK: Public
 
     /// Collected declarations.
@@ -28,7 +28,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             modifiers: node.modifiers,
             node: node,
             documentation: extractDocumentation(from: node),
-        )
+            )
         declarations.append(declaration)
 
         // Let parent handle scope tracking
@@ -44,7 +44,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             modifiers: node.modifiers,
             node: node,
             documentation: extractDocumentation(from: node),
-        )
+            )
         declarations.append(declaration)
 
         return super.visit(node)
@@ -58,7 +58,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             kind: .deinitializer,
             modifiers: node.modifiers,
             node: node,
-        )
+            )
         declarations.append(declaration)
 
         return .visitChildren
@@ -88,7 +88,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
                 typeAnnotation: typeAnnotation,
                 documentation: extractDocumentation(from: node),
                 propertyWrappers: propertyWrappers,
-            )
+                )
             declarations.append(declaration)
         }
 
@@ -110,7 +110,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             range: range(of: node),
             scope: currentScope,
             typeAnnotation: typeAnnotation,
-        )
+            )
         declarations.append(declaration)
 
         return .visitChildren
@@ -134,7 +134,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             swiftUIInfo: swiftUIInfo,
             conformances: conformances,
             attributes: attrs,
-        )
+            )
         declarations.append(declaration)
 
         return super.visit(node)
@@ -156,7 +156,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             swiftUIInfo: swiftUIInfo,
             conformances: conformances,
             attributes: attrs,
-        )
+            )
         declarations.append(declaration)
 
         return super.visit(node)
@@ -179,7 +179,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             swiftUIInfo: swiftUIInfo,
             conformances: conformances,
             attributes: attrs,
-        )
+            )
         declarations.append(declaration)
 
         // Push enum's ignore directives for its cases to inherit
@@ -203,7 +203,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             modifiers: node.modifiers,
             node: node,
             documentation: extractDocumentation(from: node),
-        )
+            )
         declarations.append(declaration)
 
         return super.visit(node)
@@ -217,7 +217,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             kind: .extension,
             modifiers: node.modifiers,
             node: node,
-        )
+            )
         declarations.append(declaration)
 
         return super.visit(node)
@@ -232,7 +232,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             modifiers: node.modifiers,
             node: node,
             documentation: extractDocumentation(from: node),
-        )
+            )
         declarations.append(declaration)
 
         return .visitChildren
@@ -247,7 +247,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             modifiers: node.modifiers,
             node: node,
             documentation: extractDocumentation(from: node),
-        )
+            )
         declarations.append(declaration)
 
         return .visitChildren
@@ -269,7 +269,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             range: range(of: node),
             scope: currentScope,
             ignoreDirectives: ignoreDirectives,
-        )
+            )
         declarations.append(declaration)
 
         return .visitChildren
@@ -284,7 +284,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             modifiers: node.modifiers,
             node: node,
             documentation: extractDocumentation(from: node),
-        )
+            )
         declarations.append(declaration)
 
         return .visitChildren
@@ -301,7 +301,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             location: location(of: node),
             range: range(of: node),
             scope: currentScope,
-        )
+            )
         declarations.append(declaration)
 
         return .visitChildren
@@ -320,7 +320,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             location: location(of: node),
             range: range(of: node),
             scope: .global,
-        )
+            )
         imports.append(declaration)
 
         return .visitChildren
@@ -367,7 +367,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
         swiftUIInfo: SwiftUITypeInfo? = nil,
         conformances: [String] = [],
         attributes: [String] = [],
-    ) -> Declaration {
+        ) -> Declaration {
         Declaration(
             name: name,
             kind: kind,
@@ -384,7 +384,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             conformances: conformances,
             attributes: attributes,
             ignoreDirectives: extractIgnoreCategories(from: node),
-        )
+            )
     }
 
     private func extractAccessLevel(from modifiers: DeclModifierListSyntax) -> AccessLevel {
@@ -594,7 +594,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
                 identifier.name.text
             } else {
                 attribute.attributeName.description
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             }
 
             // Check if this is a known property wrapper
@@ -610,7 +610,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
                 kind: kind,
                 attributeText: attributeText,
                 arguments: arguments,
-            )
+                )
             wrappers.append(wrapper)
         }
 
@@ -663,7 +663,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
                 identifier.name.text
             } else {
                 attribute.attributeName.description
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
             }
 
             result.append(attributeName)

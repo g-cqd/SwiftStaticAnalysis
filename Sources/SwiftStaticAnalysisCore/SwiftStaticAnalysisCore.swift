@@ -199,7 +199,7 @@ public struct AnalyzerConfiguration: Sendable {
     // MARK: Public
 
     /// Default configuration.
-    public static let `default` = AnalyzerConfiguration()
+    public static let `default` = Self()
 
     /// Whether to include private declarations.
     public var includePrivate: Bool

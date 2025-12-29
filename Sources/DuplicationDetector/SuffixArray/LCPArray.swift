@@ -49,10 +49,8 @@ public struct LCPArray: Sendable {
     /// These represent repeated substrings of at least `threshold` tokens.
     public func findRepeatsAboveThreshold(_ threshold: Int) -> [Int] {
         var positions: [Int] = []
-        for i in 1 ..< array.count {
-            if array[i] >= threshold {
-                positions.append(i)
-            }
+        for i in 1 ..< array.count where array[i] >= threshold {
+            positions.append(i)
         }
         return positions
     }

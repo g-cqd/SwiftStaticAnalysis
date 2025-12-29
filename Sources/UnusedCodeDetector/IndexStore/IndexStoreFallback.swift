@@ -236,7 +236,7 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
     ///   - sourceFiles: Source files to analyze.
     ///   - preferredMode: The preferred mode from configuration.
     /// - Returns: The analysis mode to use.
-    public func determineAnalysisMode(
+    public func determineAnalysisMode( // swiftlint:disable:this function_body_length
         projectRoot: String,
         sourceFiles: [String],
         preferredMode: DetectionMode,
@@ -439,7 +439,10 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
     }
 
     /// Build an Xcode project.
-    private func buildXcodeProject(at projectRoot: String, startTime: Date) async -> BuildResult {
+    private func buildXcodeProject( // swiftlint:disable:this function_body_length
+        at projectRoot: String,
+        startTime: Date,
+    ) async -> BuildResult {
         // Find workspace or project
         guard let contents = try? FileManager.default.contentsOfDirectory(atPath: projectRoot) else {
             return BuildResult(
@@ -532,13 +535,13 @@ public struct FallbackConfiguration: Sendable {
 
     // MARK: Public
 
-    public static let `default` = FallbackConfiguration()
+    public static let `default` = Self()
 
     /// Configuration with auto-build enabled.
-    public static let withAutoBuild = FallbackConfiguration(autoBuild: true)
+    public static let withAutoBuild = Self(autoBuild: true)
 
     /// Configuration for CI/CD where index is expected.
-    public static let cicd = FallbackConfiguration(
+    public static let cicd = Self(
         autoBuild: false,
         checkFreshness: true,
         warnOnStale: false,
@@ -546,7 +549,7 @@ public struct FallbackConfiguration: Sendable {
     )
 
     /// Hybrid mode configuration.
-    public static let hybrid = FallbackConfiguration(
+    public static let hybrid = Self(
         autoBuild: false,
         checkFreshness: true,
         warnOnStale: true,
