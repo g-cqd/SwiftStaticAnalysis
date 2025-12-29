@@ -45,11 +45,10 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
 
-      - name: Install Linting Tools
+      - name: Ensure Linting Tools
         run: |
-          brew install swiftlint swiftformat || true
-          echo "SwiftLint version: $(swiftlint version || echo 'not installed')"
-          echo "SwiftFormat version: $(swiftformat --version || echo 'not installed')"
+          command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
+          command -v swiftformat >/dev/null 2>&1 || brew install swiftformat
 
       - name: Cache SPM Dependencies
         id: cache
@@ -86,8 +85,10 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
 
-      - name: Install Linting Tools
-        run: brew install swiftlint swiftformat || true
+      - name: Ensure Linting Tools
+        run: |
+          command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
+          command -v swiftformat >/dev/null 2>&1 || brew install swiftformat
 
       - name: Restore SPM Cache
         uses: actions/cache@v4
@@ -113,8 +114,10 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
 
-      - name: Install Linting Tools
-        run: brew install swiftlint swiftformat || true
+      - name: Ensure Linting Tools
+        run: |
+          command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
+          command -v swiftformat >/dev/null 2>&1 || brew install swiftformat
 
       - name: Restore SPM Cache
         uses: actions/cache@v4
@@ -129,7 +132,7 @@ jobs:
       - name: Check for Warnings
         run: |
           swift build 2>&1 | tee build.log
-          # Filter out SwiftLint/SwiftFormat availability warnings
+          # Filter out SwiftLint/SwiftFormat availability warnings from plugins
           grep -v "SwiftLint not available\|SwiftFormat not available" build.log > filtered.log || true
           if grep -q "warning:" filtered.log; then
             echo "::warning::Build produced warnings"
@@ -175,8 +178,10 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
 
-      - name: Install Linting Tools
-        run: brew install swiftlint swiftformat || true
+      - name: Ensure Linting Tools
+        run: |
+          command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
+          command -v swiftformat >/dev/null 2>&1 || brew install swiftformat
 
       - name: Restore SPM Cache
         uses: actions/cache@v4
@@ -189,7 +194,7 @@ jobs:
             spm-${{ runner.os }}-
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: swift
           build-mode: manual
@@ -198,7 +203,7 @@ jobs:
         run: swift build -c release --arch arm64
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:swift"
 
@@ -217,8 +222,10 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
 
-      - name: Install Linting Tools
-        run: brew install swiftlint swiftformat || true
+      - name: Ensure Linting Tools
+        run: |
+          command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
+          command -v swiftformat >/dev/null 2>&1 || brew install swiftformat
 
       - name: Restore SPM Cache
         uses: actions/cache@v4
@@ -327,8 +334,10 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
 
-      - name: Install Linting Tools
-        run: brew install swiftlint swiftformat || true
+      - name: Ensure Linting Tools
+        run: |
+          command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
+          command -v swiftformat >/dev/null 2>&1 || brew install swiftformat
 
       - name: Restore SPM Cache
         uses: actions/cache@v4
