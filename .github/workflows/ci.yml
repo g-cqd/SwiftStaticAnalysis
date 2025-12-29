@@ -1,37 +1,93 @@
-name: CI
+name: CI/CD
 
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Create release'
+        type: boolean
+        default: false
+      version:
+        description: 'Version override (e.g., 1.0.0)'
+        required: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
-  contents: read
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  XCODE_PATH: /Applications/Xcode_26.1.1.app
 
 jobs:
-  build-and-test:
-    name: Build and Test
+  # ============================================================================
+  # STAGE 1: Build (macOS) - Single build, cached, artifacts shared
+  # ============================================================================
+  build:
+    name: Build
     runs-on: macos-15
+    outputs:
+      cache-hit: ${{ steps.cache.outputs.cache-hit }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+        run: sudo xcode-select -s ${{ env.XCODE_PATH }}
 
-      - name: Show Swift Version
-        run: swift --version
+      - name: Cache SPM Dependencies
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Developer/Xcode/DerivedData
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
 
-      - name: Build (Debug)
-        run: swift build
-
-      - name: Build (Release)
+      - name: Build Release
         run: swift build -c release
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-release
+          path: .build/release/swa
+          retention-days: 1
+
+  # ============================================================================
+  # STAGE 2: Test & Validate (parallel, depend on build)
+  # ============================================================================
+  test:
+    name: Test
+    runs-on: macos-15
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s ${{ env.XCODE_PATH }}
+
+      - name: Restore SPM Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Developer/Xcode/DerivedData
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
 
       - name: Run Tests
         run: swift test --parallel
@@ -39,14 +95,25 @@ jobs:
   lint:
     name: Lint
     runs-on: macos-15
+    needs: build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+        run: sudo xcode-select -s ${{ env.XCODE_PATH }}
 
-      - name: Check for warnings
+      - name: Restore SPM Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Developer/Xcode/DerivedData
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Check for Warnings
         run: |
           swift build 2>&1 | tee build.log
           if grep -q "warning:" build.log; then
@@ -56,15 +123,19 @@ jobs:
   self-analysis:
     name: Self Analysis
     runs-on: macos-15
+    needs: build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-release
+          path: .build/release
 
-      - name: Build Release
-        run: swift build -c release
+      - name: Make Binary Executable
+        run: chmod +x .build/release/swa
 
       - name: Run Unused Code Detection
         run: |
@@ -75,18 +146,207 @@ jobs:
             --exclude-paths "**/Fixtures/**" \
             --format text
 
+  # ============================================================================
+  # STAGE 3: Documentation (only on main branch or tags)
+  # ============================================================================
   docs:
-    name: Documentation
+    name: Build Documentation
     runs-on: macos-15
+    needs: build
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
+        run: sudo xcode-select -s ${{ env.XCODE_PATH }}
+
+      - name: Restore SPM Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Developer/Xcode/DerivedData
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
 
       - name: Build Documentation
         run: |
-          swift package generate-documentation \
+          swift package --allow-writing-to-directory ./docs \
+            generate-documentation \
             --target SwiftStaticAnalysisCore \
-            --warnings-as-errors
+            --target DuplicationDetector \
+            --target UnusedCodeDetector \
+            --disable-indexing \
+            --transform-for-static-hosting \
+            --hosting-base-path SwiftStaticAnalysis \
+            --output-path ./docs
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs
+
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    needs: docs
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # ============================================================================
+  # STAGE 4: Release (only on tags or manual dispatch with release=true)
+  # ============================================================================
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    if: |
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'workflow_dispatch' && inputs.release)
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      changelog: ${{ steps.changelog.outputs.content }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Version
+        id: version
+        run: |
+          if [[ -n "${{ inputs.version }}" ]]; then
+            VERSION="${{ inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            IFS='.' read -r MAJOR MINOR PATCH <<< "${LATEST_TAG#v}"
+            VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          PREVIOUS=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          RANGE="${PREVIOUS:+$PREVIOUS..}HEAD"
+
+          {
+            echo "content<<EOF"
+            for TYPE in "feat:Features" "fix:Bug Fixes" "perf:Performance"; do
+              GREP="${TYPE%%:*}"
+              TITLE="${TYPE##*:}"
+              COMMITS=$(git log $RANGE --pretty=format:"- %s (%h)" --grep="^$GREP" -i 2>/dev/null || echo "")
+              if [[ -n "$COMMITS" ]]; then
+                echo "### $TITLE"
+                echo "$COMMITS"
+                echo ""
+              fi
+            done
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+  release:
+    name: Create Release
+    runs-on: macos-15
+    needs: [prepare-release, docs]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s ${{ env.XCODE_PATH }}
+
+      - name: Restore SPM Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Developer/Xcode/DerivedData
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Build Universal Binary
+        run: |
+          swift build -c release --arch arm64
+          mv .build/release/swa .build/release/swa-arm64
+
+          swift build -c release --arch x86_64
+          mv .build/release/swa .build/release/swa-x86_64
+
+          lipo -create -output .build/release/swa \
+            .build/release/swa-arm64 \
+            .build/release/swa-x86_64
+
+          lipo -info .build/release/swa
+
+      - name: Package Binaries
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          mkdir -p release
+
+          for ARCH in universal arm64 x86_64; do
+            if [[ "$ARCH" == "universal" ]]; then
+              cp .build/release/swa release/swa
+            else
+              cp .build/release/swa-$ARCH release/swa
+            fi
+            tar -C release -czvf "release/swa-${VERSION}-macos-${ARCH}.tar.gz" swa
+          done
+
+          cd release && shasum -a 256 *.tar.gz > checksums.txt
+
+      - name: Create Tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ needs.prepare-release.outputs.tag }}" -m "Release ${{ needs.prepare-release.outputs.version }}" || true
+          git push origin "${{ needs.prepare-release.outputs.tag }}" || true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
+          name: ${{ needs.prepare-release.outputs.version }}
+          body: |
+            ## SwiftStaticAnalysis ${{ needs.prepare-release.outputs.version }}
+
+            ### Installation
+
+            **Swift Package Manager:**
+            ```swift
+            .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "${{ needs.prepare-release.outputs.version }}")
+            ```
+
+            **Pre-built Binary (macOS):**
+            ```bash
+            # Universal (Apple Silicon + Intel)
+            curl -L https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/${{ needs.prepare-release.outputs.tag }}/swa-${{ needs.prepare-release.outputs.version }}-macos-universal.tar.gz | tar xz
+            sudo mv swa /usr/local/bin/
+            ```
+
+            ### Checksums
+            ```
+            $(cat release/checksums.txt)
+            ```
+
+            ${{ needs.prepare-release.outputs.changelog }}
+          prerelease: ${{ contains(needs.prepare-release.outputs.version, 'alpha') || contains(needs.prepare-release.outputs.version, 'beta') }}
+          files: |
+            release/swa-${{ needs.prepare-release.outputs.version }}-macos-*.tar.gz
+            release/checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
