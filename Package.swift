@@ -30,6 +30,18 @@ let package = Package(
             name: "swa",
             targets: ["SwiftStaticAnalysisCLI"]
         ),
+
+        // Build plugin (runs on every build with Xcode reporting)
+        .plugin(
+            name: "StaticAnalysisBuildPlugin",
+            targets: ["StaticAnalysisBuildPlugin"]
+        ),
+
+        // Command plugin for on-demand analysis
+        .plugin(
+            name: "StaticAnalysisCommandPlugin",
+            targets: ["StaticAnalysisCommandPlugin"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "600.0.0"),
@@ -88,6 +100,26 @@ let package = Package(
                 .swiftLanguageMode(.v6),
                 .enableExperimentalFeature("StrictConcurrency"),
             ]
+        ),
+
+        // MARK: - Plugins
+
+        .plugin(
+            name: "StaticAnalysisBuildPlugin",
+            capability: .buildTool(),
+            dependencies: ["SwiftStaticAnalysisCLI"]
+        ),
+
+        .plugin(
+            name: "StaticAnalysisCommandPlugin",
+            capability: .command(
+                intent: .custom(
+                    verb: "analyze",
+                    description: "Run static analysis to find unused code and duplications"
+                ),
+                permissions: []
+            ),
+            dependencies: ["SwiftStaticAnalysisCLI"]
         ),
 
         // MARK: - Tests
