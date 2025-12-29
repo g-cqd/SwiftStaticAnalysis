@@ -48,3 +48,4 @@
 
 --disable acronyms
 --disable redundantOptionalBinding
+--disable wrapMultilineStatementBraces
