@@ -209,7 +209,7 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
                 let node = IndexSymbolNode(
                     usr: usr,
                     name: symbol.name,
-                    kind: convertSymbolKind(symbol.kind),
+                    kind: IndexedSymbolKind(from: symbol.kind),
                     definitionFile: occurrence.location.path,
                     definitionLine: occurrence.location.line,
                     isExternal: false
@@ -342,7 +342,7 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
         let node = IndexSymbolNode(
             usr: usr,
             name: symbol.name,
-            kind: convertSymbolKind(symbol.kind),
+            kind: IndexedSymbolKind(from: symbol.kind),
             isExternal: isExternal
         )
         nodes[usr] = node
@@ -486,32 +486,6 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
     /// Get incoming edges for a node.
     public func incomingEdges(for usr: String) -> Set<IndexDependencyEdge> {
         reverseEdges[usr] ?? []
-    }
-
-    // MARK: - Helpers
-
-    private func convertSymbolKind(_ kind: IndexSymbolKind) -> IndexedSymbolKind {
-        switch kind {
-        case .class: return .class
-        case .struct: return .struct
-        case .enum: return .enum
-        case .protocol: return .protocol
-        case .extension: return .extension
-        case .function, .classMethod, .instanceMethod, .staticMethod:
-            return .function
-        case .instanceProperty, .staticProperty, .classProperty:
-            return .property
-        case .variable:
-            return .variable
-        case .parameter:
-            return .parameter
-        case .typealias:
-            return .typealias
-        case .module:
-            return .module
-        default:
-            return .unknown
-        }
     }
 }
 

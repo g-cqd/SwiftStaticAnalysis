@@ -63,6 +63,31 @@ public enum IndexedSymbolKind: String, Sendable, DeclarationKindConvertible {
     case module
     case unknown
 
+    /// Convert from IndexStoreDB's IndexSymbolKind.
+    public init(from kind: IndexSymbolKind) {
+        switch kind {
+        case .class: self = .class
+        case .struct: self = .struct
+        case .enum: self = .enum
+        case .protocol: self = .protocol
+        case .extension: self = .extension
+        case .function, .classMethod, .instanceMethod, .staticMethod:
+            self = .function
+        case .instanceProperty, .staticProperty, .classProperty:
+            self = .property
+        case .variable:
+            self = .variable
+        case .parameter:
+            self = .parameter
+        case .typealias:
+            self = .typealias
+        case .module:
+            self = .module
+        default:
+            self = .unknown
+        }
+    }
+
     /// Convert IndexedSymbolKind to DeclarationKind.
     public func toDeclarationKind() -> DeclarationKind {
         switch self {
@@ -309,33 +334,9 @@ public final class IndexStoreReader: @unchecked Sendable {
         IndexedSymbol(
             usr: symbol.usr,
             name: symbol.name,
-            kind: convertSymbolKind(symbol.kind),
+            kind: IndexedSymbolKind(from: symbol.kind),
             isSystem: false // IndexStoreDB doesn't expose this directly
         )
-    }
-
-    private func convertSymbolKind(_ kind: IndexSymbolKind) -> IndexedSymbolKind {
-        switch kind {
-        case .class: return .class
-        case .struct: return .struct
-        case .enum: return .enum
-        case .protocol: return .protocol
-        case .extension: return .extension
-        case .function, .classMethod, .instanceMethod, .staticMethod:
-            return .function
-        case .instanceProperty, .staticProperty, .classProperty:
-            return .property
-        case .variable:
-            return .variable
-        case .parameter:
-            return .parameter
-        case .typealias:
-            return .typealias
-        case .module:
-            return .module
-        default:
-            return .unknown
-        }
     }
 
     private func convertRoles(_ roles: SymbolRole) -> IndexedSymbolRoles {
