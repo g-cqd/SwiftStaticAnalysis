@@ -84,8 +84,8 @@ public actor AsyncSemaphore {
 
     /// Wait to acquire a permit.
     public func wait() async {
-        // swiftformat:disable:next isEmpty
-        if !isEmpty {
+        // swiftlint:disable:next empty_count
+        if count > 0 {
             count -= 1
             return
         }
@@ -107,8 +107,8 @@ public actor AsyncSemaphore {
 
     /// Try to acquire a permit without waiting.
     public func tryWait() -> Bool {
-        // swiftformat:disable:next isEmpty
-        if !isEmpty {
+        // swiftlint:disable:next empty_count
+        if count > 0 {
             count -= 1
             return true
         }
