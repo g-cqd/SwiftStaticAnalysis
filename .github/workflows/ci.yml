@@ -414,34 +414,46 @@ jobs:
           git tag -a "${{ needs.prepare-release.outputs.tag }}" -m "Release ${{ needs.prepare-release.outputs.version }}" || true
           git push origin "${{ needs.prepare-release.outputs.tag }}" || true
 
+      - name: Prepare Release Notes
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          TAG="${{ needs.prepare-release.outputs.tag }}"
+          cat > release_notes.md << RELEASE_EOF
+          ## SwiftStaticAnalysis ${VERSION}
+
+          ${{ needs.prepare-release.outputs.changelog }}
+
+          ---
+
+          ### Installation
+
+          **Swift Package Manager:**
+          \`\`\`swift
+          .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "${VERSION}")
+          \`\`\`
+
+          **Pre-built Binary (macOS):**
+          \`\`\`bash
+          # Universal (Apple Silicon + Intel)
+          curl -L https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/${TAG}/swa-${VERSION}-macos-universal.tar.gz | tar xz
+          sudo mv swa /usr/local/bin/
+          \`\`\`
+
+          ### Checksums
+
+          \`\`\`
+          $(cat release/checksums.txt)
+          \`\`\`
+
+          RELEASE_EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare-release.outputs.tag }}
-          name: ${{ needs.prepare-release.outputs.version }}
-          body: |
-            ## SwiftStaticAnalysis ${{ needs.prepare-release.outputs.version }}
-
-            ### Installation
-
-            **Swift Package Manager:**
-            ```swift
-            .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "${{ needs.prepare-release.outputs.version }}")
-            ```
-
-            **Pre-built Binary (macOS):**
-            ```bash
-            # Universal (Apple Silicon + Intel)
-            curl -L https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/${{ needs.prepare-release.outputs.tag }}/swa-${{ needs.prepare-release.outputs.version }}-macos-universal.tar.gz | tar xz
-            sudo mv swa /usr/local/bin/
-            ```
-
-            ### Checksums
-            ```
-            $(cat release/checksums.txt)
-            ```
-
-            ${{ needs.prepare-release.outputs.changelog }}
+          name: SwiftStaticAnalysis ${{ needs.prepare-release.outputs.version }}
+          body_path: release_notes.md
+          draft: false
           prerelease: ${{ contains(needs.prepare-release.outputs.version, 'alpha') || contains(needs.prepare-release.outputs.version, 'beta') }}
           files: |
             release/swa-${{ needs.prepare-release.outputs.version }}-macos-*.tar.gz
