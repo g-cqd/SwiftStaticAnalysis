@@ -373,15 +373,19 @@ jobs:
 
       - name: Build Universal Binary
         run: |
+          # Build for ARM64
           swift build -c release --arch arm64
-          mv .build/release/swa .build/release/swa-arm64
+          cp .build/arm64-apple-macosx/release/swa .build/swa-arm64
 
+          # Build for x86_64
           swift build -c release --arch x86_64
-          mv .build/release/swa .build/release/swa-x86_64
+          cp .build/x86_64-apple-macosx/release/swa .build/swa-x86_64
 
+          # Create universal binary
+          mkdir -p .build/release
           lipo -create -output .build/release/swa \
-            .build/release/swa-arm64 \
-            .build/release/swa-x86_64
+            .build/swa-arm64 \
+            .build/swa-x86_64
 
           lipo -info .build/release/swa
 
@@ -394,7 +398,7 @@ jobs:
             if [[ "$ARCH" == "universal" ]]; then
               cp .build/release/swa release/swa
             else
-              cp .build/release/swa-$ARCH release/swa
+              cp .build/swa-$ARCH release/swa
             fi
             tar -C release -czvf "release/swa-${VERSION}-macos-${ARCH}.tar.gz" swa
           done
