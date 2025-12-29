@@ -10,6 +10,7 @@ import Foundation
 // MARK: - Property Wrapper Kind
 
 /// Known property wrapper types.
+/// Exhaustive coverage of common property wrappers for framework detection. // swa:ignore-unused-cases
 public enum PropertyWrapperKind: String, Sendable, Codable, CaseIterable {
     // MARK: - SwiftUI State Management
     case state = "State"
@@ -143,6 +144,7 @@ public struct PropertyWrapperInfo: Sendable, Codable, Hashable {
 // MARK: - SwiftUI Conformance
 
 /// SwiftUI protocol conformances that affect analysis.
+/// Exhaustive coverage for SwiftUI framework detection. // swa:ignore-unused-cases
 public enum SwiftUIConformance: String, Sendable, Codable, CaseIterable {
     /// Conforms to SwiftUI.View
     case view = "View"

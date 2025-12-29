@@ -172,17 +172,7 @@ extension Diagnostic {
             notes.append(note)
         }
 
-        let primaryWithNotes = Diagnostic(
-            file: primary.file,
-            line: primary.line,
-            column: primary.column,
-            severity: primary.severity,
-            message: primary.message,
-            category: primary.category,
-            ruleID: primary.ruleID,
-            fixIt: primary.fixIt,
-            notes: notes
-        )
+        let primaryWithNotes = primary.replacingNotes(notes)
 
         diagnostics.append(primaryWithNotes)
         return diagnostics

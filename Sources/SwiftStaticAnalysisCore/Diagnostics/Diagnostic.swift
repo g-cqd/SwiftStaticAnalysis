@@ -25,6 +25,7 @@ public enum DiagnosticSeverity: String, Sendable, Codable, CaseIterable {
 // MARK: - Diagnostic Category
 
 /// Categories for diagnostics.
+/// Exhaustive coverage for all diagnostic categories. // swa:ignore-unused-cases
 public enum DiagnosticCategory: String, Sendable, Codable {
     case unusedCode = "unused-code"
     case duplication = "duplication"
@@ -120,6 +121,36 @@ public struct Diagnostic: Sendable, Codable, Hashable {
         lhs.column == rhs.column &&
         lhs.severity == rhs.severity &&
         lhs.message == rhs.message
+    }
+
+    /// Create a copy of this diagnostic with additional notes appended.
+    public func withNotes(_ additionalNotes: [Diagnostic]) -> Diagnostic {
+        Diagnostic(
+            file: file,
+            line: line,
+            column: column,
+            severity: severity,
+            message: message,
+            category: category,
+            ruleID: ruleID,
+            fixIt: fixIt,
+            notes: notes + additionalNotes
+        )
+    }
+
+    /// Create a copy of this diagnostic with a new set of notes.
+    public func replacingNotes(_ newNotes: [Diagnostic]) -> Diagnostic {
+        Diagnostic(
+            file: file,
+            line: line,
+            column: column,
+            severity: severity,
+            message: message,
+            category: category,
+            ruleID: ruleID,
+            fixIt: fixIt,
+            notes: newNotes
+        )
     }
 }
 

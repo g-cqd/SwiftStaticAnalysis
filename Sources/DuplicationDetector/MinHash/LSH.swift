@@ -15,10 +15,47 @@
 
 import Foundation
 
+// MARK: - LSH Query Protocol
+
+/// Protocol for LSH indices that can query for similar documents.
+public protocol LSHQueryable: Sendable {
+    /// Query for candidate documents similar to the given signature.
+    func query(_ signature: MinHashSignature) -> Set<Int>
+    
+    /// Get the signature for a document ID.
+    func signature(for documentId: Int) -> MinHashSignature?
+}
+
+extension LSHQueryable {
+    /// Query and rank results by similarity.
+    ///
+    /// - Parameters:
+    ///   - signature: The query signature.
+    ///   - threshold: Minimum similarity to include.
+    /// - Returns: Array of (documentId, similarity) pairs, sorted by similarity.
+    public func queryWithSimilarity(
+        _ signature: MinHashSignature,
+        threshold: Double = 0.0
+    ) -> [(documentId: Int, similarity: Double)] {
+        let candidates = query(signature)
+
+        var results: [(documentId: Int, similarity: Double)] = []
+        for docId in candidates {
+            guard let candidateSignature = self.signature(for: docId) else { continue }
+            let similarity = signature.estimateSimilarity(with: candidateSignature)
+            if similarity >= threshold {
+                results.append((docId, similarity))
+            }
+        }
+
+        return results.sorted { $0.similarity > $1.similarity }
+    }
+}
+
 // MARK: - LSH Index
 
 /// Locality Sensitive Hashing index for efficient similarity search.
-public struct LSHIndex: Sendable {
+public struct LSHIndex: Sendable, LSHQueryable {
     /// Number of bands.
     public let bands: Int
 
@@ -160,30 +197,6 @@ public struct LSHIndex: Sendable {
         candidates.remove(signature.documentId)
 
         return candidates
-    }
-
-    /// Query and rank results by similarity.
-    ///
-    /// - Parameters:
-    ///   - signature: The query signature.
-    ///   - threshold: Minimum similarity to include.
-    /// - Returns: Array of (documentId, similarity) pairs, sorted by similarity.
-    public func queryWithSimilarity(
-        _ signature: MinHashSignature,
-        threshold: Double = 0.0
-    ) -> [(documentId: Int, similarity: Double)] {
-        let candidates = query(signature)
-
-        var results: [(documentId: Int, similarity: Double)] = []
-        for docId in candidates {
-            guard let candidateSignature = signatures[docId] else { continue }
-            let similarity = signature.estimateSimilarity(with: candidateSignature)
-            if similarity >= threshold {
-                results.append((docId, similarity))
-            }
-        }
-
-        return results.sorted { $0.similarity > $1.similarity }
     }
 
     /// Get the signature for a document ID.
@@ -336,7 +349,7 @@ public struct LSHPipeline: Sendable {
 /// The key insight is that similar documents may hash to slightly different
 /// buckets. By probing nearby buckets (obtained by perturbing hash values),
 /// we can find additional candidates without increasing index size.
-public struct MultiProbeLSH: Sendable {
+public struct MultiProbeLSH: Sendable, LSHQueryable {
     /// Base LSH index.
     private var baseIndex: LSHIndex
 
@@ -418,28 +431,9 @@ public struct MultiProbeLSH: Sendable {
         return candidates
     }
 
-    /// Query and rank results by similarity.
-    ///
-    /// - Parameters:
-    ///   - signature: The query signature.
-    ///   - threshold: Minimum similarity to include.
-    /// - Returns: Array of (documentId, similarity) pairs, sorted by similarity.
-    public func queryWithSimilarity(
-        _ signature: MinHashSignature,
-        threshold: Double = 0.0
-    ) -> [(documentId: Int, similarity: Double)] {
-        let candidates = query(signature)
-
-        var results: [(documentId: Int, similarity: Double)] = []
-        for docId in candidates {
-            guard let candidateSignature = signatures[docId] else { continue }
-            let similarity = signature.estimateSimilarity(with: candidateSignature)
-            if similarity >= threshold {
-                results.append((docId, similarity))
-            }
-        }
-
-        return results.sorted { $0.similarity > $1.similarity }
+    /// Get the signature for a document ID.
+    public func signature(for documentId: Int) -> MinHashSignature? {
+        signatures[documentId]
     }
 
     /// Find all similar pairs using multi-probe LSH.

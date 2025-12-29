@@ -30,13 +30,17 @@ public struct UnusedCodeFilterConfiguration: Sendable {
     /// Name patterns to exclude (regex).
     public var excludeNamePatterns: [String]
 
+    /// Respect `// swa:ignore` comment directives.
+    public var respectIgnoreDirectives: Bool
+
     public init(
         excludeImports: Bool = false,
         excludeDeinit: Bool = false,
         excludeBacktickedEnumCases: Bool = false,
         excludeTestSuites: Bool = false,
         excludePathPatterns: [String] = [],
-        excludeNamePatterns: [String] = []
+        excludeNamePatterns: [String] = [],
+        respectIgnoreDirectives: Bool = true
     ) {
         self.excludeImports = excludeImports
         self.excludeDeinit = excludeDeinit
@@ -44,17 +48,19 @@ public struct UnusedCodeFilterConfiguration: Sendable {
         self.excludeTestSuites = excludeTestSuites
         self.excludePathPatterns = excludePathPatterns
         self.excludeNamePatterns = excludeNamePatterns
+        self.respectIgnoreDirectives = respectIgnoreDirectives
     }
 
     /// No filtering.
-    public static let none = UnusedCodeFilterConfiguration()
+    public static let none = UnusedCodeFilterConfiguration(respectIgnoreDirectives: false)
 
     /// Sensible defaults that exclude common false positives.
     public static let sensibleDefaults = UnusedCodeFilterConfiguration(
         excludeImports: true,
         excludeDeinit: true,
         excludeBacktickedEnumCases: true,
-        excludeTestSuites: true
+        excludeTestSuites: true,
+        respectIgnoreDirectives: true
     )
 
     /// Strict filtering for production code only.
@@ -111,6 +117,11 @@ public struct UnusedCodeFilter: Sendable {
     public func shouldExclude(_ item: UnusedCode) -> Bool {
         let name = item.declaration.name
         let filePath = item.declaration.location.file
+
+        // Check ignore directives first (// swa:ignore comments)
+        if configuration.respectIgnoreDirectives && item.declaration.shouldIgnoreUnused {
+            return true
+        }
 
         // Check imports
         if configuration.excludeImports && item.declaration.kind == .import {

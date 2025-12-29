@@ -23,6 +23,7 @@ public struct ScopeID: Sendable, Hashable, Codable {
 // MARK: - Scope Kind
 
 /// The kind of lexical scope.
+/// Intentionally exhaustive to cover all Swift scope types. // swa:ignore-unused-cases
 public enum ScopeKind: String, Sendable, Codable {
     case global
     case file

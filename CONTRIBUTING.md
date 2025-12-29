@@ -209,6 +209,26 @@ SwiftStaticAnalysis/
 - Check existing issues before creating new ones
 - Use discussions for general questions
 
+## Suppressing False Positives
+
+When developing, you may encounter false positive warnings from the static analysis tool. Use `// swa:ignore` comments to suppress them:
+
+```swift
+/// Exhaustive enum for API compatibility. // swa:ignore-unused-cases
+enum APIStatus {
+    case success
+    case pending     // May not be used yet
+    case cancelled
+}
+
+// swa:ignore
+func debugOnlyHelper() {
+    // Intentionally unused in production
+}
+```
+
+See the [README](README.md#ignore-directives) for full documentation on ignore directives.
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the MIT License.

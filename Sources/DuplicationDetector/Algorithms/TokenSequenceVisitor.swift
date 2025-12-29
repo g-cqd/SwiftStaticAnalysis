@@ -45,10 +45,20 @@ public enum TokenKind: String, Sendable, Hashable {
     case unknown
 }
 
+// MARK: - Token Sequence Protocol
+
+/// Protocol for token sequences used in stream building.
+public protocol TokenSequenceProtocol: Sendable {
+    /// The source file path.
+    var file: String { get }
+    /// Number of tokens in the sequence.
+    var tokenCount: Int { get }
+}
+
 // MARK: - Token Sequence
 
 /// A sequence of tokens from a source file.
-public struct TokenSequence: Sendable {
+public struct TokenSequence: Sendable, TokenSequenceProtocol {
     /// The source file path.
     public let file: String
 
@@ -57,6 +67,9 @@ public struct TokenSequence: Sendable {
 
     /// Source lines for snippet extraction.
     public let sourceLines: [String]
+
+    /// Number of tokens in the sequence.
+    public var tokenCount: Int { tokens.count }
 
     public init(file: String, tokens: [TokenInfo], sourceLines: [String]) {
         self.file = file

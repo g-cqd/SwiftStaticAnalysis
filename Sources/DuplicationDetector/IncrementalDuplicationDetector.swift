@@ -48,6 +48,9 @@ public actor IncrementalDuplicationDetector {
     /// File parser.
     private let parser: SwiftFileParser
 
+    /// The shared duplication engine.
+    private let engine: DuplicationEngine
+
     /// Whether the cache has been initialized.
     private var isInitialized: Bool = false
 
@@ -62,6 +65,7 @@ public actor IncrementalDuplicationDetector {
         self.tokenCache = TokenSequenceCache(cacheDirectory: configuration.cacheDirectory)
         self.changeDetector = ChangeDetector()
         self.parser = SwiftFileParser()
+        self.engine = DuplicationEngine(configuration: configuration, concurrency: concurrency)
     }
 
     /// Initialize by loading cache from disk.
@@ -141,10 +145,10 @@ public actor IncrementalDuplicationDetector {
         }
 
         // Run detection
-        let cloneGroups = detectClonesInSequences(sequences)
+        let cloneGroups = engine.detectClones(in: sequences)
 
         // Add code snippets
-        let groupsWithSnippets = try await addCodeSnippets(to: cloneGroups, files: files)
+        let groupsWithSnippets = try await engine.addCodeSnippets(to: cloneGroups)
 
         return IncrementalDuplicationResult(
             cloneGroups: groupsWithSnippets,
@@ -166,96 +170,6 @@ public actor IncrementalDuplicationDetector {
         }
 
         return hashes
-    }
-
-    /// Detect clones in token sequences (synchronous).
-    private func detectClonesInSequences(_ sequences: [TokenSequence]) -> [CloneGroup] {
-        var cloneGroups: [CloneGroup] = []
-
-        if configuration.cloneTypes.contains(.exact) {
-            switch configuration.algorithm {
-            case .rollingHash, .minHashLSH:
-                let detector = ExactCloneDetector(minimumTokens: configuration.minimumTokens)
-                cloneGroups.append(contentsOf: detector.detect(in: sequences))
-
-            case .suffixArray:
-                let detector = SuffixArrayCloneDetector(
-                    minimumTokens: configuration.minimumTokens,
-                    normalizeForType2: false
-                )
-                cloneGroups.append(contentsOf: detector.detect(in: sequences))
-            }
-        }
-
-        if configuration.cloneTypes.contains(.near) {
-            switch configuration.algorithm {
-            case .rollingHash, .minHashLSH:
-                let detector = NearCloneDetector(
-                    minimumTokens: configuration.minimumTokens,
-                    minimumSimilarity: configuration.minimumSimilarity
-                )
-                cloneGroups.append(contentsOf: detector.detect(in: sequences))
-
-            case .suffixArray:
-                let detector = SuffixArrayCloneDetector(
-                    minimumTokens: configuration.minimumTokens,
-                    normalizeForType2: true
-                )
-                cloneGroups.append(contentsOf: detector.detectWithNormalization(in: sequences))
-            }
-        }
-
-        return cloneGroups
-    }
-
-    /// Add code snippets to clone groups.
-    private func addCodeSnippets(
-        to groups: [CloneGroup],
-        files: [String]
-    ) async throws -> [CloneGroup] {
-        let referencedFiles = Set(groups.flatMap { $0.clones.map(\.file) })
-
-        let fileContentPairs = try await ParallelProcessor.map(
-            Array(referencedFiles),
-            maxConcurrency: concurrency.maxConcurrentFiles
-        ) { file -> (String, [String]) in
-            let source = try String(contentsOfFile: file, encoding: .utf8)
-            return (file, source.components(separatedBy: .newlines))
-        }
-
-        let fileContents = Dictionary(uniqueKeysWithValues: fileContentPairs)
-
-        return groups.map { group in
-            let clonesWithSnippets = group.clones.map { clone -> Clone in
-                let snippet: String
-                if let lines = fileContents[clone.file] {
-                    let start = max(0, clone.startLine - 1)
-                    let end = min(lines.count, clone.endLine)
-                    if start < end {
-                        snippet = lines[start..<end].joined(separator: "\n")
-                    } else {
-                        snippet = ""
-                    }
-                } else {
-                    snippet = ""
-                }
-
-                return Clone(
-                    file: clone.file,
-                    startLine: clone.startLine,
-                    endLine: clone.endLine,
-                    tokenCount: clone.tokenCount,
-                    codeSnippet: snippet
-                )
-            }
-
-            return CloneGroup(
-                type: group.type,
-                clones: clonesWithSnippets,
-                similarity: group.similarity,
-                fingerprint: group.fingerprint
-            )
-        }
     }
 
     // MARK: - Statistics

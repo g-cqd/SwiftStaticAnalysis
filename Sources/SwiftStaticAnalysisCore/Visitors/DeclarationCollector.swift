@@ -19,6 +19,14 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
     /// Collected imports.
     public private(set) var imports: [Declaration] = []
 
+    /// Stack of ignore directives from enclosing types (for propagating to members).
+    private var ignoreDirectiveStack: [Set<String>] = []
+
+    /// Current ignore directives from enclosing type.
+    private var currentTypeIgnoreDirectives: Set<String> {
+        ignoreDirectiveStack.last ?? []
+    }
+
     // MARK: - Functions
 
     public override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
@@ -167,6 +175,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
         let conformances = extractConformances(from: node.inheritanceClause)
         let swiftUIInfo = extractSwiftUIInfo(from: conformances)
         let attrs = extractAttributes(from: node.attributes)
+        let enumIgnoreDirectives = extractIgnoreCategories(from: node)
 
         let declaration = makeDeclaration(
             name: node.name.text,
@@ -181,7 +190,18 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
         )
         declarations.append(declaration)
 
+        // Push enum's ignore directives for its cases to inherit
+        ignoreDirectiveStack.append(enumIgnoreDirectives)
+
         return super.visit(node)
+    }
+
+    public override func visitPost(_ node: EnumDeclSyntax) {
+        // Pop the ignore directives after visiting children
+        if !ignoreDirectiveStack.isEmpty {
+            ignoreDirectiveStack.removeLast()
+        }
+        super.visitPost(node)
     }
 
     public override func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind {
@@ -244,6 +264,10 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
     // MARK: - Enum Cases
 
     public override func visit(_ node: EnumCaseElementSyntax) -> SyntaxVisitorContinueKind {
+        // Combine case's own ignore directives with inherited enum directives
+        var ignoreDirectives = extractIgnoreCategories(from: node)
+        ignoreDirectives.formUnion(currentTypeIgnoreDirectives)
+
         let declaration = Declaration(
             name: node.name.text,
             kind: .enumCase,
@@ -251,7 +275,8 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             modifiers: [],
             location: location(of: node),
             range: range(of: node),
-            scope: currentScope
+            scope: currentScope,
+            ignoreDirectives: ignoreDirectives
         )
         declarations.append(declaration)
 
@@ -350,7 +375,8 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             propertyWrappers: propertyWrappers,
             swiftUIInfo: swiftUIInfo,
             conformances: conformances,
-            attributes: attributes
+            attributes: attributes,
+            ignoreDirectives: extractIgnoreCategories(from: node)
         )
     }
 
@@ -445,6 +471,74 @@ public final class DeclarationCollector: ScopeTrackingVisitor {
             }
         }
         return nil
+    }
+
+    /// Check if a node has a `// swa:ignore` directive in its leading trivia.
+    private func hasIgnoreDirective(in node: some SyntaxProtocol) -> Bool {
+        for piece in node.leadingTrivia {
+            switch piece {
+            case .lineComment(let text):
+                if text.contains("swa:ignore") {
+                    return true
+                }
+            case .blockComment(let text):
+                if text.contains("swa:ignore") {
+                    return true
+                }
+            default:
+                continue
+            }
+        }
+        return false
+    }
+
+    /// Extract ignore directive details from leading trivia.
+    /// Returns specific ignore categories if specified (e.g., "swa:ignore unused" or "swa:ignore-unused-cases")
+    private func extractIgnoreCategories(from node: some SyntaxProtocol) -> Set<String> {
+        var categories = Set<String>()
+        
+        for piece in node.leadingTrivia {
+            let text: String
+            switch piece {
+            case .lineComment(let t):
+                text = t
+            case .blockComment(let t):
+                text = t
+            case .docLineComment(let t):
+                text = t
+            case .docBlockComment(let t):
+                text = t
+            default:
+                continue
+            }
+            
+            // Look for swa:ignore patterns
+            // Supports: // swa:ignore, // swa:ignore unused, // swa:ignore-unused-cases, /* swa:ignore */
+            if let range = text.range(of: "swa:ignore") {
+                let afterDirective = text[range.upperBound...]
+                    .trimmingCharacters(in: .whitespaces)
+                
+                // Check for generic ignore (no category specified)
+                // This includes: empty, newline, end of comment (*/)
+                if afterDirective.isEmpty || 
+                   afterDirective.hasPrefix("\n") ||
+                   afterDirective.hasPrefix("*/") {
+                    // Generic ignore - ignore everything
+                    categories.insert("all")
+                } else if afterDirective.hasPrefix("-") {
+                    // Specific category like "swa:ignore-unused-cases"
+                    let category = afterDirective
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "- \n*/"))
+                        .lowercased()
+                        .replacingOccurrences(of: "-", with: "_")
+                    if !category.isEmpty {
+                        categories.insert(category)
+                    }
+                }
+            }
+        }
+        
+        return categories
     }
 
     // MARK: - Property Wrapper Extraction

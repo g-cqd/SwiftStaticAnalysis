@@ -54,6 +54,33 @@ public struct DefinitionSite: Sendable, Hashable {
     }
 }
 
+// MARK: - Definition Site Set Extensions
+
+extension Set where Element == DefinitionSite {
+    /// Update definitions by killing old definitions for a variable and inserting a new one.
+    mutating func updateDefinition(
+        for variable: String,
+        block: BlockID,
+        statementIndex: Int = -1,
+        location: SwiftStaticAnalysisCore.SourceLocation,
+        value: String? = nil,
+        isInitial: Bool = false
+    ) {
+        // Kill old definitions
+        self = self.filter { $0.variable != variable }
+        // Add new definition
+        let newDef = DefinitionSite(
+            variable: variable,
+            block: block,
+            statementIndex: statementIndex,
+            location: location,
+            value: value,
+            isInitial: isInitial
+        )
+        self.insert(newDef)
+    }
+}
+
 // MARK: - Potentially Uninitialized Use
 
 /// Represents a use of a potentially uninitialized variable.
@@ -394,16 +421,11 @@ public struct ReachingDefinitionsAnalysis: Sendable {
 
                 // Update reaching definitions for definitions in this statement
                 for definedVar in statement.defs {
-                    // Kill old definitions
-                    reachingDefs = reachingDefs.filter { $0.variable != definedVar }
-                    // Add new definition (placeholder)
-                    let newDef = DefinitionSite(
-                        variable: definedVar,
+                    reachingDefs.updateDefinition(
+                        for: definedVar,
                         block: id,
-                        statementIndex: -1, // Placeholder
                         location: statement.location
                     )
-                    reachingDefs.insert(newDef)
                 }
             }
         }
@@ -436,14 +458,11 @@ public struct ReachingDefinitionsAnalysis: Sendable {
 
                 // Update reaching definitions
                 for definedVar in statement.defs {
-                    reachingDefs = reachingDefs.filter { $0.variable != definedVar }
-                    let newDef = DefinitionSite(
-                        variable: definedVar,
+                    reachingDefs.updateDefinition(
+                        for: definedVar,
                         block: id,
-                        statementIndex: -1,
                         location: statement.location
                     )
-                    reachingDefs.insert(newDef)
                 }
             }
         }

@@ -13,6 +13,7 @@ import SwiftSyntax
 // MARK: - Result Builder Type
 
 /// Known result builder types in Swift/SwiftUI.
+/// Exhaustive coverage for result builder detection. // swa:ignore-unused-cases
 public enum ResultBuilderType: String, Sendable, Codable, CaseIterable {
     // SwiftUI builders
     case viewBuilder = "ViewBuilder"

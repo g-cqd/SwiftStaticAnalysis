@@ -39,7 +39,7 @@ public struct NormalizedToken: Sendable, Hashable {
 // MARK: - Normalized Sequence
 
 /// A sequence of normalized tokens.
-public struct NormalizedSequence: Sendable {
+public struct NormalizedSequence: Sendable, TokenSequenceProtocol {
     /// The source file path.
     public let file: String
 
@@ -48,6 +48,9 @@ public struct NormalizedSequence: Sendable {
 
     /// Source lines for snippet extraction.
     public let sourceLines: [String]
+
+    /// Number of tokens in the sequence.
+    public var tokenCount: Int { tokens.count }
 
     public init(file: String, tokens: [NormalizedToken], sourceLines: [String]) {
         self.file = file

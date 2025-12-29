@@ -8,6 +8,10 @@ import Foundation
 // MARK: - Declaration Kind
 
 /// The kind of declaration.
+///
+/// This enum is intentionally exhaustive to cover all Swift declaration types.
+/// Some cases may not be directly used within this codebase but exist for
+/// API consumers and future extensibility. // swa:ignore-unused-cases
 public enum DeclarationKind: String, Sendable, Codable, CaseIterable {
     case function
     case method
@@ -32,6 +36,7 @@ public enum DeclarationKind: String, Sendable, Codable, CaseIterable {
 // MARK: - Access Level
 
 /// Swift access level modifiers.
+/// Intentionally exhaustive for API completeness. // swa:ignore-unused-cases
 public enum AccessLevel: String, Sendable, Codable, Comparable {
     case `private`
     case `fileprivate`
@@ -132,6 +137,9 @@ public struct Declaration: Sendable, Hashable, Codable {
     /// Attributes applied to this declaration (e.g., @main, @objc, @IBAction).
     public let attributes: [String]
 
+    /// Ignore directive categories from comments (e.g., "unused", "unused_cases", "all").
+    public let ignoreDirectives: Set<String>
+
     public init(
         name: String,
         kind: DeclarationKind,
@@ -146,7 +154,8 @@ public struct Declaration: Sendable, Hashable, Codable {
         propertyWrappers: [PropertyWrapperInfo] = [],
         swiftUIInfo: SwiftUITypeInfo? = nil,
         conformances: [String] = [],
-        attributes: [String] = []
+        attributes: [String] = [],
+        ignoreDirectives: Set<String> = []
     ) {
         self.name = name
         self.kind = kind
@@ -162,6 +171,7 @@ public struct Declaration: Sendable, Hashable, Codable {
         self.swiftUIInfo = swiftUIInfo
         self.conformances = conformances
         self.attributes = attributes
+        self.ignoreDirectives = ignoreDirectives
     }
 }
 
@@ -201,6 +211,28 @@ extension Declaration {
     /// The primary property wrapper kind (if any).
     public var primaryPropertyWrapper: PropertyWrapperKind? {
         propertyWrappers.first?.kind
+    }
+
+    /// Whether this declaration has an ignore directive for the given category.
+    ///
+    /// - Parameter category: The category to check (e.g., "unused", "unused_cases").
+    ///                       If nil, checks for "all" directive.
+    /// - Returns: True if this declaration should be ignored for the category.
+    public func hasIgnoreDirective(for category: String? = nil) -> Bool {
+        if ignoreDirectives.contains("all") {
+            return true
+        }
+        if let category = category {
+            return ignoreDirectives.contains(category.lowercased().replacingOccurrences(of: "-", with: "_"))
+        }
+        return false
+    }
+
+    /// Whether this declaration should be ignored for unused code detection.
+    public var shouldIgnoreUnused: Bool {
+        hasIgnoreDirective(for: "unused") ||
+        hasIgnoreDirective(for: "unused_code") ||
+        (kind == .enumCase && hasIgnoreDirective(for: "unused_cases"))
     }
 }
 

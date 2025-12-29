@@ -26,6 +26,7 @@ import Glibc
 // MARK: - Memory Mapped File Error
 
 /// Errors that can occur during memory mapping.
+/// Exhaustive error handling for memory operations. // swa:ignore-unused-cases
 public enum MemoryMappedFileError: Error, Sendable {
     case fileNotFound(String)
     case mappingFailed(String, Int32)

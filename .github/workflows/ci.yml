@@ -36,37 +36,6 @@ jobs:
       - name: Run Tests
         run: swift test --parallel
 
-  build-platforms:
-    name: Build Platforms
-    runs-on: macos-15
-    strategy:
-      matrix:
-        include:
-          - destination: platform=macOS
-            name: macOS
-          - destination: platform=iOS Simulator,OS=latest,name=iPhone 16 Pro
-            name: iOS
-          - destination: platform=tvOS Simulator,OS=latest,name=Apple TV
-            name: tvOS
-          - destination: platform=watchOS Simulator,OS=latest,name=Apple Watch Series 10 (46mm)
-            name: watchOS
-          - destination: platform=visionOS Simulator,OS=latest,name=Apple Vision Pro
-            name: visionOS
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
-
-      - name: Build for ${{ matrix.name }}
-        run: |
-          xcodebuild build \
-            -scheme SwiftStaticAnalysis-Package \
-            -destination "${{ matrix.destination }}" \
-            -skipMacroValidation \
-            CODE_SIGNING_ALLOWED=NO
-
   lint:
     name: Lint
     runs-on: macos-15

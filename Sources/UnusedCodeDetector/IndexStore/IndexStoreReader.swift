@@ -12,6 +12,7 @@ import SwiftStaticAnalysisCore
 // MARK: - Index Store Error
 
 /// Errors that can occur when reading the index store.
+/// Exhaustive error cases for comprehensive error handling. // swa:ignore-unused-cases
 public enum IndexStoreError: Error, Sendable {
     case indexStoreNotFound(path: String)
     case failedToOpenDatabase(underlying: Error)
@@ -46,7 +47,8 @@ public struct IndexedSymbol: Sendable {
 // MARK: - Indexed Symbol Kind
 
 /// Kinds of symbols in the index store.
-public enum IndexedSymbolKind: String, Sendable {
+/// Exhaustive mapping from IndexStoreDB symbol kinds. // swa:ignore-unused-cases
+public enum IndexedSymbolKind: String, Sendable, DeclarationKindConvertible {
     case `class`
     case `struct`
     case `enum`
@@ -60,6 +62,23 @@ public enum IndexedSymbolKind: String, Sendable {
     case `typealias`
     case module
     case unknown
+
+    /// Convert IndexedSymbolKind to DeclarationKind.
+    public func toDeclarationKind() -> DeclarationKind {
+        switch self {
+        case .class: return .class
+        case .struct: return .struct
+        case .enum: return .enum
+        case .protocol: return .protocol
+        case .extension: return .extension
+        case .function, .method: return .function
+        case .property, .variable: return .variable
+        case .parameter: return .parameter
+        case .typealias: return .typealias
+        case .module: return .import
+        case .unknown: return .variable
+        }
+    }
 }
 
 // MARK: - Symbol Occurrence Info

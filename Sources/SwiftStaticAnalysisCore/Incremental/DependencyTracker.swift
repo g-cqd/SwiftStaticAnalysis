@@ -11,6 +11,7 @@ import Foundation
 // MARK: - Dependency Type
 
 /// Types of dependencies between files.
+/// Exhaustive coverage for dependency tracking. // swa:ignore-unused-cases
 public enum DependencyType: String, Codable, Sendable {
     /// Import dependency (import Module)
     case importDependency

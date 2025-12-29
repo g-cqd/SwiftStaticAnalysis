@@ -252,18 +252,42 @@ public final class CFGBuilder: SyntaxVisitor {
 
     /// Build CFG for a function declaration.
     public func buildCFG(from function: FunctionDeclSyntax) -> ControlFlowGraph {
-        let funcName = function.name.text
-        cfg = ControlFlowGraph(functionName: funcName, file: file)
+        return resetAndBuild(name: function.name.text) {
+            if let body = function.body {
+                self.processCodeBlock(body)
+            }
+        }
+    }
+
+    /// Build CFG for an initializer declaration.
+    public func buildCFG(from initializer: InitializerDeclSyntax) -> ControlFlowGraph {
+        return resetAndBuild(name: "init") {
+            if let body = initializer.body {
+                self.processCodeBlock(body)
+            }
+        }
+    }
+
+    /// Build CFG for a closure expression.
+    public func buildCFG(from closure: ClosureExprSyntax) -> ControlFlowGraph {
+        return resetAndBuild(name: "<closure>") {
+            for statement in closure.statements {
+                self.processStatement(statement.item)
+            }
+        }
+    }
+
+    /// Shared logic for building CFG.
+    private func resetAndBuild(name: String, bodyProcessor: () -> Void) -> ControlFlowGraph {
+        cfg = ControlFlowGraph(functionName: name, file: file)
         currentBlockID = .entry
         blockCounter = 0
         loopStack = []
         switchStack = []
         pendingConnections = []
 
-        // Process function body
-        if let body = function.body {
-            processCodeBlock(body)
-        }
+        // Process body
+        bodyProcessor()
 
         // Connect current block to exit if not already terminated
         if cfg.blocks[currentBlockID]?.terminator == nil {
@@ -280,62 +304,6 @@ public final class CFGBuilder: SyntaxVisitor {
         cfg.computeReversePostOrder()
 
         // Compute USE and DEF sets for each block
-        computeUseDef()
-
-        return cfg
-    }
-
-    /// Build CFG for an initializer declaration.
-    public func buildCFG(from initializer: InitializerDeclSyntax) -> ControlFlowGraph {
-        cfg = ControlFlowGraph(functionName: "init", file: file)
-        currentBlockID = .entry
-        blockCounter = 0
-        loopStack = []
-        switchStack = []
-        pendingConnections = []
-
-        if let body = initializer.body {
-            processCodeBlock(body)
-        }
-
-        if cfg.blocks[currentBlockID]?.terminator == nil {
-            cfg.addEdge(from: currentBlockID, to: .exit)
-            cfg.blocks[currentBlockID]?.terminator = .return(expression: nil)
-        }
-
-        for (from, to) in pendingConnections {
-            cfg.addEdge(from: from, to: to)
-        }
-
-        cfg.computeReversePostOrder()
-        computeUseDef()
-
-        return cfg
-    }
-
-    /// Build CFG for a closure expression.
-    public func buildCFG(from closure: ClosureExprSyntax) -> ControlFlowGraph {
-        cfg = ControlFlowGraph(functionName: "<closure>", file: file)
-        currentBlockID = .entry
-        blockCounter = 0
-        loopStack = []
-        switchStack = []
-        pendingConnections = []
-
-        for statement in closure.statements {
-            processStatement(statement.item)
-        }
-
-        if cfg.blocks[currentBlockID]?.terminator == nil {
-            cfg.addEdge(from: currentBlockID, to: .exit)
-            cfg.blocks[currentBlockID]?.terminator = .return(expression: nil)
-        }
-
-        for (from, to) in pendingConnections {
-            cfg.addEdge(from: from, to: to)
-        }
-
-        cfg.computeReversePostOrder()
         computeUseDef()
 
         return cfg

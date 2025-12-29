@@ -118,17 +118,7 @@ public struct DiagnosticDeduplicator: Sendable {
 
                 // Create grouped diagnostic
                 if !notes.isEmpty {
-                    primary = Diagnostic(
-                        file: primary.file,
-                        line: primary.line,
-                        column: primary.column,
-                        severity: primary.severity,
-                        message: primary.message,
-                        category: primary.category,
-                        ruleID: primary.ruleID,
-                        fixIt: primary.fixIt,
-                        notes: primary.notes + notes
-                    )
+                    primary = primary.withNotes(notes)
                     i = j
                 } else {
                     i += 1

@@ -102,6 +102,26 @@ public struct SuffixArrayCloneDetector: Sendable {
     private func buildConcatenatedStream(
         _ sequences: [TokenSequence]
     ) -> (tokens: [Int], infos: [TokenStreamInfo], boundaries: [FileBoundary]) {
+        buildStream(from: sequences) { seq, index in
+            (seq.tokens[index].text, seq.tokens[index].text, seq.tokens[index].line, seq.tokens[index].column)
+        }
+    }
+
+    /// Build concatenated stream from normalized sequences.
+    private func buildNormalizedStream(
+        _ sequences: [NormalizedSequence]
+    ) -> (tokens: [Int], infos: [TokenStreamInfo], boundaries: [FileBoundary]) {
+        buildStream(from: sequences) { seq, index in
+            (seq.tokens[index].normalized, seq.tokens[index].original, seq.tokens[index].line, seq.tokens[index].column)
+        }
+    }
+
+    /// Generic stream building helper.
+    private func buildStream<S: Collection>(
+        from sequences: S,
+        tokenAccessor: (S.Element, Int) -> (text: String, original: String, line: Int, column: Int)
+    ) -> (tokens: [Int], infos: [TokenStreamInfo], boundaries: [FileBoundary])
+    where S.Element: TokenSequenceProtocol {
         var tokens: [Int] = []
         var infos: [TokenStreamInfo] = []
         var boundaries: [FileBoundary] = []
@@ -116,8 +136,8 @@ public struct SuffixArrayCloneDetector: Sendable {
                 startIndex: startIndex
             ))
 
-            for token in sequence.tokens {
-                let text = token.text
+            for tokenIdx in 0..<sequence.tokenCount {
+                let (text, original, line, column) = tokenAccessor(sequence, tokenIdx)
                 let tokenId: Int
                 if let existingId = tokenIdMap[text] {
                     tokenId = existingId
@@ -131,70 +151,13 @@ public struct SuffixArrayCloneDetector: Sendable {
                 infos.append(TokenStreamInfo(
                     fileIndex: fileIndex,
                     tokenIndex: infos.count,
-                    line: token.line,
-                    column: token.column,
-                    originalText: text
+                    line: line,
+                    column: column,
+                    originalText: original
                 ))
             }
 
             // Add separator between files (unique sentinel)
-            // Use sequential IDs after regular tokens to ensure separators don't match
-            // Each file gets a unique separator value
-            let separatorId = nextTokenId
-            nextTokenId += 1
-            tokens.append(separatorId)
-            infos.append(TokenStreamInfo(
-                fileIndex: fileIndex,
-                tokenIndex: infos.count,
-                line: -1,
-                column: -1,
-                originalText: "<SEP>"
-            ))
-        }
-
-        return (tokens, infos, boundaries)
-    }
-
-    /// Build concatenated stream from normalized sequences.
-    private func buildNormalizedStream(
-        _ sequences: [NormalizedSequence]
-    ) -> (tokens: [Int], infos: [TokenStreamInfo], boundaries: [FileBoundary]) {
-        var tokens: [Int] = []
-        var infos: [TokenStreamInfo] = []
-        var boundaries: [FileBoundary] = []
-        var tokenIdMap: [String: Int] = [:]
-        var nextTokenId = 1
-
-        for (fileIndex, sequence) in sequences.enumerated() {
-            let startIndex = tokens.count
-            boundaries.append(FileBoundary(
-                fileIndex: fileIndex,
-                file: sequence.file,
-                startIndex: startIndex
-            ))
-
-            for token in sequence.tokens {
-                let text = token.normalized
-                let tokenId: Int
-                if let existingId = tokenIdMap[text] {
-                    tokenId = existingId
-                } else {
-                    tokenId = nextTokenId
-                    tokenIdMap[text] = tokenId
-                    nextTokenId += 1
-                }
-
-                tokens.append(tokenId)
-                infos.append(TokenStreamInfo(
-                    fileIndex: fileIndex,
-                    tokenIndex: infos.count,
-                    line: token.line,
-                    column: token.column,
-                    originalText: token.original
-                ))
-            }
-
-            // Add separator (unique sequential ID for each file)
             let separatorId = nextTokenId
             nextTokenId += 1
             tokens.append(separatorId)

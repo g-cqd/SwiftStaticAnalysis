@@ -258,36 +258,18 @@ public struct IndexStoreBasedDetector: Sendable {
 
     /// Check if a symbol should be reported based on configuration.
     private func shouldReport(_ usage: SymbolUsage) -> Bool {
-        switch usage.kind {
-        case .variable, .property:
-            return configuration.detectVariables
-        case .function, .method:
-            return configuration.detectFunctions
-        case .class, .struct, .enum, .protocol:
-            return configuration.detectTypes
-        case .parameter:
-            return configuration.detectParameters
-        default:
-            return true
-        }
+        let filter = DeclarationKindFilter(
+            detectVariables: configuration.detectVariables,
+            detectFunctions: configuration.detectFunctions,
+            detectTypes: configuration.detectTypes,
+            detectParameters: configuration.detectParameters
+        )
+        return filter.shouldReport(usage.kind.toDeclarationKind())
     }
 
     /// Convert index kind to declaration kind.
     private func convertKind(_ kind: IndexedSymbolKind) -> DeclarationKind {
-        switch kind {
-        case .class: return .class
-        case .struct: return .struct
-        case .enum: return .enum
-        case .protocol: return .protocol
-        case .extension: return .extension
-        case .function, .method: return .function
-        case .property: return .variable
-        case .variable: return .variable
-        case .parameter: return .parameter
-        case .typealias: return .typealias
-        case .module: return .import
-        case .unknown: return .variable
-        }
+        kind.toDeclarationKind()
     }
 
     /// Generate a suggestion for the unused symbol.

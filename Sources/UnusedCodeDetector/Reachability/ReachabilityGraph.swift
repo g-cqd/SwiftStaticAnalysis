@@ -122,6 +122,7 @@ public struct DependencyEdge: Hashable, Sendable {
 // MARK: - Dependency Kind
 
 /// Kinds of dependencies between declarations.
+/// Exhaustive coverage for reachability analysis. // swa:ignore-unused-cases
 public enum DependencyKind: String, Sendable, Codable {
     /// Direct function/method call.
     case call

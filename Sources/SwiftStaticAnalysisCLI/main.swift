@@ -74,44 +74,21 @@ struct Analyze: AsyncParsableCommand {
     private func outputText(clones: [CloneGroup], unused: [UnusedCode]) {
         print("\n=== Duplication Report ===")
         print("Clone groups found: \(clones.count)")
-        for (index, group) in clones.enumerated() {
-            print("\n[\(index + 1)] \(group.type.rawValue) clone (\(group.occurrences) occurrences)")
-            for clone in group.clones {
-                print("  - \(clone.file):\(clone.startLine)-\(clone.endLine)")
-            }
-        }
+        OutputFormatter.printCloneGroupsText(clones)
 
         print("\n=== Unused Code Report ===")
         print("Unused items found: \(unused.count)")
-        for item in unused {
-            let confidence = "[\(item.confidence.rawValue)]"
-            print("\(confidence) \(item.declaration.location): \(item.suggestion)")
-        }
+        OutputFormatter.printUnusedText(unused)
     }
 
     private func outputJSON(clones: [CloneGroup], unused: [UnusedCode]) {
         let report = CombinedReport(clones: clones, unused: unused)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-
-        if let data = try? encoder.encode(report),
-           let json = String(data: data, encoding: .utf8) {
-            print(json)
-        }
+        OutputFormatter.printJSON(report)
     }
 
     private func outputXcode(clones: [CloneGroup], unused: [UnusedCode]) {
-        // Output in Xcode-compatible warning format
-        for group in clones {
-            for clone in group.clones {
-                print("\(clone.file):\(clone.startLine): warning: Duplicate code detected (\(group.type.rawValue) clone)")
-            }
-        }
-
-        for item in unused {
-            let loc = item.declaration.location
-            print("\(loc.file):\(loc.line):\(loc.column): warning: \(item.suggestion)")
-        }
+        OutputFormatter.printCloneGroupsXcode(clones)
+        OutputFormatter.printUnusedXcode(unused)
     }
 }
 
@@ -150,25 +127,11 @@ struct Duplicates: AsyncParsableCommand {
         switch format {
         case .text:
             print("Found \(clones.count) clone group(s)")
-            for (index, group) in clones.enumerated() {
-                print("\n[\(index + 1)] \(group.type.rawValue) clone (\(group.occurrences) occurrences)")
-                for clone in group.clones {
-                    print("  - \(clone.file):\(clone.startLine)-\(clone.endLine)")
-                }
-            }
+            OutputFormatter.printCloneGroupsText(clones)
         case .json:
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            if let data = try? encoder.encode(clones),
-               let json = String(data: data, encoding: .utf8) {
-                print(json)
-            }
+            OutputFormatter.printJSON(clones)
         case .xcode:
-            for group in clones {
-                for clone in group.clones {
-                    print("\(clone.file):\(clone.startLine): warning: Duplicate code detected (\(group.type.rawValue) clone, \(group.occurrences) occurrences)")
-                }
-            }
+            OutputFormatter.printCloneGroupsXcode(clones)
         }
     }
 }
@@ -284,6 +247,11 @@ struct Unused: AsyncParsableCommand {
         unused = unused.filter { item in
             let name = item.declaration.name
 
+            // Respect swa:ignore directives
+            if item.declaration.shouldIgnoreUnused {
+                return false
+            }
+
             // Exclude imports
             if shouldExcludeImports && item.declaration.kind == .import {
                 return false
@@ -320,21 +288,11 @@ struct Unused: AsyncParsableCommand {
         switch format {
         case .text:
             print("Found \(unused.count) potentially unused item(s)")
-            for item in unused {
-                print("[\(item.confidence.rawValue)] \(item.declaration.location): \(item.suggestion)")
-            }
+            OutputFormatter.printUnusedText(unused)
         case .json:
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            if let data = try? encoder.encode(unused),
-               let json = String(data: data, encoding: .utf8) {
-                print(json)
-            }
+            OutputFormatter.printJSON(unused)
         case .xcode:
-            for item in unused {
-                let loc = item.declaration.location
-                print("\(loc.file):\(loc.line):\(loc.column): warning: \(item.suggestion)")
-            }
+            OutputFormatter.printUnusedXcode(unused)
         }
     }
 }
@@ -350,6 +308,58 @@ enum OutputFormat: String, ExpressibleByArgument, CaseIterable {
 struct CombinedReport: Codable {
     let clones: [CloneGroup]
     let unused: [UnusedCode]
+}
+
+// MARK: - Output Formatting Helpers
+
+/// Shared formatting utilities to avoid code duplication across commands.
+enum OutputFormatter {
+    /// Print clone groups in text format.
+    static func printCloneGroupsText(_ clones: [CloneGroup], header: String? = nil) {
+        if let header = header {
+            print(header)
+        }
+        for (index, group) in clones.enumerated() {
+            print("\n[\(index + 1)] \(group.type.rawValue) clone (\(group.occurrences) occurrences)")
+            for clone in group.clones {
+                print("  - \(clone.file):\(clone.startLine)-\(clone.endLine)")
+            }
+        }
+    }
+
+    /// Print clone groups in Xcode-compatible warning format.
+    static func printCloneGroupsXcode(_ clones: [CloneGroup]) {
+        for group in clones {
+            for clone in group.clones {
+                print("\(clone.file):\(clone.startLine): warning: Duplicate code detected (\(group.type.rawValue) clone, \(group.occurrences) occurrences)")
+            }
+        }
+    }
+
+    /// Print unused code items in text format.
+    static func printUnusedText(_ unused: [UnusedCode]) {
+        for item in unused {
+            print("[\(item.confidence.rawValue)] \(item.declaration.location): \(item.suggestion)")
+        }
+    }
+
+    /// Print unused code items in Xcode-compatible warning format.
+    static func printUnusedXcode(_ unused: [UnusedCode]) {
+        for item in unused {
+            let loc = item.declaration.location
+            print("\(loc.file):\(loc.line):\(loc.column): warning: \(item.suggestion)")
+        }
+    }
+
+    /// Encode and print as JSON.
+    static func printJSON<T: Encodable>(_ value: T) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        if let data = try? encoder.encode(value),
+           let json = String(data: data, encoding: .utf8) {
+            print(json)
+        }
+    }
 }
 
 func findSwiftFiles(in path: String) throws -> [String] {

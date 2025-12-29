@@ -193,6 +193,9 @@ public struct DuplicationDetector: Sendable {
     /// The file parser.
     private let parser: SwiftFileParser
 
+    /// The shared duplication engine.
+    private let engine: DuplicationEngine
+
     public init(
         configuration: DuplicationConfiguration = .default,
         concurrency: ConcurrencyConfiguration = .default
@@ -200,6 +203,7 @@ public struct DuplicationDetector: Sendable {
         self.configuration = configuration
         self.concurrency = concurrency
         self.parser = SwiftFileParser()
+        self.engine = DuplicationEngine(configuration: configuration, concurrency: concurrency)
     }
 
     /// Detect clones in the given files.
@@ -209,14 +213,11 @@ public struct DuplicationDetector: Sendable {
     public func detectClones(in files: [String]) async throws -> [CloneGroup] {
         var cloneGroups: [CloneGroup] = []
 
-        if configuration.cloneTypes.contains(.exact) {
-            let exactClones = try await detectExactClones(in: files)
-            cloneGroups.append(contentsOf: exactClones)
-        }
-
-        if configuration.cloneTypes.contains(.near) {
-            let nearClones = try await detectNearClones(in: files)
-            cloneGroups.append(contentsOf: nearClones)
+        // Extract token sequences once if needed for exact or near detection
+        if configuration.cloneTypes.contains(.exact) || configuration.cloneTypes.contains(.near) {
+            let sequences = try await extractTokenSequences(from: files)
+            let engineClones = engine.detectClones(in: sequences)
+            cloneGroups.append(contentsOf: engineClones)
         }
 
         if configuration.cloneTypes.contains(.semantic) {
@@ -225,54 +226,7 @@ public struct DuplicationDetector: Sendable {
         }
 
         // Add code snippets to all clones
-        return try await addCodeSnippets(to: cloneGroups, files: files)
-    }
-
-    // MARK: - Exact Clone Detection
-
-    private func detectExactClones(in files: [String]) async throws -> [CloneGroup] {
-        // Extract token sequences from all files
-        let sequences = try await extractTokenSequences(from: files)
-
-        switch configuration.algorithm {
-        case .rollingHash, .minHashLSH:
-            // Rolling hash detection (minHashLSH uses this for Type-1 clones)
-            let detector = ExactCloneDetector(minimumTokens: configuration.minimumTokens)
-            return detector.detect(in: sequences)
-
-        case .suffixArray:
-            // High-performance suffix array detection
-            let detector = SuffixArrayCloneDetector(
-                minimumTokens: configuration.minimumTokens,
-                normalizeForType2: false
-            )
-            return detector.detect(in: sequences)
-        }
-    }
-
-    // MARK: - Near Clone Detection
-
-    private func detectNearClones(in files: [String]) async throws -> [CloneGroup] {
-        // Extract token sequences from all files
-        let sequences = try await extractTokenSequences(from: files)
-
-        switch configuration.algorithm {
-        case .rollingHash, .minHashLSH:
-            // Near clone detection (minHashLSH uses this for Type-2 clones)
-            let detector = NearCloneDetector(
-                minimumTokens: configuration.minimumTokens,
-                minimumSimilarity: configuration.minimumSimilarity
-            )
-            return detector.detect(in: sequences)
-
-        case .suffixArray:
-            // Suffix array with normalized tokens for Type-2 detection
-            let detector = SuffixArrayCloneDetector(
-                minimumTokens: configuration.minimumTokens,
-                normalizeForType2: true
-            )
-            return detector.detectWithNormalization(in: sequences)
-        }
+        return try await engine.addCodeSnippets(to: cloneGroups)
     }
 
     // MARK: - Semantic Clone Detection
@@ -316,59 +270,6 @@ public struct DuplicationDetector: Sendable {
         }
 
         return sequences
-    }
-
-    /// Add code snippets to clone groups.
-    private func addCodeSnippets(
-        to groups: [CloneGroup],
-        files: [String]
-    ) async throws -> [CloneGroup] {
-        // Collect unique files referenced in clones
-        let referencedFiles = Set(groups.flatMap { $0.clones.map(\.file) })
-
-        // Load file contents in parallel
-        let fileContentPairs = try await ParallelProcessor.map(
-            Array(referencedFiles),
-            maxConcurrency: concurrency.maxConcurrentFiles
-        ) { file -> (String, [String]) in
-            let source = try String(contentsOfFile: file, encoding: .utf8)
-            return (file, source.components(separatedBy: .newlines))
-        }
-
-        // Build lookup dictionary
-        let fileContents = Dictionary(uniqueKeysWithValues: fileContentPairs)
-
-        return groups.map { group in
-            let clonesWithSnippets = group.clones.map { clone -> Clone in
-                let snippet: String
-                if let lines = fileContents[clone.file] {
-                    let start = max(0, clone.startLine - 1)
-                    let end = min(lines.count, clone.endLine)
-                    if start < end {
-                        snippet = lines[start..<end].joined(separator: "\n")
-                    } else {
-                        snippet = ""
-                    }
-                } else {
-                    snippet = ""
-                }
-
-                return Clone(
-                    file: clone.file,
-                    startLine: clone.startLine,
-                    endLine: clone.endLine,
-                    tokenCount: clone.tokenCount,
-                    codeSnippet: snippet
-                )
-            }
-
-            return CloneGroup(
-                type: group.type,
-                clones: clonesWithSnippets,
-                similarity: group.similarity,
-                fingerprint: group.fingerprint
-            )
-        }
     }
 }
 

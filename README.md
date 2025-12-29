@@ -1,7 +1,7 @@
 # SwiftStaticAnalysis
 
 [![Swift 6.2](https://img.shields.io/badge/Swift-6.2-orange.svg)](https://swift.org)
-[![Platform](https://img.shields.io/badge/Platform-macOS%2015%2B%20%7C%20iOS%2018%2B-blue.svg)](https://developer.apple.com)
+[![Platform](https://img.shields.io/badge/Platform-macOS%2015%2B-blue.svg)](https://developer.apple.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/g-cqd/SwiftStaticAnalysis/actions/workflows/ci.yml/badge.svg)](https://github.com/g-cqd/SwiftStaticAnalysis/actions/workflows/ci.yml)
 
@@ -12,6 +12,7 @@ A high-performance Swift static analysis framework for **code duplication detect
 - **Multi-Algorithm Clone Detection**: Exact (Type-1), near (Type-2), and semantic (Type-3/4) clone detection
 - **IndexStoreDB Integration**: Accurate cross-module unused code detection using compiler index data
 - **Reachability Analysis**: Graph-based dead code detection with entry point tracking
+- **Ignore Directives**: Suppress false positives with `// swa:ignore` comments
 - **High-Performance Parsing**: Memory-mapped I/O, SoA token storage, and arena allocation
 - **Zero-Boilerplate CLI**: Full-featured `swa` command with JSON/text/Xcode output formats
 - **Swift 6 Concurrency**: Thread-safe design with `Sendable` conformance throughout
@@ -19,7 +20,7 @@ A high-performance Swift static analysis framework for **code duplication detect
 
 ## Requirements
 
-- macOS 15.0+ / iOS 18.0+
+- macOS 15.0+
 - Swift 6.2+
 - Xcode 26.0+
 
@@ -139,6 +140,51 @@ let detector = UnusedCodeDetector(configuration: config)
 let unused = try await detector.detectUnused(in: swiftFiles)
 ```
 
+## Ignore Directives
+
+Suppress false positives directly in your source code using `// swa:ignore` comments.
+
+### Supported Formats
+
+```swift
+// swa:ignore                    - Ignore all warnings for this declaration
+// swa:ignore-unused             - Ignore unused code warnings
+// swa:ignore-unused-cases       - Ignore unused enum case warnings (for exhaustive enums)
+/// Doc comment. // swa:ignore   - Also works in doc comments
+/* swa:ignore */                 - Block comments work too
+```
+
+### Example Usage
+
+```swift
+/// Known error types for API responses.
+/// Exhaustive for serialization. // swa:ignore-unused-cases
+public enum APIError: String, Codable {
+    case networkError
+    case authenticationFailed
+    case serverError      // May not be used yet, but needed for API compatibility
+    case rateLimited
+}
+
+// swa:ignore
+func debugHelper() {
+    // Intentionally unused in production, used only during development
+}
+```
+
+### Enum Case Inheritance
+
+When you mark an enum with `// swa:ignore-unused-cases`, all its cases automatically inherit the directive:
+
+```swift
+/// Protocol message types. // swa:ignore-unused-cases
+enum MessageType {
+    case request    // ← Automatically ignored
+    case response   // ← Automatically ignored
+    case error      // ← Automatically ignored
+}
+```
+
 ## Detection Modes
 
 | Mode | Speed | Accuracy | Use Case |
@@ -212,7 +258,7 @@ The framework includes several performance optimizations:
 ## Testing
 
 ```bash
-# Run all tests (357 tests across 89 suites)
+# Run all tests
 swift test
 
 # Run tests in parallel
@@ -220,6 +266,9 @@ swift test --parallel
 
 # Run specific test suite
 swift test --filter DuplicationDetectorTests
+
+# Run ignore directive tests
+swift test --filter IgnoreDirectiveTests
 
 # Run with verbose output
 swift test -v

@@ -93,6 +93,7 @@ public struct IndexDependencyEdge: Hashable, Sendable {
 // MARK: - Index Dependency Kind
 
 /// Kinds of dependencies detected from the index.
+/// Exhaustive coverage for dependency graph edges. // swa:ignore-unused-cases
 public enum IndexDependencyKind: String, Sendable, Codable {
     /// Direct function/method call.
     case call
