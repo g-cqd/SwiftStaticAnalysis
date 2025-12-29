@@ -317,6 +317,8 @@ enum CloneTypeArg: String, ExpressibleByArgument, CaseIterable {
     case near
     case semantic
 
+    // MARK: Internal
+
     var toCloneType: CloneType {
         switch self {
         case .exact: .exact
@@ -333,6 +335,8 @@ enum DetectionModeArg: String, ExpressibleByArgument, CaseIterable {
     case simple
     case reachability
     case indexStore
+
+    // MARK: Internal
 
     var toDetectionMode: DetectionMode {
         switch self {

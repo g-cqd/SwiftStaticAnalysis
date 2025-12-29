@@ -5,9 +5,9 @@
 //  Comprehensive tests for MinHash, LSH, and shingle-based clone detection.
 //
 
-@testable import DuplicationDetector
 import Foundation
 import Testing
+@testable import DuplicationDetector
 
 // MARK: - ShingleGeneratorTests
 

@@ -3,11 +3,11 @@
 //  SwiftStaticAnalysis
 //
 
-@testable import DuplicationDetector
 import SwiftParser
-@testable import SwiftStaticAnalysisCore
 import SwiftSyntax
 import Testing
+@testable import DuplicationDetector
+@testable import SwiftStaticAnalysisCore
 
 // MARK: - DuplicationDetectorTests
 

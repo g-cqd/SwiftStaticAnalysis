@@ -3,8 +3,8 @@
 //  SwiftStaticAnalysis
 //
 
-@testable import SwiftStaticAnalysisCore
 import Testing
+@testable import SwiftStaticAnalysisCore
 
 @Suite("SwiftStaticAnalysisCore Tests")
 struct SwiftStaticAnalysisCoreTests {

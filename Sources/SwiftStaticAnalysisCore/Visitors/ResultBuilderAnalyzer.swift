@@ -562,27 +562,6 @@ public final class ResultBuilderVisitor: SyntaxVisitor {
         contextStack.removeLast()
     }
 
-    /// Push a type declaration context onto the stack.
-    private func pushTypeContext<T: DeclGroupSyntax>(name: String, node: T) {
-        let conformances = node.inheritanceClause?.inheritedTypes.map(\.type.trimmedDescription) ?? []
-
-        let attributes = node.attributes.compactMap { attr -> String? in
-            if case let .attribute(a) = attr {
-                return a.attributeName.trimmedDescription
-            }
-            return nil
-        }
-
-        let context = ResultBuilderContext(
-            declarationName: nil,
-            typeName: name,
-            attributes: attributes,
-            conformances: conformances,
-        )
-
-        contextStack.append(context)
-    }
-
     override public func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {
         let name = node.bindings.first?.pattern.trimmedDescription
 
@@ -646,4 +625,25 @@ public final class ResultBuilderVisitor: SyntaxVisitor {
 
     /// Current context stack.
     private var contextStack: [ResultBuilderContext] = []
+
+    /// Push a type declaration context onto the stack.
+    private func pushTypeContext(name: String, node: some DeclGroupSyntax) {
+        let conformances = node.inheritanceClause?.inheritedTypes.map(\.type.trimmedDescription) ?? []
+
+        let attributes = node.attributes.compactMap { attr -> String? in
+            if case let .attribute(a) = attr {
+                return a.attributeName.trimmedDescription
+            }
+            return nil
+        }
+
+        let context = ResultBuilderContext(
+            declarationName: nil,
+            typeName: name,
+            attributes: attributes,
+            conformances: conformances,
+        )
+
+        contextStack.append(context)
+    }
 }

@@ -60,7 +60,6 @@ public struct DeclarationKindFilter: Sendable {
              .struct,
              .typealias:
             detectTypes
-
         case .parameter:
             detectParameters
         case .enumCase,

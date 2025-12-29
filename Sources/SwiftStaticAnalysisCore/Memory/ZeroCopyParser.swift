@@ -332,7 +332,6 @@ public actor ZeroCopyParser {
              .rightSquare,
              .semicolon:
             .punctuation
-
         default:
             .unknown
         }

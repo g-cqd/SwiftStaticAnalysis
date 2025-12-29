@@ -5,12 +5,12 @@
 //  Tests for exact clone (Type-1) detection.
 //
 
-@testable import DuplicationDetector
 import Foundation
 import SwiftParser
-@testable import SwiftStaticAnalysisCore
 import SwiftSyntax
 import Testing
+@testable import DuplicationDetector
+@testable import SwiftStaticAnalysisCore
 
 // MARK: - ExactCloneTests
 

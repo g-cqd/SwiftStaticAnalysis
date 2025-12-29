@@ -5,9 +5,9 @@
 //  Tests for suffix array implementation and clone detection.
 //
 
-@testable import DuplicationDetector
 import Foundation
 import Testing
+@testable import DuplicationDetector
 
 // MARK: - SuffixArrayConstructionTests
 

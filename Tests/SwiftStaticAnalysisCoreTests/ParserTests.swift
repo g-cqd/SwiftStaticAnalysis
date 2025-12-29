@@ -7,9 +7,9 @@
 
 import Foundation
 import SwiftParser
-@testable import SwiftStaticAnalysisCore
 import SwiftSyntax
 import Testing
+@testable import SwiftStaticAnalysisCore
 
 // MARK: - ParserTests
 

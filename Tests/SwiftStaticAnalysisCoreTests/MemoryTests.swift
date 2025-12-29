@@ -6,8 +6,8 @@
 //
 
 import Foundation
-@testable import SwiftStaticAnalysisCore
 import Testing
+@testable import SwiftStaticAnalysisCore
 
 // MARK: - ArenaAllocationTests
 

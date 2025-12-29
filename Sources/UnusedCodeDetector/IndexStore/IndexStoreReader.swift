@@ -86,19 +86,14 @@ public enum IndexedSymbolKind: String, Sendable, DeclarationKindConvertible {
              .instanceProperty,
              .staticProperty:
             self = .property
-
         case .variable:
             self = .variable
-
         case .parameter:
             self = .parameter
-
         case .typealias:
             self = .typealias
-
         case .module:
             self = .module
-
         default:
             self = .unknown
         }

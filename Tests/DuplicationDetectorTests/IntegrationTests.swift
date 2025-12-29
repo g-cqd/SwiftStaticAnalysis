@@ -5,10 +5,10 @@
 //  End-to-end integration tests for the duplication detector.
 //
 
-@testable import DuplicationDetector
 import Foundation
-@testable import SwiftStaticAnalysisCore
 import Testing
+@testable import DuplicationDetector
+@testable import SwiftStaticAnalysisCore
 
 // MARK: - DuplicationDetectorIntegrationTests
 
