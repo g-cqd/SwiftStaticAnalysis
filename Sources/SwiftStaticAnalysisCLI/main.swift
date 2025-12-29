@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 //
 //  main.swift
 //  SwiftStaticAnalysis
@@ -40,24 +41,42 @@ struct Analyze: AsyncParsableCommand {
     @Argument(help: "Path to analyze (directory or file)")
     var path: String = "."
 
+    @Option(name: .long, help: "Path to configuration file (.swa.json)")
+    var config: String?
+
     @Option(name: .shortAndLong, help: "Output format (text, json, xcode)")
     var format: OutputFormat = .xcode
 
     func run() async throws {
-        let files = try findSwiftFiles(in: path)
+        // Load configuration
+        let swaConfig = try loadConfiguration(configPath: config, analysisPath: path)
+
+        // Apply format from config if not specified on CLI
+        let outputFormat = format
+
+        let files = try findSwiftFiles(in: path, excludePaths: swaConfig?.excludePaths)
 
         print("Analyzing \(files.count) Swift files...")
 
-        // Run duplication detection
-        let dupDetector = DuplicationDetector()
-        let clones = try await dupDetector.detectClones(in: files)
+        // Run duplication detection if enabled
+        var clones: [CloneGroup] = []
+        if swaConfig?.duplicates?.enabled != false {
+            let dupConfig = buildDuplicationConfig(from: swaConfig?.duplicates)
+            let dupDetector = DuplicationDetector(configuration: dupConfig)
+            clones = try await dupDetector.detectClones(in: files)
+        }
 
-        // Run unused code detection
-        let unusedDetector = UnusedCodeDetector()
-        let unused = try await unusedDetector.detectUnused(in: files)
+        // Run unused code detection if enabled
+        var unused: [UnusedCode] = []
+        if swaConfig?.unused?.enabled != false {
+            let unusedConfig = buildUnusedConfig(from: swaConfig?.unused)
+            let unusedDetector = UnusedCodeDetector(configuration: unusedConfig)
+            unused = try await unusedDetector.detectUnused(in: files)
+            unused = applyUnusedFilters(unused, config: swaConfig?.unused)
+        }
 
         // Output results
-        outputResults(clones: clones, unused: unused, format: format)
+        outputResults(clones: clones, unused: unused, format: outputFormat)
     }
 
     // MARK: Private
@@ -110,26 +129,52 @@ struct Duplicates: AsyncParsableCommand {
     @Argument(help: "Path to analyze")
     var path: String = "."
 
+    @Option(name: .long, help: "Path to configuration file (.swa.json)")
+    var config: String?
+
     @Option(name: .long, help: "Clone types to detect")
     var types: [CloneTypeArg] = [.exact]
 
     @Option(name: .long, help: "Minimum tokens for a clone")
-    var minTokens: Int = 50
+    var minTokens: Int?
+
+    @Option(name: .long, help: "Minimum similarity (0.0-1.0)")
+    var minSimilarity: Double?
+
+    @Option(name: .long, help: "Detection algorithm (rollingHash, suffixArray, minHashLSH)")
+    var algorithm: AlgorithmArg?
+
+    @Option(name: .long, parsing: .upToNextOption, help: "Paths to exclude (glob patterns)")
+    var excludePaths: [String] = []
 
     @Option(name: .shortAndLong, help: "Output format")
     var format: OutputFormat = .xcode
 
     func run() async throws {
-        let files = try findSwiftFiles(in: path)
+        // Load configuration
+        let swaConfig = try loadConfiguration(configPath: config, analysisPath: path)
+        let dupConfig = swaConfig?.duplicates
 
-        let cloneTypes = Set(types.map(\.toCloneType))
+        // Merge CLI args with config (CLI takes precedence)
+        let effectiveMinTokens = minTokens ?? dupConfig?.minTokens ?? 50
+        let effectiveMinSimilarity = minSimilarity ?? dupConfig?.minSimilarity ?? 0.8
+        let effectiveAlgorithm = algorithm?.toAlgorithm ?? parseAlgorithm(dupConfig?.algorithm)
+        let effectiveTypes = types.isEmpty ? parseCloneTypes(dupConfig?.types) : Set(types.map(\.toCloneType))
+        let effectiveExcludePaths = excludePaths.isEmpty ? (dupConfig?.excludePaths ?? []) : excludePaths
 
-        let config = DuplicationConfiguration(
-            minimumTokens: minTokens,
-            cloneTypes: cloneTypes,
+        // Merge with global excludePaths
+        let allExcludePaths = effectiveExcludePaths + (swaConfig?.excludePaths ?? [])
+
+        let files = try findSwiftFiles(in: path, excludePaths: allExcludePaths.isEmpty ? nil : allExcludePaths)
+
+        let detectorConfig = DuplicationConfiguration(
+            minimumTokens: effectiveMinTokens,
+            cloneTypes: effectiveTypes,
+            minimumSimilarity: effectiveMinSimilarity,
+            algorithm: effectiveAlgorithm,
         )
 
-        let detector = DuplicationDetector(configuration: config)
+        let detector = DuplicationDetector(configuration: detectorConfig)
         let clones = try await detector.detectClones(in: files)
 
         switch format {
@@ -156,14 +201,20 @@ struct Unused: AsyncParsableCommand {
     @Argument(help: "Path to analyze")
     var path: String = "."
 
+    @Option(name: .long, help: "Path to configuration file (.swa.json)")
+    var config: String?
+
     @Flag(name: .long, help: "Ignore public API")
     var ignorePublic: Bool = false
 
     @Option(name: .long, help: "Detection mode")
-    var mode: DetectionModeArg = .simple
+    var mode: DetectionModeArg?
 
     @Option(name: .long, help: "Path to index store")
     var indexStorePath: String?
+
+    @Option(name: .long, help: "Minimum confidence level (low, medium, high)")
+    var minConfidence: ConfidenceArg?
 
     @Flag(name: .long, help: "Generate reachability report")
     var report: Bool = false
@@ -190,31 +241,95 @@ struct Unused: AsyncParsableCommand {
     @Flag(name: .long, help: "Apply sensible defaults (exclude imports, deinit, enum cases)")
     var sensibleDefaults: Bool = false
 
+    // Root treatment flags
+    @Flag(name: .long, help: "Treat public API as entry points")
+    var treatPublicAsRoot: Bool = false
+
+    @Flag(name: .long, help: "Treat @objc declarations as entry points")
+    var treatObjcAsRoot: Bool = false
+
+    @Flag(name: .long, help: "Treat test methods as entry points")
+    var treatTestsAsRoot: Bool = false
+
+    @Flag(name: .long, help: "Treat SwiftUI Views as entry points")
+    var treatSwiftUIViewsAsRoot: Bool = false
+
+    // SwiftUI flags
+    @Flag(name: .long, help: "Ignore SwiftUI property wrappers")
+    var ignoreSwiftUIPropertyWrappers: Bool = false
+
+    @Flag(name: .long, help: "Ignore PreviewProvider implementations")
+    var ignorePreviewProviders: Bool = false
+
+    @Flag(name: .long, help: "Ignore View body properties")
+    var ignoreViewBody: Bool = false
+
     // swiftlint:disable:next function_body_length
     func run() async throws {
-        var files = try findSwiftFiles(in: path)
+        // Load configuration
+        let swaConfig = try loadConfiguration(configPath: config, analysisPath: path)
+        let unusedConfig = swaConfig?.unused
+
+        // Merge CLI args with config (CLI takes precedence)
+        let effectiveMode = mode?.toDetectionMode ?? parseDetectionMode(unusedConfig?.mode)
+        let effectiveIndexStorePath = indexStorePath ?? unusedConfig?.indexStorePath
+        let effectiveIgnorePublic = ignorePublic || (unusedConfig?.ignorePublicAPI ?? false)
+        let effectiveSensibleDefaults = sensibleDefaults || (unusedConfig?.sensibleDefaults ?? false)
+
+        // Merge exclusion settings
+        let effectiveExcludeImports = excludeImports || (unusedConfig?.excludeImports ?? false) ||
+            effectiveSensibleDefaults
+        let effectiveExcludeDeinit = excludeDeinit || (unusedConfig?.excludeDeinit ?? false) ||
+            effectiveSensibleDefaults
+        let effectiveExcludeEnumCases = excludeEnumCases || (unusedConfig?.excludeEnumCases ?? false) ||
+            effectiveSensibleDefaults
+        let effectiveExcludeTestSuites = excludeTestSuites || (unusedConfig?.excludeTestSuites ?? false) ||
+            effectiveSensibleDefaults
+
+        // Merge root treatment settings
+        let effectiveTreatPublicAsRoot = treatPublicAsRoot || (unusedConfig?.treatPublicAsRoot ?? false)
+        let effectiveTreatObjcAsRoot = treatObjcAsRoot || (unusedConfig?.treatObjcAsRoot ?? false)
+        let effectiveTreatTestsAsRoot = treatTestsAsRoot || (unusedConfig?.treatTestsAsRoot ?? false)
+        let effectiveTreatSwiftUIViewsAsRoot = treatSwiftUIViewsAsRoot ||
+            (unusedConfig?.treatSwiftUIViewsAsRoot ?? false)
+
+        // Merge SwiftUI settings
+        let effectiveIgnoreSwiftUIPropertyWrappers = ignoreSwiftUIPropertyWrappers ||
+            (unusedConfig?.ignoreSwiftUIPropertyWrappers ?? false)
+        let effectiveIgnorePreviewProviders = ignorePreviewProviders || (unusedConfig?.ignorePreviewProviders ?? false)
+        let effectiveIgnoreViewBody = ignoreViewBody || (unusedConfig?.ignoreViewBody ?? false)
+
+        // Merge path exclusions
+        let effectiveExcludePaths = excludePaths.isEmpty ? (unusedConfig?.excludePaths ?? []) : excludePaths
+        let allExcludePaths = effectiveExcludePaths + (swaConfig?.excludePaths ?? [])
+
+        var files = try findSwiftFiles(in: path, excludePaths: allExcludePaths.isEmpty ? nil : allExcludePaths)
 
         // Apply path exclusions
-        let excludePatterns = sensibleDefaults ? excludePaths : excludePaths
-        if !excludePatterns.isEmpty {
+        if !allExcludePaths.isEmpty {
             files = files.filter { file in
-                !excludePatterns.contains { pattern in
+                !allExcludePaths.contains { pattern in
                     UnusedCodeFilter.matchesGlobPattern(file, pattern: pattern)
                 }
             }
         }
 
-        let detectionMode = mode.toDetectionMode
-
-        let config = UnusedCodeConfiguration(
-            ignorePublicAPI: ignorePublic,
-            mode: detectionMode,
-            indexStorePath: indexStorePath,
+        let detectorConfig = UnusedCodeConfiguration(
+            ignorePublicAPI: effectiveIgnorePublic,
+            mode: effectiveMode,
+            indexStorePath: effectiveIndexStorePath,
+            treatPublicAsRoot: effectiveTreatPublicAsRoot,
+            treatObjcAsRoot: effectiveTreatObjcAsRoot,
+            treatTestsAsRoot: effectiveTreatTestsAsRoot,
+            treatSwiftUIViewsAsRoot: effectiveTreatSwiftUIViewsAsRoot,
+            ignoreSwiftUIPropertyWrappers: effectiveIgnoreSwiftUIPropertyWrappers,
+            ignorePreviewProviders: effectiveIgnorePreviewProviders,
+            ignoreViewBody: effectiveIgnoreViewBody,
         )
 
-        let detector = UnusedCodeDetector(configuration: config)
+        let detector = UnusedCodeDetector(configuration: detectorConfig)
 
-        if report && detectionMode == .reachability {
+        if report, effectiveMode == .reachability {
             let reachabilityReport = try await detector.generateReachabilityReport(for: files)
             print("=== Reachability Report ===")
             print("Total declarations: \(reachabilityReport.totalDeclarations)")
@@ -242,49 +357,15 @@ struct Unused: AsyncParsableCommand {
         var unused = try await detector.detectUnused(in: files)
 
         // Apply exclusion filters
-        let shouldExcludeImports = excludeImports || sensibleDefaults
-        let shouldExcludeDeinit = excludeDeinit || sensibleDefaults
-        let shouldExcludeEnumCases = excludeEnumCases || sensibleDefaults
-        let shouldExcludeTestSuites = excludeTestSuites || sensibleDefaults
-
-        unused = unused.filter { item in
-            let name = item.declaration.name
-
-            // Respect swa:ignore directives
-            if item.declaration.shouldIgnoreUnused {
-                return false
-            }
-
-            // Exclude imports
-            if shouldExcludeImports, item.declaration.kind == .import {
-                return false
-            }
-
-            // Exclude deinit
-            if shouldExcludeDeinit, name == "deinit" {
-                return false
-            }
-
-            // Exclude backticked enum cases
-            if shouldExcludeEnumCases, name.hasPrefix("`"), name.hasSuffix("`") {
-                return false
-            }
-
-            // Exclude test suites (names ending with Tests)
-            if shouldExcludeTestSuites, name.hasSuffix("Tests") {
-                return false
-            }
-
-            // Exclude based on path patterns
-            if !excludePaths.isEmpty {
-                let filePath = item.declaration.location.file
-                for pattern in excludePaths where UnusedCodeFilter.matchesGlobPattern(filePath, pattern: pattern) {
-                    return false
-                }
-            }
-
-            return true
-        }
+        let minConf = minConfidence ?? parseConfidence(unusedConfig?.minConfidence)
+        unused = filterUnusedResults(
+            unused,
+            excludeImports: effectiveExcludeImports,
+            excludeDeinit: effectiveExcludeDeinit,
+            excludeEnumCases: effectiveExcludeEnumCases,
+            excludeTestSuites: effectiveExcludeTestSuites,
+            minConfidence: minConf,
+        )
 
         switch format {
         case .text:
@@ -298,6 +379,155 @@ struct Unused: AsyncParsableCommand {
             OutputFormatter.printUnusedXcode(unused)
         }
     }
+}
+
+// MARK: - Configuration Loading Helpers
+
+func loadConfiguration(configPath: String?, analysisPath: String) throws -> SWAConfiguration? {
+    let loader = ConfigurationLoader()
+
+    if let configPath {
+        // Explicit config path provided
+        let url = URL(fileURLWithPath: configPath)
+        return try loader.loadFromFile(url)
+    }
+
+    // Auto-detect config file in analysis directory
+    let analysisURL = URL(fileURLWithPath: analysisPath)
+    var searchDirectory = analysisURL
+
+    // If path is a file, search in its parent directory
+    var isDirectory: ObjCBool = false
+    if FileManager.default.fileExists(atPath: analysisPath, isDirectory: &isDirectory), !isDirectory.boolValue {
+        searchDirectory = analysisURL.deletingLastPathComponent()
+    }
+
+    return try loader.load(from: searchDirectory)
+}
+
+func buildDuplicationConfig(from config: DuplicatesConfiguration?) -> DuplicationConfiguration {
+    DuplicationConfiguration(
+        minimumTokens: config?.minTokens ?? 50,
+        cloneTypes: parseCloneTypes(config?.types),
+        minimumSimilarity: config?.minSimilarity ?? 0.8,
+        algorithm: parseAlgorithm(config?.algorithm),
+    )
+}
+
+func buildUnusedConfig(from config: UnusedConfiguration?) -> UnusedCodeConfiguration {
+    UnusedCodeConfiguration(
+        ignorePublicAPI: config?.ignorePublicAPI ?? false,
+        mode: parseDetectionMode(config?.mode),
+        indexStorePath: config?.indexStorePath,
+        treatPublicAsRoot: config?.treatPublicAsRoot ?? false,
+        treatObjcAsRoot: config?.treatObjcAsRoot ?? false,
+        treatTestsAsRoot: config?.treatTestsAsRoot ?? false,
+        treatSwiftUIViewsAsRoot: config?.treatSwiftUIViewsAsRoot ?? false,
+        ignoreSwiftUIPropertyWrappers: config?.ignoreSwiftUIPropertyWrappers ?? false,
+        ignorePreviewProviders: config?.ignorePreviewProviders ?? false,
+        ignoreViewBody: config?.ignoreViewBody ?? false,
+    )
+}
+
+func applyUnusedFilters(_ unused: [UnusedCode], config: UnusedConfiguration?) -> [UnusedCode] {
+    let sensibleDefaults = config?.sensibleDefaults ?? false
+    let excludeImports = config?.excludeImports ?? sensibleDefaults
+    let excludeDeinit = config?.excludeDeinit ?? sensibleDefaults
+    let excludeEnumCases = config?.excludeEnumCases ?? sensibleDefaults
+    let excludeTestSuites = config?.excludeTestSuites ?? sensibleDefaults
+
+    return filterUnusedResults(
+        unused,
+        excludeImports: excludeImports,
+        excludeDeinit: excludeDeinit,
+        excludeEnumCases: excludeEnumCases,
+        excludeTestSuites: excludeTestSuites,
+        minConfidence: nil,
+    )
+}
+
+func parseCloneTypes(_ types: [String]?) -> Set<CloneType> {
+    guard let types, !types.isEmpty else {
+        return [.exact]
+    }
+    return Set(types.compactMap { CloneType(rawValue: $0) })
+}
+
+func parseAlgorithm(_ algorithm: String?) -> DetectionAlgorithm {
+    guard let algorithm else { return .rollingHash }
+    switch algorithm.lowercased() {
+    case "rollinghash": return .rollingHash
+    case "suffixarray": return .suffixArray
+    case "minhashlsh": return .minHashLSH
+    default: return .rollingHash
+    }
+}
+
+func parseDetectionMode(_ mode: String?) -> DetectionMode {
+    guard let mode else { return .simple }
+    switch mode.lowercased() {
+    case "simple": return .simple
+    case "reachability": return .reachability
+    case "indexstore": return .indexStore
+    default: return .simple
+    }
+}
+
+func parseConfidence(_ confidence: String?) -> ConfidenceArg? {
+    guard let confidence else { return nil }
+    return ConfidenceArg(rawValue: confidence.lowercased())
+}
+
+// swiftlint:disable:next function_parameter_count
+func filterUnusedResults(
+    _ unused: [UnusedCode],
+    excludeImports: Bool,
+    excludeDeinit: Bool,
+    excludeEnumCases: Bool,
+    excludeTestSuites: Bool,
+    minConfidence: ConfidenceArg?,
+) -> [UnusedCode] {
+    var results: [UnusedCode] = []
+
+    for item in unused {
+        let name = item.declaration.name
+
+        // Respect swa:ignore directives
+        if item.declaration.shouldIgnoreUnused {
+            continue
+        }
+
+        // Exclude imports
+        if excludeImports, item.declaration.kind == .import {
+            continue
+        }
+
+        // Exclude deinit
+        if excludeDeinit, name == "deinit" {
+            continue
+        }
+
+        // Exclude backticked enum cases
+        if excludeEnumCases, name.hasPrefix("`"), name.hasSuffix("`") {
+            continue
+        }
+
+        // Exclude test suites (names ending with Tests)
+        if excludeTestSuites, name.hasSuffix("Tests") {
+            continue
+        }
+
+        // Filter by minimum confidence
+        if let minConf = minConfidence {
+            if item.confidence < minConf.toConfidence {
+                continue
+            }
+        }
+
+        results.append(item)
+    }
+
+    return results
 }
 
 // MARK: - OutputFormat
@@ -342,6 +572,44 @@ enum DetectionModeArg: String, ExpressibleByArgument, CaseIterable {
         case .simple: .simple
         case .reachability: .reachability
         case .indexStore: .indexStore
+        }
+    }
+}
+
+// MARK: - AlgorithmArg
+
+/// Validated algorithm argument for CLI.
+enum AlgorithmArg: String, ExpressibleByArgument, CaseIterable {
+    case rollingHash
+    case suffixArray
+    case minHashLSH
+
+    // MARK: Internal
+
+    var toAlgorithm: DetectionAlgorithm {
+        switch self {
+        case .rollingHash: .rollingHash
+        case .suffixArray: .suffixArray
+        case .minHashLSH: .minHashLSH
+        }
+    }
+}
+
+// MARK: - ConfidenceArg
+
+/// Validated confidence argument for CLI.
+enum ConfidenceArg: String, ExpressibleByArgument, CaseIterable {
+    case low
+    case medium
+    case high
+
+    // MARK: Internal
+
+    var toConfidence: Confidence {
+        switch self {
+        case .low: .low
+        case .medium: .medium
+        case .high: .high
         }
     }
 }
@@ -407,7 +675,7 @@ enum OutputFormatter {
     }
 }
 
-func findSwiftFiles(in path: String) throws -> [String] {
+func findSwiftFiles(in path: String, excludePaths: [String]? = nil) throws -> [String] {
     let fileManager = FileManager.default
     let url = URL(fileURLWithPath: path)
 
@@ -433,7 +701,19 @@ func findSwiftFiles(in path: String) throws -> [String] {
         options: [.skipsHiddenFiles],
     ) {
         for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
-            swiftFiles.append(fileURL.path)
+            let filePath = fileURL.path
+
+            // Apply exclusion patterns
+            if let excludePaths, !excludePaths.isEmpty {
+                let shouldExclude = excludePaths.contains { pattern in
+                    UnusedCodeFilter.matchesGlobPattern(filePath, pattern: pattern)
+                }
+                if shouldExclude {
+                    continue
+                }
+            }
+
+            swiftFiles.append(filePath)
         }
     }
 
