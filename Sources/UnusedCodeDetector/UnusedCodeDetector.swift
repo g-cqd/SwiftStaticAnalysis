@@ -260,26 +260,26 @@ extension UnusedCodeDetector {
         switch declaration.kind {
         case .constant,
              .variable:
-            return configuration.detectVariables
+            configuration.detectVariables
 
         case .function,
              .method:
-            return configuration.detectFunctions
+            configuration.detectFunctions
 
         case .class,
              .enum,
              .protocol,
              .struct:
-            return configuration.detectTypes
+            configuration.detectTypes
 
         case .parameter:
-            return configuration.detectParameters
+            configuration.detectParameters
 
         case .import:
-            return false // Handled separately
+            false // Handled separately
 
         default:
-            return true
+            true
         }
     }
 
