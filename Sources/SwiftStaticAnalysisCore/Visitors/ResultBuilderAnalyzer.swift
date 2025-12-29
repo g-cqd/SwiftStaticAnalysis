@@ -512,24 +512,7 @@ public struct ResultBuilderAnalyzer: Sendable {
 
     /// Generic expression normalization.
     private func normalizeGenericExpression(_ expr: ExprSyntax) -> String {
-        // Remove literals, keep structure
-        var normalized = expr.trimmedDescription
-
-        // Replace string literals
-        normalized = normalized.replacingOccurrences(
-            of: #""[^"]*""#,
-            with: "\"$STR\"",
-            options: .regularExpression,
-        )
-
-        // Replace numeric literals
-        normalized = normalized.replacingOccurrences(
-            of: #"\b\d+(\.\d+)?\b"#,
-            with: "$NUM",
-            options: .regularExpression,
-        )
-
-        return normalized
+        expr.trimmedDescription.normalizingLiterals()
     }
 }
 
@@ -562,23 +545,7 @@ public final class ResultBuilderVisitor: SyntaxVisitor {
     // MARK: - Visit Methods
 
     override public func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
-        let conformances = node.inheritanceClause?.inheritedTypes.map(\.type.trimmedDescription) ?? []
-
-        let attributes = node.attributes.compactMap { attr -> String? in
-            if case let .attribute(a) = attr {
-                return a.attributeName.trimmedDescription
-            }
-            return nil
-        }
-
-        let context = ResultBuilderContext(
-            declarationName: nil,
-            typeName: node.name.text,
-            attributes: attributes,
-            conformances: conformances,
-        )
-
-        contextStack.append(context)
+        pushTypeContext(name: node.name.text, node: node)
         return .visitChildren
     }
 
@@ -587,6 +554,16 @@ public final class ResultBuilderVisitor: SyntaxVisitor {
     }
 
     override public func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+        pushTypeContext(name: node.name.text, node: node)
+        return .visitChildren
+    }
+
+    override public func visitPost(_ node: ClassDeclSyntax) {
+        contextStack.removeLast()
+    }
+
+    /// Push a type declaration context onto the stack.
+    private func pushTypeContext<T: DeclGroupSyntax>(name: String, node: T) {
         let conformances = node.inheritanceClause?.inheritedTypes.map(\.type.trimmedDescription) ?? []
 
         let attributes = node.attributes.compactMap { attr -> String? in
@@ -598,17 +575,12 @@ public final class ResultBuilderVisitor: SyntaxVisitor {
 
         let context = ResultBuilderContext(
             declarationName: nil,
-            typeName: node.name.text,
+            typeName: name,
             attributes: attributes,
             conformances: conformances,
         )
 
         contextStack.append(context)
-        return .visitChildren
-    }
-
-    override public func visitPost(_ node: ClassDeclSyntax) {
-        contextStack.removeLast()
     }
 
     override public func visit(_ node: VariableDeclSyntax) -> SyntaxVisitorContinueKind {

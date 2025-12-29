@@ -168,28 +168,81 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.1.1.app
 
-      - name: Build Release Binary
-        run: swift build -c release
+      - name: Build Universal Release Binary
+        run: |
+          # Build for arm64
+          swift build -c release --arch arm64
+          mv .build/release/swa .build/release/swa-arm64
+
+          # Build for x86_64
+          swift build -c release --arch x86_64
+          mv .build/release/swa .build/release/swa-x86_64
+
+          # Create universal binary
+          lipo -create -output .build/release/swa \
+            .build/release/swa-arm64 \
+            .build/release/swa-x86_64
+
+          # Verify universal binary
+          file .build/release/swa
+          lipo -info .build/release/swa
 
       - name: Package Binary
         run: |
+          VERSION="${{ needs.validate.outputs.version }}"
           mkdir -p release
+
+          # Copy and package universal binary
           cp .build/release/swa release/
           cd release
-          tar -czvf swa-${{ needs.validate.outputs.version }}-macos.tar.gz swa
+          tar -czvf "swa-${VERSION}-macos-universal.tar.gz" swa
+
+          # Also package architecture-specific binaries
+          cp ../.build/release/swa-arm64 ./swa
+          tar -czvf "swa-${VERSION}-macos-arm64.tar.gz" swa
+          cp ../.build/release/swa-x86_64 ./swa
+          tar -czvf "swa-${VERSION}-macos-x86_64.tar.gz" swa
+
+          # Restore universal for any other steps
+          cp ../.build/release/swa ./swa
+
+      - name: Generate Checksums
+        run: |
+          cd release
+          shasum -a 256 *.tar.gz > checksums.txt
+          cat checksums.txt
 
       - name: Generate Release Notes
         id: notes
         run: |
+          VERSION="${{ needs.validate.outputs.version }}"
           {
             echo "notes<<NOTES_EOF"
-            echo "## SwiftStaticAnalysis ${{ needs.validate.outputs.version }}"
+            echo "## SwiftStaticAnalysis ${VERSION}"
             echo ""
             echo "### Installation"
             echo ""
+            echo "#### Swift Package Manager"
+            echo "\`\`\`swift"
+            echo ".package(url: \"https://github.com/g-cqd/SwiftStaticAnalysis.git\", from: \"${VERSION}\")"
+            echo "\`\`\`"
+            echo ""
+            echo "#### Pre-built Binary (macOS)"
             echo "\`\`\`bash"
-            echo "# Swift Package Manager"
-            echo ".package(url: \"https://github.com/g-cqd/SwiftStaticAnalysis.git\", from: \"${{ needs.validate.outputs.version }}\")"
+            echo "# Universal binary (recommended - works on both Apple Silicon and Intel)"
+            echo "curl -L https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/v${VERSION}/swa-${VERSION}-macos-universal.tar.gz | tar xz"
+            echo "sudo mv swa /usr/local/bin/"
+            echo ""
+            echo "# Or for Apple Silicon only"
+            echo "curl -L https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/v${VERSION}/swa-${VERSION}-macos-arm64.tar.gz | tar xz"
+            echo ""
+            echo "# Or for Intel only"
+            echo "curl -L https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/v${VERSION}/swa-${VERSION}-macos-x86_64.tar.gz | tar xz"
+            echo "\`\`\`"
+            echo ""
+            echo "### Checksums"
+            echo "\`\`\`"
+            cat release/checksums.txt
             echo "\`\`\`"
             echo ""
             echo "### What's Changed"
@@ -217,6 +270,9 @@ jobs:
           body: ${{ steps.notes.outputs.notes }}
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           files: |
-            release/swa-${{ needs.validate.outputs.version }}-macos.tar.gz
+            release/swa-${{ needs.validate.outputs.version }}-macos-universal.tar.gz
+            release/swa-${{ needs.validate.outputs.version }}-macos-arm64.tar.gz
+            release/swa-${{ needs.validate.outputs.version }}-macos-x86_64.tar.gz
+            release/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

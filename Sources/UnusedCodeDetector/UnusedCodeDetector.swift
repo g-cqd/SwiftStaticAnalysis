@@ -144,48 +144,11 @@ extension UnusedCodeDetector {
 extension UnusedCodeDetector {
     /// Detect unused code using SwiftSyntax only (fast but approximate).
     func detectUnusedWithSyntax(in files: [String]) async throws -> [UnusedCode] {
-        // Analyze all files
         let result = try await analyzer.analyze(files)
+        var unusedItems = findUnreferencedDeclarations(in: result)
 
-        var unusedItems: [UnusedCode] = []
-
-        // Build a set of all referenced identifiers
-        let referencedIdentifiers = result.references.uniqueIdentifiers
-
-        // Check each declaration
-        for declaration in result.declarations.declarations {
-            // Skip based on configuration
-            if !shouldCheck(declaration) {
-                continue
-            }
-
-            // Check if referenced
-            let isReferenced = referencedIdentifiers.contains(declaration.name)
-
-            if !isReferenced {
-                let confidence = declaration.unusedConfidence
-
-                // Skip if below minimum confidence
-                if confidence < configuration.minimumConfidence {
-                    continue
-                }
-
-                let reason = determineReason(for: declaration, result: result)
-                let suggestion = generateSuggestion(for: declaration, reason: reason)
-
-                unusedItems.append(UnusedCode(
-                    declaration: declaration,
-                    reason: reason,
-                    confidence: confidence,
-                    suggestion: suggestion,
-                ))
-            }
-        }
-
-        // Check imports if enabled
         if configuration.detectImports {
-            let unusedImports = detectUnusedImports(result: result)
-            unusedItems.append(contentsOf: unusedImports)
+            unusedItems.append(contentsOf: detectUnusedImports(result: result))
         }
 
         return unusedItems.sorted { $0.confidence > $1.confidence }
@@ -193,42 +156,33 @@ extension UnusedCodeDetector {
 
     /// Detect unused code from an analysis result (simple mode).
     func detectFromResult(_ result: AnalysisResult) -> [UnusedCode] {
-        var unusedItems: [UnusedCode] = []
+        findUnreferencedDeclarations(in: result)
+            .sorted { $0.confidence > $1.confidence }
+    }
 
-        // Build a set of all referenced identifiers
+    /// Find declarations that are not referenced in the analysis result.
+    private func findUnreferencedDeclarations(in result: AnalysisResult) -> [UnusedCode] {
         let referencedIdentifiers = result.references.uniqueIdentifiers
 
-        // Check each declaration
-        for declaration in result.declarations.declarations {
-            // Skip based on configuration
-            if !shouldCheck(declaration) {
-                continue
-            }
+        return result.declarations.declarations.compactMap { declaration -> UnusedCode? in
+            guard shouldCheck(declaration) else { return nil }
 
-            // Check if referenced
             let isReferenced = referencedIdentifiers.contains(declaration.name)
+            guard !isReferenced else { return nil }
 
-            if !isReferenced {
-                let confidence = declaration.unusedConfidence
+            let confidence = declaration.unusedConfidence
+            guard confidence >= configuration.minimumConfidence else { return nil }
 
-                // Skip if below minimum confidence
-                if confidence < configuration.minimumConfidence {
-                    continue
-                }
+            let reason = determineReason(for: declaration, result: result)
+            let suggestion = generateSuggestion(for: declaration, reason: reason)
 
-                let reason = determineReason(for: declaration, result: result)
-                let suggestion = generateSuggestion(for: declaration, reason: reason)
-
-                unusedItems.append(UnusedCode(
-                    declaration: declaration,
-                    reason: reason,
-                    confidence: confidence,
-                    suggestion: suggestion,
-                ))
-            }
+            return UnusedCode(
+                declaration: declaration,
+                reason: reason,
+                confidence: confidence,
+                suggestion: suggestion,
+            )
         }
-
-        return unusedItems.sorted { $0.confidence > $1.confidence }
     }
 }
 

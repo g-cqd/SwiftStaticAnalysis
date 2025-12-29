@@ -110,8 +110,8 @@ struct Duplicates: AsyncParsableCommand {
     @Argument(help: "Path to analyze")
     var path: String = "."
 
-    @Option(name: .long, help: "Clone types to detect (exact, near, semantic)")
-    var types: [String] = ["exact"]
+    @Option(name: .long, help: "Clone types to detect")
+    var types: [CloneTypeArg] = [.exact]
 
     @Option(name: .long, help: "Minimum tokens for a clone")
     var minTokens: Int = 50
@@ -122,11 +122,11 @@ struct Duplicates: AsyncParsableCommand {
     func run() async throws {
         let files = try findSwiftFiles(in: path)
 
-        let cloneTypes = Set(types.compactMap { CloneType(rawValue: $0) })
+        let cloneTypes = Set(types.map(\.toCloneType))
 
         let config = DuplicationConfiguration(
             minimumTokens: minTokens,
-            cloneTypes: cloneTypes.isEmpty ? [.exact] : cloneTypes,
+            cloneTypes: cloneTypes,
         )
 
         let detector = DuplicationDetector(configuration: config)
@@ -159,8 +159,8 @@ struct Unused: AsyncParsableCommand {
     @Flag(name: .long, help: "Ignore public API")
     var ignorePublic: Bool = false
 
-    @Option(name: .long, help: "Detection mode: simple, reachability, indexStore")
-    var mode: String = "simple"
+    @Option(name: .long, help: "Detection mode")
+    var mode: DetectionModeArg = .simple
 
     @Option(name: .long, help: "Path to index store")
     var indexStorePath: String?
@@ -203,17 +203,7 @@ struct Unused: AsyncParsableCommand {
             }
         }
 
-        let detectionMode: DetectionMode = switch mode.lowercased() {
-        case "reachability":
-            .reachability
-
-        case "index",
-             "indexstore":
-            .indexStore
-
-        default:
-            .simple
-        }
+        let detectionMode = mode.toDetectionMode
 
         let config = UnusedCodeConfiguration(
             ignorePublicAPI: ignorePublic,
@@ -317,6 +307,40 @@ enum OutputFormat: String, ExpressibleByArgument, CaseIterable {
     case text
     case json
     case xcode
+}
+
+// MARK: - CloneTypeArg
+
+/// Validated clone type argument for CLI.
+enum CloneTypeArg: String, ExpressibleByArgument, CaseIterable {
+    case exact
+    case near
+    case semantic
+
+    var toCloneType: CloneType {
+        switch self {
+        case .exact: .exact
+        case .near: .near
+        case .semantic: .semantic
+        }
+    }
+}
+
+// MARK: - DetectionModeArg
+
+/// Validated detection mode argument for CLI.
+enum DetectionModeArg: String, ExpressibleByArgument, CaseIterable {
+    case simple
+    case reachability
+    case indexStore
+
+    var toDetectionMode: DetectionMode {
+        switch self {
+        case .simple: .simple
+        case .reachability: .reachability
+        case .indexStore: .indexStore
+        }
+    }
 }
 
 // MARK: - CombinedReport

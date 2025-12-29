@@ -10,6 +10,21 @@
 import Foundation
 import SwiftSyntax
 
+// MARK: - String Normalization Utilities
+
+extension String {
+    /// Normalize string and numeric literals for clone detection.
+    func normalizingLiterals() -> String {
+        replacingOccurrences(of: #""[^"]*""#, with: "\"$STR\"", options: .regularExpression)
+            .replacingOccurrences(of: #"\b\d+(\.\d+)?\b"#, with: "$NUM", options: .regularExpression)
+    }
+
+    /// Normalize shorthand parameters ($0, $1, etc.) to canonical form.
+    func normalizingShorthandParameters() -> String {
+        replacingOccurrences(of: #"\$\d+"#, with: "$X", options: .regularExpression)
+    }
+}
+
 // MARK: - ClosureForm
 
 /// The syntactic form of a closure.
@@ -263,34 +278,9 @@ public struct ClosureNormalizer: Sendable {
 
     /// Normalize a statement for fingerprinting.
     private func normalizeStatement(_ item: CodeBlockItemSyntax.Item) -> String {
-        // Replace shorthand parameters with normalized form
-        var normalized = item.trimmedDescription
-
-        // Replace $0, $1, etc. with $X
-        normalized = normalized.replacingOccurrences(
-            of: #"\$\d+"#,
-            with: "$X",
-            options: .regularExpression,
-        )
-
-        // Replace named parameters with $X (if we knew them)
-        // For now, just normalize identifiers to a canonical form
-
-        // Replace string literals
-        normalized = normalized.replacingOccurrences(
-            of: #""[^"]*""#,
-            with: "\"$STR\"",
-            options: .regularExpression,
-        )
-
-        // Replace numeric literals
-        normalized = normalized.replacingOccurrences(
-            of: #"\b\d+(\.\d+)?\b"#,
-            with: "$NUM",
-            options: .regularExpression,
-        )
-
-        return normalized
+        item.trimmedDescription
+            .normalizingShorthandParameters()
+            .normalizingLiterals()
     }
 }
 
