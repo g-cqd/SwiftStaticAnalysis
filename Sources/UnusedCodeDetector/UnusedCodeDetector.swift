@@ -545,7 +545,7 @@ public struct UnusedCodeDetector: Sendable {
             let isReferenced = referencedIdentifiers.contains(declaration.name)
 
             if !isReferenced {
-                let confidence = determineConfidence(for: declaration)
+                let confidence = declaration.unusedConfidence
 
                 // Skip if below minimum confidence
                 if confidence < configuration.minimumConfidence {
@@ -644,17 +644,6 @@ public struct UnusedCodeDetector: Sendable {
         }
 
         return true
-    }
-
-    private func determineConfidence(for declaration: Declaration) -> Confidence {
-        switch declaration.accessLevel {
-        case .private, .fileprivate:
-            return .high
-        case .internal, .package:
-            return .medium
-        case .public, .open:
-            return .low
-        }
     }
 
     private func determineReason(
@@ -782,7 +771,7 @@ public struct UnusedCodeDetector: Sendable {
             let isReferenced = referencedIdentifiers.contains(declaration.name)
 
             if !isReferenced {
-                let confidence = determineConfidence(for: declaration)
+                let confidence = declaration.unusedConfidence
 
                 // Skip if below minimum confidence
                 if confidence < configuration.minimumConfidence {

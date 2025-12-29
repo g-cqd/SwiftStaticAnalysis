@@ -379,7 +379,7 @@ public struct ReachabilityBasedDetector: Sendable {
             }
 
             // Skip if below minimum confidence
-            let confidence = determineConfidence(for: declaration)
+            let confidence = declaration.unusedConfidence
             if confidence < configuration.minimumConfidence {
                 return nil
             }
@@ -408,18 +408,6 @@ public struct ReachabilityBasedDetector: Sendable {
             return configuration.detectImports
         default:
             return true
-        }
-    }
-
-    /// Determine confidence level for a declaration.
-    private func determineConfidence(for declaration: Declaration) -> Confidence {
-        switch declaration.accessLevel {
-        case .private, .fileprivate:
-            return .high
-        case .internal, .package:
-            return .medium
-        case .public, .open:
-            return .low
         }
     }
 

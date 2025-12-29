@@ -268,14 +268,8 @@ public struct ChangeDetector: Sendable {
                 for file in batch {
                     group.addTask {
                         // Optimization: if not always verifying hash, check mod time first
-                        if !self.configuration.alwaysVerifyHash,
-                           let previous = previousState[file],
-                           let attrs = try? FileManager.default.attributesOfItem(atPath: file),
-                           let modDate = attrs[.modificationDate] as? Date,
-                           let size = attrs[.size] as? Int64,
-                           modDate == previous.modificationTime,
-                           size == previous.size {
-                            // File metadata unchanged, assume content unchanged
+                        if let previous = previousState[file],
+                           self.fileMetadataMatches(file, previous: previous) {
                             return (file, previous)
                         }
 
@@ -306,13 +300,8 @@ public struct ChangeDetector: Sendable {
 
         for file in files {
             // Optimization: check mod time first
-            if !configuration.alwaysVerifyHash,
-               let previous = previousState[file],
-               let attrs = try? FileManager.default.attributesOfItem(atPath: file),
-               let modDate = attrs[.modificationDate] as? Date,
-               let size = attrs[.size] as? Int64,
-               modDate == previous.modificationTime,
-               size == previous.size {
+            if let previous = previousState[file],
+               fileMetadataMatches(file, previous: previous) {
                 results[file] = previous
                 continue
             }
@@ -323,6 +312,17 @@ public struct ChangeDetector: Sendable {
         }
 
         return results
+    }
+
+    /// Check if file metadata matches previous state (optimization to avoid hash computation).
+    private func fileMetadataMatches(_ file: String, previous: FileState) -> Bool {
+        guard !configuration.alwaysVerifyHash,
+              let attrs = try? FileManager.default.attributesOfItem(atPath: file),
+              let modDate = attrs[.modificationDate] as? Date,
+              let size = attrs[.size] as? Int64 else {
+            return false
+        }
+        return modDate == previous.modificationTime && size == previous.size
     }
 }
 

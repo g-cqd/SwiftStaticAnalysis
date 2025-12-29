@@ -130,7 +130,7 @@ public actor IncrementalUnusedCodeDetector {
 
             if count == 0 {
                 // No references at all
-                let confidence = determineConfidence(for: declaration)
+                let confidence = declaration.unusedConfidence
                 if confidence >= configuration.minimumConfidence {
                     unused.append(UnusedCode(
                         declaration: declaration,
@@ -141,7 +141,7 @@ public actor IncrementalUnusedCodeDetector {
                 }
             } else if isSelfReferenceOnly(declaration, referenceCount: count, in: result) {
                 // Only referenced by itself
-                let confidence = determineConfidence(for: declaration)
+                let confidence = declaration.unusedConfidence
                 if confidence >= configuration.minimumConfidence {
                     unused.append(UnusedCode(
                         declaration: declaration,
@@ -214,18 +214,6 @@ public actor IncrementalUnusedCodeDetector {
         }
 
         return true
-    }
-
-    /// Determine confidence level for a declaration.
-    private func determineConfidence(for declaration: Declaration) -> Confidence {
-        switch declaration.accessLevel {
-        case .private, .fileprivate:
-            return .high
-        case .internal, .package:
-            return .medium
-        case .public, .open:
-            return .low
-        }
     }
 
     /// Check if a declaration is only referenced by itself.
