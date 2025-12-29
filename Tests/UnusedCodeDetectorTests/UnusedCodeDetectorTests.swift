@@ -57,7 +57,7 @@ struct UnusedCodeDetectorTests {
         #expect(config.detectTypes == true)
         #expect(config.detectImports == true)
         #expect(config.ignorePublicAPI == true)
-        #expect(config.useIndexStore == false)
+        #expect(config.mode == .simple)
     }
 
     @Test("UnusedCodeDetector initialization")

@@ -191,7 +191,7 @@ public struct ClosureNormalizer: Sendable {
                 switch params {
                 case let .simpleInput(identifiers):
                     // { a, b in ... }
-                    for index in identifiers.indices {
+                    for index in 0 ..< identifiers.count {
                         parameters.append(NormalizedParameter(
                             normalizedName: "param_\(index)",
                             hasTypeAnnotation: false,
