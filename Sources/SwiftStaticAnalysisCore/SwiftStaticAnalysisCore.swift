@@ -6,9 +6,7 @@
 //
 
 import Foundation
-
 @_exported import SwiftParser
-
 // Re-export SwiftSyntax types commonly needed by consumers
 @_exported import SwiftSyntax
 

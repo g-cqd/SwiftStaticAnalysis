@@ -166,39 +166,43 @@ public final class ASTFingerprintVisitor: SyntaxVisitor {
         let startLoc = converter.location(for: block.positionAfterSkippingLeadingTrivia)
         let endLoc = converter.location(for: block.endPositionBeforeTrailingTrivia)
 
-        fingerprintedNodes.append(FingerprintedNode(
-            file: file,
-            fingerprint: result,
-            startLine: startLoc.line,
-            endLine: endLoc.line,
-            startColumn: startLoc.column,
-            tokenCount: countTokens(in: block),
-        ))
+        fingerprintedNodes.append(
+            FingerprintedNode(
+                file: file,
+                fingerprint: result,
+                startLine: startLoc.line,
+                endLine: endLoc.line,
+                startColumn: startLoc.column,
+                tokenCount: countTokens(in: block),
+            ))
     }
 
     private func fingerprintClosure(_ closure: ClosureExprSyntax) {
         // Check if this is a result builder closure and compute appropriate fingerprint
-        let result: ASTFingerprint = if let analyzer = resultBuilderAnalyzer,
-                                        let normalized = analyzer.normalizeClosure(closure) {
-            // Use normalized fingerprint for result builder closures
-            computeNormalizedFingerprint(for: normalized)
-        } else {
-            computeFingerprint(for: Syntax(closure))
-        }
+        let result: ASTFingerprint =
+            if let analyzer = resultBuilderAnalyzer,
+                let normalized = analyzer.normalizeClosure(closure)
+            {
+                // Use normalized fingerprint for result builder closures
+                computeNormalizedFingerprint(for: normalized)
+            } else {
+                computeFingerprint(for: Syntax(closure))
+            }
 
         guard result.nodeCount >= minimumNodes else { return }
 
         let startLoc = converter.location(for: closure.positionAfterSkippingLeadingTrivia)
         let endLoc = converter.location(for: closure.endPositionBeforeTrailingTrivia)
 
-        fingerprintedNodes.append(FingerprintedNode(
-            file: file,
-            fingerprint: result,
-            startLine: startLoc.line,
-            endLine: endLoc.line,
-            startColumn: startLoc.column,
-            tokenCount: countTokens(in: closure),
-        ))
+        fingerprintedNodes.append(
+            FingerprintedNode(
+                file: file,
+                fingerprint: result,
+                startLine: startLoc.line,
+                endLine: endLoc.line,
+                startColumn: startLoc.column,
+                tokenCount: countTokens(in: closure),
+            ))
     }
 
     /// Compute fingerprint for a normalized result builder closure.

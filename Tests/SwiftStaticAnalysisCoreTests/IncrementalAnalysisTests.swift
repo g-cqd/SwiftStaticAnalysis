@@ -7,6 +7,7 @@
 
 import Foundation
 import Testing
+
 @testable import SwiftStaticAnalysisCore
 
 // MARK: - ChangeDetectorTests
@@ -241,11 +242,12 @@ struct DependencyGraphTests {
     func directDependents() {
         var graph = DependencyGraph()
 
-        graph.addDependency(FileDependency(
-            dependentFile: "/a.swift",
-            dependencyFile: "/b.swift",
-            type: .typeReference,
-        ))
+        graph.addDependency(
+            FileDependency(
+                dependentFile: "/a.swift",
+                dependencyFile: "/b.swift",
+                type: .typeReference,
+            ))
 
         #expect(graph.getDirectDependents(of: "/b.swift") == ["/a.swift"])
         #expect(graph.getDirectDependencies(of: "/a.swift") == ["/b.swift"])
@@ -256,16 +258,18 @@ struct DependencyGraphTests {
         var graph = DependencyGraph()
 
         // a -> b -> c
-        graph.addDependency(FileDependency(
-            dependentFile: "/a.swift",
-            dependencyFile: "/b.swift",
-            type: .typeReference,
-        ))
-        graph.addDependency(FileDependency(
-            dependentFile: "/b.swift",
-            dependencyFile: "/c.swift",
-            type: .typeReference,
-        ))
+        graph.addDependency(
+            FileDependency(
+                dependentFile: "/a.swift",
+                dependencyFile: "/b.swift",
+                type: .typeReference,
+            ))
+        graph.addDependency(
+            FileDependency(
+                dependentFile: "/b.swift",
+                dependencyFile: "/c.swift",
+                type: .typeReference,
+            ))
 
         // If c changes, both a and b should be affected
         let affected = graph.getAffectedFiles(changedFiles: ["/c.swift"])
@@ -278,11 +282,12 @@ struct DependencyGraphTests {
     func removeDependencies() {
         var graph = DependencyGraph()
 
-        graph.addDependency(FileDependency(
-            dependentFile: "/a.swift",
-            dependencyFile: "/b.swift",
-            type: .typeReference,
-        ))
+        graph.addDependency(
+            FileDependency(
+                dependentFile: "/a.swift",
+                dependencyFile: "/b.swift",
+                type: .typeReference,
+            ))
 
         #expect(graph.getDirectDependents(of: "/b.swift").count == 1)
 

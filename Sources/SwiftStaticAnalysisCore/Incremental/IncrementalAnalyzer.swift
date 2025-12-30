@@ -20,7 +20,9 @@ public struct IncrementalConfiguration: Sendable {
         changeDetection: ChangeDetector.Configuration = .default,
         concurrency: ConcurrencyConfiguration = .default,
     ) {
-        self.cacheDirectory = cacheDirectory ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        self.cacheDirectory =
+            cacheDirectory
+            ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent(".swiftanalysis")
         self.trackDependencies = trackDependencies
         self.changeDetection = changeDetection
@@ -133,7 +135,7 @@ public actor IncrementalAnalyzer {
     ///
     /// - Parameter files: Files to analyze.
     /// - Returns: Incremental analysis result.
-    public func analyze( // swiftlint:disable:this function_body_length
+    public func analyze(  // swiftlint:disable:this function_body_length
         _ files: [String],
     ) async throws -> IncrementalAnalysisResult {
         try await initialize()
@@ -174,42 +176,44 @@ public actor IncrementalAnalyzer {
             let refs = await cache.getReferences(for: file)
 
             // Convert cached data back to full objects
-            cachedDeclarations.append(contentsOf: decls.map { cached in
-                let location = SourceLocation(
-                    file: cached.file,
-                    line: cached.line,
-                    column: cached.column,
-                    offset: cached.offset,
-                )
-                return Declaration(
-                    name: cached.name,
-                    kind: DeclarationKind(rawValue: cached.kind) ?? .variable,
-                    accessLevel: AccessLevel(rawValue: cached.accessLevel) ?? .internal,
-                    modifiers: DeclarationModifiers(rawValue: cached.modifiers),
-                    location: location,
-                    range: SourceRange(start: location, end: location),
-                    scope: ScopeID(cached.scopeID),
-                    typeAnnotation: cached.typeAnnotation,
-                    documentation: cached.documentation,
-                    conformances: cached.conformances,
-                )
-            })
-
-            cachedReferences.append(contentsOf: refs.map { cached in
-                Reference(
-                    identifier: cached.identifier,
-                    location: SourceLocation(
+            cachedDeclarations.append(
+                contentsOf: decls.map { cached in
+                    let location = SourceLocation(
                         file: cached.file,
                         line: cached.line,
                         column: cached.column,
                         offset: cached.offset,
-                    ),
-                    scope: ScopeID(cached.scopeID),
-                    context: ReferenceContext(rawValue: cached.context) ?? .unknown,
-                    isQualified: cached.isQualified,
-                    qualifier: cached.qualifier,
-                )
-            })
+                    )
+                    return Declaration(
+                        name: cached.name,
+                        kind: DeclarationKind(rawValue: cached.kind) ?? .variable,
+                        accessLevel: AccessLevel(rawValue: cached.accessLevel) ?? .internal,
+                        modifiers: DeclarationModifiers(rawValue: cached.modifiers),
+                        location: location,
+                        range: SourceRange(start: location, end: location),
+                        scope: ScopeID(cached.scopeID),
+                        typeAnnotation: cached.typeAnnotation,
+                        documentation: cached.documentation,
+                        conformances: cached.conformances,
+                    )
+                })
+
+            cachedReferences.append(
+                contentsOf: refs.map { cached in
+                    Reference(
+                        identifier: cached.identifier,
+                        location: SourceLocation(
+                            file: cached.file,
+                            line: cached.line,
+                            column: cached.column,
+                            offset: cached.offset,
+                        ),
+                        scope: ScopeID(cached.scopeID),
+                        context: ReferenceContext(rawValue: cached.context) ?? .unknown,
+                        isQualified: cached.isQualified,
+                        qualifier: cached.qualifier,
+                    )
+                })
         }
 
         // Step 4: Analyze changed files in parallel

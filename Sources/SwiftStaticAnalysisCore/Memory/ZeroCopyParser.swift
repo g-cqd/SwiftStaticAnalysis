@@ -101,7 +101,7 @@ public struct ZeroCopyParsedFile: Sendable {
             let length = tokens.length(at: index)
             let start = source.utf8.index(source.utf8.startIndex, offsetBy: offset)
             let end = source.utf8.index(start, offsetBy: length)
-            return String(source.utf8[start ..< end])
+            return String(source.utf8[start..<end])
         }
         return nil
     }
@@ -122,7 +122,7 @@ public struct ZeroCopyParsedFile: Sendable {
         } else if let source = sourceString {
             let startIdx = source.utf8.index(source.utf8.startIndex, offsetBy: startOffset)
             let endIdx = source.utf8.index(startIdx, offsetBy: length)
-            return String(source.utf8[startIdx ..< endIdx]) ?? ""
+            return String(source.utf8[startIdx..<endIdx]) ?? ""
         }
         return ""
     }
@@ -167,13 +167,14 @@ public actor ZeroCopyParser {
         let attrs = try FileManager.default.attributesOfItem(atPath: path)
         let fileSize = (attrs[.size] as? Int) ?? 0
 
-        let parsedFile: ZeroCopyParsedFile = if fileSize >= configuration.mmapThreshold {
-            // Use memory-mapped I/O
-            try parseMemoryMapped(path: path)
-        } else {
-            // Use regular I/O for small files
-            try parseRegular(path: path)
-        }
+        let parsedFile: ZeroCopyParsedFile =
+            if fileSize >= configuration.mmapThreshold {
+                // Use memory-mapped I/O
+                try parseMemoryMapped(path: path)
+            } else {
+                // Use regular I/O for small files
+                try parseRegular(path: path)
+            }
 
         // Cache result
         let modDate = try fileModificationDate(path)
@@ -299,40 +300,40 @@ public actor ZeroCopyParser {
         case .keyword:
             .keyword
         case .dollarIdentifier,
-             .identifier:
+            .identifier:
             .identifier
         case .floatLiteral,
-             .integerLiteral,
-             .regexLiteralPattern,
-             .regexSlash,
-             .stringSegment:
+            .integerLiteral,
+            .regexLiteralPattern,
+            .regexSlash,
+            .stringSegment:
             .literal
         case .arrow,
-             .binaryOperator,
-             .equal,
-             .exclamationMark,
-             .infixQuestionMark,
-             .postfixOperator,
-             .postfixQuestionMark,
-             .prefixOperator:
+            .binaryOperator,
+            .equal,
+            .exclamationMark,
+            .infixQuestionMark,
+            .postfixOperator,
+            .postfixQuestionMark,
+            .prefixOperator:
             .operator
         case .atSign,
-             .backslash,
-             .backtick,
-             .colon,
-             .comma,
-             .ellipsis,
-             .leftAngle,
-             .leftBrace,
-             .leftParen,
-             .leftSquare,
-             .period,
-             .pound,
-             .rightAngle,
-             .rightBrace,
-             .rightParen,
-             .rightSquare,
-             .semicolon:
+            .backslash,
+            .backtick,
+            .colon,
+            .comma,
+            .ellipsis,
+            .leftAngle,
+            .leftBrace,
+            .leftParen,
+            .leftSquare,
+            .period,
+            .pound,
+            .rightAngle,
+            .rightBrace,
+            .rightParen,
+            .rightSquare,
+            .semicolon:
             .punctuation
         default:
             .unknown
@@ -344,7 +345,7 @@ public actor ZeroCopyParser {
         var lineStart = 0
         let bytes = Array(source.utf8)
 
-        for (i, byte) in bytes.enumerated() where byte == 0x0A { // '\n'
+        for (i, byte) in bytes.enumerated() where byte == 0x0A {  // '\n'
             ranges.append((lineStart, i - lineStart))
             lineStart = i + 1
         }

@@ -19,6 +19,7 @@
 //
 
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("Clone Model Tests")
@@ -61,7 +62,7 @@ struct CloneModelTests {
         )
 
         #expect(group.occurrences == 2)
-        #expect(group.duplicatedLines == 20) // 10 + 10
+        #expect(group.duplicatedLines == 20)  // 10 + 10
     }
 
     @Test("DuplicationConfiguration defaults")

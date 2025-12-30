@@ -15,6 +15,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("LSH Index Tests")
@@ -23,7 +24,7 @@ struct LSHIndexTests {
     func optimalBandsAndRows() {
         // Test that optimal parameters produce reasonable thresholds
         let (b1, r1) = LSHIndex.optimalBandsAndRows(signatureSize: 128, threshold: 0.5)
-        #expect(b1 * r1 <= 128) // May not use all hashes
+        #expect(b1 * r1 <= 128)  // May not use all hashes
         #expect(b1 > 0)
         #expect(r1 > 0)
 
@@ -35,7 +36,7 @@ struct LSHIndexTests {
     @Test("Insert and query")
     func insertAndQuery() {
         let generator = MinHashGenerator(numHashes: 64)
-        let hashes: Set<UInt64> = Set((0 ..< 100).map { UInt64($0) })
+        let hashes: Set<UInt64> = Set((0..<100).map { UInt64($0) })
         let sig1 = generator.computeSignature(for: hashes, documentId: 1)
         let sig2 = generator.computeSignature(for: hashes, documentId: 2)
 
@@ -53,13 +54,13 @@ struct LSHIndexTests {
         let generator = MinHashGenerator(numHashes: 64)
 
         // Create 3 similar documents
-        let common: Set<UInt64> = Set((0 ..< 50).map { UInt64($0) })
+        let common: Set<UInt64> = Set((0..<50).map { UInt64($0) })
         let sig1 = generator.computeSignature(for: common.union([100, 101]), documentId: 1)
         let sig2 = generator.computeSignature(for: common.union([200, 201]), documentId: 2)
         let sig3 = generator.computeSignature(for: common.union([300, 301]), documentId: 3)
 
         // Create 1 dissimilar document
-        let dissimilar: Set<UInt64> = Set((1000 ..< 1100).map { UInt64($0) })
+        let dissimilar: Set<UInt64> = Set((1000..<1100).map { UInt64($0) })
         let sig4 = generator.computeSignature(for: dissimilar, documentId: 4)
 
         var index = LSHIndex(signatureSize: 64, threshold: 0.5)
@@ -80,9 +81,9 @@ struct LSHIndexTests {
     func queryWithSimilarity() {
         let generator = MinHashGenerator(numHashes: 128)
 
-        let base: Set<UInt64> = Set((0 ..< 100).map { UInt64($0) })
-        let similar: Set<UInt64> = base.union(Set((100 ..< 120).map { UInt64($0) }))
-        let dissimilar: Set<UInt64> = Set((1000 ..< 1100).map { UInt64($0) })
+        let base: Set<UInt64> = Set((0..<100).map { UInt64($0) })
+        let similar: Set<UInt64> = base.union(Set((100..<120).map { UInt64($0) }))
+        let dissimilar: Set<UInt64> = Set((1000..<1100).map { UInt64($0) })
 
         let sigBase = generator.computeSignature(for: base, documentId: 0)
         let sigSimilar = generator.computeSignature(for: similar, documentId: 1)

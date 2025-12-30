@@ -13,6 +13,7 @@ import Foundation
 import SwiftParser
 import SwiftSyntax
 import Testing
+
 @testable import SwiftStaticAnalysisCore
 @testable import UnusedCodeDetector
 
@@ -26,7 +27,8 @@ private func extractFunction(_ source: String, named name: String = "test") -> F
     let tree = parseSource(source)
     for statement in tree.statements {
         if let funcDecl = statement.item.as(FunctionDeclSyntax.self),
-           funcDecl.name.text == name {
+            funcDecl.name.text == name
+        {
             return funcDecl
         }
     }
@@ -47,16 +49,16 @@ struct CFGBuilderTests {
     @Test("Empty function creates minimal CFG")
     func emptyFunction() {
         let source = """
-        func test() {
-        }
-        """
+            func test() {
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
         }
 
         #expect(cfg.functionName == "test")
-        #expect(cfg.blocks.count >= 2) // entry and exit at minimum
+        #expect(cfg.blocks.count >= 2)  // entry and exit at minimum
         #expect(cfg.blocks[.entry] != nil)
         #expect(cfg.blocks[.exit] != nil)
     }
@@ -64,12 +66,12 @@ struct CFGBuilderTests {
     @Test("Simple statements create single block")
     func simpleStatements() {
         let source = """
-        func test() {
-            let x = 1
-            let y = 2
-            let z = x + y
-        }
-        """
+            func test() {
+                let x = 1
+                let y = 2
+                let z = x + y
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -82,14 +84,14 @@ struct CFGBuilderTests {
     @Test("If statement creates branches")
     func ifStatement() {
         let source = """
-        func test(condition: Bool) {
-            if condition {
-                let x = 1
-            } else {
-                let y = 2
+            func test(condition: Bool) {
+                if condition {
+                    let x = 1
+                } else {
+                    let y = 2
+                }
             }
-        }
-        """
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -103,13 +105,13 @@ struct CFGBuilderTests {
     @Test("Guard statement creates early exit")
     func guardStatement() {
         let source = """
-        func test(value: Int?) {
-            guard let x = value else {
-                return
+            func test(value: Int?) {
+                guard let x = value else {
+                    return
+                }
+                let y = x
             }
-            let y = x
-        }
-        """
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -122,12 +124,12 @@ struct CFGBuilderTests {
     @Test("For loop creates back edge")
     func forLoop() {
         let source = """
-        func test() {
-            for i in 0..<10 {
-                let x = i
+            func test() {
+                for i in 0..<10 {
+                    let x = i
+                }
             }
-        }
-        """
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -141,13 +143,13 @@ struct CFGBuilderTests {
     @Test("While loop creates back edge")
     func whileLoop() {
         let source = """
-        func test() {
-            var x = 0
-            while x < 10 {
-                x += 1
+            func test() {
+                var x = 0
+                while x < 10 {
+                    x += 1
+                }
             }
-        }
-        """
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -160,13 +162,13 @@ struct CFGBuilderTests {
     @Test("Repeat-while loop creates back edge")
     func repeatWhileLoop() {
         let source = """
-        func test() {
-            var x = 0
-            repeat {
-                x += 1
-            } while x < 10
-        }
-        """
+            func test() {
+                var x = 0
+                repeat {
+                    x += 1
+                } while x < 10
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -179,19 +181,19 @@ struct CFGBuilderTests {
     @Test("Switch statement creates multiple branches")
     func switchStatement() {
         let source = """
-        func test(value: Int) {
-            switch value {
-            case 1:
-                let x = 1
+            func test(value: Int) {
+                switch value {
+                case 1:
+                    let x = 1
 
-            case 2:
-                let y = 2
+                case 2:
+                    let y = 2
 
-            default:
-                let z = 0
+                default:
+                    let z = 0
+                }
             }
-        }
-        """
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -205,11 +207,11 @@ struct CFGBuilderTests {
     @Test("Return statement terminates block")
     func returnStatement() {
         let source = """
-        func test() -> Int {
-            let x = 1
-            return x
-        }
-        """
+            func test() -> Int {
+                let x = 1
+                return x
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -226,14 +228,14 @@ struct CFGBuilderTests {
     @Test("Break exits loop")
     func breakStatement() {
         let source = """
-        func test() {
-            for i in 0..<10 {
-                if i == 5 {
-                    break
+            func test() {
+                for i in 0..<10 {
+                    if i == 5 {
+                        break
+                    }
                 }
             }
-        }
-        """
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -250,14 +252,14 @@ struct CFGBuilderTests {
     @Test("Continue jumps to loop header")
     func continueStatement() {
         let source = """
-        func test() {
-            for i in 0..<10 {
-                if i == 5 {
-                    continue
+            func test() {
+                for i in 0..<10 {
+                    if i == 5 {
+                        continue
+                    }
                 }
             }
-        }
-        """
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -273,11 +275,11 @@ struct CFGBuilderTests {
     @Test("USE and DEF sets are computed")
     func useDefSets() {
         let source = """
-        func test() {
-            let x = 1
-            let y = x + 2
-        }
-        """
+            func test() {
+                let x = 1
+                let y = x + 2
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -292,13 +294,13 @@ struct CFGBuilderTests {
     @Test("Reverse postorder is computed")
     func reversePostOrder() {
         let source = """
-        func test(condition: Bool) {
-            if condition {
-                let x = 1
+            func test(condition: Bool) {
+                if condition {
+                    let x = 1
+                }
+                let y = 2
             }
-            let y = 2
-        }
-        """
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -316,9 +318,9 @@ struct LiveVariableAnalysisTests {
     @Test("Empty function has no dead stores")
     func emptyFunctionNoDeadStores() {
         let source = """
-        func test() {
-        }
-        """
+            func test() {
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -334,11 +336,11 @@ struct LiveVariableAnalysisTests {
     @Test("Used variable is live")
     func usedVariableIsLive() {
         let source = """
-        func test() -> Int {
-            let x = 1
-            return x
-        }
-        """
+            func test() -> Int {
+                let x = 1
+                return x
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -354,10 +356,10 @@ struct LiveVariableAnalysisTests {
     @Test("Unused variable is detected")
     func unusedVariableDetected() {
         let source = """
-        func test() {
-            let x = 1
-        }
-        """
+            func test() {
+                let x = 1
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -373,12 +375,12 @@ struct LiveVariableAnalysisTests {
     @Test("Dead store is detected")
     func deadStoreDetected() {
         let source = """
-        func test() -> Int {
-            var x = 1
-            x = 2
-            return x
-        }
-        """
+            func test() -> Int {
+                var x = 1
+                x = 2
+                return x
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -395,12 +397,12 @@ struct LiveVariableAnalysisTests {
     @Test("Live in/out sets are computed")
     func liveInOutSets() {
         let source = """
-        func test() -> Int {
-            let x = 1
-            let y = 2
-            return x + y
-        }
-        """
+            func test() -> Int {
+                let x = 1
+                let y = 2
+                return x + y
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -416,10 +418,10 @@ struct LiveVariableAnalysisTests {
     @Test("Ignored variable underscore is skipped")
     func ignoredVariableSkipped() {
         let source = """
-        func test() {
-            let _ = 1
-        }
-        """
+            func test() {
+                let _ = 1
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -436,12 +438,12 @@ struct LiveVariableAnalysisTests {
     @Test("Statement-level liveness")
     func statementLevelLiveness() {
         let source = """
-        func test() -> Int {
-            let x = 1
-            let y = x + 1
-            return y
-        }
-        """
+            func test() -> Int {
+                let x = 1
+                let y = x + 1
+                return y
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -452,7 +454,8 @@ struct LiveVariableAnalysisTests {
 
         // Check statement liveness for entry block
         if let entryBlock = result.cfg.blocks[.entry],
-           let liveOut = result.liveOut[.entry] {
+            let liveOut = result.liveOut[.entry]
+        {
             let stmtLiveness = analysis.computeStatementLiveness(block: entryBlock, liveAtExit: liveOut)
             #expect(!stmtLiveness.isEmpty)
         }
@@ -466,10 +469,10 @@ struct SCCPAnalysisTests {
     @Test("Constant integer is propagated")
     func constantIntegerPropagated() {
         let source = """
-        func test() {
-            let x = 42
-        }
-        """
+            func test() {
+                let x = 42
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -480,7 +483,8 @@ struct SCCPAnalysisTests {
 
         // x should have constant value 42
         if let xValue = result.variableValues["x"],
-           case .constant(.int(42)) = xValue {
+            case .constant(.int(42)) = xValue
+        {
             // Good
         } else {
             // May not track depending on implementation
@@ -490,10 +494,10 @@ struct SCCPAnalysisTests {
     @Test("Constant boolean is propagated")
     func constantBooleanPropagated() {
         let source = """
-        func test() {
-            let flag = true
-        }
-        """
+            func test() {
+                let flag = true
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -503,7 +507,8 @@ struct SCCPAnalysisTests {
         let result = analysis.analyze(cfg)
 
         if let flagValue = result.variableValues["flag"],
-           case .constant(.bool(true)) = flagValue {
+            case .constant(.bool(true)) = flagValue
+        {
             // Good
         } else {
             // May not track depending on implementation
@@ -536,14 +541,14 @@ struct SCCPAnalysisTests {
     @Test("Dead branch with true condition")
     func deadBranchTrueCondition() {
         let source = """
-        func test() {
-            if true {
-                let x = 1
-            } else {
-                let y = 2
+            func test() {
+                if true {
+                    let x = 1
+                } else {
+                    let y = 2
+                }
             }
-        }
-        """
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -554,20 +559,20 @@ struct SCCPAnalysisTests {
 
         // False branch should be detected as dead
         let hasFalseDead = result.deadBranches.contains { $0.deadBranch == .falseBranch }
-        #expect(hasFalseDead || result.deadBranches.isEmpty) // May not detect literal conditions
+        #expect(hasFalseDead || result.deadBranches.isEmpty)  // May not detect literal conditions
     }
 
     @Test("Dead branch with false condition")
     func deadBranchFalseCondition() {
         let source = """
-        func test() {
-            if false {
-                let x = 1
-            } else {
-                let y = 2
+            func test() {
+                if false {
+                    let x = 1
+                } else {
+                    let y = 2
+                }
             }
-        }
-        """
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -584,11 +589,11 @@ struct SCCPAnalysisTests {
     @Test("Unreachable blocks are detected")
     func unreachableBlocksDetected() {
         let source = """
-        func test() {
-            return
-            let x = 1
-        }
-        """
+            func test() {
+                return
+                let x = 1
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -605,11 +610,11 @@ struct SCCPAnalysisTests {
     @Test("Executable edges are tracked")
     func executableEdgesTracked() {
         let source = """
-        func test() {
-            let x = 1
-            let y = 2
-        }
-        """
+            func test() {
+                let x = 1
+                let y = 2
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -625,12 +630,12 @@ struct SCCPAnalysisTests {
     @Test("Arithmetic constant folding")
     func arithmeticConstantFolding() {
         let source = """
-        func test() {
-            let a = 2
-            let b = 3
-            let c = a + b
-        }
-        """
+            func test() {
+                let a = 2
+                let b = 3
+                let c = a + b
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -647,12 +652,12 @@ struct SCCPAnalysisTests {
     @Test("Boolean constant folding")
     func booleanConstantFolding() {
         let source = """
-        func test() {
-            let a = true
-            let b = false
-            let c = a && b
-        }
-        """
+            func test() {
+                let a = true
+                let b = false
+                let c = a && b
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -673,11 +678,11 @@ struct ReachingDefinitionsAnalysisTests {
     @Test("Single definition reaches use")
     func singleDefinitionReachesUse() {
         let source = """
-        func test() -> Int {
-            let x = 1
-            return x
-        }
-        """
+            func test() -> Int {
+                let x = 1
+                return x
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -694,12 +699,12 @@ struct ReachingDefinitionsAnalysisTests {
     @Test("Multiple definitions are collected")
     func multipleDefinitionsCollected() {
         let source = """
-        func test() {
-            let x = 1
-            let y = 2
-            let z = 3
-        }
-        """
+            func test() {
+                let x = 1
+                let y = 2
+                let z = 3
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -714,12 +719,12 @@ struct ReachingDefinitionsAnalysisTests {
     @Test("Redefinition kills previous")
     func redefinitionKillsPrevious() {
         let source = """
-        func test() -> Int {
-            var x = 1
-            x = 2
-            return x
-        }
-        """
+            func test() -> Int {
+                var x = 1
+                x = 2
+                return x
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -737,12 +742,12 @@ struct ReachingDefinitionsAnalysisTests {
     @Test("REACH_in and REACH_out are computed")
     func reachInOutComputed() {
         let source = """
-        func test() -> Int {
-            let x = 1
-            let y = x + 1
-            return y
-        }
-        """
+            func test() -> Int {
+                let x = 1
+                let y = x + 1
+                return y
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -757,12 +762,12 @@ struct ReachingDefinitionsAnalysisTests {
     @Test("Def-use chains are built")
     func defUseChainsBuilt() {
         let source = """
-        func test() -> Int {
-            let x = 1
-            let y = x + 1
-            return y
-        }
-        """
+            func test() -> Int {
+                let x = 1
+                let y = x + 1
+                return y
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -779,11 +784,11 @@ struct ReachingDefinitionsAnalysisTests {
     @Test("Uninitialized use detection is disabled by default works")
     func uninitializedUseDetection() {
         let source = """
-        func test() -> Int {
-            let x = 1
-            return x
-        }
-        """
+            func test() -> Int {
+                let x = 1
+                return x
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -800,10 +805,10 @@ struct ReachingDefinitionsAnalysisTests {
     @Test("Ignored variables are skipped")
     func ignoredVariablesSkipped() {
         let source = """
-        func test() {
-            let _ = 1
-        }
-        """
+            func test() {
+                let _ = 1
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -825,12 +830,12 @@ struct CombinedDataFlowAnalysisTests {
     @Test("Combined analysis runs both analyses")
     func combinedAnalysisRunsBoth() {
         let source = """
-        func test() -> Int {
-            let x = 1
-            let y = x + 1
-            return y
-        }
-        """
+            func test() -> Int {
+                let x = 1
+                let y = x + 1
+                return y
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -846,12 +851,12 @@ struct CombinedDataFlowAnalysisTests {
     @Test("Combined dead store detection")
     func combinedDeadStoreDetection() {
         let source = """
-        func test() -> Int {
-            var x = 1
-            x = 2
-            return x
-        }
-        """
+            func test() -> Int {
+                var x = 1
+                x = 2
+                return x
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -861,7 +866,7 @@ struct CombinedDataFlowAnalysisTests {
         let deadStores = combined.findAllDeadStores(cfg)
 
         // First assignment to x should be dead
-        #expect(deadStores.isEmpty) // May or may not detect depending on granularity
+        #expect(deadStores.isEmpty)  // May or may not detect depending on granularity
     }
 }
 
@@ -1091,10 +1096,10 @@ struct DebugOutputTests {
     @Test("CFG debug print")
     func cfgDebugPrint() {
         let source = """
-        func test() {
-            let x = 1
-        }
-        """
+            func test() {
+                let x = 1
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -1108,10 +1113,10 @@ struct DebugOutputTests {
     @Test("Live variable result debug description")
     func liveVariableDebugDescription() {
         let source = """
-        func test() {
-            let x = 1
-        }
-        """
+            func test() {
+                let x = 1
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -1127,10 +1132,10 @@ struct DebugOutputTests {
     @Test("SCCP result debug description")
     func sccpDebugDescription() {
         let source = """
-        func test() {
-            let x = 1
-        }
-        """
+            func test() {
+                let x = 1
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return
@@ -1146,10 +1151,10 @@ struct DebugOutputTests {
     @Test("Reaching definitions result debug description")
     func reachingDefinitionsDebugDescription() {
         let source = """
-        func test() {
-            let x = 1
-        }
-        """
+            func test() {
+                let x = 1
+            }
+            """
         guard let cfg = buildCFG(from: source) else {
             Issue.record("Failed to build CFG")
             return

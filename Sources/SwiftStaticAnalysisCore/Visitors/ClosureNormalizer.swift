@@ -60,9 +60,9 @@ extension String {
 
 /// The syntactic form of a closure.
 public enum ClosureForm: String, Sendable, Codable {
-    case trailingClosure // foo { ... }
-    case parenthesizedArgument // foo({ ... })
-    case multipleTrailingClosures // foo { } bar: { }
+    case trailingClosure  // foo { ... }
+    case parenthesizedArgument  // foo({ ... })
+    case multipleTrailingClosures  // foo { } bar: { }
 }
 
 // MARK: - NormalizedClosure
@@ -112,9 +112,9 @@ public struct NormalizedParameter: Sendable, Hashable {
 /// Normalized representation of a closure body.
 public struct NormalizedClosureBody: Sendable, Hashable {
     public enum BodyKind: String, Sendable, Hashable {
-        case expression // Single expression
-        case multiStatement // Multiple statements
-        case empty // Empty closure
+        case expression  // Single expression
+        case multiStatement  // Multiple statements
+        case empty  // Empty closure
     }
 
     /// The kind of body.
@@ -220,36 +220,39 @@ public struct ClosureNormalizer: Sendable {
             // Has explicit signature
             if let params = signature.parameterClause {
                 switch params {
-                case let .simpleInput(identifiers):
+                case .simpleInput(let identifiers):
                     // { a, b in ... }
-                    for index in 0 ..< identifiers.count {
-                        parameters.append(NormalizedParameter(
-                            normalizedName: "param_\(index)",
-                            hasTypeAnnotation: false,
-                            index: index,
-                        ))
+                    for index in 0..<identifiers.count {
+                        parameters.append(
+                            NormalizedParameter(
+                                normalizedName: "param_\(index)",
+                                hasTypeAnnotation: false,
+                                index: index,
+                            ))
                     }
 
-                case let .parameterClause(parameterClause):
+                case .parameterClause(let parameterClause):
                     // { (a: Int, b: String) in ... }
                     for (index, param) in parameterClause.parameters.enumerated() {
-                        parameters.append(NormalizedParameter(
-                            normalizedName: "param_\(index)",
-                            hasTypeAnnotation: param.type != nil,
-                            index: index,
-                        ))
+                        parameters.append(
+                            NormalizedParameter(
+                                normalizedName: "param_\(index)",
+                                hasTypeAnnotation: param.type != nil,
+                                index: index,
+                            ))
                     }
                 }
             }
         } else {
             // Infer parameter count from shorthand usage
             let count = inferShorthandParameterCount(closure)
-            for index in 0 ..< count {
-                parameters.append(NormalizedParameter(
-                    normalizedName: "$\(index)",
-                    hasTypeAnnotation: false,
-                    index: index,
-                ))
+            for index in 0..<count {
+                parameters.append(
+                    NormalizedParameter(
+                        normalizedName: "$\(index)",
+                        hasTypeAnnotation: false,
+                        index: index,
+                    ))
             }
         }
 
@@ -278,11 +281,12 @@ public struct ClosureNormalizer: Sendable {
             )
         }
 
-        let isSingleExpression: Bool = if statements.count == 1, let firstStatement = statements.first {
-            !firstStatement.item.is(ReturnStmtSyntax.self)
-        } else {
-            false
-        }
+        let isSingleExpression: Bool =
+            if statements.count == 1, let firstStatement = statements.first {
+                !firstStatement.item.is(ReturnStmtSyntax.self)
+            } else {
+                false
+            }
 
         let kind: NormalizedClosureBody.BodyKind = statements.count == 1 ? .expression : .multiStatement
 
@@ -367,7 +371,7 @@ public struct ClosureEquivalenceChecker: Sendable {
     ) -> Bool {
         // Get closures from both calls
         guard let closure1 = extractClosure(from: call1),
-              let closure2 = extractClosure(from: call2)
+            let closure2 = extractClosure(from: call2)
         else {
             return false
         }
@@ -482,8 +486,7 @@ public struct FunctionCallNormalizer: Sendable {
         if expr.is(StringLiteralExprSyntax.self) {
             return "$STR"
         }
-        if expr.is(IntegerLiteralExprSyntax.self) ||
-            expr.is(FloatLiteralExprSyntax.self) {
+        if expr.is(IntegerLiteralExprSyntax.self) || expr.is(FloatLiteralExprSyntax.self) {
             return "$NUM"
         }
         if expr.is(BooleanLiteralExprSyntax.self) {

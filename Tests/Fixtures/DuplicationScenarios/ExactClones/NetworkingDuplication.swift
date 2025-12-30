@@ -49,7 +49,7 @@ func fetchUsers() async throws -> [User] {
     let url = URL(string: "https://api.example.com/users")!
     let (data, response) = try await URLSession.shared.data(from: url)
     guard let httpResponse = response as? HTTPURLResponse,
-          (200 ... 299).contains(httpResponse.statusCode)
+        (200...299).contains(httpResponse.statusCode)
     else {
         throw NetworkError.invalidResponse
     }
@@ -61,7 +61,7 @@ func fetchProducts() async throws -> [Product] {
     let url = URL(string: "https://api.example.com/products")!
     let (data, response) = try await URLSession.shared.data(from: url)
     guard let httpResponse = response as? HTTPURLResponse,
-          (200 ... 299).contains(httpResponse.statusCode)
+        (200...299).contains(httpResponse.statusCode)
     else {
         throw NetworkError.invalidResponse
     }
@@ -73,7 +73,7 @@ func fetchOrders() async throws -> [Order] {
     let url = URL(string: "https://api.example.com/orders")!
     let (data, response) = try await URLSession.shared.data(from: url)
     guard let httpResponse = response as? HTTPURLResponse,
-          (200 ... 299).contains(httpResponse.statusCode)
+        (200...299).contains(httpResponse.statusCode)
     else {
         throw NetworkError.invalidResponse
     }

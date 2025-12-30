@@ -15,6 +15,7 @@
 //
 
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("Semantic Clone Detector Tests")

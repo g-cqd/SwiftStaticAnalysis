@@ -13,6 +13,7 @@
 
 import Foundation
 import Testing
+
 @testable import UnusedCodeDetector
 
 @Suite("Test Suite Name Detection Tests")

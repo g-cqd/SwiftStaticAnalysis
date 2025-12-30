@@ -48,7 +48,7 @@ public struct SuffixArray: Sendable {
         var alphabet: [String: Int] = [:]
         var tokens: [Int] = []
         tokens.reserveCapacity(strings.count)
-        var nextId = 1 // Reserve 0 for sentinel
+        var nextId = 1  // Reserve 0 for sentinel
 
         for s in strings {
             if let existingId = alphabet[s] {
@@ -87,11 +87,11 @@ enum SuffixArrayBuilder {
         }
 
         // Find alphabet size
-        let alphabetSize = (input.max() ?? 0) + 2 // +1 for max value, +1 for sentinel
+        let alphabetSize = (input.max() ?? 0) + 2  // +1 for max value, +1 for sentinel
 
         // Append sentinel (smaller than all other characters)
         var text = input
-        text.append(0) // Sentinel
+        text.append(0)  // Sentinel
 
         // Build suffix array using SA-IS
         let sa = SAIS.build(text, alphabetSize: alphabetSize)
@@ -161,7 +161,7 @@ enum SAIS {
     private static func classifyTypes(_ text: [Int]) -> [Bool] {
         let n = text.count
         var types = [Bool](repeating: false, count: n)
-        types[n - 1] = true // Last suffix is always S-type (sentinel)
+        types[n - 1] = true  // Last suffix is always S-type (sentinel)
 
         for i in stride(from: n - 2, through: 0, by: -1) {
             if text[i] < text[i + 1] {
@@ -176,7 +176,7 @@ enum SAIS {
     /// Find LMS (Leftmost S-type) positions.
     private static func findLMSPositions(_ types: [Bool]) -> [Int] {
         var positions: [Int] = []
-        for i in 1 ..< types.count where types[i] && !types[i - 1] {
+        for i in 1..<types.count where types[i] && !types[i - 1] {
             positions.append(i)
         }
         return positions
@@ -194,7 +194,7 @@ enum SAIS {
         var heads = [Int](repeating: 0, count: alphabetSize)
         var tails = [Int](repeating: 0, count: alphabetSize)
         var sum = 0
-        for i in 0 ..< alphabetSize {
+        for i in 0..<alphabetSize {
             heads[i] = sum
             sum += bucketSizes[i]
             tails[i] = sum - 1
@@ -237,7 +237,7 @@ enum SAIS {
         sa: inout [Int], text: [Int], types: [Bool], bucketHeads: [Int],
     ) {
         var heads = bucketHeads
-        for i in 0 ..< sa.count where sa[i] > 0 && !types[sa[i] - 1] {
+        for i in 0..<sa.count where sa[i] > 0 && !types[sa[i] - 1] {
             let j = sa[i] - 1
             let c = text[j]
             sa[heads[c]] = j
@@ -267,7 +267,7 @@ enum SAIS {
         var name = 0
         var prevLMS = -1
 
-        for i in 0 ..< n {
+        for i in 0..<n {
             let pos = sa[i]
             guard pos > 0, types[pos], !types[pos - 1] else { continue }
 
@@ -323,7 +323,7 @@ enum SAIS {
     /// Simple O(n log n) suffix array for small inputs.
     private static func buildSimple(_ text: [Int]) -> [Int] {
         let n = text.count
-        var sa = Array(0 ..< n)
+        var sa = Array(0..<n)
         sa.sort { i, j in
             var pi = i
             var pj = j
@@ -333,7 +333,7 @@ enum SAIS {
                 pi += 1
                 pj += 1
             }
-            return pi >= n // Shorter suffix comes first
+            return pi >= n  // Shorter suffix comes first
         }
         return sa
     }
@@ -341,14 +341,14 @@ enum SAIS {
 
 // MARK: - Suffix Array Utilities
 
-public extension SuffixArray {
+extension SuffixArray {
     /// Binary search for a pattern in the suffix array.
     ///
     /// - Parameters:
     ///   - pattern: The pattern to search for (as token IDs).
     ///   - tokens: The original token array.
     /// - Returns: Range of indices in the suffix array where pattern occurs.
-    func search(pattern: [Int], in tokens: [Int]) -> Range<Int>? {
+    public func search(pattern: [Int], in tokens: [Int]) -> Range<Int>? {
         guard !pattern.isEmpty, !array.isEmpty else { return nil }
 
         // Find lower bound
@@ -376,16 +376,16 @@ public extension SuffixArray {
         }
         let upper = lo
 
-        return lower < upper ? lower ..< upper : nil
+        return lower < upper ? lower..<upper : nil
     }
 
     /// Compare a suffix with a pattern.
     /// Returns negative if suffix < pattern, 0 if prefix match, positive if suffix > pattern.
     private func compare(suffix start: Int, with pattern: [Int], in tokens: [Int]) -> Int {
-        for i in 0 ..< pattern.count {
+        for i in 0..<pattern.count {
             let pos = start + i
             if pos >= tokens.count {
-                return -1 // Suffix is shorter, so it's "less than"
+                return -1  // Suffix is shorter, so it's "less than"
             }
             if tokens[pos] < pattern[i] {
                 return -1
@@ -394,12 +394,12 @@ public extension SuffixArray {
                 return 1
             }
         }
-        return 0 // Prefix match
+        return 0  // Prefix match
     }
 
     /// Get all occurrences of a pattern.
-    func findOccurrences(of pattern: [Int], in tokens: [Int]) -> [Int] {
+    public func findOccurrences(of pattern: [Int], in tokens: [Int]) -> [Int] {
         guard let range = search(pattern: pattern, in: tokens) else { return [] }
-        return (range.lowerBound ..< range.upperBound).map { array[$0] }
+        return (range.lowerBound..<range.upperBound).map { array[$0] }
     }
 }

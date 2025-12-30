@@ -8,6 +8,7 @@
 import Foundation
 import SwiftStaticAnalysisCore
 import Testing
+
 @testable import UnusedCodeDetector
 
 // MARK: - IndexSymbolNodeTests

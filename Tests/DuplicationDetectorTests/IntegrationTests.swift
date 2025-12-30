@@ -19,6 +19,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 @testable import SwiftStaticAnalysisCore
 
@@ -233,7 +234,7 @@ struct DuplicationDetectorIntegrationTests {
         // Build report manually for now
         let report = DuplicationReport(
             filesAnalyzed: 1,
-            totalLines: 100, // Approximate
+            totalLines: 100,  // Approximate
             cloneGroups: clones,
         )
 

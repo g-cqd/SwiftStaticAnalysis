@@ -11,6 +11,7 @@
 //
 
 import Foundation
+
 #if canImport(simd)
     import simd
 #endif
@@ -67,10 +68,10 @@ public struct MinHashGenerator: Sendable {
         var a: [UInt64] = []
         var b: [UInt64] = []
 
-        for _ in 0 ..< numHashes {
+        for _ in 0..<numHashes {
             // Linear congruential generator
             rng = rng &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-            a.append((rng >> 33) | 1) // Ensure odd for better distribution
+            a.append((rng >> 33) | 1)  // Ensure odd for better distribution
 
             rng = rng &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
             b.append(rng >> 33)
@@ -100,11 +101,12 @@ public struct MinHashGenerator: Sendable {
         }
 
         // Use SIMD-optimized path for larger signatures
-        let signature: [UInt64] = if numHashes >= 4 {
-            computeSignatureSIMD(for: Array(shingleHashes))
-        } else {
-            computeSignatureScalar(for: Array(shingleHashes))
-        }
+        let signature: [UInt64] =
+            if numHashes >= 4 {
+                computeSignatureSIMD(for: Array(shingleHashes))
+            } else {
+                computeSignatureScalar(for: Array(shingleHashes))
+            }
 
         return MinHashSignature(values: signature, documentId: documentId)
     }
@@ -122,7 +124,7 @@ public struct MinHashGenerator: Sendable {
     // MARK: Private
 
     /// Large prime for modulo operation.
-    private static let largePrime: UInt64 = 4_294_967_311 // Next prime after 2^32
+    private static let largePrime: UInt64 = 4_294_967_311  // Next prime after 2^32
 
     /// Pre-computed hash function coefficients.
     private let coefficientsA: [UInt64]
@@ -136,7 +138,7 @@ public struct MinHashGenerator: Sendable {
         let prime = Self.largePrime
 
         for shingleHash in hashes {
-            for i in 0 ..< numHashes {
+            for i in 0..<numHashes {
                 // h_i(x) = (a_i * x + b_i) mod prime
                 let hashValue = (coefficientsA[i] &* shingleHash &+ coefficientsB[i]) % prime
                 signature[i] = min(signature[i], hashValue)
@@ -157,7 +159,7 @@ public struct MinHashGenerator: Sendable {
 
         for shingleHash in hashes {
             // SIMD path: process 4 at a time
-            for chunk in 0 ..< chunks {
+            for chunk in 0..<chunks {
                 let baseIdx = chunk * 4
 
                 // Load coefficients
@@ -185,7 +187,7 @@ public struct MinHashGenerator: Sendable {
             }
 
             // Handle remainder
-            for i in (chunks * 4) ..< numHashes {
+            for i in (chunks * 4)..<numHashes {
                 let hashValue = (coefficientsA[i] &* shingleHash &+ coefficientsB[i]) % Self.largePrime
                 signature[i] = min(signature[i], hashValue)
             }
@@ -197,12 +199,12 @@ public struct MinHashGenerator: Sendable {
 
 // MARK: - Jaccard Similarity
 
-public extension MinHashGenerator {
+extension MinHashGenerator {
     /// Compute exact Jaccard similarity between two sets.
     ///
     /// This is O(n + m) where n, m are set sizes.
     /// Used for verification and small sets where exact computation is feasible.
-    static func exactJaccardSimilarity(
+    public static func exactJaccardSimilarity(
         _ set1: Set<UInt64>,
         _ set2: Set<UInt64>,
     ) -> Double {
@@ -215,7 +217,7 @@ public extension MinHashGenerator {
     }
 
     /// Compute exact Jaccard similarity for shingled documents.
-    static func exactJaccardSimilarity(
+    public static func exactJaccardSimilarity(
         _ doc1: ShingledDocument,
         _ doc2: ShingledDocument,
     ) -> Double {
@@ -254,11 +256,11 @@ public struct WeightedMinHashGenerator: Sendable {
     ) -> MinHashSignature {
         // Expand shingles by their frequency (capped for efficiency)
         var expandedHashes = Set<UInt64>()
-        let maxExpansion = 10 // Cap expansion to avoid memory issues
+        let maxExpansion = 10  // Cap expansion to avoid memory issues
 
         for (hash, count) in shingleCounts {
             let expandedCount = min(count, maxExpansion)
-            for i in 0 ..< expandedCount {
+            for i in 0..<expandedCount {
                 // Create variant hash for each occurrence
                 let variantHash = hash &+ UInt64(i) &* 2_654_435_761
                 expandedHashes.insert(variantHash)
@@ -276,9 +278,9 @@ public struct WeightedMinHashGenerator: Sendable {
 
 // MARK: - Batch Processing
 
-public extension MinHashGenerator {
+extension MinHashGenerator {
     /// Results from batch similarity computation.
-    struct SimilarityPair: Sendable {
+    public struct SimilarityPair: Sendable {
         // MARK: Lifecycle
 
         public init(documentId1: Int, documentId2: Int, similarity: Double) {
@@ -304,21 +306,22 @@ public extension MinHashGenerator {
     ///   - threshold: Minimum similarity to include in results.
     /// - Returns: Array of similar pairs above threshold.
     /// - Note: swa:ignore-unused - Alternative similarity computation for debugging and small datasets
-    func computePairwiseSimilarities(
+    public func computePairwiseSimilarities(
         _ signatures: [MinHashSignature],
         threshold: Double,
     ) -> [SimilarityPair] {
         var results: [SimilarityPair] = []
 
-        for i in 0 ..< signatures.count {
-            for j in (i + 1) ..< signatures.count {
+        for i in 0..<signatures.count {
+            for j in (i + 1)..<signatures.count {
                 let similarity = signatures[i].estimateSimilarity(with: signatures[j])
                 if similarity >= threshold {
-                    results.append(SimilarityPair(
-                        documentId1: signatures[i].documentId,
-                        documentId2: signatures[j].documentId,
-                        similarity: similarity,
-                    ))
+                    results.append(
+                        SimilarityPair(
+                            documentId1: signatures[i].documentId,
+                            documentId2: signatures[j].documentId,
+                            similarity: similarity,
+                        ))
                 }
             }
         }

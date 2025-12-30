@@ -24,7 +24,7 @@ struct DuplicationEngine: Sendable {
         if configuration.cloneTypes.contains(.exact) {
             switch configuration.algorithm {
             case .minHashLSH,
-                 .rollingHash:
+                .rollingHash:
                 // Rolling hash detection (minHashLSH uses this for Type-1 clones)
                 let detector = ExactCloneDetector(minimumTokens: configuration.minimumTokens)
                 cloneGroups.append(contentsOf: detector.detect(in: sequences))
@@ -42,7 +42,7 @@ struct DuplicationEngine: Sendable {
         if configuration.cloneTypes.contains(.near) {
             switch configuration.algorithm {
             case .minHashLSH,
-                 .rollingHash:
+                .rollingHash:
                 // Near clone detection (minHashLSH uses this for Type-2 clones)
                 let detector = NearCloneDetector(
                     minimumTokens: configuration.minimumTokens,
@@ -87,7 +87,7 @@ struct DuplicationEngine: Sendable {
                     let start = max(0, clone.startLine - 1)
                     let end = min(lines.count, clone.endLine)
                     if start < end {
-                        snippet = lines[start ..< end].joined(separator: "\n")
+                        snippet = lines[start..<end].joined(separator: "\n")
                     } else {
                         snippet = ""
                     }

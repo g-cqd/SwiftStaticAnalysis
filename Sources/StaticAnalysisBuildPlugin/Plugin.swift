@@ -45,7 +45,7 @@ struct StaticAnalysisBuildPlugin: BuildToolPlugin {
                 executable: swaTool.url,
                 arguments: arguments,
                 outputFilesDirectory: outputDir,
-            ),
+            )
         ]
     }
 }
@@ -87,7 +87,7 @@ struct StaticAnalysisBuildPlugin: BuildToolPlugin {
                     executable: swaTool.url,
                     arguments: arguments,
                     outputFilesDirectory: outputDir,
-                ),
+                )
             ]
         }
     }

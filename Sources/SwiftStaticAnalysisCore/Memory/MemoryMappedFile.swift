@@ -159,10 +159,11 @@ public final class MemoryMappedFile: @unchecked Sendable {
         let length = end - start
         var result = [UInt8](repeating: 0, count: length)
         result.withUnsafeMutableBytes { buffer in
-            buffer.copyMemory(from: UnsafeRawBufferPointer(
-                start: data.advanced(by: start),
-                count: length,
-            ))
+            buffer.copyMemory(
+                from: UnsafeRawBufferPointer(
+                    start: data.advanced(by: start),
+                    count: length,
+                ))
         }
         return result
     }
@@ -188,7 +189,7 @@ public final class MemoryMappedFile: @unchecked Sendable {
         var ranges: [(Int, Int)] = []
         var lineStart = 0
 
-        for i in 0 ..< size where data.load(fromByteOffset: i, as: UInt8.self) == 0x0A { // '\n'
+        for i in 0..<size where data.load(fromByteOffset: i, as: UInt8.self) == 0x0A {  // '\n'
             ranges.append((lineStart, i - lineStart))
             lineStart = i + 1
         }
@@ -339,7 +340,7 @@ public struct FileSlice: @unchecked Sendable {
     public func hash() -> UInt64 {
         // FNV-1a hash
         var hash: UInt64 = 14_695_981_039_346_656_037
-        for i in 0 ..< length {
+        for i in 0..<length {
             let byte = base.load(fromByteOffset: i, as: UInt8.self)
             hash ^= UInt64(byte)
             hash = hash &* 1_099_511_628_211

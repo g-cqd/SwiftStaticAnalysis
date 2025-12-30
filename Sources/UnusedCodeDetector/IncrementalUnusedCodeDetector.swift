@@ -149,23 +149,25 @@ public actor IncrementalUnusedCodeDetector {
                 // No references at all
                 let confidence = declaration.unusedConfidence
                 if confidence >= configuration.minimumConfidence {
-                    unused.append(UnusedCode(
-                        declaration: declaration,
-                        reason: .neverReferenced,
-                        confidence: confidence,
-                        suggestion: suggestion(for: declaration),
-                    ))
+                    unused.append(
+                        UnusedCode(
+                            declaration: declaration,
+                            reason: .neverReferenced,
+                            confidence: confidence,
+                            suggestion: suggestion(for: declaration),
+                        ))
                 }
             } else if isSelfReferenceOnly(declaration, referenceCount: count, in: result) {
                 // Only referenced by itself
                 let confidence = declaration.unusedConfidence
                 if confidence >= configuration.minimumConfidence {
-                    unused.append(UnusedCode(
-                        declaration: declaration,
-                        reason: .onlySelfReferenced,
-                        confidence: confidence,
-                        suggestion: suggestion(for: declaration),
-                    ))
+                    unused.append(
+                        UnusedCode(
+                            declaration: declaration,
+                            reason: .onlySelfReferenced,
+                            confidence: confidence,
+                            suggestion: suggestion(for: declaration),
+                        ))
                 }
             }
         }
@@ -182,17 +184,17 @@ public actor IncrementalUnusedCodeDetector {
     private func shouldCheck(_ declaration: Declaration) -> Bool {
         switch declaration.kind {
         case .constant,
-             .variable:
+            .variable:
             configuration.detectVariables
 
         case .function,
-             .method:
+            .method:
             configuration.detectFunctions
 
         case .class,
-             .enum,
-             .protocol,
-             .struct:
+            .enum,
+            .protocol,
+            .struct:
             configuration.detectTypes
 
         case .import:
@@ -210,14 +212,16 @@ public actor IncrementalUnusedCodeDetector {
     private func passesFilters(_ declaration: Declaration) -> Bool {
         // Check public API filter
         if configuration.ignorePublicAPI,
-           declaration.accessLevel == .public || declaration.accessLevel == .open {
+            declaration.accessLevel == .public || declaration.accessLevel == .open
+        {
             return false
         }
 
         // Check ignored patterns
         for pattern in configuration.ignoredPatterns {
             if let regex = try? Regex(pattern),
-               declaration.name.contains(regex) {
+                declaration.name.contains(regex)
+            {
                 return false
             }
         }
@@ -265,15 +269,15 @@ public actor IncrementalUnusedCodeDetector {
     private func suggestion(for declaration: Declaration) -> String {
         switch declaration.kind {
         case .function,
-             .method:
+            .method:
             "Consider removing this unused function"
 
         case .constant,
-             .variable:
+            .variable:
             "Consider removing this unused variable"
 
         case .class,
-             .struct:
+            .struct:
             "Consider removing this unused type"
 
         case .protocol:
@@ -297,12 +301,13 @@ public actor IncrementalUnusedCodeDetector {
         // Simple heuristic: if the import name isn't referenced anywhere
         // (This is a rough check - real import checking requires type resolution)
         for importDecl in imports where !referencedIdentifiers.contains(importDecl.name) {
-            unused.append(UnusedCode(
-                declaration: importDecl,
-                reason: .importNotUsed,
-                confidence: .low, // Low confidence without full type resolution
-                suggestion: "Consider removing unused import '\(importDecl.name)'",
-            ))
+            unused.append(
+                UnusedCode(
+                    declaration: importDecl,
+                    reason: .importNotUsed,
+                    confidence: .low,  // Low confidence without full type resolution
+                    suggestion: "Consider removing unused import '\(importDecl.name)'",
+                ))
         }
 
         return unused

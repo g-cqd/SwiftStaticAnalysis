@@ -45,27 +45,27 @@ public struct DeclarationKindFilter: Sendable {
     public func shouldReport(_ kind: DeclarationKind) -> Bool {
         switch kind {
         case .constant,
-             .variable:
+            .variable:
             detectVariables
         case .deinitializer,
-             .function,
-             .initializer,
-             .method,
-             .subscript:
+            .function,
+            .initializer,
+            .method,
+            .subscript:
             detectFunctions
         case .associatedtype,
-             .class,
-             .enum,
-             .extension,
-             .protocol,
-             .struct,
-             .typealias:
+            .class,
+            .enum,
+            .extension,
+            .protocol,
+            .struct,
+            .typealias:
             detectTypes
         case .parameter:
             detectParameters
         case .enumCase,
-             .import,
-             .operator:
+            .import,
+            .operator:
             true
         }
     }

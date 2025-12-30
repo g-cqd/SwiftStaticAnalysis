@@ -38,10 +38,10 @@ public enum IndexStoreStatus: Sendable {
     public var isUsable: Bool {
         switch self {
         case .available,
-             .stale:
+            .stale:
             true
         case .failed,
-             .notFound:
+            .notFound:
             false
         }
     }
@@ -49,11 +49,11 @@ public enum IndexStoreStatus: Sendable {
     /// The path to the index store, if available.
     public var path: String? {
         switch self {
-        case let .available(path),
-             let .stale(path, _):
+        case .available(let path),
+            .stale(let path, _):
             path
         case .failed,
-             .notFound:
+            .notFound:
             nil
         }
     }
@@ -96,10 +96,10 @@ public enum FallbackReason: Sendable, CustomStringConvertible {
         case .noIndexStore:
             "No index store found. Run 'swift build' to generate one."
 
-        case let .indexStoreFailed(error):
+        case .indexStoreFailed(let error):
             "Failed to open index store: \(error)"
 
-        case let .buildFailed(error):
+        case .buildFailed(let error):
             "Build failed: \(error)"
 
         case .userRequested:
@@ -215,7 +215,8 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
 
         // Check for Xcode project
         if let contents = try? FileManager.default.contentsOfDirectory(atPath: projectRoot),
-           contents.contains(where: { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".xcworkspace") }) {
+            contents.contains(where: { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".xcworkspace") })
+        {
             return await buildXcodeProject(at: projectRoot, startTime: startTime)
         }
 
@@ -236,7 +237,7 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
     ///   - sourceFiles: Source files to analyze.
     ///   - preferredMode: The preferred mode from configuration.
     /// - Returns: The analysis mode to use.
-    public func determineAnalysisMode( // swiftlint:disable:this function_body_length
+    public func determineAnalysisMode(  // swiftlint:disable:this function_body_length
         projectRoot: String,
         sourceFiles: [String],
         preferredMode: DetectionMode,
@@ -271,7 +272,7 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
             case .notFound:
                 return .reachability(reason: .noIndexStore)
 
-            case let .failed(error):
+            case .failed(let error):
                 return .reachability(reason: .indexStoreFailed(error: error))
 
             default:
@@ -300,7 +301,7 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
             )
 
             // Warn about stale files if applicable
-            if case let .stale(_, staleFiles) = status {
+            if case .stale(_, let staleFiles) = status {
                 if configuration.warnOnStale {
                     // Log warning (in a real implementation, use proper logging)
                     print(
@@ -418,9 +419,10 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
             let output = String(data: data, encoding: .utf8) ?? ""
 
             let success = process.terminationStatus == 0
-            let indexPath = success ?
-                URL(fileURLWithPath: projectRoot)
-                .appendingPathComponent(".build/index/store").path : nil
+            let indexPath =
+                success
+                ? URL(fileURLWithPath: projectRoot)
+                    .appendingPathComponent(".build/index/store").path : nil
 
             return BuildResult(
                 success: success,
@@ -439,7 +441,7 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
     }
 
     /// Build an Xcode project.
-    private func buildXcodeProject( // swiftlint:disable:this function_body_length
+    private func buildXcodeProject(  // swiftlint:disable:this function_body_length
         at projectRoot: String,
         startTime: Date,
     ) async -> BuildResult {
@@ -524,7 +526,7 @@ public struct FallbackConfiguration: Sendable {
         checkFreshness: Bool = true,
         warnOnStale: Bool = true,
         hybridMode: Bool = false,
-        maxStaleness: TimeInterval = 3600, // 1 hour
+        maxStaleness: TimeInterval = 3600,  // 1 hour
     ) {
         self.autoBuild = autoBuild
         self.checkFreshness = checkFreshness

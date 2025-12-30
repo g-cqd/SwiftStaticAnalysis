@@ -12,7 +12,7 @@ import SwiftSyntax
 ///
 /// This visitor traverses the AST and extracts all declarations
 /// including functions, variables, types, and imports.
-public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:disable:this type_body_length
+public final class DeclarationCollector: ScopeTrackingVisitor {  // swiftlint:disable:this type_body_length
     // MARK: Public
 
     /// Collected declarations.
@@ -28,7 +28,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
             modifiers: node.modifiers,
             node: node,
             documentation: extractDocumentation(from: node),
-            )
+        )
         declarations.append(declaration)
 
         // Let parent handle scope tracking
@@ -44,7 +44,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
             modifiers: node.modifiers,
             node: node,
             documentation: extractDocumentation(from: node),
-            )
+        )
         declarations.append(declaration)
 
         return super.visit(node)
@@ -58,7 +58,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
             kind: .deinitializer,
             modifiers: node.modifiers,
             node: node,
-            )
+        )
         declarations.append(declaration)
 
         return .visitChildren
@@ -88,7 +88,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
                 typeAnnotation: typeAnnotation,
                 documentation: extractDocumentation(from: node),
                 propertyWrappers: propertyWrappers,
-                )
+            )
             declarations.append(declaration)
         }
 
@@ -110,7 +110,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
             range: range(of: node),
             scope: currentScope,
             typeAnnotation: typeAnnotation,
-            )
+        )
         declarations.append(declaration)
 
         return .visitChildren
@@ -292,7 +292,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
             modifiers: node.modifiers,
             node: node,
             documentation: extractDocumentation(from: node),
-            )
+        )
         declarations.append(declaration)
 
         return .visitChildren
@@ -307,7 +307,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
             modifiers: node.modifiers,
             node: node,
             documentation: extractDocumentation(from: node),
-            )
+        )
         declarations.append(declaration)
 
         return .visitChildren
@@ -323,13 +323,13 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
         let declaration = Declaration(
             name: node.name.text,
             kind: .enumCase,
-            accessLevel: .internal, // Inherits from enum
+            accessLevel: .internal,  // Inherits from enum
             modifiers: [],
             location: location(of: node),
             range: range(of: node),
             scope: currentScope,
             ignoreDirectives: ignoreDirectives,
-            )
+        )
         declarations.append(declaration)
 
         return .visitChildren
@@ -344,7 +344,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
             modifiers: node.modifiers,
             node: node,
             documentation: extractDocumentation(from: node),
-            )
+        )
         declarations.append(declaration)
 
         return .visitChildren
@@ -361,7 +361,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
             location: location(of: node),
             range: range(of: node),
             scope: currentScope,
-            )
+        )
         declarations.append(declaration)
 
         return .visitChildren
@@ -380,7 +380,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
             location: location(of: node),
             range: range(of: node),
             scope: .global,
-            )
+        )
         imports.append(declaration)
 
         return .visitChildren
@@ -403,10 +403,10 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
         return ancestors.contains { scope in
             switch scope.kind {
             case .class,
-                 .enum,
-                 .extension,
-                 .protocol,
-                 .struct:
+                .enum,
+                .extension,
+                .protocol,
+                .struct:
                 true
 
             default:
@@ -427,7 +427,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
         swiftUIInfo: SwiftUITypeInfo? = nil,
         conformances: [String] = [],
         attributes: [String] = [],
-        ) -> Declaration {
+    ) -> Declaration {
         // Combine node's own ignore directives with inherited parent directives
         var ignoreDirectives = extractIgnoreCategories(from: node)
         ignoreDirectives.formUnion(currentTypeIgnoreDirectives)
@@ -546,10 +546,10 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
         // Look for documentation comments in leading trivia
         for piece in node.leadingTrivia {
             switch piece {
-            case let .docLineComment(text):
+            case .docLineComment(let text):
                 return String(text.dropFirst(3)).trimmingCharacters(in: .whitespaces)
 
-            case let .docBlockComment(text):
+            case .docBlockComment(let text):
                 // Remove /** and */
                 var cleaned = text
                 if cleaned.hasPrefix("/**") {
@@ -571,12 +571,12 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
     private func hasIgnoreDirective(in node: some SyntaxProtocol) -> Bool {
         for piece in node.leadingTrivia {
             switch piece {
-            case let .lineComment(text):
+            case .lineComment(let text):
                 if text.contains("swa:ignore") {
                     return true
                 }
 
-            case let .blockComment(text):
+            case .blockComment(let text):
                 if text.contains("swa:ignore") {
                     return true
                 }
@@ -596,16 +596,16 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
         for piece in node.leadingTrivia {
             let text: String
             switch piece {
-            case let .lineComment(t):
+            case .lineComment(let t):
                 text = t
 
-            case let .blockComment(t):
+            case .blockComment(let t):
                 text = t
 
-            case let .docLineComment(t):
+            case .docLineComment(let t):
                 text = t
 
-            case let .docBlockComment(t):
+            case .docBlockComment(let t):
                 text = t
 
             default:
@@ -620,9 +620,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
 
                 // Check for generic ignore (no category specified)
                 // This includes: empty, newline, end of comment (*/)
-                if afterDirective.isEmpty ||
-                    afterDirective.hasPrefix("\n") ||
-                    afterDirective.hasPrefix("*/") {
+                if afterDirective.isEmpty || afterDirective.hasPrefix("\n") || afterDirective.hasPrefix("*/") {
                     // Generic ignore - ignore everything
                     categories.insert("all")
                 } else if afterDirective.hasPrefix("-") {
@@ -639,7 +637,8 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
                         remaining = String(remaining[..<endCommentRange.lowerBound])
                     }
 
-                    let category = remaining
+                    let category =
+                        remaining
                         .trimmingCharacters(in: .whitespaces)
                         .lowercased()
                         .replacingOccurrences(of: "-", with: "_")
@@ -659,19 +658,20 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
         var wrappers: [PropertyWrapperInfo] = []
 
         for element in attributes {
-            guard case let .attribute(attribute) = element else {
+            guard case .attribute(let attribute) = element else {
                 continue
             }
 
             let attributeText = attribute.description.trimmingCharacters(in: .whitespacesAndNewlines)
 
             // Extract the attribute name
-            let attributeName: String = if let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self) {
-                identifier.name.text
-            } else {
-                attribute.attributeName.description
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            }
+            let attributeName: String =
+                if let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self) {
+                    identifier.name.text
+                } else {
+                    attribute.attributeName.description
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                }
 
             // Check if this is a known property wrapper
             let kind = PropertyWrapperKind(attributeName: attributeName)
@@ -686,7 +686,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
                 kind: kind,
                 attributeText: attributeText,
                 arguments: arguments,
-                )
+            )
             wrappers.append(wrapper)
         }
 
@@ -730,17 +730,18 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
         var result: [String] = []
 
         for element in attributes {
-            guard case let .attribute(attribute) = element else {
+            guard case .attribute(let attribute) = element else {
                 continue
             }
 
             // Extract the attribute name
-            let attributeName: String = if let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self) {
-                identifier.name.text
-            } else {
-                attribute.attributeName.description
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            }
+            let attributeName: String =
+                if let identifier = attribute.attributeName.as(IdentifierTypeSyntax.self) {
+                    identifier.name.text
+                } else {
+                    attribute.attributeName.description
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                }
 
             result.append(attributeName)
         }

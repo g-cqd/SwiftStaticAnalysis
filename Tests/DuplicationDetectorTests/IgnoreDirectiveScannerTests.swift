@@ -19,11 +19,11 @@ struct IgnoreDirectiveScannerTests {
     @Test("Detect single-line ignore directive")
     func detectSingleLineDirective() {
         let source = """
-        // swa:ignore-duplicates
-        func generatedCode() {
-            let x = 1
-        }
-        """
+            // swa:ignore-duplicates
+            func generatedCode() {
+                let x = 1
+            }
+            """
 
         let scanner = IgnoreDirectiveScanner()
         let regions = scanner.scan(source: source, file: "test.swift")
@@ -39,11 +39,11 @@ struct IgnoreDirectiveScannerTests {
     @Test("Detect generic swa:ignore directive")
     func detectGenericIgnoreDirective() {
         let source = """
-        // swa:ignore
-        func ignoredFunction() {
-            doSomething()
-        }
-        """
+            // swa:ignore
+            func ignoredFunction() {
+                doSomething()
+            }
+            """
 
         let scanner = IgnoreDirectiveScanner()
         let regions = scanner.scan(source: source, file: "test.swift")
@@ -58,16 +58,16 @@ struct IgnoreDirectiveScannerTests {
     @Test("Detect range ignore directives")
     func detectRangeDirectives() {
         let source = """
-        // swa:ignore-duplicates:begin
-        struct Generated1 {
-            var id: String
-        }
+            // swa:ignore-duplicates:begin
+            struct Generated1 {
+                var id: String
+            }
 
-        struct Generated2 {
-            var id: String
-        }
-        // swa:ignore-duplicates:end
-        """
+            struct Generated2 {
+                var id: String
+            }
+            // swa:ignore-duplicates:end
+            """
 
         let scanner = IgnoreDirectiveScanner()
         let regions = scanner.scan(source: source, file: "test.swift")
@@ -82,11 +82,11 @@ struct IgnoreDirectiveScannerTests {
     @Test("Detect generic range ignore directives")
     func detectGenericRangeDirectives() {
         let source = """
-        // swa:ignore:begin
-        func a() {}
-        func b() {}
-        // swa:ignore:end
-        """
+            // swa:ignore:begin
+            func a() {}
+            func b() {}
+            // swa:ignore:end
+            """
 
         let scanner = IgnoreDirectiveScanner()
         let regions = scanner.scan(source: source, file: "test.swift")
@@ -103,14 +103,14 @@ struct IgnoreDirectiveScannerTests {
     @Test("Detect multiple separate ignore regions")
     func detectMultipleRegions() {
         let source = """
-        // swa:ignore-duplicates
-        func a() { }
+            // swa:ignore-duplicates
+            func a() { }
 
-        func normal() { }
+            func normal() { }
 
-        // swa:ignore-duplicates
-        func b() { }
-        """
+            // swa:ignore-duplicates
+            func b() { }
+            """
 
         let scanner = IgnoreDirectiveScanner()
         let regions = scanner.scan(source: source, file: "test.swift")
@@ -121,16 +121,16 @@ struct IgnoreDirectiveScannerTests {
     @Test("Detect mixed single and range directives")
     func detectMixedDirectives() {
         let source = """
-        // swa:ignore-duplicates
-        func single() { }
+            // swa:ignore-duplicates
+            func single() { }
 
-        // swa:ignore-duplicates:begin
-        func rangeA() { }
-        func rangeB() { }
-        // swa:ignore-duplicates:end
+            // swa:ignore-duplicates:begin
+            func rangeA() { }
+            func rangeB() { }
+            // swa:ignore-duplicates:end
 
-        func normal() { }
-        """
+            func normal() { }
+            """
 
         let scanner = IgnoreDirectiveScanner()
         let regions = scanner.scan(source: source, file: "test.swift")
@@ -143,9 +143,9 @@ struct IgnoreDirectiveScannerTests {
     @Test("Detect block comment directive")
     func detectBlockCommentDirective() {
         let source = """
-        /* swa:ignore-duplicates */
-        func ignored() { }
-        """
+            /* swa:ignore-duplicates */
+            func ignored() { }
+            """
 
         let scanner = IgnoreDirectiveScanner()
         let regions = scanner.scan(source: source, file: "test.swift")
@@ -166,11 +166,11 @@ struct IgnoreDirectiveScannerTests {
     @Test("Source without directives returns no regions")
     func noDirectivesNoRegions() {
         let source = """
-        func normalFunction() {
-            let x = 1
-            print(x)
-        }
-        """
+            func normalFunction() {
+                let x = 1
+                print(x)
+            }
+            """
 
         let scanner = IgnoreDirectiveScanner()
         let regions = scanner.scan(source: source, file: "test.swift")
@@ -181,10 +181,10 @@ struct IgnoreDirectiveScannerTests {
     @Test("Unclosed range extends to end of file")
     func unclosedRangeExtendsToEnd() {
         let source = """
-        // swa:ignore-duplicates:begin
-        func a() { }
-        func b() { }
-        """
+            // swa:ignore-duplicates:begin
+            func a() { }
+            func b() { }
+            """
 
         let scanner = IgnoreDirectiveScanner()
         let regions = scanner.scan(source: source, file: "test.swift")
@@ -199,11 +199,11 @@ struct IgnoreDirectiveScannerTests {
     @Test("Single-line declaration without braces")
     func singleLineDeclaration() {
         let source = """
-        // swa:ignore-duplicates
-        var property: Int
+            // swa:ignore-duplicates
+            var property: Int
 
-        func normal() { }
-        """
+            func normal() { }
+            """
 
         let scanner = IgnoreDirectiveScanner()
         let regions = scanner.scan(source: source, file: "test.swift")
@@ -312,7 +312,7 @@ struct CloneGroupFilteringTests {
         )
 
         let ignoreRegions: [String: [IgnoreRegion]] = [
-            "test.swift": [IgnoreRegion(file: "test.swift", startLine: 3, endLine: 12)],
+            "test.swift": [IgnoreRegion(file: "test.swift", startLine: 3, endLine: 12)]
         ]
 
         let filtered = [group].filteringIgnored(ignoreRegions)
@@ -357,7 +357,7 @@ struct CloneGroupFilteringTests {
             "test.swift": [
                 IgnoreRegion(file: "test.swift", startLine: 3, endLine: 12),
                 IgnoreRegion(file: "test.swift", startLine: 14, endLine: 22),
-            ],
+            ]
         ]
 
         let filtered = [group].filteringIgnored(ignoreRegions)

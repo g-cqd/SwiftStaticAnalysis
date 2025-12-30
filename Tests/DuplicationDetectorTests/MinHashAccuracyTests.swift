@@ -13,6 +13,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("MinHash Accuracy Tests")
@@ -27,9 +28,9 @@ struct MinHashAccuracyTests {
             let totalSize = Int(Double(overlapSize) / targetSim)
             let uniquePerSet = (totalSize - overlapSize) / 2
 
-            let common: Set<UInt64> = Set((0 ..< overlapSize).map { UInt64($0) })
-            let unique1: Set<UInt64> = Set((1000 ..< (1000 + uniquePerSet)).map { UInt64($0) })
-            let unique2: Set<UInt64> = Set((2000 ..< (2000 + uniquePerSet)).map { UInt64($0) })
+            let common: Set<UInt64> = Set((0..<overlapSize).map { UInt64($0) })
+            let unique1: Set<UInt64> = Set((1000..<(1000 + uniquePerSet)).map { UInt64($0) })
+            let unique2: Set<UInt64> = Set((2000..<(2000 + uniquePerSet)).map { UInt64($0) })
 
             let hashes1 = common.union(unique1)
             let hashes2 = common.union(unique2)
@@ -51,9 +52,9 @@ struct MinHashAccuracyTests {
         let overlapRatio = 0.6
 
         let overlapSize = Int(Double(size) * overlapRatio)
-        let common: Set<UInt64> = Set((0 ..< overlapSize).map { UInt64($0) })
-        let unique1: Set<UInt64> = Set((size ..< (2 * size - overlapSize)).map { UInt64($0) })
-        let unique2: Set<UInt64> = Set(((2 * size) ..< (3 * size - overlapSize)).map { UInt64($0) })
+        let common: Set<UInt64> = Set((0..<overlapSize).map { UInt64($0) })
+        let unique1: Set<UInt64> = Set((size..<(2 * size - overlapSize)).map { UInt64($0) })
+        let unique2: Set<UInt64> = Set(((2 * size)..<(3 * size - overlapSize)).map { UInt64($0) })
 
         let hashes1 = common.union(unique1)
         let hashes2 = common.union(unique2)

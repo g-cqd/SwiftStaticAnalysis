@@ -37,15 +37,15 @@ extension UnusedCodeDetector {
         )
 
         switch modeResult {
-        case let .indexStore(db, _):
+        case .indexStore(let db, _):
             // Use index-based dependency graph
             return detectWithIndexGraph(db: db, files: files)
 
-        case let .hybrid(db, _):
+        case .hybrid(let db, _):
             // Combine index and syntax analysis
             return try await detectWithHybridMode(db: db, files: files)
 
-        case let .reachability(reason):
+        case .reachability(let reason):
             // Log the reason and fall back
             if configuration.warnOnStaleIndex {
                 print("Note: \(reason.description)")
@@ -83,7 +83,7 @@ extension UnusedCodeDetector {
             }
 
             guard let file = node.definitionFile,
-                  let line = node.definitionLine
+                let line = node.definitionLine
             else {
                 return nil
             }
@@ -92,7 +92,7 @@ extension UnusedCodeDetector {
             let declaration = Declaration(
                 name: node.name,
                 kind: convertIndexKind(node.kind),
-                accessLevel: .internal, // Not available from index
+                accessLevel: .internal,  // Not available from index
                 modifiers: [],
                 location: location,
                 range: SourceRange(start: location, end: location),
@@ -102,7 +102,7 @@ extension UnusedCodeDetector {
             return UnusedCode(
                 declaration: declaration,
                 reason: .neverReferenced,
-                confidence: .high, // High confidence from index analysis
+                confidence: .high,  // High confidence from index analysis
                 suggestion: "Unreachable symbol '\(node.name)' - consider removing",
             )
         }
@@ -161,7 +161,7 @@ extension UnusedCodeDetector {
         var current = URL(fileURLWithPath: firstFile).deletingLastPathComponent()
         let maxDepth = 10
 
-        for _ in 0 ..< maxDepth {
+        for _ in 0..<maxDepth {
             // Check for Package.swift (Swift package)
             let packageSwift = current.appendingPathComponent("Package.swift")
             if FileManager.default.fileExists(atPath: packageSwift.path) {
@@ -170,7 +170,8 @@ extension UnusedCodeDetector {
 
             // Check for .xcodeproj or .xcworkspace
             if let contents = try? FileManager.default.contentsOfDirectory(atPath: current.path),
-               contents.contains(where: { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".xcworkspace") }) {
+                contents.contains(where: { $0.hasSuffix(".xcodeproj") || $0.hasSuffix(".xcworkspace") })
+            {
                 return current.path
             }
 
@@ -188,7 +189,7 @@ extension UnusedCodeDetector {
         var current = URL(fileURLWithPath: firstFile).deletingLastPathComponent()
         let maxDepth = 10
 
-        for _ in 0 ..< maxDepth {
+        for _ in 0..<maxDepth {
             // Check for Package.swift (Swift package)
             let packageSwift = current.appendingPathComponent("Package.swift")
             if FileManager.default.fileExists(atPath: packageSwift.path) {
@@ -197,7 +198,8 @@ extension UnusedCodeDetector {
 
             // Check for .xcodeproj
             if let contents = try? FileManager.default.contentsOfDirectory(atPath: current.path),
-               contents.contains(where: { $0.hasSuffix(".xcodeproj") }) {
+                contents.contains(where: { $0.hasSuffix(".xcodeproj") })
+            {
                 return IndexStorePathFinder.findIndexStorePath(in: current.path)
             }
 

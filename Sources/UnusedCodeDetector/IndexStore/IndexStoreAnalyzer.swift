@@ -141,22 +141,18 @@ public final class IndexStoreAnalyzer: @unchecked Sendable {
                 definitionFiles.insert(occ.file)
             }
 
-            if occ.roles.contains(.reference) ||
-                occ.roles.contains(.call) ||
-                occ.roles.contains(.read) {
+            if occ.roles.contains(.reference) || occ.roles.contains(.call) || occ.roles.contains(.read) {
                 referenceCount += 1
                 referenceFiles.insert(occ.file)
             }
         }
 
         // Check if only self-referenced
-        let onlySelfReferenced = referenceCount > 0 &&
-            referenceFiles.isSubset(of: definitionFiles)
+        let onlySelfReferenced = referenceCount > 0 && referenceFiles.isSubset(of: definitionFiles)
 
         // Check if it's a test symbol
-        let isTestSymbol = symbol.name.hasPrefix("test") ||
-            definition.file.contains("Tests") ||
-            definition.file.contains("Test")
+        let isTestSymbol =
+            symbol.name.hasPrefix("test") || definition.file.contains("Tests") || definition.file.contains("Test")
 
         let definitionLocation = SourceLocation(
             file: definition.file,
@@ -251,7 +247,7 @@ public struct IndexStoreBasedDetector: Sendable {
             let declaration = Declaration(
                 name: usage.name,
                 kind: convertKind(usage.kind),
-                accessLevel: .internal, // We don't have this info from index store
+                accessLevel: .internal,  // We don't have this info from index store
                 modifiers: [],
                 location: location,
                 range: SourceRange(start: location, end: location),
@@ -259,7 +255,7 @@ public struct IndexStoreBasedDetector: Sendable {
             )
 
             let reason: UnusedReason = usage.onlySelfReferenced ? .onlySelfReferenced : .neverReferenced
-            let confidence: Confidence = .high // Index store is accurate
+            let confidence: Confidence = .high  // Index store is accurate
 
             return UnusedCode(
                 declaration: declaration,
@@ -294,18 +290,21 @@ public struct IndexStoreBasedDetector: Sendable {
             return "'\(usage.name)' is only referenced within its own definition"
         }
 
-        let kindName = switch usage.kind {
-        case .class: "class"
-        case .struct: "struct"
-        case .enum: "enum"
-        case .protocol: "protocol"
-        case .function,
-             .method: "function"
-        case .property,
-             .variable: "variable"
-        case .parameter: "parameter"
-        default: "symbol"
-        }
+        let kindName =
+            switch usage.kind {
+            case .class: "class"
+            case .struct: "struct"
+            case .enum: "enum"
+            case .protocol: "protocol"
+            case .function,
+                .method:
+                "function"
+            case .property,
+                .variable:
+                "variable"
+            case .parameter: "parameter"
+            default: "symbol"
+            }
 
         return "Consider removing unused \(kindName) '\(usage.name)'"
     }

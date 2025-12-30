@@ -13,13 +13,14 @@ import Foundation
 import SwiftParser
 import SwiftSyntax
 import Testing
+
 @testable import SwiftStaticAnalysisCore
 
 @Suite("Concurrent Parsing Tests")
 struct ConcurrentParsingTests {
     @Test("Parse multiple sources concurrently")
     func parseConcurrently() async throws {
-        let sources = (1 ... 10).map { i in
+        let sources = (1...10).map { i in
             """
             struct Type\(i) {
                 let value: Int = \(i)

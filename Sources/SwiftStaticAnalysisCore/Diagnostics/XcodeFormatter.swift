@@ -62,7 +62,8 @@ public struct XcodeFormatter: Sendable {
             message = "(\(diagnostic.category.rawValue)) \(message)"
         }
 
-        return "\(diagnostic.file):\(diagnostic.line):\(diagnostic.column): \(diagnostic.severity.xcodeString): \(message)"
+        return
+            "\(diagnostic.file):\(diagnostic.line):\(diagnostic.column): \(diagnostic.severity.xcodeString): \(message)"
     }
 
     /// Format a fix-it suggestion.
@@ -129,7 +130,7 @@ public struct XcodeFormatterConfiguration: Sendable {
 // MARK: - Diagnostic Conversion
 
 // swa:ignore-unused - Factory methods for API completeness and future Xcode integration
-public extension Diagnostic {
+extension Diagnostic {
     /// Create a diagnostic from an unused code finding.
     ///
     /// This factory method converts an unused code detection result into
@@ -141,7 +142,7 @@ public extension Diagnostic {
     ///   - suggestion: Action suggestion for the user.
     ///   - severity: Diagnostic severity level.
     /// - Returns: A formatted diagnostic.
-    static func fromUnusedCode(
+    public static func fromUnusedCode(
         declaration: Declaration,
         reason: String,
         suggestion: String,
@@ -168,7 +169,7 @@ public extension Diagnostic {
     ///   - cloneType: Type of clone (exact, near, semantic).
     ///   - severity: Diagnostic severity level.
     /// - Returns: Array of formatted diagnostics.
-    static func fromCloneGroup(
+    public static func fromCloneGroup(
         clones: [(file: String, startLine: Int, endLine: Int)],
         cloneType: String,
         severity: DiagnosticSeverity = .warning,

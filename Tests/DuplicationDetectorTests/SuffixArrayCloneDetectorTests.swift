@@ -13,6 +13,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("Suffix Array Clone Detector Tests")
@@ -35,7 +36,7 @@ struct SuffixArrayCloneDetectorTests {
     func detectBelowThreshold() {
         let detector = SuffixArrayCloneDetector(minimumTokens: 100)
 
-        let tokens = (0 ..< 50).map { TokenInfo(kind: .identifier, text: "t\($0)", line: $0, column: 0) }
+        let tokens = (0..<50).map { TokenInfo(kind: .identifier, text: "t\($0)", line: $0, column: 0) }
         let sequence = TokenSequence(file: "test.swift", tokens: tokens, sourceLines: [])
 
         let result = detector.detect(in: [sequence])

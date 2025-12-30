@@ -17,6 +17,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("MinHash Signature Tests")
@@ -43,18 +44,18 @@ struct MinHashSignatureTests {
         let sig2 = generator.computeSignature(for: hashes2, documentId: 1)
 
         let similarity = sig1.estimateSimilarity(with: sig2)
-        #expect(similarity < 0.2) // Should be very low
+        #expect(similarity < 0.2)  // Should be very low
     }
 
     @Test("Partial overlap similarity estimation")
     func partialOverlapSimilarity() {
         let generator = MinHashGenerator(numHashes: 256)
-        let common: Set<UInt64> = Set(1 ... 50)
-        let unique1: Set<UInt64> = Set(51 ... 100)
-        let unique2: Set<UInt64> = Set(101 ... 150)
+        let common: Set<UInt64> = Set(1...50)
+        let unique1: Set<UInt64> = Set(51...100)
+        let unique2: Set<UInt64> = Set(101...150)
 
-        let hashes1 = common.union(unique1) // 100 elements, 50 in common
-        let hashes2 = common.union(unique2) // 100 elements, 50 in common
+        let hashes1 = common.union(unique1)  // 100 elements, 50 in common
+        let hashes2 = common.union(unique2)  // 100 elements, 50 in common
 
         // Exact Jaccard = 50 / 150 = 0.333
         let sig1 = generator.computeSignature(for: hashes1, documentId: 0)
@@ -63,7 +64,7 @@ struct MinHashSignatureTests {
         let estimated = sig1.estimateSimilarity(with: sig2)
         let exact = MinHashGenerator.exactJaccardSimilarity(hashes1, hashes2)
 
-        #expect(abs(estimated - exact) < 0.1) // Within 10%
+        #expect(abs(estimated - exact) < 0.1)  // Within 10%
     }
 
     @Test("Empty set signature")

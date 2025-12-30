@@ -7,6 +7,7 @@
 
 import Foundation
 import Testing
+
 @testable import SwiftStaticAnalysisCore
 
 // MARK: - PropertyWrapperDetectionTests
@@ -216,17 +217,17 @@ struct SwiftUISourceParsingTests {
     @Test("Parse SwiftUI View with @State properties")
     func parseSwiftUIViewWithStateProperties() async throws {
         let source = """
-        import SwiftUI
+            import SwiftUI
 
-        struct CounterView: View {
-            @State private var count: Int = 0
-            @State private var name: String = ""
+            struct CounterView: View {
+                @State private var count: Int = 0
+                @State private var name: String = ""
 
-            var body: some View {
-                Text("Count: \\(count)")
+                var body: some View {
+                    Text("Count: \\(count)")
+                }
             }
-        }
-        """
+            """
 
         let parser = SwiftFileParser()
         let tree = try await parser.parse(source: source)
@@ -255,17 +256,17 @@ struct SwiftUISourceParsingTests {
     @Test("Parse SwiftUI App entry point")
     func parseSwiftUIAppEntryPoint() async throws {
         let source = """
-        import SwiftUI
+            import SwiftUI
 
-        @main
-        struct MyApp: App {
-            var body: some Scene {
-                WindowGroup {
-                    ContentView()
+            @main
+            struct MyApp: App {
+                var body: some Scene {
+                    WindowGroup {
+                        ContentView()
+                    }
                 }
             }
-        }
-        """
+            """
 
         let parser = SwiftFileParser()
         let tree = try await parser.parse(source: source)
@@ -281,23 +282,23 @@ struct SwiftUISourceParsingTests {
     @Test("Parse View with multiple property wrappers")
     func parseViewWithMultiplePropertyWrappers() async throws {
         let source = """
-        import SwiftUI
+            import SwiftUI
 
-        struct SettingsView: View {
-            @State private var isEnabled: Bool = false
-            @Binding var value: String
-            @Environment(\\.colorScheme) private var colorScheme
-            @StateObject private var viewModel = ViewModel()
+            struct SettingsView: View {
+                @State private var isEnabled: Bool = false
+                @Binding var value: String
+                @Environment(\\.colorScheme) private var colorScheme
+                @StateObject private var viewModel = ViewModel()
 
-            var body: some View {
-                Text("Settings")
+                var body: some View {
+                    Text("Settings")
+                }
             }
-        }
 
-        class ViewModel: ObservableObject {
-            @Published var data: [String] = []
-        }
-        """
+            class ViewModel: ObservableObject {
+                @Published var data: [String] = []
+            }
+            """
 
         let parser = SwiftFileParser()
         let tree = try await parser.parse(source: source)

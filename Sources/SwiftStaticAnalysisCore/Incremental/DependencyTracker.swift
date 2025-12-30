@@ -190,7 +190,7 @@ public actor DependencyTracker {
     /// Load dependency graph from disk.
     public func load() async throws {
         guard let url = cacheURL,
-              FileManager.default.fileExists(atPath: url.path)
+            FileManager.default.fileExists(atPath: url.path)
         else {
             return
         }
@@ -287,7 +287,8 @@ public actor DependencyTracker {
     public func statistics() -> Statistics {
         let fileCount = Set(graph.dependencies.keys).union(graph.dependents.keys).count
         let dependencyCount = graph.details.count
-        let avgDeps = fileCount > 0
+        let avgDeps =
+            fileCount > 0
             ? Double(graph.dependencies.values.reduce(0) { $0 + $1.count }) / Double(fileCount)
             : 0
         let maxDeps = graph.dependencies.values.map(\.count).max() ?? 0
@@ -348,32 +349,34 @@ public struct DependencyExtractor: Sendable {
                 // Skip if defined in same file
                 guard definition.location.file != sourceFile else { continue }
 
-                let depType: DependencyType = switch reference.context {
-                case .genericConstraint,
-                     .typeAnnotation:
-                    .typeReference
+                let depType: DependencyType =
+                    switch reference.context {
+                    case .genericConstraint,
+                        .typeAnnotation:
+                        .typeReference
 
-                case .call:
-                    .functionCall
+                    case .call:
+                        .functionCall
 
-                case .inheritance:
-                    // Check if it's a protocol or class
-                    if definition.kind == .protocol {
-                        .protocolConformance
-                    } else {
-                        .inheritance
+                    case .inheritance:
+                        // Check if it's a protocol or class
+                        if definition.kind == .protocol {
+                            .protocolConformance
+                        } else {
+                            .inheritance
+                        }
+
+                    default:
+                        .typeReference
                     }
 
-                default:
-                    .typeReference
-                }
-
-                dependencies.append(FileDependency(
-                    dependentFile: sourceFile,
-                    dependencyFile: definition.location.file,
-                    type: depType,
-                    symbolName: reference.identifier,
-                ))
+                dependencies.append(
+                    FileDependency(
+                        dependentFile: sourceFile,
+                        dependencyFile: definition.location.file,
+                        type: depType,
+                        symbolName: reference.identifier,
+                    ))
             }
         }
 
@@ -401,12 +404,13 @@ public struct DependencyExtractor: Sendable {
             // If we know files for this module, add dependencies
             if let files = moduleToFiles[declaration.name] {
                 for file in files where file != sourceFile {
-                    dependencies.append(FileDependency(
-                        dependentFile: sourceFile,
-                        dependencyFile: file,
-                        type: .importDependency,
-                        symbolName: declaration.name,
-                    ))
+                    dependencies.append(
+                        FileDependency(
+                            dependentFile: sourceFile,
+                            dependencyFile: file,
+                            type: .importDependency,
+                            symbolName: declaration.name,
+                        ))
                 }
             }
         }

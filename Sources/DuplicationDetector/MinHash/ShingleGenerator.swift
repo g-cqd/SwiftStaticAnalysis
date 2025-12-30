@@ -108,17 +108,18 @@ public struct ShingleGenerator: Sendable {
     public func generate(tokens: [String], kinds: [TokenKind]? = nil) -> [Shingle] {
         guard tokens.count >= shingleSize else { return [] }
 
-        let normalizedTokens: [String] = if normalize, let kinds {
-            normalizeTokens(tokens, kinds: kinds)
-        } else {
-            tokens
-        }
+        let normalizedTokens: [String] =
+            if normalize, let kinds {
+                normalizeTokens(tokens, kinds: kinds)
+            } else {
+                tokens
+            }
 
         var shingles: [Shingle] = []
         let maxStart = normalizedTokens.count - shingleSize
 
-        for i in 0 ... maxStart {
-            let shingleTokens = Array(normalizedTokens[i ..< (i + shingleSize)])
+        for i in 0...maxStart {
+            let shingleTokens = Array(normalizedTokens[i..<(i + shingleSize)])
             let hash = computeShingleHash(shingleTokens)
             shingles.append(Shingle(hash: hash, position: i, tokens: shingleTokens))
         }
@@ -174,26 +175,27 @@ public struct ShingleGenerator: Sendable {
         // Use sliding window approach for overlapping blocks
         let tokens = sequence.tokens.map(\.text)
         let kinds = sequence.tokens.map(\.kind)
-        let stride = max(1, blockSize / 2) // 50% overlap
+        let stride = max(1, blockSize / 2)  // 50% overlap
 
         var i = 0
         while i + blockSize <= sequence.tokens.count {
-            let blockTokens = Array(tokens[i ..< (i + blockSize)])
-            let blockKinds = Array(kinds[i ..< (i + blockSize)])
+            let blockTokens = Array(tokens[i..<(i + blockSize)])
+            let blockKinds = Array(kinds[i..<(i + blockSize)])
             let shingles = generate(tokens: blockTokens, kinds: blockKinds)
 
             let startLine = sequence.tokens[i].line
             let endLine = sequence.tokens[i + blockSize - 1].line
 
-            documents.append(ShingledDocument(
-                file: sequence.file,
-                startLine: startLine,
-                endLine: endLine,
-                tokenCount: blockSize,
-                shingleHashes: Set(shingles.map(\.hash)),
-                shingles: shingles,
-                id: currentId,
-            ))
+            documents.append(
+                ShingledDocument(
+                    file: sequence.file,
+                    startLine: startLine,
+                    endLine: endLine,
+                    tokenCount: blockSize,
+                    shingleHashes: Set(shingles.map(\.hash)),
+                    shingles: shingles,
+                    id: currentId,
+                ))
 
             currentId += 1
             i += stride
@@ -247,8 +249,8 @@ public struct ShingleGenerator: Sendable {
     /// Compute hash for a shingle using FNV-1a.
     private func computeShingleHash(_ tokens: [String]) -> UInt64 {
         // FNV-1a 64-bit hash
-        var hash: UInt64 = 14_695_981_039_346_656_037 // FNV offset basis
-        let prime: UInt64 = 1_099_511_628_211 // FNV prime
+        var hash: UInt64 = 14_695_981_039_346_656_037  // FNV offset basis
+        let prime: UInt64 = 1_099_511_628_211  // FNV prime
 
         for token in tokens {
             for byte in token.utf8 {
@@ -281,8 +283,8 @@ extension ShingleGenerator {
 
         var hashes = Set<UInt64>()
 
-        for i in 0 ... (chars.count - k) {
-            let shingle = String(chars[i ..< (i + k)])
+        for i in 0...(chars.count - k) {
+            let shingle = String(chars[i..<(i + k)])
             hashes.insert(computeStringHash(shingle))
         }
 

@@ -21,10 +21,10 @@ private func processA() { print("Processing A") }
 private func processB() { print("Processing B") }
 
 /// This function IS actually unused
-private func bar() { print("bar") } // SHOULD BE FLAGGED
+private func bar() { print("bar") }  // SHOULD BE FLAGGED
 
 /// This function IS actually unused
-private func unusedHelper() { print("unused") } // SHOULD BE FLAGGED
+private func unusedHelper() { print("unused") }  // SHOULD BE FLAGGED
 
 // MARK: - Indirect Usage Patterns
 
@@ -72,12 +72,12 @@ private func transform(_ value: Int) -> Int {
 }
 
 /// This function is NOT used
-private func unusedTransform(_ value: Int) -> Int { // SHOULD BE FLAGGED
+private func unusedTransform(_ value: Int) -> Int {  // SHOULD BE FLAGGED
     value * 3
 }
 
 let numbers = [1, 2, 3, 4, 5]
-let doubled = numbers.map(transform) // transform is used here
+let doubled = numbers.map(transform)  // transform is used here
 
 // MARK: - Optional Closure References
 
@@ -86,7 +86,7 @@ private func optionalHandler() { print("optional") }
 var optionalCallback: (() -> Void)?
 
 func setupOptionalCallback() {
-    optionalCallback = optionalHandler // optionalHandler is used
+    optionalCallback = optionalHandler  // optionalHandler is used
 }
 
 // MARK: - Type Alias References
@@ -95,20 +95,20 @@ typealias Handler = () -> Void
 
 private func aliasedHandler() { print("aliased") }
 
-let handlerRef: Handler = aliasedHandler // Used through type alias
+let handlerRef: Handler = aliasedHandler  // Used through type alias
 
 // MARK: - Completely Unused Section
 
 /// These are definitely unused
-private func neverCalled1() { print("never1") } // SHOULD BE FLAGGED
-private func neverCalled2() { print("never2") } // SHOULD BE FLAGGED
-private func neverCalled3() { print("never3") } // SHOULD BE FLAGGED
+private func neverCalled1() { print("never1") }  // SHOULD BE FLAGGED
+private func neverCalled2() { print("never2") }  // SHOULD BE FLAGGED
+private func neverCalled3() { print("never3") }  // SHOULD BE FLAGGED
 
-private var unusedVariable = 42 // SHOULD BE FLAGGED
-private let unusedConstant = "unused" // SHOULD BE FLAGGED
+private var unusedVariable = 42  // SHOULD BE FLAGGED
+private let unusedConstant = "unused"  // SHOULD BE FLAGGED
 
 // MARK: - UnusedClass
 
-private class UnusedClass { // SHOULD BE FLAGGED
+private class UnusedClass {  // SHOULD BE FLAGGED
     func unusedMethod() {}
 }

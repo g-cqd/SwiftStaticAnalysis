@@ -273,12 +273,13 @@ public struct LiveVariableAnalysis: Sendable {
                         let usedInSameStatement = statement.uses.contains(definedVar)
 
                         if !usedInSameStatement {
-                            deadStores.append(DeadStore(
-                                variable: definedVar,
-                                location: statement.location,
-                                assignedValue: extractAssignedValue(statement),
-                                suggestion: "Variable '\(definedVar)' is assigned but never read",
-                            ))
+                            deadStores.append(
+                                DeadStore(
+                                    variable: definedVar,
+                                    location: statement.location,
+                                    assignedValue: extractAssignedValue(statement),
+                                    suggestion: "Variable '\(definedVar)' is assigned but never read",
+                                ))
                         }
                     }
                 }
@@ -330,14 +331,14 @@ public struct LiveVariableAnalysis: Sendable {
 // MARK: - Statement-Level Analysis
 
 // swa:ignore-unused - Advanced analysis utilities for debugging and future features
-public extension LiveVariableAnalysis {
+extension LiveVariableAnalysis {
     /// Compute live variables at each statement in a block.
     ///
     /// - Parameters:
     ///   - block: The basic block to analyze.
     ///   - liveAtExit: Variables live at block exit.
     /// - Returns: Array of (statement, liveBeforeStatement) pairs.
-    func computeStatementLiveness(
+    public func computeStatementLiveness(
         block: BasicBlock,
         liveAtExit: Set<String>,
     ) -> [(statement: CFGStatement, liveBefore: Set<String>)] {
@@ -361,14 +362,14 @@ public extension LiveVariableAnalysis {
 
 // MARK: - Multi-Function Analysis
 
-public extension LiveVariableAnalysis {
+extension LiveVariableAnalysis {
     /// Analyze all functions in a source file.
     ///
     /// - Parameters:
     ///   - file: Path to the Swift source file.
     ///   - tree: Parsed syntax tree.
     /// - Returns: Array of results for each function/closure.
-    func analyzeFile(
+    public func analyzeFile(
         file: String,
         tree: SourceFileSyntax,
     ) -> [LiveVariableResult] {
@@ -426,9 +427,9 @@ private final class FunctionCollector: SyntaxVisitor {
 // MARK: - Debug Output
 
 // swa:ignore-unused - Debug utilities for development and troubleshooting
-public extension LiveVariableResult {
+extension LiveVariableResult {
     /// Generate a debug string showing liveness information.
-    func debugDescription() -> String {
+    public func debugDescription() -> String {
         var output = "Live Variable Analysis Results:\n"
         output += "================================\n\n"
 

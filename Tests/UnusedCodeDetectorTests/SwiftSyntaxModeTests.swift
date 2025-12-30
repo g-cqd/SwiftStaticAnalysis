@@ -7,6 +7,7 @@
 
 import Foundation
 import Testing
+
 @testable import SwiftStaticAnalysisCore
 @testable import UnusedCodeDetector
 
@@ -19,18 +20,18 @@ struct SwiftSyntaxModeTests {
     @Test("Detect unused private functions")
     func detectUnusedPrivateFunctions() async throws {
         let source = """
-        private func usedFunction() {
-            print("used")
-        }
+            private func usedFunction() {
+                print("used")
+            }
 
-        private func unusedFunction() {
-            print("unused")
-        }
+            private func unusedFunction() {
+                print("unused")
+            }
 
-        func main() {
-            usedFunction()
-        }
-        """
+            func main() {
+                usedFunction()
+            }
+            """
 
         let detector = UnusedCodeDetector(configuration: .default)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -47,13 +48,13 @@ struct SwiftSyntaxModeTests {
     @Test("Detect unused variables")
     func detectUnusedVariables() async throws {
         let source = """
-        let usedVar = 42
-        let unusedVar = 100
+            let usedVar = 42
+            let unusedVar = 100
 
-        func test() {
-            print(usedVar)
-        }
-        """
+            func test() {
+                print(usedVar)
+            }
+            """
 
         let config = UnusedCodeConfiguration(
             detectVariables: true,
@@ -70,11 +71,11 @@ struct SwiftSyntaxModeTests {
     @Test("Detect unused types")
     func detectUnusedTypes() async throws {
         let source = """
-        struct UsedStruct {}
-        struct UnusedStruct {}
+            struct UsedStruct {}
+            struct UnusedStruct {}
 
-        let instance = UsedStruct()
-        """
+            let instance = UsedStruct()
+            """
 
         let config = UnusedCodeConfiguration(
             detectTypes: true,
@@ -93,14 +94,14 @@ struct SwiftSyntaxModeTests {
     @Test("Ignore public API when configured")
     func ignorePublicAPI() async throws {
         let source = """
-        public func publicAPI() {
-            print("public")
-        }
+            public func publicAPI() {
+                print("public")
+            }
 
-        private func privateUnused() {
-            print("private")
-        }
-        """
+            private func privateUnused() {
+                print("private")
+            }
+            """
 
         let config = UnusedCodeConfiguration(
             ignorePublicAPI: true,
@@ -120,10 +121,10 @@ struct SwiftSyntaxModeTests {
     @Test("Include public API when not ignoring")
     func includePublicAPI() async throws {
         let source = """
-        public func publicUnused() {
-            print("public unused")
-        }
-        """
+            public func publicUnused() {
+                print("public unused")
+            }
+            """
 
         let config = UnusedCodeConfiguration(
             ignorePublicAPI: false,
@@ -142,10 +143,10 @@ struct SwiftSyntaxModeTests {
     @Test("Assign correct confidence levels")
     func assignConfidenceLevels() async throws {
         let source = """
-        private func privateFunc() {}
-        internal func internalFunc() {}
-        public func publicFunc() {}
-        """
+            private func privateFunc() {}
+            internal func internalFunc() {}
+            public func publicFunc() {}
+            """
 
         let config = UnusedCodeConfiguration(
             ignorePublicAPI: false,
@@ -171,9 +172,9 @@ struct SwiftSyntaxModeTests {
     @Test("Filter by minimum confidence")
     func filterByMinimumConfidence() async throws {
         let source = """
-        private func privateFunc() {}
-        public func publicFunc() {}
-        """
+            private func privateFunc() {}
+            public func publicFunc() {}
+            """
 
         let config = UnusedCodeConfiguration(
             ignorePublicAPI: false,
@@ -195,9 +196,9 @@ struct SwiftSyntaxModeTests {
     @Test("Disable variable detection")
     func disableVariableDetection() async throws {
         let source = """
-        let unusedVar = 42
-        private func unusedFunc() {}
-        """
+            let unusedVar = 42
+            private func unusedFunc() {}
+            """
 
         let config = UnusedCodeConfiguration(
             detectVariables: false,
@@ -218,9 +219,9 @@ struct SwiftSyntaxModeTests {
     @Test("Disable function detection")
     func disableFunctionDetection() async throws {
         let source = """
-        let unusedVar = 42
-        private func unusedFunc() {}
-        """
+            let unusedVar = 42
+            private func unusedFunc() {}
+            """
 
         let config = UnusedCodeConfiguration(
             detectVariables: true,
@@ -240,10 +241,10 @@ struct SwiftSyntaxModeTests {
     @Test("Identify never referenced reason")
     func identifyNeverReferenced() async throws {
         let source = """
-        private func neverCalled() {
-            print("never")
-        }
-        """
+            private func neverCalled() {
+                print("never")
+            }
+            """
 
         let detector = UnusedCodeDetector(configuration: .default)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -267,9 +268,9 @@ struct SwiftSyntaxModeTests {
     @Test("Handle source with only comments")
     func handleOnlyComments() async throws {
         let source = """
-        // This is a comment
-        /* Block comment */
-        """
+            // This is a comment
+            /* Block comment */
+            """
 
         let detector = UnusedCodeDetector(configuration: .default)
         let result = try await detector.detectFromSource(source, file: "test.swift")
@@ -280,10 +281,10 @@ struct SwiftSyntaxModeTests {
     @Test("Handle syntax errors gracefully")
     func handleSyntaxErrors() async throws {
         let source = """
-        func broken( {
-            let x =
-        }
-        """
+            func broken( {
+                let x =
+            }
+            """
 
         let detector = UnusedCodeDetector(configuration: .default)
         // Should not throw
@@ -301,16 +302,16 @@ struct FalsePositivePreventionTests {
     @Test("Private method called within same type is not unused")
     func privateMethodCalledWithinSameType() async throws {
         let source = """
-        struct TokenNormalizer {
-            func normalize(_ token: String) -> String {
-                return normalizeToken(token)
-            }
+            struct TokenNormalizer {
+                func normalize(_ token: String) -> String {
+                    return normalizeToken(token)
+                }
 
-            private func normalizeToken(_ token: String) -> String {
-                return token.uppercased()
+                private func normalizeToken(_ token: String) -> String {
+                    return token.uppercased()
+                }
             }
-        }
-        """
+            """
 
         let config = UnusedCodeConfiguration(
             detectFunctions: true,
@@ -327,15 +328,15 @@ struct FalsePositivePreventionTests {
     @Test("Variable used within closure is not unused")
     func variableUsedWithinClosure() async throws {
         let source = """
-        func process() {
-            let items = [1, 2, 3]
-            let result = items.map { item in
-                let multiplier = 2
-                return item * multiplier
+            func process() {
+                let items = [1, 2, 3]
+                let result = items.map { item in
+                    let multiplier = 2
+                    return item * multiplier
+                }
+                print(result)
             }
-            print(result)
-        }
-        """
+            """
 
         let config = UnusedCodeConfiguration(
             detectVariables: true,
@@ -352,21 +353,21 @@ struct FalsePositivePreventionTests {
     @Test("Variables declared and used in map closure are not unused")
     func variablesInMapClosure() async throws {
         let source = """
-        func transform(_ groups: [Group]) -> [Result] {
-            return groups.map { group in
-                let items = group.items.map { item -> Item in
-                    let snippet: String
-                    if item.hasValue {
-                        snippet = item.value
-                    } else {
-                        snippet = ""
+            func transform(_ groups: [Group]) -> [Result] {
+                return groups.map { group in
+                    let items = group.items.map { item -> Item in
+                        let snippet: String
+                        if item.hasValue {
+                            snippet = item.value
+                        } else {
+                            snippet = ""
+                        }
+                        return Item(text: snippet)
                     }
-                    return Item(text: snippet)
+                    return Result(items: items)
                 }
-                return Result(items: items)
             }
-        }
-        """
+            """
 
         let config = UnusedCodeConfiguration(
             detectVariables: true,
@@ -385,20 +386,20 @@ struct FalsePositivePreventionTests {
     @Test("Struct with @main attribute is not unused")
     func structWithMainAttribute() async throws {
         let source = """
-        import ArgumentParser
+            import ArgumentParser
 
-        @main
-        struct CLI: AsyncParsableCommand {
-            static let configuration = CommandConfiguration(
-                commandName: "cli",
-                abstract: "A CLI tool"
-            )
+            @main
+            struct CLI: AsyncParsableCommand {
+                static let configuration = CommandConfiguration(
+                    commandName: "cli",
+                    abstract: "A CLI tool"
+                )
 
-            func run() async throws {
-                print("Running")
+                func run() async throws {
+                    print("Running")
+                }
             }
-        }
-        """
+            """
 
         let config = UnusedCodeConfiguration(
             detectTypes: true,
@@ -416,26 +417,26 @@ struct FalsePositivePreventionTests {
     @Test("Multiple helper functions called within type are not unused")
     func multipleHelperFunctions() async throws {
         let source = """
-        class CloneDetector {
-            func detect(_ input: [String]) -> [Clone] {
-                let validated = validate(input)
-                let normalized = normalize(validated)
-                return findClones(in: normalized)
-            }
+            class CloneDetector {
+                func detect(_ input: [String]) -> [Clone] {
+                    let validated = validate(input)
+                    let normalized = normalize(validated)
+                    return findClones(in: normalized)
+                }
 
-            private func validate(_ input: [String]) -> [String] {
-                return input.filter { !$0.isEmpty }
-            }
+                private func validate(_ input: [String]) -> [String] {
+                    return input.filter { !$0.isEmpty }
+                }
 
-            private func normalize(_ input: [String]) -> [String] {
-                return input.map { $0.lowercased() }
-            }
+                private func normalize(_ input: [String]) -> [String] {
+                    return input.map { $0.lowercased() }
+                }
 
-            private func findClones(in input: [String]) -> [Clone] {
-                return []
+                private func findClones(in input: [String]) -> [Clone] {
+                    return []
+                }
             }
-        }
-        """
+            """
 
         let config = UnusedCodeConfiguration(
             detectFunctions: true,
@@ -457,21 +458,21 @@ struct FalsePositivePreventionTests {
     @Test("Filter clause variables are not unused")
     func filterClauseVariables() async throws {
         let source = """
-        func filterData(_ items: [Item]) -> [Item] {
-            let shouldExcludeEmpty = true
-            let shouldExcludeHidden = true
+            func filterData(_ items: [Item]) -> [Item] {
+                let shouldExcludeEmpty = true
+                let shouldExcludeHidden = true
 
-            return items.filter { item in
-                if shouldExcludeEmpty && item.isEmpty {
-                    return false
+                return items.filter { item in
+                    if shouldExcludeEmpty && item.isEmpty {
+                        return false
+                    }
+                    if shouldExcludeHidden && item.isHidden {
+                        return false
+                    }
+                    return true
                 }
-                if shouldExcludeHidden && item.isHidden {
-                    return false
-                }
-                return true
             }
-        }
-        """
+            """
 
         let config = UnusedCodeConfiguration(
             detectVariables: true,

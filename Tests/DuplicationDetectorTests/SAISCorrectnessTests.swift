@@ -14,6 +14,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("SA-IS Algorithm Correctness Tests")
@@ -25,7 +26,7 @@ struct SAISCorrectnessTests {
 
         // Check that SA is a permutation of [0, n-1]
         let sorted = sa.array.sorted()
-        #expect(sorted == Array(0 ..< tokens.count))
+        #expect(sorted == Array(0..<tokens.count))
     }
 
     @Test("Suffixes are lexicographically sorted")
@@ -34,13 +35,13 @@ struct SAISCorrectnessTests {
         let sa = SuffixArray(tokens: tokens)
 
         // Verify each adjacent pair is in correct order
-        for i in 0 ..< (sa.array.count - 1) {
+        for i in 0..<(sa.array.count - 1) {
             let suffix1 = Array(tokens[sa.array[i]...])
             let suffix2 = Array(tokens[sa.array[i + 1]...])
 
-            let isOrdered = suffix1.lexicographicallyPrecedes(suffix2) ||
-                suffix1.starts(with: suffix2) ||
-                suffix2.starts(with: suffix1)
+            let isOrdered =
+                suffix1.lexicographicallyPrecedes(suffix2) || suffix1.starts(with: suffix2)
+                || suffix2.starts(with: suffix1)
             #expect(isOrdered, "Suffixes at SA[\(i)] and SA[\(i + 1)] are not properly ordered")
         }
     }
@@ -53,7 +54,7 @@ struct SAISCorrectnessTests {
         // For all-same elements, SA should be [9,8,7,6,5,4,3,2,1,0]
         // (shortest suffix first)
         #expect(sa.array.count == 10)
-        for i in 0 ..< 10 {
+        for i in 0..<10 {
             #expect(sa.array[i] == 9 - i)
         }
     }

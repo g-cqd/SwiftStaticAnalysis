@@ -72,14 +72,16 @@ public struct IgnoreDirectiveScanner: Sendable {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
 
             // Check for range markers
-            if containsDirective(trimmed, directive: "swa:ignore-duplicates:begin") ||
-                containsDirective(trimmed, directive: "swa:ignore:begin") {
+            if containsDirective(trimmed, directive: "swa:ignore-duplicates:begin")
+                || containsDirective(trimmed, directive: "swa:ignore:begin")
+            {
                 rangeStartLine = lineNumber
                 continue
             }
 
-            if containsDirective(trimmed, directive: "swa:ignore-duplicates:end") ||
-                containsDirective(trimmed, directive: "swa:ignore:end") {
+            if containsDirective(trimmed, directive: "swa:ignore-duplicates:end")
+                || containsDirective(trimmed, directive: "swa:ignore:end")
+            {
                 if let start = rangeStartLine {
                     regions.append(IgnoreRegion(file: file, startLine: start, endLine: lineNumber))
                     rangeStartLine = nil
@@ -88,8 +90,9 @@ public struct IgnoreDirectiveScanner: Sendable {
             }
 
             // Check for single-line ignore (applies to next non-comment line)
-            if containsDirective(trimmed, directive: "swa:ignore-duplicates") ||
-                containsDirective(trimmed, directive: "swa:ignore") {
+            if containsDirective(trimmed, directive: "swa:ignore-duplicates")
+                || containsDirective(trimmed, directive: "swa:ignore")
+            {
                 // Find the extent of the following declaration
                 if let extent = findDeclarationExtent(lines: lines, startingAt: index + 1) {
                     regions.append(IgnoreRegion(file: file, startLine: lineNumber, endLine: extent))
@@ -160,7 +163,7 @@ public struct IgnoreDirectiveScanner: Sendable {
         var foundOpenBrace = false
         let startLine = currentIndex + 1
 
-        for i in currentIndex ..< lines.count {
+        for i in currentIndex..<lines.count {
             let line = lines[i]
 
             for char in line {
@@ -170,7 +173,7 @@ public struct IgnoreDirectiveScanner: Sendable {
                 } else if char == "}" {
                     braceDepth -= 1
                     if foundOpenBrace, braceDepth == 0 {
-                        return i + 1 // Return 1-based line number
+                        return i + 1  // Return 1-based line number
                     }
                 }
             }
@@ -180,7 +183,7 @@ public struct IgnoreDirectiveScanner: Sendable {
                 // If we see a new declaration keyword, the previous one ended
                 let trimmed = line.trimmingCharacters(in: .whitespaces)
                 if startsNewDeclaration(trimmed) {
-                    return i // Previous line was the end
+                    return i  // Previous line was the end
                 }
             }
         }
@@ -203,16 +206,16 @@ public struct IgnoreDirectiveScanner: Sendable {
 
 // MARK: - CloneGroup Filtering
 
-public extension [CloneGroup] {
+extension [CloneGroup] {
     /// Filter clone groups to exclude clones in ignored regions.
     ///
     /// - Parameter ignoreRegions: Dictionary mapping file paths to their ignore regions.
     /// - Returns: Filtered clone groups with ignored clones removed.
-    func filteringIgnored(_ ignoreRegions: [String: [IgnoreRegion]]) -> [CloneGroup] {
+    public func filteringIgnored(_ ignoreRegions: [String: [IgnoreRegion]]) -> [CloneGroup] {
         compactMap { group in
             let filteredClones = group.clones.filter { clone in
                 guard let regions = ignoreRegions[clone.file] else {
-                    return true // No ignore regions for this file
+                    return true  // No ignore regions for this file
                 }
                 // Keep clone if it doesn't overlap with any ignore region
                 return !regions.contains { $0.overlaps(startLine: clone.startLine, endLine: clone.endLine) }

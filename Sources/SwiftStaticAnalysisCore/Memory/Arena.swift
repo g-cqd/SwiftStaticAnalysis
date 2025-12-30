@@ -274,8 +274,8 @@ public protocol ArenaAllocatable {
     static func allocate(in arena: Arena, count: Int) -> UnsafeMutableBufferPointer<Self>
 }
 
-public extension ArenaAllocatable {
-    static func allocate(in arena: Arena, count: Int) -> UnsafeMutableBufferPointer<Self> {
+extension ArenaAllocatable {
+    public static func allocate(in arena: Arena, count: Int) -> UnsafeMutableBufferPointer<Self> {
         arena.allocate(count: count)
     }
 }
@@ -330,19 +330,19 @@ extension Bool: ArenaAllocatable {}
 ///     // Use data...
 /// } // Arena automatically reset here
 /// ```
-public extension Arena {
+extension Arena {
     /// Execute a closure with a scoped arena that resets after completion.
     ///
     /// - Parameter body: Closure that uses the arena.
     /// - Returns: The result of the closure.
-    func withScope<T>(_ body: (Arena) throws -> T) rethrows -> T {
+    public func withScope<T>(_ body: (Arena) throws -> T) rethrows -> T {
         let startOffset = blocks.isEmpty ? 0 : blocks[max(0, currentBlockIndex)].offset
         let startBlock = currentBlockIndex
 
         defer {
             // Reset to the starting state
             if startBlock >= 0, startBlock < blocks.count {
-                for i in (startBlock + 1) ..< blocks.count {
+                for i in (startBlock + 1)..<blocks.count {
                     blocks[i].reset()
                 }
                 blocks[startBlock].offset = startOffset

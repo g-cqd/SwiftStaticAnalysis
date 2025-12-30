@@ -13,6 +13,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("LCP Array Tests")

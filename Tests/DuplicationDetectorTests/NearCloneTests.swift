@@ -9,6 +9,7 @@ import Foundation
 import SwiftParser
 import SwiftSyntax
 import Testing
+
 @testable import DuplicationDetector
 @testable import SwiftStaticAnalysisCore
 
@@ -21,18 +22,18 @@ struct NearCloneTests {
     @Test("Detect clones with renamed variables")
     func detectRenamedVariables() {
         let source = """
-        func processUser() {
-            let userName = "John"
-            let userAge = 25
-            print(userName, userAge)
-        }
+            func processUser() {
+                let userName = "John"
+                let userAge = 25
+                print(userName, userAge)
+            }
 
-        func processProduct() {
-            let productName = "Widget"
-            let productPrice = 25
-            print(productName, productPrice)
-        }
-        """
+            func processProduct() {
+                let productName = "Widget"
+                let productPrice = 25
+                print(productName, productPrice)
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let extractor = TokenSequenceExtractor()
@@ -57,18 +58,18 @@ struct NearCloneTests {
     @Test("Detect clones with different literal values")
     func detectDifferentLiterals() {
         let source = """
-        func config1() -> Int {
-            let timeout = 30
-            let retries = 3
-            return timeout * retries
-        }
+            func config1() -> Int {
+                let timeout = 30
+                let retries = 3
+                return timeout * retries
+            }
 
-        func config2() -> Int {
-            let timeout = 60
-            let retries = 5
-            return timeout * retries
-        }
-        """
+            func config2() -> Int {
+                let timeout = 60
+                let retries = 5
+                return timeout * retries
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let extractor = TokenSequenceExtractor()
@@ -158,9 +159,9 @@ struct NearCloneTests {
     @Test("Normalizer handles string literals")
     func normalizerHandlesStrings() {
         let source = """
-        let message1 = "Hello, World!"
-        let message2 = "Goodbye, World!"
-        """
+            let message1 = "Hello, World!"
+            let message2 = "Goodbye, World!"
+            """
 
         let tree = Parser.parse(source: source)
         let extractor = TokenSequenceExtractor()
@@ -181,20 +182,20 @@ struct NearCloneTests {
     func respectSimilarityThreshold() {
         // Two blocks with only 50% similarity
         let source = """
-        func a() {
-            let x = 1
-            let y = 2
-            completely_different_code()
-            more_unique_stuff()
-        }
+            func a() {
+                let x = 1
+                let y = 2
+                completely_different_code()
+                more_unique_stuff()
+            }
 
-        func b() {
-            let x = 1
-            let y = 2
-            something_else_entirely()
-            and_more_unique()
-        }
-        """
+            func b() {
+                let x = 1
+                let y = 2
+                something_else_entirely()
+                and_more_unique()
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let extractor = TokenSequenceExtractor()

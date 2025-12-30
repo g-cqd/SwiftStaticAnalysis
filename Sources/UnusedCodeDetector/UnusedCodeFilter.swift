@@ -167,7 +167,8 @@ public struct UnusedCodeFilter: Sendable {
         // Check path patterns
         for pattern in compiledPathPatterns {
             if let regex = try? Regex(pattern),
-               filePath.contains(regex) {
+                filePath.contains(regex)
+            {
                 return true
             }
         }
@@ -175,7 +176,8 @@ public struct UnusedCodeFilter: Sendable {
         // Check name patterns
         for pattern in namePatterns {
             if let regex = try? Regex(pattern),
-               name.contains(regex) {
+                name.contains(regex)
+            {
                 return true
             }
         }
@@ -205,15 +207,15 @@ public struct UnusedCodeFilter: Sendable {
 // MARK: - Convenience Extensions
 
 // swa:ignore-unused - Convenience extensions for API completeness
-public extension [UnusedCode] {
+extension [UnusedCode] {
     /// Filter results using the specified configuration.
-    func filtered(with configuration: UnusedCodeFilterConfiguration) -> [UnusedCode] {
+    public func filtered(with configuration: UnusedCodeFilterConfiguration) -> [UnusedCode] {
         let filter = UnusedCodeFilter(configuration: configuration)
         return filter.filter(self)
     }
 
     /// Filter results with sensible defaults.
-    func filteredWithSensibleDefaults() -> [UnusedCode] {
+    public func filteredWithSensibleDefaults() -> [UnusedCode] {
         filtered(with: .sensibleDefaults)
     }
 }

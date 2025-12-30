@@ -142,11 +142,9 @@ public struct SoATokenStorage: Sendable {
 
     /// Total memory used in bytes.
     public var memoryUsage: Int {
-        kinds.count * MemoryLayout<UInt8>.size +
-            offsets.count * MemoryLayout<UInt32>.size +
-            lengths.count * MemoryLayout<UInt16>.size +
-            lines.count * MemoryLayout<UInt32>.size +
-            columns.count * MemoryLayout<UInt16>.size
+        kinds.count * MemoryLayout<UInt8>.size + offsets.count * MemoryLayout<UInt32>.size + lengths.count
+            * MemoryLayout<UInt16>.size + lines.count * MemoryLayout<UInt32>.size + columns.count
+            * MemoryLayout<UInt16>.size
     }
 
     /// Memory per token (average).
@@ -267,7 +265,7 @@ public struct SoATokenStorage: Sendable {
 
     /// Iterate over all tokens.
     public func forEach(_ body: (Int, TokenKindByte, UInt32, UInt16, UInt32) -> Void) {
-        for i in 0 ..< count {
+        for i in 0..<count {
             body(i, kind(at: i), offsets[i], lengths[i], lines[i])
         }
     }
@@ -275,7 +273,7 @@ public struct SoATokenStorage: Sendable {
     /// Iterate over token indices with a specific kind.
     public func indicesWithKind(_ kind: TokenKindByte) -> [Int] {
         var result: [Int] = []
-        for i in 0 ..< count where kinds[i] == kind.rawValue {
+        for i in 0..<count where kinds[i] == kind.rawValue {
             result.append(i)
         }
         return result
@@ -388,7 +386,7 @@ public struct MultiFileSoAStorage: Sendable {
 
     /// Total number of tokens across all files.
     public var totalTokenCount: Int {
-        storage.count - files.count // Subtract boundary markers
+        storage.count - files.count  // Subtract boundary markers
     }
 
     /// Number of files.
@@ -401,7 +399,7 @@ public struct MultiFileSoAStorage: Sendable {
         let start = storage.count
 
         // Copy tokens
-        for i in 0 ..< tokens.count {
+        for i in 0..<tokens.count {
             storage.append(
                 kind: tokens.kind(at: i),
                 offset: UInt32(tokens.offset(at: i)),
@@ -443,11 +441,11 @@ public struct MultiFileSoAStorage: Sendable {
 // MARK: - SIMD Operations on Token Arrays
 
 // swa:ignore-unused - Utility operations for advanced token analysis and future optimizations
-public extension SoATokenStorage {
+extension SoATokenStorage {
     /// Count tokens of each kind using SIMD acceleration.
     ///
     /// Returns an array where index corresponds to TokenKindByte.rawValue.
-    func countByKind() -> [Int] {
+    public func countByKind() -> [Int] {
         var counts = [Int](repeating: 0, count: 256)
         for kind in kinds {
             counts[Int(kind)] += 1
@@ -456,14 +454,14 @@ public extension SoATokenStorage {
     }
 
     /// Find all tokens within a line range.
-    func tokensInLineRange(_ lineRange: ClosedRange<Int>) -> Range<Int> {
+    public func tokensInLineRange(_ lineRange: ClosedRange<Int>) -> Range<Int> {
         let startLine = UInt32(lineRange.lowerBound)
         let endLine = UInt32(lineRange.upperBound)
 
         var start: Int?
         var end = 0
 
-        for i in 0 ..< count {
+        for i in 0..<count {
             let line = lines[i]
             if line >= startLine, line <= endLine {
                 if start == nil { start = i }
@@ -471,13 +469,13 @@ public extension SoATokenStorage {
             }
         }
 
-        return (start ?? 0) ..< end
+        return (start ?? 0)..<end
     }
 
     /// Hash a range of tokens for clone detection.
     ///
     /// Uses rolling hash combining kind and length.
-    func hashRange(_ range: Range<Int>) -> UInt64 {
+    public func hashRange(_ range: Range<Int>) -> UInt64 {
         var hash: UInt64 = 0
         let prime: UInt64 = 31
 
@@ -490,7 +488,7 @@ public extension SoATokenStorage {
     }
 
     /// Compare two ranges for equality (same kinds and lengths).
-    func rangesEqual(_ range1: Range<Int>, _ range2: Range<Int>) -> Bool {
+    public func rangesEqual(_ range1: Range<Int>, _ range2: Range<Int>) -> Bool {
         guard range1.count == range2.count else { return false }
 
         for (i, j) in zip(range1, range2) {
@@ -505,9 +503,9 @@ public extension SoATokenStorage {
 
 // MARK: - Conversion Utilities
 
-public extension SoATokenStorage {
+extension SoATokenStorage {
     /// Create from an array of TokenInfo.
-    static func from(_ tokens: [SoATokenInfo]) -> SoATokenStorage {
+    public static func from(_ tokens: [SoATokenInfo]) -> SoATokenStorage {
         var storage = SoATokenStorage(capacity: tokens.count)
         for token in tokens {
             storage.append(

@@ -35,10 +35,10 @@ struct ProtocolConsumerView<VM: ViewModelProtocol>: View {
 
     var body: some View {
         VStack {
-            Text(viewModel.title) // Uses protocol property
+            Text(viewModel.title)  // Uses protocol property
         }
         .task {
-            await viewModel.load() // Uses protocol method
+            await viewModel.load()  // Uses protocol method
         }
     }
 }
@@ -135,8 +135,9 @@ struct ScrollTrackingView: View {
         ScrollView {
             GeometryReader { geo in
                 Color.clear
-                    .preference(key: ScrollOffsetPreferenceKey.self,
-                                value: geo.frame(in: .global).minY)
+                    .preference(
+                        key: ScrollOffsetPreferenceKey.self,
+                        value: geo.frame(in: .global).minY)
             }
         }
         .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
@@ -171,7 +172,7 @@ func makeArray<T>(@ArrayBuilder<T> content: () -> [T]) -> [T] {
 
 class ExpensiveResource {
     /// This property IS accessed lazily - should NOT be flagged
-    lazy var computedValue: Int = (0 ..< 1000).reduce(0, +)
+    lazy var computedValue: Int = (0..<1000).reduce(0, +)
 }
 
 // MARK: - PreviewedView

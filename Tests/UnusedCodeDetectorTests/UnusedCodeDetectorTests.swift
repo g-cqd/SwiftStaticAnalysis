@@ -19,6 +19,7 @@
 //
 
 import Testing
+
 @testable import SwiftStaticAnalysisCore
 @testable import UnusedCodeDetector
 

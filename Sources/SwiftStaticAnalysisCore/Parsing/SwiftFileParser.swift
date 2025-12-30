@@ -148,9 +148,9 @@ public actor SwiftFileParser {
 
 // MARK: - Syntax Position Extensions
 
-public extension AbsolutePosition {
+extension AbsolutePosition {
     /// Convert to SourceLocation using a converter.
-    func toSourceLocation(
+    public func toSourceLocation(
         using converter: SourceLocationConverter,
         file: String,
     ) -> SourceLocation {
@@ -164,9 +164,9 @@ public extension AbsolutePosition {
     }
 }
 
-public extension SyntaxProtocol {
+extension SyntaxProtocol {
     /// Get the source range for this syntax node.
-    func sourceRange(
+    public func sourceRange(
         using converter: SourceLocationConverter,
         file: String,
     ) -> SourceRange {

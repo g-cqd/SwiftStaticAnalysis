@@ -20,6 +20,7 @@
 //
 
 import Testing
+
 @testable import SwiftStaticAnalysisCore
 
 @Suite("SwiftStaticAnalysisCore Tests")

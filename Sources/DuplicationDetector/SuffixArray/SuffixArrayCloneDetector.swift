@@ -56,7 +56,8 @@ public struct SuffixArrayCloneDetector: Sendable {
     /// - Parameter sequences: Token sequences from parsed files.
     /// - Returns: Array of detected clone groups.
     public func detect(in sequences: [TokenSequence]) -> [CloneGroup] {
-        guard !sequences.isEmpty else { return [] }
+        // Safety: ensure minimumTokens is valid
+        guard !sequences.isEmpty, minimumTokens > 0 else { return [] }
 
         // Build concatenated token stream with file boundaries
         let streamResult = buildConcatenatedStream(sequences)
@@ -85,6 +86,9 @@ public struct SuffixArrayCloneDetector: Sendable {
     /// - Parameter sequences: Token sequences from parsed files.
     /// - Returns: Array of detected clone groups (both exact and parameterized).
     public func detectWithNormalization(in sequences: [TokenSequence]) -> [CloneGroup] {
+        // Safety: ensure minimumTokens is valid
+        guard !sequences.isEmpty, minimumTokens > 0 else { return [] }
+
         // Normalize sequences
         let normalizedSequences = sequences.map { normalizer.normalize($0) }
 
@@ -149,10 +153,10 @@ public struct SuffixArrayCloneDetector: Sendable {
         var tokens: [Int] = []
         var infos: [TokenStreamInfo] = []
         var tokenIdMap: [String: Int] = [:]
-        var nextTokenId = 1 // 0 reserved for separators
+        var nextTokenId = 1  // 0 reserved for separators
 
         for (fileIndex, sequence) in sequences.enumerated() {
-            for tokenIdx in 0 ..< sequence.tokenCount {
+            for tokenIdx in 0..<sequence.tokenCount {
                 let accessor = tokenAccessor(sequence, tokenIdx)
                 let tokenId: Int
                 if let existingId = tokenIdMap[accessor.text] {
@@ -164,26 +168,28 @@ public struct SuffixArrayCloneDetector: Sendable {
                 }
 
                 tokens.append(tokenId)
-                infos.append(TokenStreamInfo(
-                    fileIndex: fileIndex,
-                    tokenIndex: infos.count,
-                    line: accessor.line,
-                    column: accessor.column,
-                    originalText: accessor.original,
-                ))
+                infos.append(
+                    TokenStreamInfo(
+                        fileIndex: fileIndex,
+                        tokenIndex: infos.count,
+                        line: accessor.line,
+                        column: accessor.column,
+                        originalText: accessor.original,
+                    ))
             }
 
             // Add separator between files (unique sentinel)
             let separatorId = nextTokenId
             nextTokenId += 1
             tokens.append(separatorId)
-            infos.append(TokenStreamInfo(
-                fileIndex: fileIndex,
-                tokenIndex: infos.count,
-                line: -1,
-                column: -1,
-                originalText: "<SEP>",
-            ))
+            infos.append(
+                TokenStreamInfo(
+                    fileIndex: fileIndex,
+                    tokenIndex: infos.count,
+                    line: -1,
+                    column: -1,
+                    originalText: "<SEP>",
+                ))
         }
 
         return TokenStreamResult(tokens: tokens, infos: infos)
@@ -271,12 +277,13 @@ public struct SuffixArrayCloneDetector: Sendable {
                 tokenInfos: tokenInfos,
             )
 
-            cloneGroups.append(CloneGroup(
-                type: cloneType,
-                clones: clones,
-                similarity: 1.0,
-                fingerprint: fingerprint,
-            ))
+            cloneGroups.append(
+                CloneGroup(
+                    type: cloneType,
+                    clones: clones,
+                    similarity: 1.0,
+                    fingerprint: fingerprint,
+                ))
         }
 
         return deduplicateGroups(cloneGroups)
@@ -384,7 +391,7 @@ public struct SuffixArrayCloneDetector: Sendable {
         tokenInfos: [TokenStreamInfo],
     ) -> String {
         var parts: [String] = []
-        for i in position ..< min(position + length, tokenInfos.count) {
+        for i in position..<min(position + length, tokenInfos.count) {
             parts.append(tokenInfos[i].originalText)
         }
         return parts.joined(separator: " ").hashValue.description

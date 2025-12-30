@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Ignore directive description support: `// swa:ignore-unused - Reason for ignoring`
+- Modern RegexBuilder-based pattern matching for internal analyzers
+- `.editorconfig` for consistent editor settings
+- `.spi.yml` for Swift Package Index documentation
+
+### Changed
+- **BREAKING**: Replaced SwiftLint and SwiftFormat with official `swift-format` package
+- **BREAKING**: Restructured package to follow Apple/Swift.org conventions:
+  - CLI target renamed from `SwiftStaticAnalysisCLI` to `swa`
+  - Plugins moved from `Plugins/` to `Sources/`
+- Updated SwiftProjectKit from 0.0.12 to 0.0.19
+- `--min-tokens` CLI argument now validates input range (1-10000)
+
+### Fixed
+- `--min-tokens` argument now properly validates input, preventing crashes with invalid values
+- Added defensive guards in all clone detection algorithms for edge cases
+
+## [0.0.14] - Unreleased
+
+### Added
 - Type member inheritance: members of extensions, classes, structs, and protocols now inherit ignore directives from their parent
 - CLI Reference documentation article with complete command-line options
 - Configuration file section in README with `.swa.json` example

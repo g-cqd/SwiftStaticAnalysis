@@ -130,7 +130,8 @@ public struct DuplicationConfiguration: Sendable {
         useIncremental: Bool = false,
         cacheDirectory: URL? = nil,
     ) {
-        self.minimumTokens = minimumTokens
+        // Validate and clamp minimumTokens to safe range [1, 10000]
+        self.minimumTokens = min(max(minimumTokens, 1), 10000)
         self.cloneTypes = cloneTypes
         self.ignoredPatterns = ignoredPatterns
         self.minimumSimilarity = minimumSimilarity
@@ -269,10 +270,10 @@ public struct DuplicationDetector: Sendable {
             return try await detector.detect(in: files)
 
         case .rollingHash,
-             .suffixArray:
+            .suffixArray:
             // Use AST fingerprinting for semantic clone detection
             let detector = SemanticCloneDetector(
-                minimumNodes: configuration.minimumTokens / 5, // Roughly 5 tokens per node
+                minimumNodes: configuration.minimumTokens / 5,  // Roughly 5 tokens per node
                 minimumSimilarity: configuration.minimumSimilarity,
             )
             return try await detector.detect(in: files)
@@ -338,12 +339,12 @@ public struct DuplicationReport: Sendable, Codable {
 
 // MARK: - Clone Group Utilities
 
-public extension [CloneGroup] {
+extension [CloneGroup] {
     /// Remove duplicate clone groups based on their location fingerprints.
     ///
     /// Two clone groups are considered duplicates if they contain clones
     /// at the exact same file locations.
-    func deduplicated() -> [CloneGroup] {
+    public func deduplicated() -> [CloneGroup] {
         var seen = Set<String>()
         var result: [CloneGroup] = []
 

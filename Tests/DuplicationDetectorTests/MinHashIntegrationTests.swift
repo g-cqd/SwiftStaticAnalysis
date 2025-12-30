@@ -13,6 +13,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("MinHash Integration Tests")
@@ -78,24 +79,26 @@ struct MinHashIntegrationTests {
         // Create 10 documents, 3 of which are near-duplicates
         var documents: [ShingledDocument] = []
 
-        for i in 0 ..< 10 {
-            let tokens: [String] = if i < 3 {
-                // Near-duplicates: same base with small variation
-                ["common", "tokens", "here", "variant\(i)"]
-            } else {
-                // Unique documents
-                ["unique", "document", "number", "\(i)", "extra\(i)"]
-            }
+        for i in 0..<10 {
+            let tokens: [String] =
+                if i < 3 {
+                    // Near-duplicates: same base with small variation
+                    ["common", "tokens", "here", "variant\(i)"]
+                } else {
+                    // Unique documents
+                    ["unique", "document", "number", "\(i)", "extra\(i)"]
+                }
 
             let shingles = shingleGen.generate(tokens: tokens, kinds: nil)
-            documents.append(ShingledDocument(
-                file: "file\(i).swift",
-                startLine: 1, endLine: 1,
-                tokenCount: tokens.count,
-                shingleHashes: Set(shingles.map(\.hash)),
-                shingles: shingles,
-                id: i,
-            ))
+            documents.append(
+                ShingledDocument(
+                    file: "file\(i).swift",
+                    startLine: 1, endLine: 1,
+                    tokenCount: tokens.count,
+                    shingleHashes: Set(shingles.map(\.hash)),
+                    shingles: shingles,
+                    id: i,
+                ))
         }
 
         // Build LSH index

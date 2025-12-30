@@ -7,6 +7,7 @@
 
 import Foundation
 import Testing
+
 @testable import SwiftStaticAnalysisCore
 
 // MARK: - DiagnosticModelTests
@@ -145,7 +146,7 @@ struct DiagnosticDeduplicationTests {
     @Test("Merge diagnostics from multiple sources")
     func mergeDiagnosticsFromMultipleSources() {
         let source1 = [
-            Diagnostic(file: "a.swift", line: 1, column: 1, severity: .warning, message: "From source 1"),
+            Diagnostic(file: "a.swift", line: 1, column: 1, severity: .warning, message: "From source 1")
         ]
 
         let source2 = [
@@ -168,14 +169,15 @@ struct DiagnosticDeduplicationTests {
     @Test("Apply per-file limit")
     func applyPerFileLimit() {
         var diagnostics: [Diagnostic] = []
-        for i in 1 ... 10 {
-            diagnostics.append(Diagnostic(
-                file: "a.swift",
-                line: i,
-                column: 1,
-                severity: .warning,
-                message: "Warning \(i)",
-            ))
+        for i in 1...10 {
+            diagnostics.append(
+                Diagnostic(
+                    file: "a.swift",
+                    line: i,
+                    column: 1,
+                    severity: .warning,
+                    message: "Warning \(i)",
+                ))
         }
 
         let config = DeduplicationConfiguration(maxDiagnosticsPerFile: 5)
@@ -191,11 +193,11 @@ struct DiagnosticDeduplicationTests {
     @Test("Merge removes duplicates across sources")
     func mergeRemovesDuplicatesAcrossSources() {
         let source1 = [
-            Diagnostic(file: "a.swift", line: 1, column: 1, severity: .warning, message: "Same warning"),
+            Diagnostic(file: "a.swift", line: 1, column: 1, severity: .warning, message: "Same warning")
         ]
 
         let source2 = [
-            Diagnostic(file: "a.swift", line: 1, column: 1, severity: .warning, message: "Same warning"),
+            Diagnostic(file: "a.swift", line: 1, column: 1, severity: .warning, message: "Same warning")
         ]
 
         let deduplicator = DiagnosticDeduplicator()

@@ -9,6 +9,7 @@ import Foundation
 import SwiftParser
 import SwiftSyntax
 import Testing
+
 @testable import DuplicationDetector
 @testable import SwiftStaticAnalysisCore
 
@@ -21,20 +22,20 @@ struct ExactCloneTests {
     @Test("Detect identical code blocks")
     func detectIdenticalBlocks() {
         let source = """
-        func block1() {
-            let x = 1
-            let y = 2
-            let z = x + y
-            print(z)
-        }
+            func block1() {
+                let x = 1
+                let y = 2
+                let z = x + y
+                print(z)
+            }
 
-        func block2() {
-            let x = 1
-            let y = 2
-            let z = x + y
-            print(z)
-        }
-        """
+            func block2() {
+                let x = 1
+                let y = 2
+                let z = x + y
+                print(z)
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let extractor = TokenSequenceExtractor()
@@ -55,9 +56,9 @@ struct ExactCloneTests {
     @Test("Respect minimum token threshold")
     func respectMinimumTokens() {
         let source = """
-        let a = 1
-        let b = 1
-        """
+            let a = 1
+            let b = 1
+            """
 
         let tree = Parser.parse(source: source)
         let extractor = TokenSequenceExtractor()
@@ -133,7 +134,7 @@ struct ExactCloneTests {
         let productAPIPath = fixturesPath.appendingPathComponent("ProductAPI.swift")
 
         guard FileManager.default.fileExists(atPath: userAPIPath.path),
-              FileManager.default.fileExists(atPath: productAPIPath.path)
+            FileManager.default.fileExists(atPath: productAPIPath.path)
         else {
             Issue.record("Fixture files not found")
             return
@@ -209,22 +210,22 @@ struct CloneMergingTests {
     @Test("Merge overlapping clones")
     func mergeOverlapping() {
         let source = """
-        func test() {
-            let a = 1
-            let b = 2
-            let c = 3
-            let d = 4
-            let e = 5
-        }
+            func test() {
+                let a = 1
+                let b = 2
+                let c = 3
+                let d = 4
+                let e = 5
+            }
 
-        func test2() {
-            let a = 1
-            let b = 2
-            let c = 3
-            let d = 4
-            let e = 5
-        }
-        """
+            func test2() {
+                let a = 1
+                let b = 2
+                let c = 3
+                let d = 4
+                let e = 5
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let extractor = TokenSequenceExtractor()
@@ -246,10 +247,10 @@ struct HashCollisionTests {
     func verifyHashMatch() {
         // Two different code blocks that might have same hash (unlikely but test verification)
         let source = """
-        func a() { let x = 1; let y = 2 }
-        func b() { let x = 1; let y = 2 }
-        func c() { let p = 9; let q = 8 }
-        """
+            func a() { let x = 1; let y = 2 }
+            func b() { let x = 1; let y = 2 }
+            func c() { let p = 9; let q = 8 }
+            """
 
         let tree = Parser.parse(source: source)
         let extractor = TokenSequenceExtractor()

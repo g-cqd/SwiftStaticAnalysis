@@ -103,12 +103,13 @@ public struct SemanticCloneDetector: Sendable {
                     let similarity = calculateSimilarity(group)
 
                     if similarity >= minimumSimilarity {
-                        cloneGroups.append(CloneGroup(
-                            type: .semantic,
-                            clones: clones,
-                            similarity: similarity,
-                            fingerprint: String(hash),
-                        ))
+                        cloneGroups.append(
+                            CloneGroup(
+                                type: .semantic,
+                                clones: clones,
+                                similarity: similarity,
+                                fingerprint: String(hash),
+                            ))
                     }
                 }
             }
@@ -176,8 +177,8 @@ public struct SemanticCloneDetector: Sendable {
         var totalSimilarity = 0.0
         var comparisons = 0
 
-        for i in 0 ..< group.count {
-            for j in (i + 1) ..< group.count {
+        for i in 0..<group.count {
+            for j in (i + 1)..<group.count {
                 let sim = fingerprintSimilarity(group[i].fingerprint, group[j].fingerprint)
                 totalSimilarity += sim
                 comparisons += 1

@@ -112,11 +112,8 @@ public struct Diagnostic: Sendable, Codable, Hashable {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.file == rhs.file &&
-            lhs.line == rhs.line &&
-            lhs.column == rhs.column &&
-            lhs.severity == rhs.severity &&
-            lhs.message == rhs.message
+        lhs.file == rhs.file && lhs.line == rhs.line && lhs.column == rhs.column && lhs.severity == rhs.severity
+            && lhs.message == rhs.message
     }
 
     // MARK: - Hashable

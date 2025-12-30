@@ -145,7 +145,8 @@ public final class ReferenceCollector: ScopeTrackingVisitor {
     override public func visit(_ node: InfixOperatorExprSyntax) -> SyntaxVisitorContinueKind {
         // Check if this is an assignment
         if let op = node.operator.as(BinaryOperatorExprSyntax.self),
-           op.operator.text == "=" {
+            op.operator.text == "="
+        {
             // Left side is write context
             contextStack.append(.write)
             walk(node.leftOperand)

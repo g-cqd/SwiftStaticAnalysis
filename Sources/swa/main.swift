@@ -286,25 +286,25 @@ struct Unused: AsyncParsableCommand {
         let effectiveSensibleDefaults = sensibleDefaults || (unusedConfig?.sensibleDefaults ?? false)
 
         // Merge exclusion settings
-        let effectiveExcludeImports = excludeImports || (unusedConfig?.excludeImports ?? false) ||
-            effectiveSensibleDefaults
-        let effectiveExcludeDeinit = excludeDeinit || (unusedConfig?.excludeDeinit ?? false) ||
-            effectiveSensibleDefaults
-        let effectiveExcludeEnumCases = excludeEnumCases || (unusedConfig?.excludeEnumCases ?? false) ||
-            effectiveSensibleDefaults
-        let effectiveExcludeTestSuites = excludeTestSuites || (unusedConfig?.excludeTestSuites ?? false) ||
-            effectiveSensibleDefaults
+        let effectiveExcludeImports =
+            excludeImports || (unusedConfig?.excludeImports ?? false) || effectiveSensibleDefaults
+        let effectiveExcludeDeinit =
+            excludeDeinit || (unusedConfig?.excludeDeinit ?? false) || effectiveSensibleDefaults
+        let effectiveExcludeEnumCases =
+            excludeEnumCases || (unusedConfig?.excludeEnumCases ?? false) || effectiveSensibleDefaults
+        let effectiveExcludeTestSuites =
+            excludeTestSuites || (unusedConfig?.excludeTestSuites ?? false) || effectiveSensibleDefaults
 
         // Merge root treatment settings
         let effectiveTreatPublicAsRoot = treatPublicAsRoot || (unusedConfig?.treatPublicAsRoot ?? false)
         let effectiveTreatObjcAsRoot = treatObjcAsRoot || (unusedConfig?.treatObjcAsRoot ?? false)
         let effectiveTreatTestsAsRoot = treatTestsAsRoot || (unusedConfig?.treatTestsAsRoot ?? false)
-        let effectiveTreatSwiftUIViewsAsRoot = treatSwiftUIViewsAsRoot ||
-            (unusedConfig?.treatSwiftUIViewsAsRoot ?? false)
+        let effectiveTreatSwiftUIViewsAsRoot =
+            treatSwiftUIViewsAsRoot || (unusedConfig?.treatSwiftUIViewsAsRoot ?? false)
 
         // Merge SwiftUI settings
-        let effectiveIgnoreSwiftUIPropertyWrappers = ignoreSwiftUIPropertyWrappers ||
-            (unusedConfig?.ignoreSwiftUIPropertyWrappers ?? false)
+        let effectiveIgnoreSwiftUIPropertyWrappers =
+            ignoreSwiftUIPropertyWrappers || (unusedConfig?.ignoreSwiftUIPropertyWrappers ?? false)
         let effectiveIgnorePreviewProviders = ignorePreviewProviders || (unusedConfig?.ignorePreviewProviders ?? false)
         let effectiveIgnoreViewBody = ignoreViewBody || (unusedConfig?.ignoreViewBody ?? false)
 
@@ -678,7 +678,8 @@ enum OutputFormatter {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         if let data = try? encoder.encode(value),
-           let json = String(data: data, encoding: .utf8) {
+            let json = String(data: data, encoding: .utf8)
+        {
             print(json)
         }
     }

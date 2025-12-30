@@ -133,7 +133,8 @@ extension UnusedCodeDetector {
             unusedItems.append(contentsOf: unusedImports)
         }
 
-        return unusedItems
+        return
+            unusedItems
             .filter { $0.confidence >= configuration.minimumConfidence }
             .sorted { $0.confidence > $1.confidence }
     }
@@ -213,24 +214,24 @@ extension UnusedCodeDetector {
     private func shouldCheckKind(_ declaration: Declaration) -> Bool {
         switch declaration.kind {
         case .constant,
-             .variable:
+            .variable:
             configuration.detectVariables
 
         case .function,
-             .method:
+            .method:
             configuration.detectFunctions
 
         case .class,
-             .enum,
-             .protocol,
-             .struct:
+            .enum,
+            .protocol,
+            .struct:
             configuration.detectTypes
 
         case .parameter:
             configuration.detectParameters
 
         case .import:
-            false // Handled separately
+            false  // Handled separately
 
         default:
             true
@@ -270,8 +271,9 @@ extension UnusedCodeDetector {
 
         // Ignore View body computed property
         if configuration.ignoreViewBody,
-           declaration.name == "body",
-           declaration.kind == .variable {
+            declaration.name == "body",
+            declaration.kind == .variable
+        {
             return true
         }
 
@@ -282,7 +284,8 @@ extension UnusedCodeDetector {
     private func matchesIgnoredPattern(_ declaration: Declaration) -> Bool {
         for pattern in configuration.ignoredPatterns {
             if let regex = try? Regex(pattern),
-               declaration.name.contains(regex) {
+                declaration.name.contains(regex)
+            {
                 return true
             }
         }
@@ -299,7 +302,7 @@ extension UnusedCodeDetector {
     ) -> UnusedReason {
         switch declaration.kind {
         case .constant,
-             .variable:
+            .variable:
             // Check if only written to
             let refs = result.references.find(identifier: declaration.name)
             let hasReads = refs.contains { $0.context == .read }
@@ -354,19 +357,18 @@ extension UnusedCodeDetector {
             // Check if any type reference might be from this module
             // This is approximate without semantic analysis
             let potentiallyUsed = result.references.references.contains { ref in
-                ref.context == .typeAnnotation ||
-                    ref.context == .inheritance ||
-                    ref.context == .call
+                ref.context == .typeAnnotation || ref.context == .inheritance || ref.context == .call
             }
 
             // For now, mark as low confidence since we can't be certain
             if !potentiallyUsed {
-                unusedImports.append(UnusedCode(
-                    declaration: importDecl,
-                    reason: .importNotUsed,
-                    confidence: .low,
-                    suggestion: "Import '\(moduleName)' may not be used",
-                ))
+                unusedImports.append(
+                    UnusedCode(
+                        declaration: importDecl,
+                        reason: .importNotUsed,
+                        confidence: .low,
+                        suggestion: "Import '\(moduleName)' may not be used",
+                    ))
             }
         }
 

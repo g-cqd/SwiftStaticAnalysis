@@ -7,6 +7,7 @@
 
 import Foundation
 import Testing
+
 @testable import SwiftStaticAnalysisCore
 
 // MARK: - ArenaAllocationTests
@@ -28,10 +29,10 @@ struct ArenaAllocationTests {
         #expect(buffer.count == 10)
 
         // Write and verify
-        for i in 0 ..< 10 {
+        for i in 0..<10 {
             buffer[i] = i * 10
         }
-        for i in 0 ..< 10 {
+        for i in 0..<10 {
             #expect(buffer[i] == i * 10)
         }
     }
@@ -58,7 +59,7 @@ struct ArenaAllocationTests {
         let arena = Arena()
 
         // Make some allocations
-        for _ in 0 ..< 100 {
+        for _ in 0..<100 {
             arena.allocate(size: 1000, alignment: 8)
         }
 
@@ -68,7 +69,7 @@ struct ArenaAllocationTests {
         // Reset
         arena.reset()
         #expect(arena.totalBytesAllocated == 0)
-        #expect(arena.blockCount == blockCount) // Blocks kept
+        #expect(arena.blockCount == blockCount)  // Blocks kept
     }
 
     @Test("Arena release frees all memory")
@@ -76,7 +77,7 @@ struct ArenaAllocationTests {
         let arena = Arena()
 
         // Make some allocations
-        for _ in 0 ..< 10 {
+        for _ in 0..<10 {
             arena.allocate(size: 10000, alignment: 8)
         }
 
@@ -254,9 +255,9 @@ struct MemoryMappedFileTests {
 
         let mmf = try MemoryMappedFile(path: path)
 
-        #expect(mmf[0] == 65) // 'A'
-        #expect(mmf[4] == 69) // 'E'
-        #expect(mmf[5] == nil) // Out of range
+        #expect(mmf[0] == 65)  // 'A'
+        #expect(mmf[4] == 69)  // 'E'
+        #expect(mmf[5] == nil)  // Out of range
     }
 
     @Test("Line ranges are computed correctly")
@@ -457,7 +458,7 @@ struct SoATokenStorageTests {
         storage.reserveCapacity(1000)
 
         // Should be able to add without reallocation
-        for i in 0 ..< 1000 {
+        for i in 0..<1000 {
             storage.append(kind: .identifier, offset: i, length: 1, line: 1)
         }
 
@@ -467,7 +468,7 @@ struct SoATokenStorageTests {
     @Test("RemoveAll clears storage")
     func removeAll() {
         var storage = SoATokenStorage()
-        for i in 0 ..< 100 {
+        for i in 0..<100 {
             storage.append(kind: .keyword, offset: i, length: 1, line: 1)
         }
 
@@ -517,8 +518,8 @@ struct SoATokenStorageTests {
         storage.append(kind: .keyword, offset: 3, length: 1, line: 4)
         storage.append(kind: .keyword, offset: 4, length: 1, line: 5)
 
-        let range = storage.tokensInLineRange(2 ... 4)
-        #expect(range == 1 ..< 4)
+        let range = storage.tokensInLineRange(2...4)
+        #expect(range == 1..<4)
     }
 
     @Test("Hash range produces consistent hash")
@@ -527,8 +528,8 @@ struct SoATokenStorageTests {
         storage.append(kind: .keyword, offset: 0, length: 4, line: 1)
         storage.append(kind: .identifier, offset: 5, length: 3, line: 1)
 
-        let hash1 = storage.hashRange(0 ..< 2)
-        let hash2 = storage.hashRange(0 ..< 2)
+        let hash1 = storage.hashRange(0..<2)
+        let hash2 = storage.hashRange(0..<2)
 
         #expect(hash1 == hash2)
     }
@@ -541,13 +542,13 @@ struct SoATokenStorageTests {
         storage.append(kind: .keyword, offset: 10, length: 4, line: 2)
         storage.append(kind: .identifier, offset: 15, length: 3, line: 2)
 
-        #expect(storage.rangesEqual(0 ..< 2, 2 ..< 4))
+        #expect(storage.rangesEqual(0..<2, 2..<4))
     }
 
     @Test("Memory usage is calculated correctly")
     func memoryUsage() {
         var storage = SoATokenStorage()
-        for i in 0 ..< 100 {
+        for i in 0..<100 {
             storage.append(kind: .keyword, offset: i, length: 1, line: 1)
         }
 
@@ -626,13 +627,13 @@ struct MultiFileSoAStorageTests {
         var multi = MultiFileSoAStorage()
 
         var tokens1 = SoATokenStorage()
-        for i in 0 ..< 5 {
+        for i in 0..<5 {
             tokens1.append(kind: .keyword, offset: i, length: 1, line: 1)
         }
         multi.addFile(path: "file1.swift", tokens: tokens1)
 
         var tokens2 = SoATokenStorage()
-        for i in 0 ..< 3 {
+        for i in 0..<3 {
             tokens2.append(kind: .identifier, offset: i, length: 1, line: 1)
         }
         multi.addFile(path: "file2.swift", tokens: tokens2)
@@ -642,7 +643,7 @@ struct MultiFileSoAStorageTests {
         #expect(range1.end == 5)
 
         let range2 = multi.tokens(forFile: 1)
-        #expect(range2.start == 6) // After boundary marker
+        #expect(range2.start == 6)  // After boundary marker
         #expect(range2.end == 9)
     }
 
@@ -651,13 +652,13 @@ struct MultiFileSoAStorageTests {
         var multi = MultiFileSoAStorage()
 
         var tokens1 = SoATokenStorage()
-        for i in 0 ..< 5 {
+        for i in 0..<5 {
             tokens1.append(kind: .keyword, offset: i, length: 1, line: 1)
         }
         multi.addFile(path: "file1.swift", tokens: tokens1)
 
         var tokens2 = SoATokenStorage()
-        for i in 0 ..< 3 {
+        for i in 0..<3 {
             tokens2.append(kind: .identifier, offset: i, length: 1, line: 1)
         }
         multi.addFile(path: "file2.swift", tokens: tokens2)
@@ -695,7 +696,7 @@ struct TokenKindByteTests {
         var set = Set<TokenKindByte>()
         set.insert(.keyword)
         set.insert(.identifier)
-        set.insert(.keyword) // Duplicate
+        set.insert(.keyword)  // Duplicate
 
         #expect(set.count == 2)
     }
@@ -720,10 +721,10 @@ struct ZeroCopyParserTests {
     @Test("Zero-copy parser can parse Swift file")
     func basicParsing() async throws {
         let content = """
-        func hello() {
-            print("Hello")
-        }
-        """
+            func hello() {
+                print("Hello")
+            }
+            """
         let path = try createTempSwiftFile(content: content)
         defer { deleteTempFile(path) }
 
@@ -748,7 +749,7 @@ struct ZeroCopyParserTests {
         #expect(result.tokens.count >= 4)
 
         // Check token kinds
-        let kinds = (0 ..< result.tokens.count).map { result.tokens.kind(at: $0) }
+        let kinds = (0..<result.tokens.count).map { result.tokens.kind(at: $0) }
         #expect(kinds.contains(.keyword))
         #expect(kinds.contains(.identifier))
         #expect(kinds.contains(.literal))
@@ -769,7 +770,7 @@ struct ZeroCopyParserTests {
         let cacheSize2 = await parser.cacheSize
 
         #expect(cacheSize1 == 1)
-        #expect(cacheSize2 == 1) // Same entry reused
+        #expect(cacheSize2 == 1)  // Same entry reused
     }
 
     @Test("Zero-copy parser cache can be cleared")
@@ -789,7 +790,7 @@ struct ZeroCopyParserTests {
 
     @Test("Small files use regular I/O")
     func smallFileHandling() async throws {
-        let content = "x" // Very small file
+        let content = "x"  // Very small file
         let path = try createTempSwiftFile(content: content)
         defer { deleteTempFile(path) }
 
@@ -805,10 +806,10 @@ struct ZeroCopyParserTests {
     @Test("Code snippet extraction works")
     func snippetExtraction() async throws {
         let content = """
-        line 1
-        line 2
-        line 3
-        """
+            line 1
+            line 2
+            line 3
+            """
         let path = try createTempSwiftFile(content: content)
         defer { deleteTempFile(path) }
 
@@ -842,7 +843,7 @@ struct BatchTokenExtractorTests {
             createTempSwiftFile(name: "b_\(UUID()).swift", content: "let b = 2"),
             createTempSwiftFile(name: "c_\(UUID()).swift", content: "let c = 3"),
         ]
-        defer { files.forEach { deleteTempFile($0) } }
+        defer { for file in files { deleteTempFile(file) } }
 
         let extractor = BatchTokenExtractor()
         let result = try await extractor.extract(from: files)
@@ -854,11 +855,11 @@ struct BatchTokenExtractorTests {
     @Test("Parallel extraction works")
     func parallelExtraction() async throws {
         var files: [String] = []
-        for i in 0 ..< 5 {
+        for i in 0..<5 {
             let file = try createTempSwiftFile(name: "file\(i)_\(UUID()).swift", content: "let x\(i) = \(i)")
             files.append(file)
         }
-        defer { files.forEach { deleteTempFile($0) } }
+        defer { for file in files { deleteTempFile(file) } }
 
         let extractor = BatchTokenExtractor()
         let result = try await extractor.extractParallel(from: files, maxConcurrency: 4)
@@ -891,10 +892,10 @@ struct SliceBasedTokenSequenceTests {
 
         let mmf = try MemoryMappedFile(path: path)
         let tokens = [
-            TokenSlice(offset: 0, length: 4, line: 1, column: 1), // func
-            TokenSlice(offset: 5, length: 4, line: 1, column: 6), // test
+            TokenSlice(offset: 0, length: 4, line: 1, column: 1),  // func
+            TokenSlice(offset: 5, length: 4, line: 1, column: 6),  // test
         ]
-        let kinds: [UInt8] = [0, 1] // keyword, identifier
+        let kinds: [UInt8] = [0, 1]  // keyword, identifier
 
         let sequence = SliceBasedTokenSequence(
             file: path,

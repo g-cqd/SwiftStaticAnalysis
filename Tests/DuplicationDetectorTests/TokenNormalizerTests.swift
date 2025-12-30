@@ -15,6 +15,7 @@
 
 import SwiftParser
 import Testing
+
 @testable import DuplicationDetector
 @testable import SwiftStaticAnalysisCore
 

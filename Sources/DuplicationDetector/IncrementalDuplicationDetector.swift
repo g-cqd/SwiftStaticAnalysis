@@ -103,7 +103,8 @@ public actor IncrementalDuplicationDetector {
         // Load cached sequences
         for file in cachedFiles {
             if let hash = fileHashes[file],
-               let cached = await tokenCache.get(file: file, currentHash: hash) {
+                let cached = await tokenCache.get(file: file, currentHash: hash)
+            {
                 sequences.append(cached.toTokenSequence())
             }
         }

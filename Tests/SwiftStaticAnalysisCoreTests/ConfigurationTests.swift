@@ -56,23 +56,23 @@ struct SWAConfigurationTests {
     @Test("Configuration parses from JSON")
     func parseFromJSON() throws {
         let json = """
-        {
-            "version": 1,
-            "format": "text",
-            "excludePaths": ["**/Fixtures/**", "**/Generated/**"],
-            "unused": {
-                "enabled": true,
-                "mode": "simple",
-                "sensibleDefaults": true,
-                "ignorePublicAPI": true
-            },
-            "duplicates": {
-                "enabled": false,
-                "minTokens": 75,
-                "minSimilarity": 0.9
+            {
+                "version": 1,
+                "format": "text",
+                "excludePaths": ["**/Fixtures/**", "**/Generated/**"],
+                "unused": {
+                    "enabled": true,
+                    "mode": "simple",
+                    "sensibleDefaults": true,
+                    "ignorePublicAPI": true
+                },
+                "duplicates": {
+                    "enabled": false,
+                    "minTokens": 75,
+                    "minSimilarity": 0.9
+                }
             }
-        }
-        """
+            """
 
         let data = json.data(using: .utf8)!
         let decoder = JSONDecoder()
@@ -93,13 +93,13 @@ struct SWAConfigurationTests {
     @Test("Partial configuration uses nil for missing values")
     func partialConfiguration() throws {
         let json = """
-        {
-            "version": 1,
-            "unused": {
-                "mode": "reachability"
+            {
+                "version": 1,
+                "unused": {
+                    "mode": "reachability"
+                }
             }
-        }
-        """
+            """
 
         let data = json.data(using: .utf8)!
         let decoder = JSONDecoder()
@@ -117,13 +117,13 @@ struct SWAConfigurationTests {
     @Test("Configuration without version field uses default version")
     func configWithoutVersion() throws {
         let json = """
-        {
-            "format": "xcode",
-            "unused": {
-                "sensibleDefaults": true
+            {
+                "format": "xcode",
+                "unused": {
+                    "sensibleDefaults": true
+                }
             }
-        }
-        """
+            """
 
         let data = json.data(using: .utf8)!
         let decoder = JSONDecoder()
@@ -138,12 +138,12 @@ struct SWAConfigurationTests {
     @Test("Minimal configuration with only one setting parses correctly")
     func minimalConfiguration() throws {
         let json = """
-        {
-            "duplicates": {
-                "minTokens": 100
+            {
+                "duplicates": {
+                    "minTokens": 100
+                }
             }
-        }
-        """
+            """
 
         let data = json.data(using: .utf8)!
         let decoder = JSONDecoder()
@@ -159,15 +159,15 @@ struct SWAConfigurationTests {
     @Test("Unknown keys are ignored (forward compatibility)")
     func unknownKeysIgnored() throws {
         let json = """
-        {
-            "version": 1,
-            "futureKey": "futureValue",
-            "unused": {
-                "enabled": true,
-                "futureOption": 42
+            {
+                "version": 1,
+                "futureKey": "futureValue",
+                "unused": {
+                    "enabled": true,
+                    "futureOption": 42
+                }
             }
-        }
-        """
+            """
 
         let data = json.data(using: .utf8)!
         let decoder = JSONDecoder()
@@ -287,11 +287,11 @@ struct ConfigurationLoaderTests {
 
         let configPath = tempDir.appendingPathComponent(".swa.json")
         let configContent = """
-        {
-            "version": 1,
-            "format": "xcode"
-        }
-        """
+            {
+                "version": 1,
+                "format": "xcode"
+            }
+            """
         try configContent.write(to: configPath, atomically: true, encoding: .utf8)
 
         let loader = ConfigurationLoader()
@@ -310,10 +310,10 @@ struct ConfigurationLoaderTests {
 
         let configPath = tempDir.appendingPathComponent("swa.json")
         let configContent = """
-        {
-            "version": 1
-        }
-        """
+            {
+                "version": 1
+            }
+            """
         try configContent.write(to: configPath, atomically: true, encoding: .utf8)
 
         let loader = ConfigurationLoader()
@@ -366,15 +366,15 @@ struct ConfigurationLoaderTests {
 
         let configPath = tempDir.appendingPathComponent(".swa.json")
         let configContent = """
-        {
-            "version": 1,
-            "format": "json",
-            "unused": {
-                "enabled": true,
-                "mode": "reachability"
+            {
+                "version": 1,
+                "format": "json",
+                "unused": {
+                    "enabled": true,
+                    "mode": "reachability"
+                }
             }
-        }
-        """
+            """
         try configContent.write(to: configPath, atomically: true, encoding: .utf8)
 
         let loader = ConfigurationLoader()
@@ -414,13 +414,13 @@ struct ConfigurationLoaderTests {
 
         let configPath = tempDir.appendingPathComponent("custom-config.json")
         let configContent = """
-        {
-            "version": 1,
-            "duplicates": {
-                "minTokens": 200
+            {
+                "version": 1,
+                "duplicates": {
+                    "minTokens": 200
+                }
             }
-        }
-        """
+            """
         try configContent.write(to: configPath, atomically: true, encoding: .utf8)
 
         let loader = ConfigurationLoader()

@@ -11,6 +11,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("LSH Pipeline Tests")

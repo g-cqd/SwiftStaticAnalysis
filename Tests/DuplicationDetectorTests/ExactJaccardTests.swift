@@ -14,6 +14,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("Exact Jaccard Similarity Tests")

@@ -26,7 +26,7 @@ struct UnusedComplexView: View {
     var body: some View {
         VStack {
             Text("Complex but unused")
-            ForEach(0 ..< 10) { i in
+            ForEach(0..<10) { i in
                 Text("Item \(i)")
             }
         }

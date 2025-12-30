@@ -322,9 +322,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
 
                 // GEN: definitions created in this block
                 let newDef = definitions.first {
-                    $0.block == block.id &&
-                        $0.statementIndex == index &&
-                        $0.variable == variable
+                    $0.block == block.id && $0.statementIndex == index && $0.variable == variable
                 }
                 if let newDef {
                     gen.insert(newDef)
@@ -433,12 +431,13 @@ public struct ReachingDefinitionsAnalysis: Sendable {
 
                     if varDefs.isEmpty {
                         // No definition reaches this use
-                        uninitializedUses.append(UninitializedUse(
-                            variable: usedVar,
-                            location: statement.location,
-                            reachingDefinitionCount: 0,
-                            definitelyUninitialized: true,
-                        ))
+                        uninitializedUses.append(
+                            UninitializedUse(
+                                variable: usedVar,
+                                location: statement.location,
+                                reachingDefinitionCount: 0,
+                                definitelyUninitialized: true,
+                            ))
                     }
                 }
 
@@ -497,9 +496,9 @@ public struct ReachingDefinitionsAnalysis: Sendable {
 // MARK: - Debug Output
 
 // swa:ignore-unused - Debug utilities for development and troubleshooting
-public extension ReachingDefinitionsResult {
+extension ReachingDefinitionsResult {
     /// Generate a debug string showing reaching definitions information.
-    func debugDescription() -> String {
+    public func debugDescription() -> String {
         var output = "Reaching Definitions Analysis Results:\n"
         output += "======================================\n\n"
 
@@ -625,9 +624,7 @@ public struct CombinedDataFlowAnalysis: Sendable {
 
 extension DeadStore: Hashable {
     public static func == (lhs: DeadStore, rhs: DeadStore) -> Bool {
-        lhs.variable == rhs.variable &&
-            lhs.location.line == rhs.location.line &&
-            lhs.location.file == rhs.location.file
+        lhs.variable == rhs.variable && lhs.location.line == rhs.location.line && lhs.location.file == rhs.location.file
     }
 
     public func hash(into hasher: inout Hasher) {

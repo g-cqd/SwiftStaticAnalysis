@@ -16,6 +16,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("Shingle Generator Tests")
@@ -26,7 +27,7 @@ struct ShingleGeneratorTests {
         let tokens = ["a", "b", "c", "d", "e"]
         let shingles = generator.generate(tokens: tokens, kinds: nil)
 
-        #expect(shingles.count == 3) // 5 tokens - 3 + 1 = 3 shingles
+        #expect(shingles.count == 3)  // 5 tokens - 3 + 1 = 3 shingles
         #expect(shingles[0].tokens == ["a", "b", "c"])
         #expect(shingles[1].tokens == ["b", "c", "d"])
         #expect(shingles[2].tokens == ["c", "d", "e"])
@@ -108,7 +109,7 @@ struct ShingleGeneratorTests {
     func differentShingleSizes() {
         let tokens = ["a", "b", "c", "d", "e", "f"]
 
-        for size in 1 ... 5 {
+        for size in 1...5 {
             let generator = ShingleGenerator(shingleSize: size, normalize: false)
             let shingles = generator.generate(tokens: tokens, kinds: nil)
             #expect(shingles.count == tokens.count - size + 1)

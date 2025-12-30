@@ -33,7 +33,7 @@ let package = Package(
         // CLI tool
         .executable(
             name: "swa",
-            targets: ["SwiftStaticAnalysisCLI"]
+            targets: ["swa"]
         ),
 
         // Build plugin (runs on every build with Xcode reporting)
@@ -52,7 +52,8 @@ let package = Package(
         .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
         .package(url: "https://github.com/swiftlang/indexstore-db.git", branch: "main"),
-        .package(url: "https://github.com/g-cqd/SwiftProjectKit.git", from: "0.0.12"),
+        .package(url: "https://github.com/swiftlang/swift-format.git", from: "602.0.0"),
+        .package(url: "https://github.com/g-cqd/SwiftProjectKit.git", from: "0.0.19"),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.3"),
     ],
     targets: [
@@ -66,10 +67,6 @@ let package = Package(
             swiftSettings: [
                 .swiftLanguageMode(.v6),
                 .enableExperimentalFeature("StrictConcurrency"),
-            ],
-            plugins: [
-                .plugin(name: "SwiftLintBuildPlugin", package: "SwiftProjectKit"),
-                .plugin(name: "SwiftFormatBuildPlugin", package: "SwiftProjectKit"),
             ]
         ),
 
@@ -82,10 +79,6 @@ let package = Package(
             swiftSettings: [
                 .swiftLanguageMode(.v6),
                 .enableExperimentalFeature("StrictConcurrency"),
-            ],
-            plugins: [
-                .plugin(name: "SwiftLintBuildPlugin", package: "SwiftProjectKit"),
-                .plugin(name: "SwiftFormatBuildPlugin", package: "SwiftProjectKit"),
             ]
         ),
 
@@ -99,16 +92,12 @@ let package = Package(
             swiftSettings: [
                 .swiftLanguageMode(.v6),
                 .enableExperimentalFeature("StrictConcurrency"),
-            ],
-            plugins: [
-                .plugin(name: "SwiftLintBuildPlugin", package: "SwiftProjectKit"),
-                .plugin(name: "SwiftFormatBuildPlugin", package: "SwiftProjectKit"),
             ]
         ),
 
         // MARK: - CLI Tool
         .executableTarget(
-            name: "SwiftStaticAnalysisCLI",
+            name: "swa",
             dependencies: [
                 "SwiftStaticAnalysisCore",
                 "DuplicationDetector",
@@ -118,10 +107,6 @@ let package = Package(
             swiftSettings: [
                 .swiftLanguageMode(.v6),
                 .enableExperimentalFeature("StrictConcurrency"),
-            ],
-            plugins: [
-                .plugin(name: "SwiftLintBuildPlugin", package: "SwiftProjectKit"),
-                .plugin(name: "SwiftFormatBuildPlugin", package: "SwiftProjectKit"),
             ]
         ),
 
@@ -130,7 +115,8 @@ let package = Package(
         .plugin(
             name: "StaticAnalysisBuildPlugin",
             capability: .buildTool(),
-            dependencies: ["SwiftStaticAnalysisCLI"]
+            dependencies: ["swa"],
+            path: "Sources/StaticAnalysisBuildPlugin"
         ),
 
         .plugin(
@@ -142,7 +128,8 @@ let package = Package(
                 ),
                 permissions: []
             ),
-            dependencies: ["SwiftStaticAnalysisCLI"]
+            dependencies: ["swa"],
+            path: "Sources/StaticAnalysisCommandPlugin"
         ),
 
         // MARK: - Unified Module (re-exports all components)

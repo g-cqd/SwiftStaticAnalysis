@@ -121,8 +121,7 @@ public struct DependencyExtractor: Sendable {
 
         return fileRefs.filter { ref in
             // Check if the reference is within the declaration's range
-            ref.location.line >= declaration.range.start.line &&
-                ref.location.line <= declaration.range.end.line
+            ref.location.line >= declaration.range.start.line && ref.location.line <= declaration.range.end.line
         }
     }
 
@@ -156,7 +155,7 @@ public struct DependencyExtractor: Sendable {
             .call
 
         case .read,
-             .write:
+            .write:
             .propertyAccess
 
         case .typeAnnotation:
@@ -172,13 +171,13 @@ public struct DependencyExtractor: Sendable {
             .keyPath
 
         case .memberAccessBase,
-             .memberAccessMember:
+            .memberAccessMember:
             .propertyAccess
 
         case .attribute,
-             .import,
-             .pattern,
-             .unknown:
+            .import,
+            .pattern,
+            .unknown:
             .typeReference
         }
     }
@@ -188,7 +187,8 @@ public struct DependencyExtractor: Sendable {
         var names: [String] = []
 
         // Simple extraction - split on common type separators
-        let cleaned = typeAnnotation
+        let cleaned =
+            typeAnnotation
             .replacingOccurrences(of: "[", with: " ")
             .replacingOccurrences(of: "]", with: " ")
             .replacingOccurrences(of: "<", with: " ")
@@ -208,8 +208,9 @@ public struct DependencyExtractor: Sendable {
 
             // Skip keywords and basic types
             if !name.isEmpty,
-               name.first?.isUppercase == true,
-               !isBuiltInType(name) {
+                name.first?.isUppercase == true,
+                !isBuiltInType(name)
+            {
                 names.append(name)
             }
         }
@@ -265,8 +266,7 @@ public struct DependencyExtractor: Sendable {
         for proto in protocols {
             // Get methods declared in the protocol (approximate by scope)
             let protoMethods = result.declarations.declarations.filter { decl in
-                (decl.kind == .function || decl.kind == .method) &&
-                    decl.scope.id.contains(proto.name)
+                (decl.kind == .function || decl.kind == .method) && decl.scope.id.contains(proto.name)
             }
 
             for protoMethod in protoMethods {
@@ -276,7 +276,8 @@ public struct DependencyExtractor: Sendable {
                         // Check if this is likely a protocol implementation
                         // (same kind, not in protocol itself)
                         if impl.kind == protoMethod.kind,
-                           !impl.scope.id.contains(proto.name) {
+                            !impl.scope.id.contains(proto.name)
+                        {
                             // Add edge from protocol method to implementation
                             let protoNode = DeclarationNode(declaration: protoMethod)
                             let implNode = DeclarationNode(declaration: impl)
@@ -296,8 +297,7 @@ public struct DependencyExtractor: Sendable {
 
             // Find methods in this type's scope
             let typeMethods = result.declarations.declarations.filter { decl in
-                (decl.kind == .function || decl.kind == .method) &&
-                    decl.scope.id.contains(type.name)
+                (decl.kind == .function || decl.kind == .method) && decl.scope.id.contains(type.name)
             }
 
             for method in typeMethods {
@@ -432,17 +432,17 @@ public struct ReachabilityBasedDetector: Sendable {
     private func shouldReport(_ declaration: Declaration) -> Bool {
         switch declaration.kind {
         case .constant,
-             .variable:
+            .variable:
             configuration.detectVariables
 
         case .function,
-             .method:
+            .method:
             configuration.detectFunctions
 
         case .class,
-             .enum,
-             .protocol,
-             .struct:
+            .enum,
+            .protocol,
+            .struct:
             configuration.detectTypes
 
         case .parameter:

@@ -367,7 +367,7 @@ public final class ReachabilityGraph: @unchecked Sendable {
     private let lock = NSLock()
 
     /// Determine if a declaration should be a root and why.
-    private func determineRootReason( // swiftlint:disable:this cyclomatic_complexity function_body_length
+    private func determineRootReason(  // swiftlint:disable:this cyclomatic_complexity function_body_length
         for declaration: Declaration,
         configuration: RootDetectionConfiguration,
     ) -> RootReason? {
@@ -407,17 +407,16 @@ public final class ReachabilityGraph: @unchecked Sendable {
         }
 
         // Check for Interface Builder connections
-        if hasAttribute(declaration, named: "IBAction") ||
-            hasAttribute(declaration, named: "IBOutlet") ||
-            hasAttribute(declaration, named: "IBInspectable") ||
-            hasAttribute(declaration, named: "IBDesignable") {
+        if hasAttribute(declaration, named: "IBAction") || hasAttribute(declaration, named: "IBOutlet")
+            || hasAttribute(declaration, named: "IBInspectable") || hasAttribute(declaration, named: "IBDesignable")
+        {
             return .interfaceBuilder
         }
 
         // Check for test methods
-        if configuration.treatTestsAsRoot &&
-            declaration.name.hasPrefix("test") &&
-            (declaration.kind == .function || declaration.kind == .method) {
+        if configuration.treatTestsAsRoot && declaration.name.hasPrefix("test")
+            && (declaration.kind == .function || declaration.kind == .method)
+        {
             return .testMethod
         }
 
@@ -426,15 +425,15 @@ public final class ReachabilityGraph: @unchecked Sendable {
             return .codableRequirement
         }
 
-        if (declaration.name == "encode" || declaration.name == "init") &&
-            declaration.kind == .function {
+        if (declaration.name == "encode" || declaration.name == "init") && declaration.kind == .function {
             // Could be Codable - mark as potential root with low confidence
             // This should be refined with type information
         }
 
         // Check for dynamic features
-        if hasAttribute(declaration, named: "dynamicMemberLookup") ||
-            hasAttribute(declaration, named: "dynamicCallable") {
+        if hasAttribute(declaration, named: "dynamicMemberLookup")
+            || hasAttribute(declaration, named: "dynamicCallable")
+        {
             return .dynamicFeature
         }
 
@@ -462,8 +461,9 @@ public final class ReachabilityGraph: @unchecked Sendable {
 
         // Check for View body property
         if configuration.treatSwiftUIViewsAsRoot,
-           declaration.name == "body",
-           declaration.kind == .variable {
+            declaration.name == "body",
+            declaration.kind == .variable
+        {
             return .viewBody
         }
 
@@ -601,9 +601,9 @@ public struct ReachabilityReport: Sendable {
     }
 }
 
-public extension ReachabilityGraph {
+extension ReachabilityGraph {
     /// Generate a report of the reachability analysis.
-    func generateReport() -> ReachabilityReport {
+    public func generateReport() -> ReachabilityReport {
         let reachable = computeReachable()
         let unreachableNodes = computeUnreachable()
 

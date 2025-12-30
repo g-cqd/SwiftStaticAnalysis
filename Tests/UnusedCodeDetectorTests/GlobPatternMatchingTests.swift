@@ -16,6 +16,7 @@
 
 import Foundation
 import Testing
+
 @testable import UnusedCodeDetector
 
 @Suite("Glob Pattern Matching Tests")

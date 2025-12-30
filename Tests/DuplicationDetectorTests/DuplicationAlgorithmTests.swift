@@ -13,6 +13,7 @@
 //
 
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("Duplication Detector Algorithm Tests")

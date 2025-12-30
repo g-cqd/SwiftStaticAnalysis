@@ -125,15 +125,17 @@ public struct MultiProbeLSH: Sendable, LSHQueryable {
         var results: [SimilarPair] = []
         for pair in pairs {
             guard let sig1 = signatures[pair.id1],
-                  let sig2 = signatures[pair.id2] else { continue }
+                let sig2 = signatures[pair.id2]
+            else { continue }
 
             let similarity = sig1.estimateSimilarity(with: sig2)
             if similarity >= threshold {
-                results.append(SimilarPair(
-                    documentId1: pair.id1,
-                    documentId2: pair.id2,
-                    similarity: similarity,
-                ))
+                results.append(
+                    SimilarPair(
+                        documentId1: pair.id1,
+                        documentId2: pair.id2,
+                        similarity: similarity,
+                    ))
             }
         }
 
@@ -162,25 +164,26 @@ public struct MultiProbeLSH: Sendable, LSHQueryable {
     ) -> [PerturbationVector] {
         var vectors: [PerturbationVector] = []
 
-        for band in 0 ..< bands {
+        for band in 0..<bands {
             let bandStart = band * rows
 
-            for probe in 0 ..< probesPerBand {
+            for probe in 0..<probesPerBand {
                 var deltas: [(index: Int, delta: UInt64)] = []
 
                 // For each probe, perturb positions within the band
                 // Use different perturbation strategies for each probe
-                for row in 0 ..< min(probe + 1, rows) {
+                for row in 0..<min(probe + 1, rows) {
                     let index = bandStart + row
                     // Use incrementing deltas for variety
                     let delta = UInt64(probe + 1)
                     deltas.append((index, delta))
                 }
 
-                vectors.append(PerturbationVector(
-                    band: band,
-                    deltas: deltas,
-                ))
+                vectors.append(
+                    PerturbationVector(
+                        band: band,
+                        deltas: deltas,
+                    ))
             }
         }
 
@@ -231,14 +234,14 @@ struct PerturbationVector: Sendable {
 
 // MARK: - LSH Index Extension for Multi-Probe Support
 
-public extension LSHIndex {
+extension LSHIndex {
     /// Query with multiple probes for improved recall.
     ///
     /// - Parameters:
     ///   - signature: The query signature.
     ///   - probes: Number of additional probes per band.
     /// - Returns: Set of candidate document IDs.
-    func queryMultiProbe(
+    public func queryMultiProbe(
         _ signature: MinHashSignature,
         probes: Int = 3,
     ) -> Set<Int> {
@@ -269,7 +272,7 @@ public extension LSHIndex {
     ///   - threshold: Minimum similarity to include.
     /// - Returns: Array of (documentId, similarity) pairs, sorted by similarity.
     /// - Note: swa:ignore-unused - Advanced query with ranking for future similarity-based features
-    func queryMultiProbeWithSimilarity(
+    public func queryMultiProbeWithSimilarity(
         _ signature: MinHashSignature,
         probes: Int = 3,
         threshold: Double = 0.0,
@@ -295,27 +298,29 @@ public extension LSHIndex {
     ) -> [MinHashSignature] {
         var perturbations: [MinHashSignature] = []
 
-        for bandIndex in 0 ..< min(count, bands) {
+        for bandIndex in 0..<min(count, bands) {
             var perturbed = signature.values
             // Perturb one value in this band
             let offset = bandIndex * rows
             if offset < perturbed.count {
                 perturbed[offset] = perturbed[offset] &+ 1
             }
-            perturbations.append(MinHashSignature(
-                values: perturbed,
-                documentId: signature.documentId,
-            ))
+            perturbations.append(
+                MinHashSignature(
+                    values: perturbed,
+                    documentId: signature.documentId,
+                ))
 
             // Also try subtracting
             var perturbed2 = signature.values
             if offset < perturbed2.count {
                 perturbed2[offset] = perturbed2[offset] &- 1
             }
-            perturbations.append(MinHashSignature(
-                values: perturbed2,
-                documentId: signature.documentId,
-            ))
+            perturbations.append(
+                MinHashSignature(
+                    values: perturbed2,
+                    documentId: signature.documentId,
+                ))
         }
 
         return perturbations
@@ -385,7 +390,8 @@ public struct MultiProbeLSHPipeline: Sendable {
 
             results = results.compactMap { pair in
                 guard let doc1 = documentMap[pair.documentId1],
-                      let doc2 = documentMap[pair.documentId2] else { return nil }
+                    let doc2 = documentMap[pair.documentId2]
+                else { return nil }
 
                 let exactSimilarity = MinHashGenerator.exactJaccardSimilarity(doc1, doc2)
                 if exactSimilarity >= threshold {

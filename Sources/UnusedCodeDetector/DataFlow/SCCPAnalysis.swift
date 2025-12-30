@@ -32,7 +32,7 @@ public enum LatticeValue: Sendable, Hashable, CustomStringConvertible {
         case .top:
             "⊤"
 
-        case let .constant(c):
+        case .constant(let c):
             "const(\(c))"
 
         case .bottom:
@@ -42,8 +42,8 @@ public enum LatticeValue: Sendable, Hashable, CustomStringConvertible {
 
     /// Check if this is a known boolean constant.
     /// Returns nil if not a boolean constant (valid tri-state: true/false/unknown).
-    public var boolValue: Bool? { // swiftlint:disable:this discouraged_optional_boolean
-        if case let .constant(c) = self, case let .bool(b) = c {
+    public var boolValue: Bool? {  // swiftlint:disable:this discouraged_optional_boolean
+        if case .constant(let c) = self, case .bool(let b) = c {
             return b
         }
         return nil
@@ -52,15 +52,15 @@ public enum LatticeValue: Sendable, Hashable, CustomStringConvertible {
     /// Meet operation: combines two lattice values.
     public func meet(_ other: Self) -> Self {
         switch (self, other) {
-        case let (.top, v),
-             let (v, .top):
+        case (.top, let v),
+            (let v, .top):
             v
 
         case (_, .bottom),
-             (.bottom, _):
+            (.bottom, _):
             .bottom
 
-        case let (.constant(c1), .constant(c2)):
+        case (.constant(let c1), .constant(let c2)):
             if c1 == c2 {
                 .constant(c1)
             } else {
@@ -84,10 +84,10 @@ public enum ConstantValue: Sendable, Hashable, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case let .int(i): "\(i)"
-        case let .double(d): "\(d)"
-        case let .bool(b): "\(b)"
-        case let .string(s): "\"\(s)\""
+        case .int(let i): "\(i)"
+        case .double(let d): "\(d)"
+        case .bool(let b): "\(b)"
+        case .string(let s): "\"\(s)\""
         case .nil: "nil"
         }
     }
@@ -121,7 +121,7 @@ public struct DeadBranch: Sendable {
         condition: String,
         deadBranch: BranchDirection,
         conditionValue: String,
-        ) {
+    ) {
         self.location = location
         self.condition = condition
         self.deadBranch = deadBranch
@@ -164,8 +164,8 @@ public struct SCCPResult: Sendable {
             variable: String,
             value: ConstantValue,
             location: SwiftStaticAnalysisCore.SourceLocation,
-            )],
-        ) {
+        )],
+    ) {
         self.cfg = cfg
         self.variableValues = variableValues
         self.executableEdges = executableEdges
@@ -192,17 +192,18 @@ public struct SCCPResult: Sendable {
     public let deadBranches: [DeadBranch]
 
     /// Constants that can be propagated.
-    public let propagatableConstants: [(
-        variable: String,
-        value: ConstantValue,
-        location: SwiftStaticAnalysisCore.SourceLocation,
+    public let propagatableConstants:
+        [(
+            variable: String,
+            value: ConstantValue,
+            location: SwiftStaticAnalysisCore.SourceLocation,
         )]
 }
 
 // MARK: - SCCPAnalysis
 
 /// Performs Sparse Conditional Constant Propagation analysis.
-public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this type_body_length
+public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:this type_body_length
     // MARK: Lifecycle
 
     public init(configuration: Configuration = .default) {
@@ -220,7 +221,7 @@ public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this
             detectDeadBranches: Bool = true,
             trackStrings: Bool = false,
             ignoredVariables: Set<String> = ["_"],
-            ) {
+        ) {
             self.maxIterations = maxIterations
             self.detectDeadBranches = detectDeadBranches
             self.trackStrings = trackStrings
@@ -295,7 +296,7 @@ public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this
             unreachableBlocks: unreachableBlocks,
             deadBranches: deadBranches,
             propagatableConstants: constants,
-            )
+        )
     }
 
     // MARK: Private
@@ -415,14 +416,14 @@ public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this
         if case .bottom = rightValue { return .bottom }
 
         // Both are constants - evaluate
-        guard case let .constant(left) = leftValue,
-              case let .constant(right) = rightValue
+        guard case .constant(let left) = leftValue,
+            case .constant(let right) = rightValue
         else {
             return .bottom
         }
 
         // Arithmetic operations
-        if case let .int(l) = left, case let .int(r) = right {
+        if case .int(let l) = left, case .int(let r) = right {
             switch opText {
             case "+": return .constant(.int(l + r))
             case "-": return .constant(.int(l - r))
@@ -440,7 +441,7 @@ public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this
         }
 
         // Boolean operations
-        if case let .bool(l) = left, case let .bool(r) = right {
+        if case .bool(let l) = left, case .bool(let r) = right {
             switch opText {
             case "&&": return .constant(.bool(l && r))
             case "||": return .constant(.bool(l || r))
@@ -461,21 +462,21 @@ public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this
         if case .top = operandValue { return .top }
         if case .bottom = operandValue { return .bottom }
 
-        guard case let .constant(operand) = operandValue else {
+        guard case .constant(let operand) = operandValue else {
             return .bottom
         }
 
         switch opText {
         case "!":
-            if case let .bool(b) = operand {
+            if case .bool(let b) = operand {
                 return .constant(.bool(!b))
             }
 
         case "-":
-            if case let .int(i) = operand {
+            if case .int(let i) = operand {
                 return .constant(.int(-i))
             }
-            if case let .double(d) = operand {
+            if case .double(let d) = operand {
                 return .constant(.double(-d))
             }
 
@@ -490,10 +491,10 @@ public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this
 
     private func processTerminator(_ terminator: Terminator, in blockID: BlockID, firstVisit: Bool) {
         switch terminator {
-        case let .branch(target):
+        case .branch(let target):
             cfgWorklist.append(CFGEdge(from: blockID, to: target))
 
-        case let .conditionalBranch(condition, trueTarget, falseTarget):
+        case .conditionalBranch(let condition, let trueTarget, let falseTarget):
             // Try to evaluate the condition
             let condValue = evaluateCondition(condition)
 
@@ -514,13 +515,13 @@ public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this
                 }
 
             case .bottom,
-                 .constant:
+                .constant:
                 // Non-constant or unknown constant type - both branches executable
                 cfgWorklist.append(CFGEdge(from: blockID, to: trueTarget))
                 cfgWorklist.append(CFGEdge(from: blockID, to: falseTarget))
             }
 
-        case let .switch(_, cases, defaultTarget):
+        case .switch(_, let cases, let defaultTarget):
             // For switches, conservatively mark all cases as executable
             for (_, target) in cases {
                 cfgWorklist.append(CFGEdge(from: blockID, to: target))
@@ -530,20 +531,20 @@ public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this
             }
 
         case .return,
-             .throw,
-             .unreachable:
+            .throw,
+            .unreachable:
             // Terminal - connect to exit
             cfgWorklist.append(CFGEdge(from: blockID, to: .exit))
 
-        case let .fallthrough(target):
+        case .fallthrough(let target):
             cfgWorklist.append(CFGEdge(from: blockID, to: target))
 
-        case let .break(target):
+        case .break(let target):
             if let target {
                 cfgWorklist.append(CFGEdge(from: blockID, to: target))
             }
 
-        case let .continue(target):
+        case .continue(let target):
             if let target {
                 cfgWorklist.append(CFGEdge(from: blockID, to: target))
             }
@@ -614,36 +615,39 @@ public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this
         for id in cfg.blockOrder {
             guard let block = cfg.blocks[id] else { continue }
 
-            if case let .conditionalBranch(condition, trueTarget, falseTarget) = block.terminator {
+            if case .conditionalBranch(let condition, let trueTarget, let falseTarget) = block.terminator {
                 let condValue = evaluateCondition(condition)
 
                 // Get location from last statement or estimate
-                let location: SwiftStaticAnalysisCore.SourceLocation = if let lastStmt = block.statements.last {
-                    lastStmt.location
-                } else {
-                    SwiftStaticAnalysisCore.SourceLocation(file: cfg.file, line: 0, column: 0, offset: 0)
-                }
+                let location: SwiftStaticAnalysisCore.SourceLocation =
+                    if let lastStmt = block.statements.last {
+                        lastStmt.location
+                    } else {
+                        SwiftStaticAnalysisCore.SourceLocation(file: cfg.file, line: 0, column: 0, offset: 0)
+                    }
 
                 switch condValue {
                 case .constant(.bool(true)):
                     // False branch is dead
                     if !executableEdges.contains(CFGEdge(from: id, to: falseTarget)) {
-                        deadBranches.append(DeadBranch(
-                            location: location,
-                            condition: condition,
-                            deadBranch: .falseBranch,
-                            conditionValue: "true",
+                        deadBranches.append(
+                            DeadBranch(
+                                location: location,
+                                condition: condition,
+                                deadBranch: .falseBranch,
+                                conditionValue: "true",
                             ))
                     }
 
                 case .constant(.bool(false)):
                     // True branch is dead
                     if !executableEdges.contains(CFGEdge(from: id, to: trueTarget)) {
-                        deadBranches.append(DeadBranch(
-                            location: location,
-                            condition: condition,
-                            deadBranch: .trueBranch,
-                            conditionValue: "false",
+                        deadBranches.append(
+                            DeadBranch(
+                                location: location,
+                                condition: condition,
+                                deadBranch: .trueBranch,
+                                conditionValue: "false",
                             ))
                     }
 
@@ -660,7 +664,7 @@ public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this
         variable: String,
         value: ConstantValue,
         location: SwiftStaticAnalysisCore.SourceLocation,
-        )] {
+    )] {
         var constants: [(String, ConstantValue, SwiftStaticAnalysisCore.SourceLocation)] = []
 
         for id in cfg.blockOrder {
@@ -669,7 +673,8 @@ public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this
             for statement in block.statements {
                 for variable in statement.defs {
                     if let latticeValue = values[variable],
-                       case let .constant(constValue) = latticeValue {
+                        case .constant(let constValue) = latticeValue
+                    {
                         constants.append((variable, constValue, statement.location))
                     }
                 }
@@ -683,9 +688,9 @@ public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this
 // MARK: - Debug Output
 
 // swa:ignore-unused - Debug utilities for development and troubleshooting
-public extension SCCPResult {
+extension SCCPResult {
     /// Generate a debug string showing SCCP results.
-    func debugDescription() -> String {
+    public func debugDescription() -> String {
         var output = "SCCP Analysis Results:\n"
         output += "======================\n\n"
 

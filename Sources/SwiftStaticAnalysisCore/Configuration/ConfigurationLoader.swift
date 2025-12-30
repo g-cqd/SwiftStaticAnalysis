@@ -99,13 +99,13 @@ public enum ConfigurationError: Error, CustomStringConvertible, Sendable {
 
     public var description: String {
         switch self {
-        case let .fileReadError(path, underlying):
+        case .fileReadError(let path, let underlying):
             "Failed to read configuration file at \(path): \(underlying.localizedDescription)"
 
-        case let .parseError(path, underlying):
+        case .parseError(let path, let underlying):
             "Failed to parse configuration file at \(path): \(underlying.localizedDescription)"
 
-        case let .unsupportedVersion(version, path):
+        case .unsupportedVersion(let version, let path):
             "Unsupported configuration version \(version) in \(path). Supported versions: 1"
         }
     }

@@ -354,21 +354,24 @@ swa duplicates [<path>] [options]
 ## Architecture
 
 ```
-SwiftStaticAnalysis/
-├── SwiftStaticAnalysisCore/     # Core infrastructure
+Sources/
+├── SwiftStaticAnalysis/          # Unified module (re-exports all)
+├── SwiftStaticAnalysisCore/      # Core infrastructure
 │   ├── Models/                   # Declaration, Reference, Scope
 │   ├── Parsing/                  # SwiftFileParser with caching
 │   ├── Visitors/                 # AST visitors
 │   └── Memory/                   # Zero-copy parsing, arena allocation
 ├── DuplicationDetector/          # Clone detection
 │   ├── Algorithms/               # Suffix Array, MinHash, AST Fingerprint
-│   ├── Hashing/                  # LSH, similarity computation
-│   └── Models/                   # Clone, CloneGroup
+│   ├── MinHash/                  # LSH, similarity computation
+│   └── SuffixArray/              # SA-IS algorithm
 ├── UnusedCodeDetector/           # Unused code detection
 │   ├── IndexStore/               # IndexStoreDB integration
 │   ├── Reachability/             # Graph-based analysis
 │   └── Filters/                  # False positive reduction
-└── SwiftStaticAnalysisCLI/       # swa command-line tool
+├── swa/                          # CLI tool
+├── StaticAnalysisBuildPlugin/    # Build-time analysis plugin
+└── StaticAnalysisCommandPlugin/  # On-demand analysis plugin
 ```
 
 ## Documentation

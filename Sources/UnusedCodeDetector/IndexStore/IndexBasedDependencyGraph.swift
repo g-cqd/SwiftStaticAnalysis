@@ -330,10 +330,7 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
         let targetUSR = occurrence.symbol.usr
 
         // Skip definitions without relations
-        guard roles.contains(.reference) ||
-            roles.contains(.call) ||
-            roles.contains(.read) ||
-            roles.contains(.write)
+        guard roles.contains(.reference) || roles.contains(.call) || roles.contains(.read) || roles.contains(.write)
         else {
             return
         }
@@ -347,15 +344,16 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
             // containedBy means this occurrence is inside that symbol
             if relatedRoles.contains(.containedBy) {
                 // The containing symbol references the target
-                let kind: IndexDependencyKind = if roles.contains(.call) {
-                    .call
-                } else if roles.contains(.read) {
-                    .read
-                } else if roles.contains(.write) {
-                    .write
-                } else {
-                    .typeReference
-                }
+                let kind: IndexDependencyKind =
+                    if roles.contains(.call) {
+                        .call
+                    } else if roles.contains(.read) {
+                        .read
+                    } else if roles.contains(.write) {
+                        .write
+                    } else {
+                        .typeReference
+                    }
 
                 addEdge(from: relatedUSR, to: targetUSR, kind: kind)
             }
@@ -479,15 +477,17 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
 
         // Check for test methods
         if configuration.treatTestsAsRoot,
-           node.name.hasPrefix("test"),
-           node.kind == .function || node.kind == .method {
+            node.name.hasPrefix("test"),
+            node.kind == .function || node.kind == .method
+        {
             return .testMethod
         }
 
         // Check file path for test indicator
         if configuration.treatTestsAsRoot,
-           let file = node.definitionFile,
-           file.contains("Tests") || file.contains("Test") {
+            let file = node.definitionFile,
+            file.contains("Tests") || file.contains("Test")
+        {
             if node.kind == .function || node.kind == .method {
                 return .testMethod
             }
@@ -598,9 +598,9 @@ public struct IndexGraphReport: Sendable {
     }
 }
 
-public extension IndexBasedDependencyGraph {
+extension IndexBasedDependencyGraph {
     /// Generate a report of the analysis.
-    func generateReport() -> IndexGraphReport {
+    public func generateReport() -> IndexGraphReport {
         let reachable = computeReachable()
         let unreachableNodes = computeUnreachable()
         let externalNodes = nodes.values.filter(\.isExternal)

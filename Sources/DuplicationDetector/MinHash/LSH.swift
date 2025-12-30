@@ -26,14 +26,14 @@ public protocol LSHQueryable: Sendable {
     func signature(for documentId: Int) -> MinHashSignature?
 }
 
-public extension LSHQueryable {
+extension LSHQueryable {
     /// Query and rank results by similarity.
     ///
     /// - Parameters:
     ///   - signature: The query signature.
     ///   - threshold: Minimum similarity to include.
     /// - Returns: Array of (documentId, similarity) pairs, sorted by similarity.
-    func queryWithSimilarity(
+    public func queryWithSimilarity(
         _ signature: MinHashSignature,
         threshold: Double = 0.0,
     ) -> [(documentId: Int, similarity: Double)] {
@@ -114,7 +114,7 @@ public struct LSHIndex: Sendable, LSHQueryable {
         var bestError = Double.infinity
 
         // Search for b, r such that n = b * r and threshold = (1/b)^(1/r)
-        for b in 1 ... signatureSize {
+        for b in 1...signatureSize {
             let r = signatureSize / b
             guard r > 0, b * r <= signatureSize else { continue }
 
@@ -141,7 +141,7 @@ public struct LSHIndex: Sendable, LSHQueryable {
         signatures[signature.documentId] = signature
 
         // Hash each band
-        for band in 0 ..< bands {
+        for band in 0..<bands {
             let bandHash = hashBand(signature: signature, band: band)
             buckets[band][bandHash, default: []].append(signature.documentId)
         }
@@ -160,11 +160,11 @@ public struct LSHIndex: Sendable, LSHQueryable {
     public func findCandidatePairs() -> Set<DocumentPair> {
         var candidates = Set<DocumentPair>()
 
-        for band in 0 ..< bands {
+        for band in 0..<bands {
             for (_, docIds) in buckets[band] {
                 // All pairs in the same bucket are candidates
-                for i in 0 ..< docIds.count {
-                    for j in (i + 1) ..< docIds.count {
+                for i in 0..<docIds.count {
+                    for j in (i + 1)..<docIds.count {
                         let pair = DocumentPair(id1: docIds[i], id2: docIds[j])
                         candidates.insert(pair)
                     }
@@ -184,7 +184,7 @@ public struct LSHIndex: Sendable, LSHQueryable {
 
         var candidates = Set<Int>()
 
-        for band in 0 ..< bands {
+        for band in 0..<bands {
             let bandHash = hashBand(signature: signature, band: band)
             if let docIds = buckets[band][bandHash] {
                 candidates.formUnion(docIds)
@@ -221,7 +221,7 @@ public struct LSHIndex: Sendable, LSHQueryable {
         var hash: UInt64 = 14_695_981_039_346_656_037
         let prime: UInt64 = 1_099_511_628_211
 
-        for i in start ..< end {
+        for i in start..<end {
             hash ^= signature.values[i]
             hash = hash &* prime
         }
@@ -334,21 +334,25 @@ public struct LSHPipeline: Sendable {
         var results: [SimilarPair] = []
         for pair in candidatePairs {
             guard let sig1 = index.signature(for: pair.id1),
-                  let sig2 = index.signature(for: pair.id2) else { continue }
+                let sig2 = index.signature(for: pair.id2)
+            else { continue }
 
-            let similarity: Double = if verifyWithExact, let doc1 = documentMap[pair.id1],
-                                        let doc2 = documentMap[pair.id2] {
-                MinHashGenerator.exactJaccardSimilarity(doc1, doc2)
-            } else {
-                sig1.estimateSimilarity(with: sig2)
-            }
+            let similarity: Double =
+                if verifyWithExact, let doc1 = documentMap[pair.id1],
+                    let doc2 = documentMap[pair.id2]
+                {
+                    MinHashGenerator.exactJaccardSimilarity(doc1, doc2)
+                } else {
+                    sig1.estimateSimilarity(with: sig2)
+                }
 
             if similarity >= threshold {
-                results.append(SimilarPair(
-                    documentId1: pair.id1,
-                    documentId2: pair.id2,
-                    similarity: similarity,
-                ))
+                results.append(
+                    SimilarPair(
+                        documentId1: pair.id1,
+                        documentId2: pair.id2,
+                        similarity: similarity,
+                    ))
             }
         }
 

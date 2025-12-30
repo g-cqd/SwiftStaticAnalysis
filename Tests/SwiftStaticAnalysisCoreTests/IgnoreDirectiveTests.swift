@@ -31,12 +31,12 @@ struct IgnoreDirectiveTests {
     @Test("Enum with ignore directive excludes cases")
     func enumIgnoreDirective() throws {
         let source = """
-        /// Description. // swa:ignore-unused-cases
-        public enum TestEnum {
-            case one
-            case two
-        }
-        """
+            /// Description. // swa:ignore-unused-cases
+            public enum TestEnum {
+                case one
+                case two
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -53,15 +53,15 @@ struct IgnoreDirectiveTests {
     @Test("Enum cases inherit ignore directive from parent enum")
     func enumCasesInheritIgnoreDirective() throws {
         let source = """
-        // MARK: - Test
+            // MARK: - Test
 
-        /// Categories for diagnostics.
-        /// Exhaustive coverage. // swa:ignore-unused-cases
-        public enum DiagnosticCategory: String {
-            case one = "one"
-            case two = "two"
-        }
-        """
+            /// Categories for diagnostics.
+            /// Exhaustive coverage. // swa:ignore-unused-cases
+            public enum DiagnosticCategory: String {
+                case one = "one"
+                case two = "two"
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -96,9 +96,9 @@ struct IgnoreDirectiveTests {
     @Test("Generic swa:ignore directive marks declaration as ignored")
     func genericIgnoreDirective() throws {
         let source = """
-        // swa:ignore
-        func unusedHelper() {}
-        """
+            // swa:ignore
+            func unusedHelper() {}
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -115,9 +115,9 @@ struct IgnoreDirectiveTests {
     @Test("swa:ignore-unused directive is recognized")
     func ignoreUnusedDirective() throws {
         let source = """
-        // swa:ignore-unused
-        class UnusedHelper {}
-        """
+            // swa:ignore-unused
+            class UnusedHelper {}
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -136,14 +136,14 @@ struct IgnoreDirectiveTests {
     @Test("Declarations without ignore directives are not ignored")
     func noIgnoreDirective() throws {
         let source = """
-        /// Regular documentation
-        public enum RegularEnum {
-            case one
-            case two
-        }
+            /// Regular documentation
+            public enum RegularEnum {
+                case one
+                case two
+            }
 
-        func regularFunction() {}
-        """
+            func regularFunction() {}
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -167,18 +167,18 @@ struct IgnoreDirectiveTests {
     @Test("Multiple enums with mixed ignore directives")
     func mixedIgnoreDirectives() throws {
         let source = """
-        /// Ignored enum. // swa:ignore-unused-cases
-        enum IgnoredEnum {
-            case a
-            case b
-        }
+            /// Ignored enum. // swa:ignore-unused-cases
+            enum IgnoredEnum {
+                case a
+                case b
+            }
 
-        /// Not ignored enum.
-        enum NotIgnoredEnum {
-            case x
-            case y
-        }
-        """
+            /// Not ignored enum.
+            enum NotIgnoredEnum {
+                case x
+                case y
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -204,12 +204,12 @@ struct IgnoreDirectiveTests {
     @Test("Ignore directive with description after hyphen separator is recognized")
     func ignoreDirectiveWithDescription() throws {
         let source = """
-        // swa:ignore-unused - Utility operations for advanced token analysis
-        public extension SomeType {
-            func countByKind() {}
-            func tokensInRange() {}
-        }
-        """
+            // swa:ignore-unused - Utility operations for advanced token analysis
+            public extension SomeType {
+                func countByKind() {}
+                func tokensInRange() {}
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -231,9 +231,9 @@ struct IgnoreDirectiveTests {
     @Test("Block comment swa:ignore directive is recognized")
     func blockCommentIgnoreDirective() throws {
         let source = """
-        /* swa:ignore */
-        func helperFunction() {}
-        """
+            /* swa:ignore */
+            func helperFunction() {}
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -249,11 +249,11 @@ struct IgnoreDirectiveTests {
     @Test("hasIgnoreDirective checks specific categories")
     func hasIgnoreDirectiveMethod() throws {
         let source = """
-        // swa:ignore-unused-cases
-        enum TestEnum {
-            case test
-        }
-        """
+            // swa:ignore-unused-cases
+            enum TestEnum {
+                case test
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -269,9 +269,9 @@ struct IgnoreDirectiveTests {
     @Test("hasIgnoreDirective with 'all' matches any category check")
     func hasIgnoreDirectiveAll() throws {
         let source = """
-        // swa:ignore
-        func test() {}
-        """
+            // swa:ignore
+            func test() {}
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -290,12 +290,12 @@ struct IgnoreDirectiveTests {
     @Test("Functions in extension inherit ignore directive from extension")
     func extensionIgnoreDirectiveInheritance() throws {
         let source = """
-        // swa:ignore-unused
-        public extension SomeType {
-            func method1() {}
-            func method2() {}
-        }
-        """
+            // swa:ignore-unused
+            public extension SomeType {
+                func method1() {}
+                func method2() {}
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -321,14 +321,14 @@ struct IgnoreDirectiveTests {
     @Test("Functions in extension with MARK comment inherit ignore directive")
     func extensionWithMarkCommentInheritance() throws {
         let source = """
-        // MARK: - Utilities
+            // MARK: - Utilities
 
-        // swa:ignore-unused
-        public extension SomeType {
-            func countByKind() {}
-            func tokensInRange() {}
-        }
-        """
+            // swa:ignore-unused
+            public extension SomeType {
+                func countByKind() {}
+                func tokensInRange() {}
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -349,14 +349,14 @@ struct IgnoreDirectiveTests {
     @Test("Nested struct in class inherits ignore directive")
     func nestedStructInheritance() throws {
         let source = """
-        // swa:ignore
-        class Container {
-            struct Nested {
-                var value: Int
+            // swa:ignore
+            class Container {
+                struct Nested {
+                    var value: Int
+                }
+                func helper() {}
             }
-            func helper() {}
-        }
-        """
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)

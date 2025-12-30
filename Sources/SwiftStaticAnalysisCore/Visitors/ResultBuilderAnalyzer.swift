@@ -40,12 +40,12 @@ public enum ResultBuilderType: String, Sendable, Codable, CaseIterable {
     public var isSwiftUI: Bool {
         switch self {
         case .accessibilityRotorContentBuilder,
-             .commandsBuilder,
-             .sceneBuilder,
-             .tableColumnBuilder,
-             .tableRowBuilder,
-             .toolbarContentBuilder,
-             .viewBuilder:
+            .commandsBuilder,
+            .sceneBuilder,
+            .tableColumnBuilder,
+            .tableRowBuilder,
+            .toolbarContentBuilder,
+            .viewBuilder:
             true
 
         default:
@@ -106,7 +106,7 @@ public struct NormalizedStatement: Sendable, Hashable {
         case ifStatement
         case switchStatement
         case forLoop
-        case binding // let/var
+        case binding  // let/var
         case viewModifier
         case other
     }
@@ -223,7 +223,8 @@ public struct ResultBuilderAnalyzer: Sendable {
         if let funcDecl = decl.as(FunctionDeclSyntax.self) {
             for attribute in funcDecl.attributes {
                 if let attrName = extractAttributeName(attribute),
-                   let builderType = ResultBuilderType.from(attributeName: attrName) {
+                    let builderType = ResultBuilderType.from(attributeName: attrName)
+                {
                     return builderType
                 }
             }
@@ -232,7 +233,8 @@ public struct ResultBuilderAnalyzer: Sendable {
         if let varDecl = decl.as(VariableDeclSyntax.self) {
             for attribute in varDecl.attributes {
                 if let attrName = extractAttributeName(attribute),
-                   let builderType = ResultBuilderType.from(attributeName: attrName) {
+                    let builderType = ResultBuilderType.from(attributeName: attrName)
+                {
                     return builderType
                 }
             }
@@ -297,8 +299,7 @@ public struct ResultBuilderAnalyzer: Sendable {
             if statement.item.is(ReturnStmtSyntax.self) {
                 hasExplicitReturn = true
             }
-            if statement.item.is(ExpressionStmtSyntax.self) ||
-                statement.item.is(FunctionCallExprSyntax.self) {
+            if statement.item.is(ExpressionStmtSyntax.self) || statement.item.is(FunctionCallExprSyntax.self) {
                 expressionCount += 1
             }
         }
@@ -336,7 +337,7 @@ public struct ResultBuilderAnalyzer: Sendable {
     /// Extract attribute name from an attribute element.
     private func extractAttributeName(_ attribute: AttributeListSyntax.Element) -> String? {
         switch attribute {
-        case let .attribute(attr):
+        case .attribute(let attr):
             attr.attributeName.trimmedDescription
 
         case .ifConfigDecl:
@@ -411,10 +412,10 @@ public struct ResultBuilderAnalyzer: Sendable {
         // Normalize else clause if present
         if let elseClause = ifStmt.elseBody {
             switch elseClause {
-            case let .codeBlock(block):
+            case .codeBlock(let block):
                 children.append(contentsOf: normalizeStatements(block.statements))
 
-            case let .ifExpr(elseIf):
+            case .ifExpr(let elseIf):
                 if let normalized = normalizeIfStatement(elseIf) as NormalizedStatement? {
                     children.append(normalized)
                 }
@@ -433,7 +434,7 @@ public struct ResultBuilderAnalyzer: Sendable {
         var children: [NormalizedStatement] = []
 
         for caseItem in switchStmt.cases {
-            if case let .switchCase(switchCase) = caseItem {
+            if case .switchCase(let switchCase) = caseItem {
                 children.append(contentsOf: normalizeStatements(switchCase.statements))
             }
         }
@@ -566,7 +567,7 @@ public final class ResultBuilderVisitor: SyntaxVisitor {
         let name = node.bindings.first?.pattern.trimmedDescription
 
         let attributes = node.attributes.compactMap { attr -> String? in
-            if case let .attribute(a) = attr {
+            if case .attribute(let a) = attr {
                 return a.attributeName.trimmedDescription
             }
             return nil
@@ -601,12 +602,13 @@ public final class ResultBuilderVisitor: SyntaxVisitor {
                 converter: converter,
             )
 
-            builders.append(ResultBuilderInfo(
-                type: builderType,
-                closure: normalized,
-                declarationName: context.declarationName,
-                typeName: context.typeName,
-            ))
+            builders.append(
+                ResultBuilderInfo(
+                    type: builderType,
+                    closure: normalized,
+                    declarationName: context.declarationName,
+                    typeName: context.typeName,
+                ))
         }
 
         return .visitChildren
@@ -631,7 +633,7 @@ public final class ResultBuilderVisitor: SyntaxVisitor {
         let conformances = node.inheritanceClause?.inheritedTypes.map(\.type.trimmedDescription) ?? []
 
         let attributes = node.attributes.compactMap { attr -> String? in
-            if case let .attribute(a) = attr {
+            if case .attribute(let a) = attr {
                 return a.attributeName.trimmedDescription
             }
             return nil

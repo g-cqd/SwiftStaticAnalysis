@@ -9,6 +9,7 @@ import Foundation
 import SwiftParser
 import SwiftSyntax
 import Testing
+
 @testable import DuplicationDetector
 @testable import SwiftStaticAnalysisCore
 
@@ -21,14 +22,14 @@ struct SemanticCloneTests {
     @Test("Fingerprint function bodies")
     func fingerprintFunctions() {
         let source = """
-        func add(a: Int, b: Int) -> Int {
-            return a + b
-        }
+            func add(a: Int, b: Int) -> Int {
+                return a + b
+            }
 
-        func subtract(x: Int, y: Int) -> Int {
-            return x - y
-        }
-        """
+            func subtract(x: Int, y: Int) -> Int {
+                return x - y
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let visitor = ASTFingerprintVisitor(file: "test.swift", tree: tree)
@@ -44,14 +45,14 @@ struct SemanticCloneTests {
     func similarASTFingerprints() {
         // These have the same AST structure (binary operation on parameters)
         let source = """
-        func multiply(a: Int, b: Int) -> Int {
-            return a * b
-        }
+            func multiply(a: Int, b: Int) -> Int {
+                return a * b
+            }
 
-        func divide(x: Int, y: Int) -> Int {
-            return x / y
-        }
-        """
+            func divide(x: Int, y: Int) -> Int {
+                return x / y
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let visitor = ASTFingerprintVisitor(file: "test.swift", tree: tree)
@@ -112,20 +113,20 @@ struct SemanticCloneTests {
     @Test("Fingerprint includes depth information")
     func fingerprintIncludesDepth() {
         let source = """
-        func nested() {
-            if true {
+            func nested() {
                 if true {
                     if true {
-                        print("deep")
+                        if true {
+                            print("deep")
+                        }
                     }
                 }
             }
-        }
 
-        func shallow() {
-            print("shallow")
-        }
-        """
+            func shallow() {
+                print("shallow")
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let visitor = ASTFingerprintVisitor(file: "test.swift", tree: tree)
@@ -145,16 +146,16 @@ struct SemanticCloneTests {
     @Test("Fingerprint includes node count")
     func fingerprintIncludesNodeCount() {
         let source = """
-        func simple() { print("x") }
+            func simple() { print("x") }
 
-        func complex() {
-            let a = 1
-            let b = 2
-            let c = 3
-            let d = a + b + c
-            print(d)
-        }
-        """
+            func complex() {
+                let a = 1
+                let b = 2
+                let c = 3
+                let d = a + b + c
+                print(d)
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let visitor = ASTFingerprintVisitor(file: "test.swift", tree: tree)
@@ -175,10 +176,10 @@ struct SemanticCloneTests {
     func groupSemanticallySimilar() {
         // All these do similar things (return doubled input)
         let source = """
-        func double1(_ n: Int) -> Int { n * 2 }
-        func double2(_ n: Int) -> Int { n + n }
-        func double3(_ n: Int) -> Int { 2 * n }
-        """
+            func double1(_ n: Int) -> Int { n * 2 }
+            func double2(_ n: Int) -> Int { n + n }
+            func double3(_ n: Int) -> Int { 2 * n }
+            """
 
         let tree = Parser.parse(source: source)
         let visitor = ASTFingerprintVisitor(file: "test.swift", tree: tree)
@@ -221,9 +222,9 @@ struct SemanticCloneTests {
     @Test("Closures get fingerprinted")
     func fingerprintClosures() {
         let source = """
-        let closure1 = { (x: Int) -> Int in x * 2 }
-        let closure2 = { (y: Int) -> Int in y + y }
-        """
+            let closure1 = { (x: Int) -> Int in x * 2 }
+            let closure2 = { (y: Int) -> Int in y + y }
+            """
 
         let tree = Parser.parse(source: source)
         let visitor = ASTFingerprintVisitor(file: "test.swift", tree: tree)

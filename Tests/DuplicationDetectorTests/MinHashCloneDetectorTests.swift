@@ -14,6 +14,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("MinHash Clone Detector Tests")
@@ -51,10 +52,10 @@ struct MinHashCloneDetectorTests {
         )
 
         // Create token sequences that should be similar
-        let tokens1: [TokenInfo] = (0 ..< 20).map { i in
+        let tokens1: [TokenInfo] = (0..<20).map { i in
             TokenInfo(kind: .identifier, text: "token\(i % 5)", line: i / 5 + 1, column: 0)
         }
-        let tokens2: [TokenInfo] = (0 ..< 20).map { i in
+        let tokens2: [TokenInfo] = (0..<20).map { i in
             TokenInfo(kind: .identifier, text: "token\(i % 5)", line: i / 5 + 1, column: 0)
         }
 

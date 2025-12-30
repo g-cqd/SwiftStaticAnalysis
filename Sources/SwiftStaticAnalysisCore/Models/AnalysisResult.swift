@@ -139,16 +139,16 @@ public enum AnalysisError: Error, Sendable {
 extension AnalysisError: LocalizedError {
     public var errorDescription: String? {
         switch self {
-        case let .fileNotFound(path):
+        case .fileNotFound(let path):
             "File not found: \(path)"
 
-        case let .parseError(file, message):
+        case .parseError(let file, let message):
             "Parse error in \(file): \(message)"
 
-        case let .invalidPath(path):
+        case .invalidPath(let path):
             "Invalid path: \(path)"
 
-        case let .ioError(message):
+        case .ioError(let message):
             "I/O error: \(message)"
         }
     }

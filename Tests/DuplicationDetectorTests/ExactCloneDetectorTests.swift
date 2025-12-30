@@ -16,6 +16,7 @@
 //
 
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("Exact Clone Detector Tests")

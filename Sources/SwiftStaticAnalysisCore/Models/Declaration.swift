@@ -189,39 +189,39 @@ public struct Declaration: Sendable, Hashable, Codable {
 
 // MARK: - Declaration SwiftUI Extensions
 
-public extension Declaration {
+extension Declaration {
     /// Whether this declaration has SwiftUI property wrappers.
-    var hasSwiftUIPropertyWrapper: Bool {
+    public var hasSwiftUIPropertyWrapper: Bool {
         propertyWrappers.contains { $0.kind.isSwiftUI }
     }
 
     /// Whether this declaration's property wrappers imply usage.
-    var hasImplicitUsageWrapper: Bool {
+    public var hasImplicitUsageWrapper: Bool {
         propertyWrappers.contains { $0.kind.impliesUsage }
     }
 
     /// Whether this is a SwiftUI View type.
-    var isSwiftUIView: Bool {
+    public var isSwiftUIView: Bool {
         swiftUIInfo?.isView ?? false
     }
 
     /// Whether this is a SwiftUI App entry point.
-    var isSwiftUIApp: Bool {
+    public var isSwiftUIApp: Bool {
         swiftUIInfo?.isApp ?? false
     }
 
     /// Whether this is a SwiftUI preview.
-    var isSwiftUIPreview: Bool {
+    public var isSwiftUIPreview: Bool {
         swiftUIInfo?.isPreview ?? false
     }
 
     /// Whether this declaration's body property is implicitly used.
-    var hasImplicitBody: Bool {
+    public var hasImplicitBody: Bool {
         swiftUIInfo?.hasImplicitBody ?? false
     }
 
     /// The primary property wrapper kind (if any). // swa:ignore-unused - Used in tests
-    var primaryPropertyWrapper: PropertyWrapperKind? {
+    public var primaryPropertyWrapper: PropertyWrapperKind? {
         propertyWrappers.first?.kind
     }
 
@@ -230,7 +230,7 @@ public extension Declaration {
     /// - Parameter category: The category to check (e.g., "unused", "unused_cases").
     ///                       If nil, checks for "all" directive.
     /// - Returns: True if this declaration should be ignored for the category.
-    func hasIgnoreDirective(for category: String? = nil) -> Bool {
+    public func hasIgnoreDirective(for category: String? = nil) -> Bool {
         if ignoreDirectives.contains("all") {
             return true
         }
@@ -241,10 +241,9 @@ public extension Declaration {
     }
 
     /// Whether this declaration should be ignored for unused code detection.
-    var shouldIgnoreUnused: Bool {
-        hasIgnoreDirective(for: "unused") ||
-            hasIgnoreDirective(for: "unused_code") ||
-            (kind == .enumCase && hasIgnoreDirective(for: "unused_cases"))
+    public var shouldIgnoreUnused: Bool {
+        hasIgnoreDirective(for: "unused") || hasIgnoreDirective(for: "unused_code")
+            || (kind == .enumCase && hasIgnoreDirective(for: "unused_cases"))
     }
 }
 

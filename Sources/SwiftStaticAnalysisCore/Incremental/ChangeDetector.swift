@@ -194,11 +194,12 @@ public struct ChangeDetector: Sendable {
         var changes: [FileChange] = []
 
         // Compute current states in parallel
-        let currentStates: [String: FileState] = if configuration.parallelHashing {
-            await computeStatesParallel(for: currentFiles, previousState: previousState)
-        } else {
-            computeStatesSequential(for: currentFiles, previousState: previousState)
-        }
+        let currentStates: [String: FileState] =
+            if configuration.parallelHashing {
+                await computeStatesParallel(for: currentFiles, previousState: previousState)
+            } else {
+                computeStatesSequential(for: currentFiles, previousState: previousState)
+            }
 
         // Detect changes
         for file in currentFiles {
@@ -206,39 +207,43 @@ public struct ChangeDetector: Sendable {
 
             if let previous = previousState[file] {
                 if currentState.contentHash != previous.contentHash {
-                    changes.append(FileChange(
-                        path: file,
-                        changeType: .modified,
-                        previousState: previous,
-                        currentState: currentState,
-                    ))
+                    changes.append(
+                        FileChange(
+                            path: file,
+                            changeType: .modified,
+                            previousState: previous,
+                            currentState: currentState,
+                        ))
                 } else {
-                    changes.append(FileChange(
-                        path: file,
-                        changeType: .unchanged,
-                        previousState: previous,
-                        currentState: currentState,
-                    ))
+                    changes.append(
+                        FileChange(
+                            path: file,
+                            changeType: .unchanged,
+                            previousState: previous,
+                            currentState: currentState,
+                        ))
                 }
             } else {
-                changes.append(FileChange(
-                    path: file,
-                    changeType: .added,
-                    previousState: nil,
-                    currentState: currentState,
-                ))
+                changes.append(
+                    FileChange(
+                        path: file,
+                        changeType: .added,
+                        previousState: nil,
+                        currentState: currentState,
+                    ))
             }
         }
 
         // Detect deletions
         let currentFileSet = Set(currentFiles)
         for (path, state) in previousState where !currentFileSet.contains(path) {
-            changes.append(FileChange(
-                path: path,
-                changeType: .deleted,
-                previousState: state,
-                currentState: nil,
-            ))
+            changes.append(
+                FileChange(
+                    path: path,
+                    changeType: .deleted,
+                    previousState: state,
+                    currentState: nil,
+                ))
         }
 
         return ChangeDetectionResult(changes: changes)
@@ -252,9 +257,9 @@ public struct ChangeDetector: Sendable {
         let fileManager = FileManager.default
 
         guard let attributes = try? fileManager.attributesOfItem(atPath: path),
-              let modDate = attributes[.modificationDate] as? Date,
-              let size = attributes[.size] as? Int64,
-              let data = fileManager.contents(atPath: path)
+            let modDate = attributes[.modificationDate] as? Date,
+            let size = attributes[.size] as? Int64,
+            let data = fileManager.contents(atPath: path)
         else {
             return nil
         }
@@ -284,13 +289,14 @@ public struct ChangeDetector: Sendable {
 
             for batchStart in stride(from: 0, to: files.count, by: batchSize) {
                 let batchEnd = min(batchStart + batchSize, files.count)
-                let batch = files[batchStart ..< batchEnd]
+                let batch = files[batchStart..<batchEnd]
 
                 for file in batch {
                     group.addTask {
                         // Optimization: if not always verifying hash, check mod time first
                         if let previous = previousState[file],
-                           fileMetadataMatches(file, previous: previous) {
+                            fileMetadataMatches(file, previous: previous)
+                        {
                             return (file, previous)
                         }
 
@@ -322,7 +328,8 @@ public struct ChangeDetector: Sendable {
         for file in files {
             // Optimization: check mod time first
             if let previous = previousState[file],
-               fileMetadataMatches(file, previous: previous) {
+                fileMetadataMatches(file, previous: previous)
+            {
                 results[file] = previous
                 continue
             }
@@ -338,9 +345,9 @@ public struct ChangeDetector: Sendable {
     /// Check if file metadata matches previous state (optimization to avoid hash computation).
     private func fileMetadataMatches(_ file: String, previous: FileState) -> Bool {
         guard !configuration.alwaysVerifyHash,
-              let attrs = try? FileManager.default.attributesOfItem(atPath: file),
-              let modDate = attrs[.modificationDate] as? Date,
-              let size = attrs[.size] as? Int64
+            let attrs = try? FileManager.default.attributesOfItem(atPath: file),
+            let modDate = attrs[.modificationDate] as? Date,
+            let size = attrs[.size] as? Int64
         else {
             return false
         }

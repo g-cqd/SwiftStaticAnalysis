@@ -15,6 +15,7 @@
 
 import Foundation
 import Testing
+
 @testable import SwiftStaticAnalysisCore
 @testable import UnusedCodeDetector
 
@@ -176,19 +177,19 @@ struct FilterIntegrationTests {
             excludeBacktickedEnumCases: true,
             excludeTestSuites: true,
             excludePathPatterns: ["**/Fixtures/**"],
-            excludeNamePatterns: ["^_.*"], // Exclude names starting with underscore
+            excludeNamePatterns: ["^_.*"],  // Exclude names starting with underscore
         )
         let filter = UnusedCodeFilter(configuration: config)
 
         let items = [
-            makeUnusedCode(name: "Foundation", kind: .import), // excluded: import
-            makeUnusedCode(name: "deinit"), // excluded: deinit
-            makeUnusedCode(name: "`class`", kind: .enumCase), // excluded: backticked
-            makeUnusedCode(name: "MyClassTests", kind: .struct), // excluded: test suite
-            makeUnusedCode(name: "fixture", file: "/project/Fixtures/F.swift"), // excluded: path
-            makeUnusedCode(name: "_privateHelper"), // excluded: name pattern
-            makeUnusedCode(name: "validFunction"), // KEPT
-            makeUnusedCode(name: "ValidClass", kind: .class), // KEPT
+            makeUnusedCode(name: "Foundation", kind: .import),  // excluded: import
+            makeUnusedCode(name: "deinit"),  // excluded: deinit
+            makeUnusedCode(name: "`class`", kind: .enumCase),  // excluded: backticked
+            makeUnusedCode(name: "MyClassTests", kind: .struct),  // excluded: test suite
+            makeUnusedCode(name: "fixture", file: "/project/Fixtures/F.swift"),  // excluded: path
+            makeUnusedCode(name: "_privateHelper"),  // excluded: name pattern
+            makeUnusedCode(name: "validFunction"),  // KEPT
+            makeUnusedCode(name: "ValidClass", kind: .class),  // KEPT
         ]
 
         let filtered = filter.filter(items)

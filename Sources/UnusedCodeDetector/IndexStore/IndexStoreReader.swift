@@ -79,13 +79,13 @@ public enum IndexedSymbolKind: String, Sendable, DeclarationKindConvertible {
         case .protocol: self = .protocol
         case .extension: self = .extension
         case .classMethod,
-             .function,
-             .instanceMethod,
-             .staticMethod:
+            .function,
+            .instanceMethod,
+            .staticMethod:
             self = .function
         case .classProperty,
-             .instanceProperty,
-             .staticProperty:
+            .instanceProperty,
+            .staticProperty:
             self = .property
         case .variable:
             self = .variable
@@ -111,9 +111,11 @@ public enum IndexedSymbolKind: String, Sendable, DeclarationKindConvertible {
         case .protocol: .protocol
         case .extension: .extension
         case .function,
-             .method: .function
+            .method:
+            .function
         case .property,
-             .variable: .variable
+            .variable:
+            .variable
         case .parameter: .parameter
         case .typealias: .typealias
         case .module: .import
@@ -198,12 +200,13 @@ public final class IndexStoreReader: @unchecked Sendable {
         self.indexStorePath = indexStorePath
 
         // Find libIndexStore.dylib
-        let libPath: String = if let provided = libIndexStorePath {
-            provided
-        } else {
-            // Try to find it in the Xcode toolchain
-            Self.findLibIndexStore()
-        }
+        let libPath: String =
+            if let provided = libIndexStorePath {
+                provided
+            } else {
+                // Try to find it in the Xcode toolchain
+                Self.findLibIndexStore()
+            }
 
         // Create the IndexStoreDB
         do {
@@ -261,8 +264,8 @@ public final class IndexStoreReader: @unchecked Sendable {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             if let swiftPath = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
                 let toolchainPath = URL(fileURLWithPath: swiftPath)
-                    .deletingLastPathComponent() // bin
-                    .deletingLastPathComponent() // usr
+                    .deletingLastPathComponent()  // bin
+                    .deletingLastPathComponent()  // usr
                     .appendingPathComponent("lib")
                     .appendingPathComponent("libIndexStore.dylib")
                 return toolchainPath.path
@@ -273,7 +276,8 @@ public final class IndexStoreReader: @unchecked Sendable {
 
         // Default fallback
         // swiftlint:disable:next line_length
-        return "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libIndexStore.dylib"
+        return
+            "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libIndexStore.dylib"
     }
 
     /// Find all occurrences of a symbol with the given name.
@@ -290,15 +294,16 @@ public final class IndexStoreReader: @unchecked Sendable {
             let indexedSymbol = convertSymbol(occurrence.symbol)
             let roles = convertRoles(occurrence.roles)
 
-            occurrences.append(IndexedOccurrence(
-                symbol: indexedSymbol,
-                file: occurrence.location.path,
-                line: occurrence.location.line,
-                column: occurrence.location.utf8Column,
-                roles: roles,
-            ))
+            occurrences.append(
+                IndexedOccurrence(
+                    symbol: indexedSymbol,
+                    file: occurrence.location.path,
+                    line: occurrence.location.line,
+                    column: occurrence.location.utf8Column,
+                    roles: roles,
+                ))
 
-            return true // Continue iteration
+            return true  // Continue iteration
         }
 
         return occurrences
@@ -312,15 +317,16 @@ public final class IndexStoreReader: @unchecked Sendable {
             let indexedSymbol = convertSymbol(occurrence.symbol)
             let roles = convertRoles(occurrence.roles)
 
-            occurrences.append(IndexedOccurrence(
-                symbol: indexedSymbol,
-                file: occurrence.location.path,
-                line: occurrence.location.line,
-                column: occurrence.location.utf8Column,
-                roles: roles,
-            ))
+            occurrences.append(
+                IndexedOccurrence(
+                    symbol: indexedSymbol,
+                    file: occurrence.location.path,
+                    line: occurrence.location.line,
+                    column: occurrence.location.utf8Column,
+                    roles: roles,
+                ))
 
-            return true // Continue iteration
+            return true  // Continue iteration
         }
 
         return occurrences
@@ -358,7 +364,7 @@ public final class IndexStoreReader: @unchecked Sendable {
 
         db.forEachSymbolOccurrence(byUSR: usr, roles: .reference) { _ in
             hasRef = true
-            return false // Stop iteration
+            return false  // Stop iteration
         }
 
         return hasRef
@@ -380,13 +386,14 @@ public final class IndexStoreReader: @unchecked Sendable {
                 let indexedSymbol = convertSymbol(occurrence.symbol)
                 let roles = convertRoles(occurrence.roles)
 
-                occurrences.append(IndexedOccurrence(
-                    symbol: indexedSymbol,
-                    file: occurrence.location.path,
-                    line: occurrence.location.line,
-                    column: occurrence.location.utf8Column,
-                    roles: roles,
-                ))
+                occurrences.append(
+                    IndexedOccurrence(
+                        symbol: indexedSymbol,
+                        file: occurrence.location.path,
+                        line: occurrence.location.line,
+                        column: occurrence.location.utf8Column,
+                        roles: roles,
+                    ))
             }
             return true
         }
@@ -411,7 +418,7 @@ public final class IndexStoreReader: @unchecked Sendable {
             usr: symbol.usr,
             name: symbol.name,
             kind: IndexedSymbolKind(from: symbol.kind),
-            isSystem: false, // IndexStoreDB doesn't expose this directly
+            isSystem: false,  // IndexStoreDB doesn't expose this directly
         )
     }
 
@@ -440,7 +447,8 @@ public struct IndexStorePathFinder: Sendable {
         let buildDir = URL(fileURLWithPath: projectRoot).appendingPathComponent(".build")
 
         // Check debug first
-        let debugIndexStore = buildDir
+        let debugIndexStore =
+            buildDir
             .appendingPathComponent("debug")
             .appendingPathComponent("index")
             .appendingPathComponent("store")
@@ -450,7 +458,8 @@ public struct IndexStorePathFinder: Sendable {
         }
 
         // Check release
-        let releaseIndexStore = buildDir
+        let releaseIndexStore =
+            buildDir
             .appendingPathComponent("release")
             .appendingPathComponent("index")
             .appendingPathComponent("store")
@@ -470,7 +479,8 @@ public struct IndexStorePathFinder: Sendable {
         if let contents = try? FileManager.default.contentsOfDirectory(atPath: derivedData.path) {
             let projectName = URL(fileURLWithPath: projectRoot).lastPathComponent
             for dir in contents where dir.contains(projectName) {
-                let indexStore = derivedData
+                let indexStore =
+                    derivedData
                     .appendingPathComponent(dir)
                     .appendingPathComponent("Index.noindex")
                     .appendingPathComponent("DataStore")

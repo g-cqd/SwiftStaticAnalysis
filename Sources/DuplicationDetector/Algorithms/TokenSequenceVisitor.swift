@@ -90,7 +90,7 @@ public struct TokenSequence: Sendable, TokenSequenceProtocol {
         let start = max(0, startLine - 1)
         let end = min(sourceLines.count, endLine)
         guard start < end else { return "" }
-        return sourceLines[start ..< end].joined(separator: "\n")
+        return sourceLines[start..<end].joined(separator: "\n")
     }
 }
 
@@ -115,12 +115,13 @@ public struct TokenSequenceExtractor: Sendable {
             let kind = classifyToken(token)
             let location = converter.location(for: token.positionAfterSkippingLeadingTrivia)
 
-            tokens.append(TokenInfo(
-                kind: kind,
-                text: token.text,
-                line: location.line,
-                column: location.column,
-            ))
+            tokens.append(
+                TokenInfo(
+                    kind: kind,
+                    text: token.text,
+                    line: location.line,
+                    column: location.column,
+                ))
         }
 
         return TokenSequence(file: file, tokens: tokens, sourceLines: sourceLines)
@@ -138,46 +139,46 @@ public struct TokenSequenceExtractor: Sendable {
 
         // Identifiers
         case .dollarIdentifier,
-             .identifier:
+            .identifier:
             .identifier
 
         // Literals
         case .floatLiteral,
-             .integerLiteral,
-             .regexLiteralPattern,
-             .regexSlash,
-             .stringSegment:
+            .integerLiteral,
+            .regexLiteralPattern,
+            .regexSlash,
+            .stringSegment:
             .literal
 
         // Operators
         case .arrow,
-             .binaryOperator,
-             .equal,
-             .exclamationMark,
-             .infixQuestionMark,
-             .postfixOperator,
-             .postfixQuestionMark,
-             .prefixOperator:
+            .binaryOperator,
+            .equal,
+            .exclamationMark,
+            .infixQuestionMark,
+            .postfixOperator,
+            .postfixQuestionMark,
+            .prefixOperator:
             .operator
 
         // Punctuation
         case .atSign,
-             .backslash,
-             .backtick,
-             .colon,
-             .comma,
-             .ellipsis,
-             .leftAngle,
-             .leftBrace,
-             .leftParen,
-             .leftSquare,
-             .period,
-             .pound,
-             .rightAngle,
-             .rightBrace,
-             .rightParen,
-             .rightSquare,
-             .semicolon:
+            .backslash,
+            .backtick,
+            .colon,
+            .comma,
+            .ellipsis,
+            .leftAngle,
+            .leftBrace,
+            .leftParen,
+            .leftSquare,
+            .period,
+            .pound,
+            .rightAngle,
+            .rightBrace,
+            .rightParen,
+            .rightSquare,
+            .semicolon:
             .punctuation
 
         default:

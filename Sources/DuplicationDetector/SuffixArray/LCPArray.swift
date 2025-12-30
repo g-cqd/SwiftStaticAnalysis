@@ -49,7 +49,7 @@ public struct LCPArray: Sendable {
     /// These represent repeated substrings of at least `threshold` tokens.
     public func findRepeatsAboveThreshold(_ threshold: Int) -> [Int] {
         var positions: [Int] = []
-        for i in 1 ..< array.count where array[i] >= threshold {
+        for i in 1..<array.count where array[i] >= threshold {
             positions.append(i)
         }
         return positions
@@ -75,16 +75,16 @@ enum LCPArrayBuilder {
         // Build inverse suffix array (rank array)
         // rank[i] = position of suffix starting at i in the sorted suffix array
         var rank = [Int](repeating: 0, count: n)
-        for i in 0 ..< n {
+        for i in 0..<n {
             rank[sa[i]] = i
         }
 
         // Build LCP array using Kasai's algorithm
         var lcp = [Int](repeating: 0, count: n)
-        var h = 0 // Current LCP length
+        var h = 0  // Current LCP length
 
-        for i in 0 ..< n {
-            let r = rank[i] // Position of suffix[i] in SA
+        for i in 0..<n {
+            let r = rank[i]  // Position of suffix[i] in SA
 
             if r > 0 {
                 // Get the suffix that comes just before in sorted order
@@ -163,7 +163,7 @@ extension LCPArray {
 
                 // Collect all positions in this region
                 var positions: [Int] = []
-                for j in regionStart ... regionEnd {
+                for j in regionStart...regionEnd {
                     positions.append(sa[j])
                 }
 
@@ -245,7 +245,7 @@ extension LCPArray {
             let group = RepeatGroup(
                 positions: positions,
                 length: minLcp,
-                suffixArrayIndices: Array((i - 1) ..< j),
+                suffixArrayIndices: Array((i - 1)..<j),
             )
             groups.append(group)
 

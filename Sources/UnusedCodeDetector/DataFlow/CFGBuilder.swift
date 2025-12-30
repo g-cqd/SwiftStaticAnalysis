@@ -247,7 +247,7 @@ public struct ControlFlowGraph: Sendable {
 // MARK: - CFGBuilder
 
 /// Builds a Control Flow Graph from Swift function declarations.
-public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_body_length
+public final class CFGBuilder: SyntaxVisitor {  // swiftlint:disable:this type_body_length
     // MARK: Lifecycle
 
     public init(file: String, tree: SourceFileSyntax) {
@@ -368,13 +368,13 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
 
     private func processStatement(_ item: CodeBlockItemSyntax.Item) {
         switch item {
-        case let .stmt(stmt):
+        case .stmt(let stmt):
             processStmt(stmt)
 
-        case let .decl(decl):
+        case .decl(let decl):
             processDecl(decl)
 
-        case let .expr(expr):
+        case .expr(let expr):
             addStatementToCurrentBlock(Syntax(expr))
         }
     }
@@ -440,7 +440,7 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
             condition: conditionText,
             trueTarget: thenBlock,
             falseTarget: elseBlock,
-            )
+        )
         cfg.addEdge(from: currentBlockID, to: thenBlock)
         cfg.addEdge(from: currentBlockID, to: elseBlock)
 
@@ -456,10 +456,10 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
         switchToBlock(elseBlock)
         if let elseBody = ifStmt.elseBody {
             switch elseBody {
-            case let .codeBlock(block):
+            case .codeBlock(let block):
                 processCodeBlock(block)
 
-            case let .ifExpr(elseIf):
+            case .ifExpr(let elseIf):
                 processIfStatement(elseIf)
             }
         }
@@ -482,7 +482,7 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
             condition: conditionText,
             trueTarget: continueBlock,
             falseTarget: elseBlock,
-            )
+        )
         cfg.addEdge(from: currentBlockID, to: continueBlock)
         cfg.addEdge(from: currentBlockID, to: elseBlock)
 
@@ -519,7 +519,7 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
             condition: "for \(forStmt.pattern.description) in \(forStmt.sequence.description)",
             trueTarget: bodyBlock,
             falseTarget: exitBlock,
-            )
+        )
         cfg.addEdge(from: headerBlock, to: bodyBlock)
         cfg.addEdge(from: headerBlock, to: exitBlock)
 
@@ -559,7 +559,7 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
             condition: conditionText,
             trueTarget: bodyBlock,
             falseTarget: exitBlock,
-            )
+        )
         cfg.addEdge(from: headerBlock, to: bodyBlock)
         cfg.addEdge(from: headerBlock, to: exitBlock)
 
@@ -606,7 +606,7 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
             condition: conditionText,
             trueTarget: bodyBlock,
             falseTarget: exitBlock,
-            )
+        )
         cfg.addEdge(from: conditionBlock, to: bodyBlock)
         cfg.addEdge(from: conditionBlock, to: exitBlock)
 
@@ -626,7 +626,7 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
         // Create blocks for each case
         for caseItem in switchStmt.cases {
             switch caseItem {
-            case let .switchCase(switchCase):
+            case .switchCase(let switchCase):
                 let caseBlock = newBlock()
                 if let label = switchCase.label.as(SwitchCaseLabelSyntax.self) {
                     let pattern = label.caseItems.description
@@ -646,7 +646,7 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
             expression: switchStmt.subject.description,
             cases: caseBlocks,
             default: defaultBlock,
-            )
+        )
 
         for (_, target) in caseBlocks {
             cfg.addEdge(from: currentBlockID, to: target)
@@ -658,7 +658,7 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
         // Process each case
         for caseItem in switchStmt.cases {
             switch caseItem {
-            case let .switchCase(switchCase):
+            case .switchCase(let switchCase):
                 let caseBlock: BlockID
                 if let label = switchCase.label.as(SwitchCaseLabelSyntax.self) {
                     let pattern = label.caseItems.description
@@ -693,7 +693,7 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
         cfg.addEdge(from: currentBlockID, to: .exit)
         cfg.blocks[currentBlockID]?.terminator = .return(
             expression: returnStmt.expression?.description,
-            )
+        )
     }
 
     private func processThrowStatement(_ throwStmt: ThrowStmtSyntax) {
@@ -701,22 +701,23 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
         cfg.addEdge(from: currentBlockID, to: .exit)
         cfg.blocks[currentBlockID]?.terminator = .throw(
             expression: throwStmt.expression.description,
-            )
+        )
     }
 
     private func processBreakStatement(_ breakStmt: BreakStmtSyntax) {
         addStatementToCurrentBlock(Syntax(breakStmt))
 
         // Find target based on label or innermost loop/switch
-        let target: BlockID? = if let label = breakStmt.label {
-            loopStack.first { $0.id == label.text }?.exit ?? switchStack.last
-        } else if !switchStack.isEmpty {
-            switchStack.last
-        } else if let loop = loopStack.last {
-            loop.exit
-        } else {
-            nil
-        }
+        let target: BlockID? =
+            if let label = breakStmt.label {
+                loopStack.first { $0.id == label.text }?.exit ?? switchStack.last
+            } else if !switchStack.isEmpty {
+                switchStack.last
+            } else if let loop = loopStack.last {
+                loop.exit
+            } else {
+                nil
+            }
 
         if let target {
             cfg.addEdge(from: currentBlockID, to: target)
@@ -727,11 +728,12 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
     private func processContinueStatement(_ continueStmt: ContinueStmtSyntax) {
         addStatementToCurrentBlock(Syntax(continueStmt))
 
-        let target: BlockID? = if let label = continueStmt.label {
-            loopStack.first { $0.id == label.text }?.header
-        } else {
-            loopStack.last?.header
-        }
+        let target: BlockID? =
+            if let label = continueStmt.label {
+                loopStack.first { $0.id == label.text }?.header
+            } else {
+                loopStack.last?.header
+            }
 
         if let target {
             cfg.addEdge(from: currentBlockID, to: target)
@@ -775,7 +777,7 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
             line: loc.line,
             column: loc.column,
             offset: 0,
-            )
+        )
 
         let extractor = UseDefExtractor()
         extractor.walk(syntax)
@@ -785,7 +787,7 @@ public final class CFGBuilder: SyntaxVisitor { // swiftlint:disable:this type_bo
             location: location,
             uses: extractor.uses,
             defs: extractor.defs,
-            )
+        )
 
         cfg.blocks[currentBlockID]?.statements.append(statement)
     }
@@ -849,7 +851,8 @@ private final class UseDefExtractor: SyntaxVisitor {
     override func visit(_ node: InfixOperatorExprSyntax) -> SyntaxVisitorContinueKind {
         // Check for assignment operators
         if let op = node.operator.as(BinaryOperatorExprSyntax.self),
-           op.operator.text == "=" || op.operator.text.hasSuffix("=") {
+            op.operator.text == "=" || op.operator.text.hasSuffix("=")
+        {
             // Left side is being assigned
             if let declRef = node.leftOperand.as(DeclReferenceExprSyntax.self) {
                 defs.insert(declRef.baseName.text)
@@ -878,20 +881,20 @@ private final class UseDefExtractor: SyntaxVisitor {
 
     // Closure capture
     override func visit(_ node: ClosureCaptureSpecifierSyntax) -> SyntaxVisitorContinueKind {
-        .skipChildren // Don't descend into closures
+        .skipChildren  // Don't descend into closures
     }
 
     override func visit(_ node: ClosureExprSyntax) -> SyntaxVisitorContinueKind {
-        .skipChildren // Don't descend into closures
+        .skipChildren  // Don't descend into closures
     }
 }
 
 // MARK: - CFG Utilities
 
 // swa:ignore-unused - Debug utilities for development and troubleshooting
-public extension ControlFlowGraph {
+extension ControlFlowGraph {
     /// Print the CFG for debugging.
-    func debugPrint() -> String {
+    public func debugPrint() -> String {
         var output = "CFG for \(functionName):\n"
 
         for id in blockOrder {

@@ -13,6 +13,7 @@
 
 import SwiftParser
 import Testing
+
 @testable import DuplicationDetector
 @testable import SwiftStaticAnalysisCore
 
@@ -21,10 +22,10 @@ struct TokenExtractionTests {
     @Test("TokenSequenceExtractor extracts tokens from source")
     func extractTokens() {
         let source = """
-        func hello() {
-            print("world")
-        }
-        """
+            func hello() {
+                print("world")
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let extractor = TokenSequenceExtractor()

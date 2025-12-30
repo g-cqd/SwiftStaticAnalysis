@@ -180,7 +180,9 @@ public actor AnalysisCache {
     /// - Parameter cacheDirectory: Directory to store cache files.
     ///   Defaults to a `.swiftanalysis` directory in the current working directory.
     public init(cacheDirectory: URL? = nil) {
-        let directory = cacheDirectory ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        let directory =
+            cacheDirectory
+            ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent(".swiftanalysis")
         cacheURL = directory.appendingPathComponent("analysis_cache.json")
     }
@@ -426,12 +428,14 @@ public actor AnalysisCache {
 
     /// Get cache statistics.
     public func statistics() -> Statistics {
-        let cacheSize: Int64? = if let attrs = try? FileManager.default.attributesOfItem(atPath: cacheURL.path),
-                                   let size = attrs[.size] as? Int64 {
-            size
-        } else {
-            nil
-        }
+        let cacheSize: Int64? =
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: cacheURL.path),
+                let size = attrs[.size] as? Int64
+            {
+                size
+            } else {
+                nil
+            }
 
         return Statistics(
             fileCount: fileStates.count,

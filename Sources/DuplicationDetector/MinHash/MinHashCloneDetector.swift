@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import SwiftStaticAnalysisCore
 
 // MARK: - ClonePairInfo
 
@@ -78,6 +79,9 @@ public struct MinHashCloneDetector: Sendable {
     /// - Parameter sequences: Array of token sequences from files.
     /// - Returns: Array of clone groups found.
     public func detect(in sequences: [TokenSequence]) -> [CloneGroup] {
+        // Safety: ensure minimumTokens is valid
+        guard !sequences.isEmpty, minimumTokens > 0 else { return [] }
+
         // Generate shingled documents for all code blocks
         var allDocuments: [ShingledDocument] = []
         var documentId = 0
@@ -154,7 +158,8 @@ public struct MinHashCloneDetector: Sendable {
 
         for pair in candidatePairs {
             guard let doc1 = documentMap[pair.id1],
-                  let doc2 = documentMap[pair.id2] else { continue }
+                let doc2 = documentMap[pair.id2]
+            else { continue }
 
             // Skip if same file and overlapping lines
             if doc1.file == doc2.file {
@@ -272,14 +277,15 @@ public struct MinHashCloneDetector: Sendable {
             let groupPairs = pairs.filter { pair in
                 component.contains(pair.doc1.id) && component.contains(pair.doc2.id)
             }
-            let avgSimilarity = groupPairs.isEmpty ? minimumSimilarity :
-                groupPairs.reduce(0.0) { $0 + $1.similarity } / Double(groupPairs.count)
+            let avgSimilarity =
+                groupPairs.isEmpty
+                ? minimumSimilarity : groupPairs.reduce(0.0) { $0 + $1.similarity } / Double(groupPairs.count)
 
             // Generate fingerprint from document IDs
             let fingerprint = component.sorted().map(String.init).joined(separator: "-")
 
             return CloneGroup(
-                type: .semantic, // Type-3 clones are reported as semantic
+                type: .semantic,  // Type-3 clones are reported as semantic
                 clones: clones,
                 similarity: avgSimilarity,
                 fingerprint: fingerprint,
@@ -346,7 +352,3 @@ public struct FastSimilarityChecker: Sendable {
     /// MinHash generator.
     private let minHashGenerator: MinHashGenerator
 }
-
-// MARK: - SwiftStaticAnalysisCore Import
-
-import SwiftStaticAnalysisCore

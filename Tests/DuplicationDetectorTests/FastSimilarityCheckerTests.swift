@@ -15,6 +15,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("Fast Similarity Checker Tests")
@@ -83,10 +84,14 @@ struct FastSimilarityCheckerTests {
     @Test("Estimated vs exact similarity")
     func estimatedVsExact() {
         let checker = FastSimilarityChecker(shingleSize: 3, numHashes: 256)
-        let tokens1 = ["func", "a", "(", ")", "{", "let", "x", "=", "1", "}",
-                       "func", "b", "(", ")", "{", "let", "y", "=", "2", "}"]
-        let tokens2 = ["func", "c", "(", ")", "{", "let", "z", "=", "3", "}",
-                       "class", "D", "{", "var", "w", ":", "Int", "=", "4", "}"]
+        let tokens1 = [
+            "func", "a", "(", ")", "{", "let", "x", "=", "1", "}",
+            "func", "b", "(", ")", "{", "let", "y", "=", "2", "}",
+        ]
+        let tokens2 = [
+            "func", "c", "(", ")", "{", "let", "z", "=", "3", "}",
+            "class", "D", "{", "var", "w", ":", "Int", "=", "4", "}",
+        ]
         let kinds1: [TokenKind] = [
             .keyword,
             .identifier,

@@ -76,7 +76,7 @@ public struct NormalizedSequence: Sendable, TokenSequenceProtocol {
         let start = max(0, startLine - 1)
         let end = min(sourceLines.count, endLine)
         guard start < end else { return "" }
-        return sourceLines[start ..< end].joined(separator: "\n")
+        return sourceLines[start..<end].joined(separator: "\n")
     }
 }
 
@@ -179,9 +179,9 @@ public struct TokenNormalizer: Sendable {
             return token.text
 
         case .keyword,
-             .operator,
-             .punctuation,
-             .unknown:
+            .operator,
+            .punctuation,
+            .unknown:
             return token.text
         }
     }

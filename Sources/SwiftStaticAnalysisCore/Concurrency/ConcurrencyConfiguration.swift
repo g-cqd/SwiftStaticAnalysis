@@ -109,7 +109,7 @@ public enum ParallelProcessor {
 
         for batchStart in stride(from: 0, to: items.count, by: batchSize) {
             let batchEnd = min(batchStart + batchSize, items.count)
-            let batch = Array(items[batchStart ..< batchEnd])
+            let batch = Array(items[batchStart..<batchEnd])
 
             try await withThrowingTaskGroup(of: (Int, R).self) { group in
                 for (localIndex, item) in batch.enumerated() {
@@ -149,7 +149,7 @@ public enum ParallelProcessor {
         let batchSize = max(1, maxConcurrency)
         for batchStart in stride(from: 0, to: items.count, by: batchSize) {
             let batchEnd = min(batchStart + batchSize, items.count)
-            let batch = Array(items[batchStart ..< batchEnd])
+            let batch = Array(items[batchStart..<batchEnd])
 
             await withTaskGroup(of: R?.self) { group in
                 for item in batch {
@@ -186,7 +186,7 @@ public enum ParallelProcessor {
         let batchSize = max(1, maxConcurrency)
         for batchStart in stride(from: 0, to: items.count, by: batchSize) {
             let batchEnd = min(batchStart + batchSize, items.count)
-            let batch = Array(items[batchStart ..< batchEnd])
+            let batch = Array(items[batchStart..<batchEnd])
 
             try await withThrowingTaskGroup(of: Void.self) { group in
                 for item in batch {

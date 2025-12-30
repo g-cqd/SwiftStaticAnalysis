@@ -9,6 +9,7 @@ import Foundation
 import SwiftParser
 import SwiftSyntax
 import Testing
+
 @testable import SwiftStaticAnalysisCore
 
 // MARK: - DeclarationCollectorTests
@@ -20,14 +21,14 @@ struct DeclarationCollectorTests {
     @Test("Collect function declarations")
     func collectFunctions() {
         let source = """
-        func globalFunction() {}
+            func globalFunction() {}
 
-        private func privateFunction() -> Int { 0 }
+            private func privateFunction() -> Int { 0 }
 
-        public func publicFunction(param: String) async throws -> String {
-            param
-        }
-        """
+            public func publicFunction(param: String) async throws -> String {
+                param
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -45,12 +46,12 @@ struct DeclarationCollectorTests {
     @Test("Collect methods within types")
     func collectMethods() {
         let source = """
-        struct MyStruct {
-            func instanceMethod() {}
-            static func staticMethod() {}
-            mutating func mutatingMethod() {}
-        }
-        """
+            struct MyStruct {
+                func instanceMethod() {}
+                static func staticMethod() {}
+                mutating func mutatingMethod() {}
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -69,15 +70,15 @@ struct DeclarationCollectorTests {
     @Test("Collect variable declarations")
     func collectVariables() {
         let source = """
-        let globalConstant = 42
-        var globalVariable = "hello"
+            let globalConstant = 42
+            var globalVariable = "hello"
 
-        struct Container {
-            let storedProperty: Int
-            var computedProperty: Int { 0 }
-            static let staticProperty = true
-        }
-        """
+            struct Container {
+                let storedProperty: Int
+                var computedProperty: Int { 0 }
+                static let staticProperty = true
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -94,12 +95,12 @@ struct DeclarationCollectorTests {
     @Test("Collect class declarations")
     func collectClasses() {
         let source = """
-        class BaseClass {}
+            class BaseClass {}
 
-        final class FinalClass: BaseClass {}
+            final class FinalClass: BaseClass {}
 
-        class GenericClass<T> where T: Equatable {}
-        """
+            class GenericClass<T> where T: Equatable {}
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -112,17 +113,17 @@ struct DeclarationCollectorTests {
     @Test("Collect struct declarations")
     func collectStructs() {
         let source = """
-        struct SimpleStruct {}
+            struct SimpleStruct {}
 
-        struct StructWithMembers {
-            var x: Int
-            var y: Int
-        }
+            struct StructWithMembers {
+                var x: Int
+                var y: Int
+            }
 
-        struct GenericStruct<T> {
-            var value: T
-        }
-        """
+            struct GenericStruct<T> {
+                var value: T
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -135,21 +136,21 @@ struct DeclarationCollectorTests {
     @Test("Collect enum declarations")
     func collectEnums() {
         let source = """
-        enum SimpleEnum {
-            case a, b, c
-        }
+            enum SimpleEnum {
+                case a, b, c
+            }
 
-        enum EnumWithRawValue: String {
-            case first = "1st"
-            case second = "2nd"
-        }
+            enum EnumWithRawValue: String {
+                case first = "1st"
+                case second = "2nd"
+            }
 
-        enum EnumWithAssociatedValue {
-            case none
-            case some(Int)
-            case pair(first: String, second: Int)
-        }
-        """
+            enum EnumWithAssociatedValue {
+                case none
+                case some(Int)
+                case pair(first: String, second: Int)
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -165,18 +166,18 @@ struct DeclarationCollectorTests {
     @Test("Collect protocol declarations")
     func collectProtocols() {
         let source = """
-        protocol SimpleProtocol {}
+            protocol SimpleProtocol {}
 
-        protocol ProtocolWithRequirements {
-            var property: Int { get set }
-            func method()
-        }
+            protocol ProtocolWithRequirements {
+                var property: Int { get set }
+                func method()
+            }
 
-        protocol ProtocolWithAssociatedType {
-            associatedtype Element
-            func process(_ element: Element)
-        }
-        """
+            protocol ProtocolWithAssociatedType {
+                associatedtype Element
+                func process(_ element: Element)
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -191,13 +192,13 @@ struct DeclarationCollectorTests {
     @Test("Detect access levels correctly")
     func detectAccessLevels() {
         let source = """
-        public class PublicClass {}
-        open class OpenClass {}
-        internal class InternalClass {}
-        fileprivate class FileprivateClass {}
-        private class PrivateClass {}
-        class DefaultClass {}
-        """
+            public class PublicClass {}
+            open class OpenClass {}
+            internal class InternalClass {}
+            fileprivate class FileprivateClass {}
+            private class PrivateClass {}
+            class DefaultClass {}
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -223,12 +224,12 @@ struct DeclarationCollectorTests {
     @Test("Detect modifiers correctly")
     func detectModifiers() {
         let source = """
-        static func staticFunc() {}
-        final class FinalClass {}
-        lazy var lazyVar = 0
-        override func overrideFunc() {}
-        @discardableResult func discardable() -> Int { 0 }
-        """
+            static func staticFunc() {}
+            final class FinalClass {}
+            lazy var lazyVar = 0
+            override func overrideFunc() {}
+            @discardableResult func discardable() -> Int { 0 }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -246,16 +247,16 @@ struct DeclarationCollectorTests {
     @Test("Collect nested declarations with correct scope")
     func collectNestedDeclarations() {
         let source = """
-        class Outer {
-            struct Inner {
-                func innerMethod() {}
-            }
+            class Outer {
+                struct Inner {
+                    func innerMethod() {}
+                }
 
-            func outerMethod() {
-                let localVar = 42
+                func outerMethod() {
+                    let localVar = 42
+                }
             }
-        }
-        """
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -279,11 +280,11 @@ struct DeclarationCollectorTests {
     @Test("Collect import declarations")
     func collectImports() {
         let source = """
-        import Foundation
-        import UIKit
-        @testable import MyModule
-        import struct MyModule.MyStruct
-        """
+            import Foundation
+            import UIKit
+            @testable import MyModule
+            import struct MyModule.MyStruct
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
@@ -303,10 +304,10 @@ struct ReferenceCollectorTests {
     @Test("Collect identifier references")
     func collectIdentifiers() {
         let source = """
-        let x = 10
-        let y = x + 5
-        print(y)
-        """
+            let x = 10
+            let y = x + 5
+            print(y)
+            """
 
         let tree = Parser.parse(source: source)
         let collector = ReferenceCollector(file: "test.swift", tree: tree)
@@ -324,11 +325,11 @@ struct ReferenceCollectorTests {
     @Test("Identify call references")
     func identifyCallReferences() {
         let source = """
-        func myFunction() {}
-        myFunction()
+            func myFunction() {}
+            myFunction()
 
-        let result = someObject.method()
-        """
+            let result = someObject.method()
+            """
 
         let tree = Parser.parse(source: source)
         let collector = ReferenceCollector(file: "test.swift", tree: tree)
@@ -341,12 +342,12 @@ struct ReferenceCollectorTests {
     @Test("Identify read references")
     func identifyReadReferences() {
         let source = """
-        let x = 10
-        let y = x + 5
-        if x > 0 {
-            print(x)
-        }
-        """
+            let x = 10
+            let y = x + 5
+            if x > 0 {
+                print(x)
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = ReferenceCollector(file: "test.swift", tree: tree)
@@ -361,10 +362,10 @@ struct ReferenceCollectorTests {
     @Test("Identify write references")
     func identifyWriteReferences() {
         let source = """
-        var x = 0
-        x = 10
-        x += 5
-        """
+            var x = 0
+            x = 10
+            x += 5
+            """
 
         let tree = Parser.parse(source: source)
         let collector = ReferenceCollector(file: "test.swift", tree: tree)
@@ -379,12 +380,12 @@ struct ReferenceCollectorTests {
     @Test("Identify type annotation references")
     func identifyTypeAnnotations() {
         let source = """
-        let x: Int = 0
-        let y: String = ""
-        func process(_ input: Data) -> Result<String, Error> {
-            .success("")
-        }
-        """
+            let x: Int = 0
+            let y: String = ""
+            func process(_ input: Data) -> Result<String, Error> {
+                .success("")
+            }
+            """
 
         let tree = Parser.parse(source: source)
         let collector = ReferenceCollector(file: "test.swift", tree: tree)
@@ -400,9 +401,9 @@ struct ReferenceCollectorTests {
     @Test("Identify inheritance references")
     func identifyInheritance() {
         let source = """
-        class MyClass: BaseClass, Protocol1, Protocol2 {}
-        struct MyStruct: Codable, Hashable {}
-        """
+            class MyClass: BaseClass, Protocol1, Protocol2 {}
+            struct MyStruct: Codable, Hashable {}
+            """
 
         let tree = Parser.parse(source: source)
         let collector = ReferenceCollector(file: "test.swift", tree: tree)
@@ -421,10 +422,10 @@ struct ReferenceCollectorTests {
     @Test("Collect member access references")
     func collectMemberAccess() {
         let source = """
-        let user = User()
-        let name = user.name
-        let age = user.profile.age
-        """
+            let user = User()
+            let name = user.name
+            let age = user.profile.age
+            """
 
         let tree = Parser.parse(source: source)
         let collector = ReferenceCollector(file: "test.swift", tree: tree)
@@ -442,13 +443,13 @@ struct ScopeTrackerTests {
     @Test("Track scope hierarchy")
     func trackScopeHierarchy() {
         let source = """
-        func outer() {
-            let x = 1
-            func inner() {
-                let y = 2
+            func outer() {
+                let x = 1
+                func inner() {
+                    let y = 2
+                }
             }
-        }
-        """
+            """
 
         let tree = Parser.parse(source: source)
         let collector = DeclarationCollector(file: "test.swift", tree: tree)

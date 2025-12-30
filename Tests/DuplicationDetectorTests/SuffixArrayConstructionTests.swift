@@ -15,6 +15,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("Suffix Array Construction Tests")
@@ -38,8 +39,8 @@ struct SuffixArrayConstructionTests {
         // "ba" -> sorted suffixes: "a" (index 1), "ba" (index 0)
         let sa = SuffixArray(tokens: [2, 1])
         #expect(sa.array.count == 2)
-        #expect(sa.array[0] == 1) // "a" comes first
-        #expect(sa.array[1] == 0) // "ba" comes second
+        #expect(sa.array[0] == 1)  // "a" comes first
+        #expect(sa.array[1] == 0)  // "ba" comes second
     }
 
     @Test("Repeated elements suffix array")
@@ -58,12 +59,12 @@ struct SuffixArrayConstructionTests {
         // "banana" -> [2,1,3,1,3,1] (a=1, b=2, n=3)
         // Expected suffix array for "banana$": [6,5,3,1,0,4,2]
         // Without sentinel: suffixes sorted
-        let tokens = [2, 1, 3, 1, 3, 1] // b a n a n a
+        let tokens = [2, 1, 3, 1, 3, 1]  // b a n a n a
         let sa = SuffixArray(tokens: tokens)
         #expect(sa.array.count == 6)
 
         // Verify suffix ordering is correct
-        for i in 0 ..< (sa.array.count - 1) {
+        for i in 0..<(sa.array.count - 1) {
             let suffix1 = Array(tokens[sa.array[i]...])
             let suffix2 = Array(tokens[sa.array[i + 1]...])
             #expect(suffix1.lexicographicallyPrecedes(suffix2) || suffix1 == suffix2)
@@ -76,7 +77,7 @@ struct SuffixArrayConstructionTests {
         let (sa, alphabet) = SuffixArray.fromStrings(strings)
 
         #expect(sa.length == 4)
-        #expect(alphabet.count == 3) // func, hello, world
+        #expect(alphabet.count == 3)  // func, hello, world
 
         // "func" should map to same ID
         #expect(alphabet["func"] != nil)
@@ -88,7 +89,7 @@ struct SuffixArrayConstructionTests {
     func largeArray() {
         // Test with a larger input to verify O(n) performance
         var tokens: [Int] = []
-        for i in 0 ..< 1000 {
+        for i in 0..<1000 {
             tokens.append(i % 100 + 1)
         }
 

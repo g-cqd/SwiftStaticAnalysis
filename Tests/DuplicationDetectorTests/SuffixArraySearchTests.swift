@@ -12,6 +12,7 @@
 
 import Foundation
 import Testing
+
 @testable import DuplicationDetector
 
 @Suite("Suffix Array Search Tests")

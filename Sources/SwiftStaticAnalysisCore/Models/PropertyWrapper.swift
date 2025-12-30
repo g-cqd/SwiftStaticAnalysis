@@ -68,7 +68,8 @@ public enum PropertyWrapperKind: String, Sendable, Codable, CaseIterable {
     /// Initialize from an attribute name string.
     public init(attributeName: String) {
         // Strip leading @ if present
-        let name = attributeName.hasPrefix("@")
+        let name =
+            attributeName.hasPrefix("@")
             ? String(attributeName.dropFirst())
             : attributeName
 
@@ -84,18 +85,18 @@ public enum PropertyWrapperKind: String, Sendable, Codable, CaseIterable {
     public var isSwiftUI: Bool {
         switch self {
         case .appStorage,
-             .binding,
-             .environment,
-             .environmentObject,
-             .focusedBinding,
-             .focusedValue,
-             .focusState,
-             .gestureState,
-             .namespace,
-             .observedObject,
-             .sceneStorage,
-             .state,
-             .stateObject:
+            .binding,
+            .environment,
+            .environmentObject,
+            .focusedBinding,
+            .focusedValue,
+            .focusState,
+            .gestureState,
+            .namespace,
+            .observedObject,
+            .sceneStorage,
+            .state,
+            .stateObject:
             true
 
         default:
@@ -111,17 +112,17 @@ public enum PropertyWrapperKind: String, Sendable, Codable, CaseIterable {
     public var impliesUsage: Bool {
         switch self {
         case .appStorage,
-             .binding,
-             .environment,
-             .environmentObject,
-             .focusState,
-             .gestureState,
-             .namespace,
-             .observedObject,
-             .published,
-             .sceneStorage,
-             .state,
-             .stateObject:
+            .binding,
+            .environment,
+            .environmentObject,
+            .focusState,
+            .gestureState,
+            .namespace,
+            .observedObject,
+            .published,
+            .sceneStorage,
+            .state,
+            .stateObject:
             true
 
         default:
@@ -164,8 +165,9 @@ public struct PropertyWrapperInfo: Sendable, Codable, Hashable {
         // Extract arguments if present
         var arguments: String?
         if let parenStart = text.firstIndex(of: "("),
-           let parenEnd = text.lastIndex(of: ")") {
-            arguments = String(text[text.index(after: parenStart) ..< parenEnd])
+            let parenEnd = text.lastIndex(of: ")")
+        {
+            arguments = String(text[text.index(after: parenStart)..<parenEnd])
             text = String(text[..<parenStart])
         }
 
@@ -223,7 +225,7 @@ public enum SwiftUIConformance: String, Sendable, Codable, CaseIterable {
     public var isEntryPoint: Bool {
         switch self {
         case .app,
-             .previewProvider:
+            .previewProvider:
             true
 
         default:
@@ -235,14 +237,14 @@ public enum SwiftUIConformance: String, Sendable, Codable, CaseIterable {
     public var hasImplicitBody: Bool {
         switch self {
         case .app,
-             .commands,
-             .customizableToolbarContent,
-             .scene,
-             .tableColumnContent,
-             .tableRowContent,
-             .toolbarContent,
-             .view,
-             .viewModifier:
+            .commands,
+            .customizableToolbarContent,
+            .scene,
+            .tableColumnContent,
+            .tableRowContent,
+            .toolbarContent,
+            .view,
+            .viewModifier:
             true
 
         default:

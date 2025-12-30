@@ -30,7 +30,7 @@ public struct OrderAPI {
             throw NetworkError.invalidResponse
         }
 
-        guard (200 ... 299).contains(httpResponse.statusCode) else {
+        guard (200...299).contains(httpResponse.statusCode) else {
             throw NetworkError.serverError(httpResponse.statusCode)
         }
 
@@ -48,7 +48,7 @@ public struct OrderAPI {
             throw NetworkError.invalidResponse
         }
 
-        guard (200 ... 299).contains(httpResponse.statusCode) else {
+        guard (200...299).contains(httpResponse.statusCode) else {
             throw NetworkError.serverError(httpResponse.statusCode)
         }
 
@@ -73,7 +73,7 @@ public struct OrderAPI {
             throw NetworkError.invalidResponse
         }
 
-        guard (200 ... 299).contains(httpResponse.statusCode) else {
+        guard (200...299).contains(httpResponse.statusCode) else {
             throw NetworkError.serverError(httpResponse.statusCode)
         }
 
@@ -98,7 +98,7 @@ public struct OrderAPI {
             throw NetworkError.invalidResponse
         }
 
-        guard (200 ... 299).contains(httpResponse.statusCode) else {
+        guard (200...299).contains(httpResponse.statusCode) else {
             throw NetworkError.serverError(httpResponse.statusCode)
         }
 
@@ -118,7 +118,7 @@ public struct OrderAPI {
             throw NetworkError.invalidResponse
         }
 
-        guard (200 ... 299).contains(httpResponse.statusCode) else {
+        guard (200...299).contains(httpResponse.statusCode) else {
             throw NetworkError.serverError(httpResponse.statusCode)
         }
     }

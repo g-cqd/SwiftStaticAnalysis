@@ -20,7 +20,7 @@ struct RollingHash: Sendable {
 
         // Precompute base^(windowSize-1) mod prime
         var power: UInt64 = 1
-        for _ in 0 ..< (windowSize - 1) {
+        for _ in 0..<(windowSize - 1) {
             power = (power &* Self.base) % Self.prime
         }
         highestPower = power
@@ -141,17 +141,18 @@ public struct ExactCloneDetector: Sendable {
                         startLine: window.startLine,
                         endLine: window.endLine,
                         tokenCount: minimumTokens,
-                        codeSnippet: "", // Will be filled in by caller
+                        codeSnippet: "",  // Will be filled in by caller
                     )
                 }
 
                 if clones.count >= 2 {
-                    cloneGroups.append(CloneGroup(
-                        type: .exact,
-                        clones: clones,
-                        similarity: 1.0,
-                        fingerprint: String(hash),
-                    ))
+                    cloneGroups.append(
+                        CloneGroup(
+                            type: .exact,
+                            clones: clones,
+                            similarity: 1.0,
+                            fingerprint: String(hash),
+                        ))
                 }
             }
         }
@@ -170,7 +171,8 @@ public struct ExactCloneDetector: Sendable {
         from sequence: TokenSequence,
         rollingHash: RollingHash,
     ) -> [TokenWindow] {
-        guard sequence.tokens.count >= minimumTokens else { return [] }
+        // Safety: ensure minimumTokens is valid and sequence has enough tokens
+        guard minimumTokens > 0, sequence.tokens.count >= minimumTokens else { return [] }
 
         var windows: [TokenWindow] = []
         let tokens = sequence.tokens
@@ -180,32 +182,34 @@ public struct ExactCloneDetector: Sendable {
         var hash = rollingHash.initialHash(Array(tokenTexts.prefix(minimumTokens)))
 
         // First window
-        windows.append(TokenWindow(
-            file: sequence.file,
-            hash: hash,
-            startIndex: 0,
-            endIndex: minimumTokens - 1,
-            startLine: tokens[0].line,
-            endLine: tokens[minimumTokens - 1].line,
-            tokens: Array(tokenTexts.prefix(minimumTokens)),
-        ))
+        windows.append(
+            TokenWindow(
+                file: sequence.file,
+                hash: hash,
+                startIndex: 0,
+                endIndex: minimumTokens - 1,
+                startLine: tokens[0].line,
+                endLine: tokens[minimumTokens - 1].line,
+                tokens: Array(tokenTexts.prefix(minimumTokens)),
+            ))
 
         // Roll through remaining windows
         let maxStartIndex = tokens.count - minimumTokens
-        for i in 1 ... maxStartIndex where maxStartIndex >= 1 {
+        for i in 1...maxStartIndex where maxStartIndex >= 1 {
             let outgoing = tokenTexts[i - 1]
             let incoming = tokenTexts[i + minimumTokens - 1]
             hash = rollingHash.roll(hash: hash, outgoing: outgoing, incoming: incoming)
 
-            windows.append(TokenWindow(
-                file: sequence.file,
-                hash: hash,
-                startIndex: i,
-                endIndex: i + minimumTokens - 1,
-                startLine: tokens[i].line,
-                endLine: tokens[i + minimumTokens - 1].line,
-                tokens: Array(tokenTexts[i ..< (i + minimumTokens)]),
-            ))
+            windows.append(
+                TokenWindow(
+                    file: sequence.file,
+                    hash: hash,
+                    startIndex: i,
+                    endIndex: i + minimumTokens - 1,
+                    startLine: tokens[i].line,
+                    endLine: tokens[i + minimumTokens - 1].line,
+                    tokens: Array(tokenTexts[i..<(i + minimumTokens)]),
+                ))
         }
 
         return windows

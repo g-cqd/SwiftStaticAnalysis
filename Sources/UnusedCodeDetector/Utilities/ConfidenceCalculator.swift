@@ -9,20 +9,20 @@ import SwiftStaticAnalysisCore
 
 // MARK: - Declaration Confidence Extension
 
-public extension Declaration {
+extension Declaration {
     /// Determine confidence level for unused code detection based on access level.
     ///
     /// - Returns: Confidence level based on the declaration's access level.
-    var unusedConfidence: Confidence {
+    public var unusedConfidence: Confidence {
         switch accessLevel {
         case .fileprivate,
-             .private:
+            .private:
             .high
         case .internal,
-             .package:
+            .package:
             .medium
         case .open,
-             .public:
+            .public:
             .low
         }
     }

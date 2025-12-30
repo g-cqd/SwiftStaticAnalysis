@@ -110,7 +110,7 @@ struct PreferencesView: View {
     var body: some View {
         VStack {
             Toggle("Dark Mode", isOn: $darkMode)
-            Slider(value: $fontSize, in: 10 ... 24)
+            Slider(value: $fontSize, in: 10...24)
         }
     }
 

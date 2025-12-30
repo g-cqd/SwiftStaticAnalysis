@@ -90,12 +90,13 @@ public struct NearCloneDetector: Sendable {
                     let similarity = calculateGroupSimilarity(group)
 
                     if similarity >= minimumSimilarity {
-                        cloneGroups.append(CloneGroup(
-                            type: .near,
-                            clones: clones,
-                            similarity: similarity,
-                            fingerprint: String(hash),
-                        ))
+                        cloneGroups.append(
+                            CloneGroup(
+                                type: .near,
+                                clones: clones,
+                                similarity: similarity,
+                                fingerprint: String(hash),
+                            ))
                     }
                 }
             }
@@ -114,7 +115,8 @@ public struct NearCloneDetector: Sendable {
         from sequence: NormalizedSequence,
         rollingHash: RollingHash,
     ) -> [NormalizedWindow] {
-        guard sequence.tokens.count >= minimumTokens else { return [] }
+        // Safety: ensure minimumTokens is valid and sequence has enough tokens
+        guard minimumTokens > 0, sequence.tokens.count >= minimumTokens else { return [] }
 
         var windows: [NormalizedWindow] = []
         let tokens = sequence.tokens
@@ -125,34 +127,36 @@ public struct NearCloneDetector: Sendable {
         var hash = rollingHash.initialHash(Array(normalizedTexts.prefix(minimumTokens)))
 
         // First window
-        windows.append(NormalizedWindow(
-            file: sequence.file,
-            hash: hash,
-            startIndex: 0,
-            endIndex: minimumTokens - 1,
-            startLine: tokens[0].line,
-            endLine: tokens[minimumTokens - 1].line,
-            normalizedTokens: Array(normalizedTexts.prefix(minimumTokens)),
-            originalTokens: Array(originalTexts.prefix(minimumTokens)),
-        ))
+        windows.append(
+            NormalizedWindow(
+                file: sequence.file,
+                hash: hash,
+                startIndex: 0,
+                endIndex: minimumTokens - 1,
+                startLine: tokens[0].line,
+                endLine: tokens[minimumTokens - 1].line,
+                normalizedTokens: Array(normalizedTexts.prefix(minimumTokens)),
+                originalTokens: Array(originalTexts.prefix(minimumTokens)),
+            ))
 
         // Roll through remaining windows
         let maxStartIndex = tokens.count - minimumTokens
-        for i in 1 ... maxStartIndex where maxStartIndex >= 1 {
+        for i in 1...maxStartIndex where maxStartIndex >= 1 {
             let outgoing = normalizedTexts[i - 1]
             let incoming = normalizedTexts[i + minimumTokens - 1]
             hash = rollingHash.roll(hash: hash, outgoing: outgoing, incoming: incoming)
 
-            windows.append(NormalizedWindow(
-                file: sequence.file,
-                hash: hash,
-                startIndex: i,
-                endIndex: i + minimumTokens - 1,
-                startLine: tokens[i].line,
-                endLine: tokens[i + minimumTokens - 1].line,
-                normalizedTokens: Array(normalizedTexts[i ..< (i + minimumTokens)]),
-                originalTokens: Array(originalTexts[i ..< (i + minimumTokens)]),
-            ))
+            windows.append(
+                NormalizedWindow(
+                    file: sequence.file,
+                    hash: hash,
+                    startIndex: i,
+                    endIndex: i + minimumTokens - 1,
+                    startLine: tokens[i].line,
+                    endLine: tokens[i + minimumTokens - 1].line,
+                    normalizedTokens: Array(normalizedTexts[i..<(i + minimumTokens)]),
+                    originalTokens: Array(originalTexts[i..<(i + minimumTokens)]),
+                ))
         }
 
         return windows
@@ -171,8 +175,8 @@ public struct NearCloneDetector: Sendable {
         var totalSimilarity = 0.0
         var comparisons = 0
 
-        for i in 0 ..< group.count {
-            for j in (i + 1) ..< group.count {
+        for i in 0..<group.count {
+            for j in (i + 1)..<group.count {
                 totalSimilarity += CloneDetectionUtilities.jaccardSimilarity(
                     group[i].originalTokens,
                     group[j].originalTokens,

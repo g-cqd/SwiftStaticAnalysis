@@ -84,7 +84,7 @@ public actor TokenSequenceCache {
     /// Load cache from disk.
     public func load() async throws {
         guard let url = cacheURL,
-              FileManager.default.fileExists(atPath: url.path)
+            FileManager.default.fileExists(atPath: url.path)
         else {
             return
         }
@@ -125,7 +125,7 @@ public actor TokenSequenceCache {
     /// - Returns: Cached sequence if valid, nil otherwise.
     public func get(file: String, currentHash: UInt64) -> CachedTokenSequence? {
         guard let cached = sequences[file],
-              cached.contentHash == currentHash
+            cached.contentHash == currentHash
         else {
             return nil
         }
@@ -191,9 +191,9 @@ public actor TokenSequenceCache {
 
 // MARK: - Token Sequence Conversion
 
-public extension TokenSequence {
+extension TokenSequence {
     /// Convert to a cacheable format.
-    func toCached(contentHash: UInt64) -> CachedTokenSequence {
+    public func toCached(contentHash: UInt64) -> CachedTokenSequence {
         CachedTokenSequence(
             file: file,
             contentHash: contentHash,
@@ -210,9 +210,9 @@ public extension TokenSequence {
     }
 }
 
-public extension CachedTokenSequence {
+extension CachedTokenSequence {
     /// Convert back to a TokenSequence.
-    func toTokenSequence() -> TokenSequence {
+    public func toTokenSequence() -> TokenSequence {
         TokenSequence(
             file: file,
             tokens: tokens.map { cached in
