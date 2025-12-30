@@ -301,9 +301,7 @@ struct IgnoreDirectiveTests {
         let collector = DeclarationCollector(file: "test.swift", tree: tree)
         collector.walk(tree)
 
-        // Debug: check all declarations
         let allDecls = collector.declarations.map { "\($0.name):\($0.kind)" }
-        print("All declarations: \(allDecls)")
 
         // Functions inside extensions should be detected as methods
         let methods = collector.declarations.filter { $0.kind == .method || $0.kind == .function }
@@ -363,7 +361,6 @@ struct IgnoreDirectiveTests {
         collector.walk(tree)
 
         let allDecls = collector.declarations.map { "\($0.name):\($0.kind)" }
-        print("Nested test declarations: \(allDecls)")
 
         let structs = collector.declarations.filter { $0.kind == .struct }
         let methods = collector.declarations.filter { $0.kind == .method || $0.kind == .function }

@@ -171,10 +171,9 @@ public struct SuffixArrayCloneDetector: Sendable {
                 infos.append(
                     TokenStreamInfo(
                         fileIndex: fileIndex,
-                        tokenIndex: infos.count,
                         line: accessor.line,
                         column: accessor.column,
-                        originalText: accessor.original,
+                        originalText: accessor.original
                     ))
             }
 
@@ -185,10 +184,9 @@ public struct SuffixArrayCloneDetector: Sendable {
             infos.append(
                 TokenStreamInfo(
                     fileIndex: fileIndex,
-                    tokenIndex: infos.count,
                     line: -1,
                     column: -1,
-                    originalText: "<SEP>",
+                    originalText: "<SEP>"
                 ))
         }
 
@@ -423,7 +421,6 @@ public struct SuffixArrayCloneDetector: Sendable {
 /// Information about a token in the concatenated stream.
 struct TokenStreamInfo: Sendable {
     let fileIndex: Int
-    let tokenIndex: Int
     let line: Int
     let column: Int
     let originalText: String
