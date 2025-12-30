@@ -206,6 +206,7 @@ public struct IgnoreDirectiveScanner: Sendable {
 
 // MARK: - CloneGroup Filtering
 
+// swa:ignore-unused - Public API for library consumers
 extension [CloneGroup] {
     /// Filter clone groups to exclude clones in ignored regions.
     ///

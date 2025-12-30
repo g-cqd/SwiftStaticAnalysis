@@ -5,27 +5,7 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Added
-- Ignore directive description support: `// swa:ignore-unused - Reason for ignoring`
-- Modern RegexBuilder-based pattern matching for internal analyzers
-- `.editorconfig` for consistent editor settings
-- `.spi.yml` for Swift Package Index documentation
-
-### Changed
-- **BREAKING**: Replaced SwiftLint and SwiftFormat with official `swift-format` package
-- **BREAKING**: Restructured package to follow Apple/Swift.org conventions:
-  - CLI target renamed from `SwiftStaticAnalysisCLI` to `swa`
-  - Plugins moved from `Plugins/` to `Sources/`
-- Updated SwiftProjectKit from 0.0.12 to 0.0.19
-- `--min-tokens` CLI argument now validates input range (1-10000)
-
-### Fixed
-- `--min-tokens` argument now properly validates input, preventing crashes with invalid values
-- Added defensive guards in all clone detection algorithms for edge cases
-
-## [0.0.14] - Unreleased
+## [0.0.14] - 2025-12-30
 
 ### Added
 - Type member inheritance: members of extensions, classes, structs, and protocols now inherit ignore directives from their parent
@@ -63,10 +43,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Upgraded to Swift 6.2
 - Minimum platform requirements: macOS 15.0+, iOS 18.0+
-- Improved test coverage (511 tests across 125 suites)
+- Improved test coverage (538 tests across 128 suites)
 - Reorganized test files into single-test-suite-per-file structure
 - Refactored SemanticCloneDetector to extract common detection logic
 - Refactored SuffixArrayCloneDetector to eliminate duplicate clone group building
+- **BREAKING**: Replaced SwiftLint and SwiftFormat with official `swift-format` package
+- **BREAKING**: Restructured package to follow Apple/Swift.org conventions:
+  - CLI target renamed from `SwiftStaticAnalysisCLI` to `swa`
+  - Plugins moved from `Plugins/` to `Sources/`
+  - Internal types prefixed with underscore (`_DuplicationEngine.swift`)
+  - Protocol conformances extracted to separate files (`Type+Protocol.swift`)
+  - Modules reorganized into subdirectories (Incremental/, Configuration/, Models/, etc.)
+- Updated SwiftProjectKit from 0.0.12 to 0.0.19
+- Enhanced swift-format configuration with additional rules:
+  - `AvoidRetroactiveConformances`, `NoEmptyLinesOpeningClosingBraces`, `NoPlaygroundLiterals`
+- Removed duplicate DocC articles from SwiftStaticAnalysisCore (consolidated in SwiftStaticAnalysis)
 
 ### Removed
 - Unused `AsyncSemaphore` actor from ConcurrencyConfiguration
@@ -81,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README version in installation instructions (1.0.0 → 0.1.0)
 - CLI `--types` argument syntax in README examples
 - CLI argument validation now properly rejects invalid `--types` and `--mode` values
+- `--min-tokens` argument now properly validates input (1-10000), preventing crashes
+- CLIReference.md typo: "duplications" → "duplicates" command
+- CONTRIBUTING.md project structure updated to reflect current layout
+- SECURITY.md version corrected from "1.x" to "0.0.x"
 
 ## [0.1.0] - Initial Release
 

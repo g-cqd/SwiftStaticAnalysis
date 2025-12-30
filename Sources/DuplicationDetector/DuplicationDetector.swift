@@ -339,6 +339,7 @@ public struct DuplicationReport: Sendable, Codable {
 
 // MARK: - Clone Group Utilities
 
+// swa:ignore-unused - Public API for library consumers
 extension [CloneGroup] {
     /// Remove duplicate clone groups based on their location fingerprints.
     ///

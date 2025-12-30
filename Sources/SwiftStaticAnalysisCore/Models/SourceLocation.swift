@@ -57,23 +57,3 @@ public struct SourceRange: Sendable, Hashable, Codable {
         end.line - start.line + 1
     }
 }
-
-// MARK: - SourceLocation + CustomStringConvertible
-
-extension SourceLocation: CustomStringConvertible {
-    public var description: String {
-        "\(file):\(line):\(column)"
-    }
-}
-
-// MARK: - SourceRange + CustomStringConvertible
-
-extension SourceRange: CustomStringConvertible {
-    public var description: String {
-        if start.line == end.line {
-            "\(start.file):\(start.line):\(start.column)-\(end.column)"
-        } else {
-            "\(start.file):\(start.line)-\(end.line)"
-        }
-    }
-}

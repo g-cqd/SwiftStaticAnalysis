@@ -11,7 +11,7 @@ The `swa` (Swift Static Analysis) CLI provides commands for detecting unused cod
 ### From Source
 
 ```bash
-git clone https://github.com/your-repo/SwiftStaticAnalysis.git
+git clone https://github.com/g-cqd/SwiftStaticAnalysis.git
 cd SwiftStaticAnalysis
 swift build -c release
 cp .build/release/swa /usr/local/bin/
@@ -23,7 +23,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/your-repo/SwiftStaticAnalysis.git", from: "1.0.0")
+    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.0.14")
 ]
 ```
 
@@ -89,12 +89,12 @@ swa unused --min-confidence high Sources/
 swa unused --format xcode Sources/
 ```
 
-### duplications
+### duplicates
 
 Detect code duplication in Swift files.
 
 ```bash
-swa duplications [OPTIONS] <PATHS>...
+swa duplicates [OPTIONS] <PATHS>...
 ```
 
 #### Arguments
@@ -130,16 +130,16 @@ swa duplications [OPTIONS] <PATHS>...
 
 ```bash
 # Basic duplication detection
-swa duplications Sources/
+swa duplicates Sources/
 
 # Detect near-clones with lower threshold
-swa duplications --clone-types exact,near --min-similarity 0.7 Sources/
+swa duplicates --clone-types exact,near --min-similarity 0.7 Sources/
 
 # High-performance mode for large codebases
-swa duplications --algorithm suffixArray --min-tokens 30 Sources/
+swa duplicates --algorithm suffixArray --min-tokens 30 Sources/
 
 # JSON output for tooling integration
-swa duplications --format json --output duplications.json Sources/
+swa duplicates --format json --output duplicates.json Sources/
 ```
 
 ## Configuration File
@@ -169,7 +169,7 @@ Create a `.swa.json` file in your project root for persistent configuration.
       "^_.*"
     ]
   },
-  "duplications": {
+  "duplicates": {
     "minTokens": 50,
     "minSimilarity": 0.8,
     "cloneTypes": ["exact", "near"],
@@ -217,7 +217,7 @@ Create a `.swa.json` file in your project root for persistent configuration.
     "mode": "simple",
     "minConfidence": "high"
   },
-  "duplications": {
+  "duplicates": {
     "minTokens": 100,
     "minSimilarity": 0.9
   },

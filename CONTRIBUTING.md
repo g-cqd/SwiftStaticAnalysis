@@ -191,10 +191,13 @@ Describe:
 ```
 SwiftStaticAnalysis/
 ├── Sources/
-│   ├── SwiftStaticAnalysisCore/  # Core parsing and models
-│   ├── DuplicationDetector/       # Clone detection algorithms
-│   ├── UnusedCodeDetector/        # Unused code detection
-│   └── SwiftStaticAnalysisCLI/    # CLI tool
+│   ├── SwiftStaticAnalysis/        # Unified module (re-exports all)
+│   ├── SwiftStaticAnalysisCore/    # Core parsing and models
+│   ├── DuplicationDetector/        # Clone detection algorithms
+│   ├── UnusedCodeDetector/         # Unused code detection
+│   ├── swa/                        # CLI tool
+│   ├── StaticAnalysisBuildPlugin/  # Build-time analysis plugin
+│   └── StaticAnalysisCommandPlugin/# On-demand analysis plugin
 ├── Tests/
 │   ├── SwiftStaticAnalysisCoreTests/
 │   ├── DuplicationDetectorTests/

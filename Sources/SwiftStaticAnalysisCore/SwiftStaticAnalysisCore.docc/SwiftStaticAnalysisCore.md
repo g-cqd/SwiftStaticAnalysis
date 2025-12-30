@@ -1,41 +1,19 @@
 # ``SwiftStaticAnalysisCore``
 
-A high-performance Swift static analysis framework for code duplication detection and unused code elimination.
+Core infrastructure, parsing, and AST visitor types for Swift static analysis.
 
 ## Overview
 
-SwiftStaticAnalysis provides powerful tools to analyze Swift codebases for quality issues:
+SwiftStaticAnalysisCore provides the foundational types and parsing infrastructure used by the duplication and unused code detectors:
 
-- **Clone Detection**: Find exact, near, and semantic code duplicates using advanced algorithms
-- **Unused Code Detection**: Identify dead code with configurable accuracy modes
-- **Performance Optimized**: Memory-mapped I/O, arena allocation, and parallel processing
-- **Xcode Integration**: Output warnings in Xcode-compatible format
+- **Declaration Model**: Represents Swift declarations (classes, functions, properties, etc.)
+- **Reference Tracking**: Tracks references between declarations
+- **AST Visitors**: SwiftSyntax-based visitors for collecting declarations and references
+- **Parser Infrastructure**: Concurrent file parsing with caching
 
-The framework consists of three main modules:
-
-| Module | Purpose |
-|--------|---------|
-| ``SwiftStaticAnalysisCore`` | Core infrastructure, parsing, and AST visitors |
-| `DuplicationDetector` | Clone detection with Suffix Array, MinHash, and AST fingerprinting |
-| `UnusedCodeDetector` | Unused code detection with IndexStoreDB and reachability analysis |
+> Note: For high-level usage documentation, see the ``SwiftStaticAnalysis`` umbrella module.
 
 ## Topics
-
-### Essentials
-
-- <doc:GettingStarted>
-- <doc:CLIReference>
-- <doc:CloneDetection>
-- <doc:UnusedCodeDetection>
-
-### Configuration
-
-- <doc:IgnoreDirectives>
-- <doc:PerformanceOptimization>
-
-### Integration
-
-- <doc:CIIntegration>
 
 ### Core Types
 
