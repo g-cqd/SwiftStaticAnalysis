@@ -24,7 +24,7 @@ public struct DependencyExtractor: Sendable {
     public let configuration: DependencyExtractionConfiguration
 
     /// Build a reachability graph from analysis results.
-    public func buildGraph(from result: AnalysisResult) -> ReachabilityGraph {
+    public func buildGraph(from result: AnalysisResult) async -> ReachabilityGraph {
         let graph = ReachabilityGraph()
 
         // Add all declarations as nodes and detect roots
@@ -32,17 +32,17 @@ public struct DependencyExtractor: Sendable {
             treatPublicAsRoot: configuration.treatPublicAsRoot,
             treatObjcAsRoot: configuration.treatObjcAsRoot,
             treatTestsAsRoot: configuration.treatTestsAsRoot,
-            treatProtocolRequirementsAsRoot: configuration.treatProtocolRequirementsAsRoot,
+            treatProtocolRequirementsAsRoot: configuration.treatProtocolRequirementsAsRoot
         )
 
-        graph.detectRoots(
+        await graph.detectRoots(
             declarations: result.declarations.declarations,
             references: result.references,
-            configuration: rootConfig,
+            configuration: rootConfig
         )
 
         // Build edges based on references
-        buildEdges(graph: graph, result: result)
+        await buildEdges(graph: graph, result: result)
 
         return graph
     }
@@ -50,7 +50,7 @@ public struct DependencyExtractor: Sendable {
     // MARK: Private
 
     /// Build edges between declarations based on references.
-    private func buildEdges(graph: ReachabilityGraph, result: AnalysisResult) {
+    private func buildEdges(graph: ReachabilityGraph, result: AnalysisResult) async {
         let declarations = result.declarations
         let references = result.references
 
@@ -67,20 +67,20 @@ public struct DependencyExtractor: Sendable {
             // Find all references within this declaration's scope
             let scopeRefs = findReferencesInScope(
                 declaration: declaration,
-                allRefs: references,
+                allRefs: references
             )
 
             for ref in scopeRefs {
                 // Find target declarations for this reference
                 let targets = findTargetDeclarations(
                     for: ref,
-                    declarations: declByName,
+                    declarations: declByName
                 )
 
                 for target in targets {
                     let targetNode = DeclarationNode(declaration: target)
                     let kind = mapReferenceContextToEdgeKind(ref.context)
-                    graph.addEdge(from: declNode.id, to: targetNode.id, kind: kind)
+                    await graph.addEdge(from: declNode.id, to: targetNode.id, kind: kind)
                 }
             }
 
@@ -91,23 +91,23 @@ public struct DependencyExtractor: Sendable {
                     if let typeDecls = declByName[typeName] {
                         for typeDecl in typeDecls {
                             let targetNode = DeclarationNode(declaration: typeDecl)
-                            graph.addEdge(from: declNode.id, to: targetNode.id, kind: .typeReference)
+                            await graph.addEdge(from: declNode.id, to: targetNode.id, kind: .typeReference)
                         }
                     }
                 }
             }
 
             // Handle inheritance/conformance (for types)
-            addInheritanceEdges(
+            await addInheritanceEdges(
                 for: declaration,
                 graph: graph,
-                declarations: declByName,
+                declarations: declByName
             )
         }
 
         // Handle protocol witnesses
         if configuration.trackProtocolWitnesses {
-            addProtocolWitnessEdges(graph: graph, result: result, declByName: declByName)
+            await addProtocolWitnessEdges(graph: graph, result: result, declByName: declByName)
         }
     }
 
@@ -239,8 +239,8 @@ public struct DependencyExtractor: Sendable {
     private func addInheritanceEdges(
         for declaration: Declaration,
         graph: ReachabilityGraph,
-        declarations: [String: [Declaration]],
-    ) {
+        declarations: [String: [Declaration]]
+    ) async {
         // This would ideally use inheritance info from the syntax tree
         // For now, we rely on references with inheritance context
     }
@@ -249,8 +249,8 @@ public struct DependencyExtractor: Sendable {
     private func addProtocolWitnessEdges(
         graph: ReachabilityGraph,
         result: AnalysisResult,
-        declByName: [String: [Declaration]],
-    ) {
+        declByName: [String: [Declaration]]
+    ) async {
         // Find all protocols
         let protocols = result.declarations.find(kind: .protocol)
 
@@ -283,7 +283,7 @@ public struct DependencyExtractor: Sendable {
                             let implNode = DeclarationNode(declaration: impl)
 
                             // Implementations are reachable if protocol is reachable
-                            graph.addEdge(from: protoNode.id, to: implNode.id, kind: .typeReference)
+                            await graph.addEdge(from: protoNode.id, to: implNode.id, kind: .typeReference)
                         }
                     }
                 }
@@ -302,7 +302,7 @@ public struct DependencyExtractor: Sendable {
 
             for method in typeMethods {
                 let methodNode = DeclarationNode(declaration: method)
-                graph.addEdge(from: typeNode.id, to: methodNode.id, kind: .call)
+                await graph.addEdge(from: typeNode.id, to: methodNode.id, kind: .call)
             }
         }
     }
@@ -387,13 +387,13 @@ public struct ReachabilityBasedDetector: Sendable {
     public let extractionConfiguration: DependencyExtractionConfiguration
 
     /// Detect unused code using reachability analysis.
-    public func detect(in result: AnalysisResult) -> [UnusedCode] {
+    public func detect(in result: AnalysisResult) async -> [UnusedCode] {
         // Build the reachability graph
         let extractor = DependencyExtractor(configuration: extractionConfiguration)
-        let graph = extractor.buildGraph(from: result)
+        let graph = await extractor.buildGraph(from: result)
 
         // Get unreachable declarations
-        let unreachable = graph.computeUnreachable()
+        let unreachable = await graph.computeUnreachable()
 
         // Convert to UnusedCode
         return unreachable.compactMap { node -> UnusedCode? in
@@ -414,16 +414,16 @@ public struct ReachabilityBasedDetector: Sendable {
                 declaration: declaration,
                 reason: .neverReferenced,
                 confidence: confidence,
-                suggestion: "Unreachable from any entry point - consider removing '\(declaration.name)'",
+                suggestion: "Unreachable from any entry point - consider removing '\(declaration.name)'"
             )
         }
     }
 
     /// Generate a reachability report.
-    public func generateReport(for result: AnalysisResult) -> ReachabilityReport {
+    public func generateReport(for result: AnalysisResult) async -> ReachabilityReport {
         let extractor = DependencyExtractor(configuration: extractionConfiguration)
-        let graph = extractor.buildGraph(from: result)
-        return graph.generateReport()
+        let graph = await extractor.buildGraph(from: result)
+        return await graph.generateReport()
     }
 
     // MARK: Private

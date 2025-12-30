@@ -5,6 +5,20 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.18] - 2025-12-30
+
+### Changed
+- Converted `ReachabilityGraph` from `class` with `NSLock` to Swift `actor` for modern concurrency
+- All `ReachabilityGraph` methods now use `async`/`await` pattern
+- Added comprehensive documentation explaining thread safety design decisions
+
+### Fixed
+- Thread safety now enforced at compile-time for reachability analysis (actor isolation)
+
+### Technical Notes
+- `IndexBasedDependencyGraph` remains a `class` with `NSLock` because `IndexStoreDB` is not `Sendable`
+- Both approaches are documented in-code with rationale for the design choice
+
 ## [0.0.17] - 2025-12-30
 
 ### Removed

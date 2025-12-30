@@ -24,14 +24,14 @@ import Testing
 @Suite("Reachability Graph Tests")
 struct ReachabilityGraphTests {
     @Test("Empty graph has no reachable nodes")
-    func emptyGraph() {
+    func emptyGraph() async {
         let graph = ReachabilityGraph()
-        let reachable = graph.computeReachable()
+        let reachable = await graph.computeReachable()
         #expect(reachable.isEmpty)
     }
 
     @Test("Root nodes are reachable")
-    func rootNodesReachable() {
+    func rootNodesReachable() async {
         let graph = ReachabilityGraph()
 
         let location = SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0)
@@ -43,18 +43,18 @@ struct ReachabilityGraphTests {
             modifiers: [],
             location: location,
             range: range,
-            scope: .global,
+            scope: .global
         )
 
-        let node = graph.addNode(decl, isRoot: true, rootReason: .mainFunction)
+        let node = await graph.addNode(decl, isRoot: true, rootReason: .mainFunction)
 
-        let reachable = graph.computeReachable()
+        let reachable = await graph.computeReachable()
         #expect(reachable.contains(node.id))
         #expect(reachable.count == 1)
     }
 
     @Test("Edges make targets reachable")
-    func edgeReachability() {
+    func edgeReachability() async {
         let graph = ReachabilityGraph()
 
         let location = SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0)
@@ -65,7 +65,7 @@ struct ReachabilityGraphTests {
             kind: .function,
             location: location,
             range: range,
-            scope: .global,
+            scope: .global
         )
 
         let helperDecl = Declaration(
@@ -73,21 +73,21 @@ struct ReachabilityGraphTests {
             kind: .function,
             location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
             range: range,
-            scope: .global,
+            scope: .global
         )
 
-        let mainNode = graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
-        let helperNode = graph.addNode(helperDecl)
+        let mainNode = await graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
+        let helperNode = await graph.addNode(helperDecl)
 
-        graph.addEdge(from: mainNode.id, to: helperNode.id, kind: .call)
+        await graph.addEdge(from: mainNode.id, to: helperNode.id, kind: .call)
 
-        let reachable = graph.computeReachable()
+        let reachable = await graph.computeReachable()
         #expect(reachable.contains(mainNode.id))
         #expect(reachable.contains(helperNode.id))
     }
 
     @Test("Unreachable nodes are detected")
-    func unreachableNodes() {
+    func unreachableNodes() async {
         let graph = ReachabilityGraph()
 
         let location = SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0)
@@ -98,7 +98,7 @@ struct ReachabilityGraphTests {
             kind: .function,
             location: location,
             range: range,
-            scope: .global,
+            scope: .global
         )
 
         let unusedDecl = Declaration(
@@ -106,19 +106,19 @@ struct ReachabilityGraphTests {
             kind: .function,
             location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
             range: range,
-            scope: .global,
+            scope: .global
         )
 
-        graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
-        graph.addNode(unusedDecl)
+        await graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
+        await graph.addNode(unusedDecl)
 
-        let unreachable = graph.computeUnreachable()
+        let unreachable = await graph.computeUnreachable()
         #expect(unreachable.count == 1)
         #expect(unreachable.first?.declaration.name == "unused")
     }
 
     @Test("Transitive reachability works")
-    func transitiveReachability() {
+    func transitiveReachability() async {
         let graph = ReachabilityGraph()
 
         let location = SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0)
@@ -131,30 +131,30 @@ struct ReachabilityGraphTests {
             kind: .function,
             location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
             range: range,
-            scope: .global,
+            scope: .global
         )
         let utilityDecl = Declaration(
             name: "utility",
             kind: .function,
             location: SourceLocation(file: "test.swift", line: 20, column: 1, offset: 200),
             range: range,
-            scope: .global,
+            scope: .global
         )
 
-        let mainNode = graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
-        let helperNode = graph.addNode(helperDecl)
-        let utilityNode = graph.addNode(utilityDecl)
+        let mainNode = await graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
+        let helperNode = await graph.addNode(helperDecl)
+        let utilityNode = await graph.addNode(utilityDecl)
 
-        graph.addEdge(from: mainNode.id, to: helperNode.id, kind: .call)
-        graph.addEdge(from: helperNode.id, to: utilityNode.id, kind: .call)
+        await graph.addEdge(from: mainNode.id, to: helperNode.id, kind: .call)
+        await graph.addEdge(from: helperNode.id, to: utilityNode.id, kind: .call)
 
-        let reachable = graph.computeReachable()
+        let reachable = await graph.computeReachable()
         #expect(reachable.count == 3)
         #expect(reachable.contains(utilityNode.id))
     }
 
     @Test("Path finding from root")
-    func pathFinding() {
+    func pathFinding() async {
         let graph = ReachabilityGraph()
 
         let location = SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0)
@@ -166,15 +166,15 @@ struct ReachabilityGraphTests {
             kind: .function,
             location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
             range: range,
-            scope: .global,
+            scope: .global
         )
 
-        let mainNode = graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
-        let helperNode = graph.addNode(helperDecl)
+        let mainNode = await graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
+        let helperNode = await graph.addNode(helperDecl)
 
-        graph.addEdge(from: mainNode.id, to: helperNode.id, kind: .call)
+        await graph.addEdge(from: mainNode.id, to: helperNode.id, kind: .call)
 
-        let path = graph.findPathFromRoot(to: helperNode.id)
+        let path = await graph.findPathFromRoot(to: helperNode.id)
         #expect(path != nil)
         #expect(path?.count == 2)
         #expect(path?.first == mainNode.id)
@@ -182,7 +182,7 @@ struct ReachabilityGraphTests {
     }
 
     @Test("Unreachable node has no path")
-    func noPathForUnreachable() {
+    func noPathForUnreachable() async {
         let graph = ReachabilityGraph()
 
         let location = SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0)
@@ -194,13 +194,13 @@ struct ReachabilityGraphTests {
             kind: .function,
             location: SourceLocation(file: "test.swift", line: 10, column: 1, offset: 100),
             range: range,
-            scope: .global,
+            scope: .global
         )
 
-        graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
-        let unusedNode = graph.addNode(unusedDecl)
+        await graph.addNode(mainDecl, isRoot: true, rootReason: .mainFunction)
+        let unusedNode = await graph.addNode(unusedDecl)
 
-        let path = graph.findPathFromRoot(to: unusedNode.id)
+        let path = await graph.findPathFromRoot(to: unusedNode.id)
         #expect(path == nil)
     }
 }

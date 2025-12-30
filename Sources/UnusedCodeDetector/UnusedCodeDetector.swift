@@ -60,13 +60,13 @@ public struct UnusedCodeDetector: Sendable {
             let extractionConfig = DependencyExtractionConfiguration(
                 treatPublicAsRoot: configuration.treatPublicAsRoot,
                 treatObjcAsRoot: configuration.treatObjcAsRoot,
-                treatTestsAsRoot: configuration.treatTestsAsRoot,
+                treatTestsAsRoot: configuration.treatTestsAsRoot
             )
             let reachabilityDetector = ReachabilityBasedDetector(
                 configuration: configuration,
-                extractionConfiguration: extractionConfig,
+                extractionConfiguration: extractionConfig
             )
-            return reachabilityDetector.detect(in: result)
+            return await reachabilityDetector.detect(in: result)
 
         case .indexStore:
             // For source strings, fall back to simple mode
@@ -89,10 +89,10 @@ public struct UnusedCodeDetector: Sendable {
 
         let reachabilityDetector = ReachabilityBasedDetector(
             configuration: configuration,
-            extractionConfiguration: extractionConfig,
+            extractionConfiguration: extractionConfig
         )
 
-        return reachabilityDetector.generateReport(for: result)
+        return await reachabilityDetector.generateReport(for: result)
     }
 
     // MARK: Internal
@@ -121,11 +121,11 @@ extension UnusedCodeDetector {
 
         let reachabilityDetector = ReachabilityBasedDetector(
             configuration: configuration,
-            extractionConfiguration: extractionConfig,
+            extractionConfiguration: extractionConfig
         )
 
         // Get unreachable code
-        var unusedItems = reachabilityDetector.detect(in: result)
+        var unusedItems = await reachabilityDetector.detect(in: result)
 
         // Also check for imports if enabled
         if configuration.detectImports {

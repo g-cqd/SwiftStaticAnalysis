@@ -6,7 +6,6 @@
 //  Uses BFS traversal from root sets (entry points) to find reachable code.
 //
 
-import Foundation
 import SwiftStaticAnalysisCore
 
 // MARK: - DeclarationNode
@@ -160,7 +159,24 @@ public enum DependencyKind: String, Sendable, Codable {
 // MARK: - ReachabilityGraph
 
 /// Graph for analyzing code reachability from entry points.
-public final class ReachabilityGraph: @unchecked Sendable {
+///
+/// ## Thread Safety Design
+///
+/// This type uses Swift's `actor` model for thread safety. This is the preferred
+/// approach in modern Swift concurrency because:
+///
+/// 1. **No External Dependencies**: All types used by this graph (`Declaration`,
+///    `DeclarationNode`, `DependencyEdge`) are `Sendable`, allowing safe actor isolation.
+///
+/// 2. **Compile-Time Safety**: The actor model provides compile-time guarantees
+///    against data races, unlike `NSLock` which relies on correct manual usage.
+///
+/// 3. **Structured Concurrency**: Integrates naturally with Swift's `async`/`await`
+///    pattern used throughout the codebase.
+///
+/// - SeeAlso: `IndexBasedDependencyGraph` which uses `NSLock` instead because
+///   it depends on the non-`Sendable` `IndexStoreDB` type.
+public actor ReachabilityGraph {
     // MARK: Lifecycle
 
     public init() {}
@@ -191,11 +207,8 @@ public final class ReachabilityGraph: @unchecked Sendable {
     public func addNode(
         _ declaration: Declaration,
         isRoot: Bool = false,
-        rootReason: RootReason? = nil,
+        rootReason: RootReason? = nil
     ) -> DeclarationNode {
-        lock.lock()
-        defer { lock.unlock() }
-
         let node = DeclarationNode(declaration: declaration, isRoot: isRoot, rootReason: rootReason)
         nodes[node.id] = node
 
@@ -211,9 +224,6 @@ public final class ReachabilityGraph: @unchecked Sendable {
 
     /// Add an edge between two nodes.
     public func addEdge(from: String, to: String, kind: DependencyKind) {
-        lock.lock()
-        defer { lock.unlock() }
-
         let edge = DependencyEdge(from: from, to: to, kind: kind)
         edges[from, default: []].insert(edge)
         reverseEdges[to, default: []].insert(edge)
@@ -235,7 +245,7 @@ public final class ReachabilityGraph: @unchecked Sendable {
     public func detectRoots(
         declarations: [Declaration],
         references: ReferenceIndex,
-        configuration: RootDetectionConfiguration = .default,
+        configuration: RootDetectionConfiguration = .default
     ) {
         for declaration in declarations {
             if let reason = determineRootReason(for: declaration, configuration: configuration) {
@@ -251,9 +261,6 @@ public final class ReachabilityGraph: @unchecked Sendable {
     // swa:ignore-duplicates - Standard BFS reachability algorithm used in multiple graph implementations
     /// Compute all reachable nodes from the root set using BFS.
     public func computeReachable() -> Set<String> {
-        lock.lock()
-        defer { lock.unlock() }
-
         // Return cached result if available
         if let cached = reachableCache {
             return cached
@@ -362,9 +369,6 @@ public final class ReachabilityGraph: @unchecked Sendable {
 
     /// Cache of reachable nodes.
     private var reachableCache: Set<String>?
-
-    /// Lock for thread safety.
-    private let lock = NSLock()
 
     /// Determine if a declaration should be a root and why.
     private func determineRootReason(  // swiftlint:disable:this cyclomatic_complexity function_body_length

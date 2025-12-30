@@ -137,6 +137,25 @@ public enum IndexDependencyKind: String, Sendable, Codable {
 ///
 /// This graph provides accurate cross-module dependency tracking
 /// by leveraging the compiler's pre-built index store.
+///
+/// ## Thread Safety Design
+///
+/// This class uses `@unchecked Sendable` with `NSLock` for thread safety instead of
+/// Swift's `actor` model. This design choice was made because:
+///
+/// 1. **Non-Sendable Dependency**: `IndexStoreDB` from the `IndexStoreDB` package is not
+///    `Sendable`. Passing it to an actor method causes "sending risks data race" errors
+///    in Swift 6 strict concurrency mode.
+///
+/// 2. **Closure-Based APIs**: `IndexStoreDB` uses callback closures (e.g.,
+///    `forEachRelatedSymbolOccurrence`) that capture `self`. In an actor context,
+///    these closures would need to be `@Sendable`, but they mutate actor-isolated state.
+///
+/// 3. **Performance**: The `NSLock` pattern allows synchronous access for read-heavy
+///    operations without the overhead of `await` at every call site.
+///
+/// - SeeAlso: `ReachabilityGraph` which uses the `actor` pattern because it has no
+///   external non-Sendable dependencies.
 public final class IndexBasedDependencyGraph: @unchecked Sendable {
     // MARK: Lifecycle
 
@@ -279,7 +298,7 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
     /// Files included in the analysis scope.
     private let analysisFiles: Set<String>
 
-    /// Lock for thread safety.
+    /// Lock for thread safety (required because IndexStoreDB is not Sendable).
     private let lock = NSLock()
 
     /// Collect all symbol definitions from files in scope.

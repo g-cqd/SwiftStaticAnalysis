@@ -62,7 +62,7 @@ extension UnusedCodeDetector {
             treatTestsAsRoot: configuration.treatTestsAsRoot,
             treatProtocolRequirementsAsRoot: true,
             includeCrossModuleEdges: true,
-            trackProtocolWitnesses: true,
+            trackProtocolWitnesses: true
         )
 
         // Build the graph
