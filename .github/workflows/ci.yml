@@ -80,11 +80,6 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
 
-      - name: Ensure Linting Tools
-        run: |
-          command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
-          command -v swiftformat >/dev/null 2>&1 || brew install swiftformat
-
       - name: Restore SPM Cache
         uses: actions/cache@v4
         with:
@@ -172,11 +167,6 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
 
-      - name: Ensure Linting Tools
-        run: |
-          command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
-          command -v swiftformat >/dev/null 2>&1 || brew install swiftformat
-
       - name: Restore SPM Cache
         uses: actions/cache@v4
         with:
@@ -215,11 +205,6 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
-
-      - name: Ensure Linting Tools
-        run: |
-          command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
-          command -v swiftformat >/dev/null 2>&1 || brew install swiftformat
 
       - name: Restore SPM Cache
         uses: actions/cache@v4
@@ -362,11 +347,6 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select -s ${{ env.XCODE_PATH }}
-
-      - name: Ensure Linting Tools
-        run: |
-          command -v swiftlint >/dev/null 2>&1 || brew install swiftlint
-          command -v swiftformat >/dev/null 2>&1 || brew install swiftformat
 
       - name: Restore SPM Cache
         uses: actions/cache@v4

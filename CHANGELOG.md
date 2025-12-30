@@ -5,6 +5,16 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.16] - 2025-12-30
+
+### Added
+- Pre-commit hook scripts for automated quality checks (`scripts/pre-commit`, `scripts/install-hooks.sh`)
+- Ignore directives for SPM plugin protocol methods (false positive prevention)
+
+### Changed
+- CI workflow no longer depends on swiftlint/swiftformat (uses only swift-format from swift-format package)
+- Simplified CI pipeline by removing unnecessary Homebrew tool installations
+
 ## [0.0.15] - 2025-12-30
 
 ### Fixed

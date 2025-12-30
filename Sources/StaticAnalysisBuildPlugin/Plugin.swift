@@ -7,8 +7,9 @@ import PackagePlugin
 ///
 /// Runs both unused code detection and duplication detection with
 /// Xcode-compatible output for automated reporting in the build log.
-@main
+@main  // swa:ignore-unused - Plugin entry point called by SPM
 struct StaticAnalysisBuildPlugin: BuildToolPlugin {
+    // swa:ignore-unused - Protocol requirement called by SPM
     func createBuildCommands(
         context: PluginContext,
         target: Target,
@@ -56,6 +57,7 @@ struct StaticAnalysisBuildPlugin: BuildToolPlugin {
     import XcodeProjectPlugin
 
     extension StaticAnalysisBuildPlugin: XcodeBuildToolPlugin {
+        // swa:ignore-unused - Protocol requirement called by Xcode
         func createBuildCommands(
             context: XcodePluginContext,
             target: XcodeTarget,

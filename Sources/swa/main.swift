@@ -19,7 +19,7 @@ struct SWA: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "swa",
         abstract: "Swift Static Analysis - Analyze Swift code for issues",
-        version: "0.0.15",
+        version: "0.0.16",
         subcommands: [
             Analyze.self,
             Duplicates.self,
@@ -688,13 +688,13 @@ enum OutputFormatter {
 /// Default directories to always exclude from analysis.
 /// These contain build artifacts, dependencies, and auto-generated code.
 private let defaultExcludedDirectories: Set<String> = [
-    ".build",           // Swift Package Manager build artifacts
-    "Build",            // Xcode build directory
-    "DerivedData",      // Xcode derived data
-    ".swiftpm",         // SwiftPM metadata
-    "Pods",             // CocoaPods dependencies
-    "Carthage",         // Carthage dependencies
-    ".git",             // Git metadata
+    ".build",  // Swift Package Manager build artifacts
+    "Build",  // Xcode build directory
+    "DerivedData",  // Xcode derived data
+    ".swiftpm",  // SwiftPM metadata
+    "Pods",  // CocoaPods dependencies
+    "Carthage",  // Carthage dependencies
+    ".git",  // Git metadata
 ]
 
 func findSwiftFiles(in paths: [String], excludePaths: [String]? = nil) throws -> [String] {

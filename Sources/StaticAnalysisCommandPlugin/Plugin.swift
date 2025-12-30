@@ -9,8 +9,9 @@ import PackagePlugin
 /// - `swift package analyze unused` - Find unused code
 /// - `swift package analyze duplicates` - Find duplicated code
 /// - `swift package analyze` - Run all analyses
-@main
+@main  // swa:ignore-unused - Plugin entry point called by SPM
 struct StaticAnalysisCommandPlugin: CommandPlugin {
+    // swa:ignore-unused - Protocol requirement called by SPM
     func performCommand(
         context: PluginContext,
         arguments: [String],
@@ -86,6 +87,7 @@ struct StaticAnalysisCommandPlugin: CommandPlugin {
     import XcodeProjectPlugin
 
     extension StaticAnalysisCommandPlugin: XcodeCommandPlugin {
+        // swa:ignore-unused - Protocol requirement called by Xcode
         func performCommand(
             context: XcodePluginContext,
             arguments: [String],
