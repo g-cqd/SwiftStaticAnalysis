@@ -101,7 +101,7 @@ struct SwiftFileParserTests {
 
         try #require(
             FileManager.default.fileExists(atPath: fixturesPath.path),
-            "Fixture file required at: \(fixturesPath.path)"
+            "Fixture file required at: \(fixturesPath.path)",
         )
 
         let parser = SwiftFileParser()

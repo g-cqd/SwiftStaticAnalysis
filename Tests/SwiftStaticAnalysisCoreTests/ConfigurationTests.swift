@@ -18,7 +18,8 @@ struct SWAConfigurationTests {
     func defaultConfiguration() {
         let config = SWAConfiguration.default
 
-        #expect(config.version == 1)
+        #expect(config.version == nil)
+        #expect(config.resolvedVersion == 1)
         #expect(config.format == nil)
         #expect(config.excludePaths == nil)
         #expect(config.unused == nil)
@@ -111,6 +112,48 @@ struct SWAConfigurationTests {
         #expect(config.unused?.mode == "reachability")
         #expect(config.unused?.sensibleDefaults == nil)
         #expect(config.duplicates == nil)
+    }
+
+    @Test("Configuration without version field uses default version")
+    func configWithoutVersion() throws {
+        let json = """
+        {
+            "format": "xcode",
+            "unused": {
+                "sensibleDefaults": true
+            }
+        }
+        """
+
+        let data = json.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        let config = try decoder.decode(SWAConfiguration.self, from: data)
+
+        #expect(config.version == nil)
+        #expect(config.resolvedVersion == SWAConfiguration.currentVersion)
+        #expect(config.format == "xcode")
+        #expect(config.unused?.sensibleDefaults == true)
+    }
+
+    @Test("Minimal configuration with only one setting parses correctly")
+    func minimalConfiguration() throws {
+        let json = """
+        {
+            "duplicates": {
+                "minTokens": 100
+            }
+        }
+        """
+
+        let data = json.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        let config = try decoder.decode(SWAConfiguration.self, from: data)
+
+        #expect(config.version == nil)
+        #expect(config.resolvedVersion == 1)
+        #expect(config.format == nil)
+        #expect(config.unused == nil)
+        #expect(config.duplicates?.minTokens == 100)
     }
 
     @Test("Unknown keys are ignored (forward compatibility)")

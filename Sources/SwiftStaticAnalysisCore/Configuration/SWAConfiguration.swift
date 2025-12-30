@@ -39,7 +39,7 @@ public struct SWAConfiguration: Codable, Sendable, Equatable {
     // MARK: Lifecycle
 
     public init(
-        version: Int = 1,
+        version: Int? = nil,
         format: String? = nil,
         excludePaths: [String]? = nil,
         unused: UnusedConfiguration? = nil,
@@ -57,8 +57,11 @@ public struct SWAConfiguration: Codable, Sendable, Equatable {
     /// Default configuration with sensible defaults.
     public static let `default` = Self()
 
-    /// Configuration file format version.
-    public var version: Int
+    /// Current configuration format version.
+    public static let currentVersion = 1
+
+    /// Configuration file format version (optional, defaults to 1).
+    public var version: Int?
 
     /// Global output format: "text", "json", or "xcode".
     public var format: String?
@@ -71,6 +74,11 @@ public struct SWAConfiguration: Codable, Sendable, Equatable {
 
     /// Duplication detection configuration.
     public var duplicates: DuplicatesConfiguration?
+
+    /// Resolved version (uses default if not specified).
+    public var resolvedVersion: Int {
+        version ?? Self.currentVersion
+    }
 }
 
 // MARK: - UnusedConfiguration

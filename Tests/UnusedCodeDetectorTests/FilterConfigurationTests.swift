@@ -52,6 +52,8 @@ private func makeUnusedCode(
     )
 }
 
+// MARK: - FilterConfigurationTests
+
 @Suite("Filter Configuration Tests")
 struct FilterConfigurationTests {
     @Test("Default configuration has no exclusions")

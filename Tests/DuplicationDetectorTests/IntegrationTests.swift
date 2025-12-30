@@ -40,7 +40,7 @@ struct DuplicationDetectorIntegrationTests {
 
         try #require(
             FileManager.default.fileExists(atPath: fixturesPath.path),
-            "Fixture file required at \(fixturesPath.path)"
+            "Fixture file required at \(fixturesPath.path)",
         )
 
         let config = DuplicationConfiguration(
@@ -73,7 +73,7 @@ struct DuplicationDetectorIntegrationTests {
 
         try #require(
             FileManager.default.fileExists(atPath: fixturesPath.path),
-            "Fixture file required for near clone detection test"
+            "Fixture file required for near clone detection test",
         )
 
         let config = DuplicationConfiguration(
@@ -105,7 +105,7 @@ struct DuplicationDetectorIntegrationTests {
 
         try #require(
             FileManager.default.fileExists(atPath: fixturesPath.path),
-            "Fixture file required for semantic clone detection test"
+            "Fixture file required for semantic clone detection test",
         )
 
         let config = DuplicationConfiguration(
@@ -144,7 +144,7 @@ struct DuplicationDetectorIntegrationTests {
         for file in files {
             try #require(
                 FileManager.default.fileExists(atPath: file),
-                "Fixture file required: \(file)"
+                "Fixture file required: \(file)",
             )
         }
 
@@ -183,7 +183,7 @@ struct DuplicationDetectorIntegrationTests {
 
         try #require(
             FileManager.default.fileExists(atPath: fixturesPath.path),
-            "Fixture file required for multi-type clone detection test"
+            "Fixture file required for multi-type clone detection test",
         )
 
         let config = DuplicationConfiguration(
@@ -219,7 +219,7 @@ struct DuplicationDetectorIntegrationTests {
 
         try #require(
             FileManager.default.fileExists(atPath: fixturesPath.path),
-            "Fixture file required for report generation test"
+            "Fixture file required for report generation test",
         )
 
         let config = DuplicationConfiguration(

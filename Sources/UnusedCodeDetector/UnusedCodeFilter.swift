@@ -208,6 +208,7 @@ public struct UnusedCodeFilter: Sendable {
 
 // MARK: - Convenience Extensions
 
+// swa:ignore-unused - Convenience extensions for API completeness
 public extension [UnusedCode] {
     /// Filter results using the specified configuration.
     func filtered(with configuration: UnusedCodeFilterConfiguration) -> [UnusedCode] {

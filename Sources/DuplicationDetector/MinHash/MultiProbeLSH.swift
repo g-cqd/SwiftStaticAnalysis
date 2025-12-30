@@ -268,6 +268,7 @@ public extension LSHIndex {
     ///   - probes: Number of additional probes per band.
     ///   - threshold: Minimum similarity to include.
     /// - Returns: Array of (documentId, similarity) pairs, sorted by similarity.
+    // swa:ignore-unused - Advanced query with ranking for future similarity-based features
     func queryMultiProbeWithSimilarity(
         _ signature: MinHashSignature,
         probes: Int = 3,

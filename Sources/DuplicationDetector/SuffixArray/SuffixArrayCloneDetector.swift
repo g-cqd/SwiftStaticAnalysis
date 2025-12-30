@@ -201,15 +201,14 @@ public struct SuffixArrayCloneDetector: Sendable {
             repeatGroups: repeatGroups,
             tokenInfos: tokenInfos,
             cloneType: .exact,
-            locationCreator: { pos, length in
-                createCloneLocation(
-                    position: pos,
-                    length: length,
-                    tokenInfos: tokenInfos,
-                    sequences: sequences,
-                )
-            },
-        )
+        ) { pos, length in
+            createCloneLocation(
+                position: pos,
+                length: length,
+                tokenInfos: tokenInfos,
+                sequences: sequences,
+            )
+        }
     }
 
     /// Convert normalized repeat groups to clone groups.
@@ -222,15 +221,14 @@ public struct SuffixArrayCloneDetector: Sendable {
             repeatGroups: repeatGroups,
             tokenInfos: tokenInfos,
             cloneType: .near,
-            locationCreator: { pos, length in
-                createCloneLocationFromNormalized(
-                    position: pos,
-                    length: length,
-                    tokenInfos: tokenInfos,
-                    sequences: sequences,
-                )
-            },
-        )
+        ) { pos, length in
+            createCloneLocationFromNormalized(
+                position: pos,
+                length: length,
+                tokenInfos: tokenInfos,
+                sequences: sequences,
+            )
+        }
     }
 
     /// Common clone group building logic.

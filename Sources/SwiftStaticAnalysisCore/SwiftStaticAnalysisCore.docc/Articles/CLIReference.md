@@ -314,6 +314,16 @@ enum AllCases {
 
 /* swa:ignore */
 struct IgnoredStruct { }
+
+// swa:ignore-duplicates
+func generatedHandler() {
+    // This won't be flagged as a duplicate
+}
+
+// swa:ignore-duplicates:begin
+struct GeneratedModel1 { }
+struct GeneratedModel2 { }
+// swa:ignore-duplicates:end
 ```
 
 ### Directive Types
@@ -323,6 +333,9 @@ struct IgnoredStruct { }
 | `swa:ignore` | Ignore all warnings for this declaration |
 | `swa:ignore-unused` | Ignore unused code warnings |
 | `swa:ignore-unused-cases` | Ignore unused enum case warnings (inherits to cases) |
+| `swa:ignore-duplicates` | Ignore duplication warnings for this declaration |
+| `swa:ignore-duplicates:begin` | Start of region to ignore for duplication |
+| `swa:ignore-duplicates:end` | End of region to ignore for duplication |
 
 ## SwiftUI Support
 

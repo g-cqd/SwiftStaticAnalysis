@@ -303,6 +303,7 @@ public extension MinHashGenerator {
     ///   - signatures: Array of signatures to compare.
     ///   - threshold: Minimum similarity to include in results.
     /// - Returns: Array of similar pairs above threshold.
+    // swa:ignore-unused - Alternative similarity computation for debugging and small datasets
     func computePairwiseSimilarities(
         _ signatures: [MinHashSignature],
         threshold: Double,

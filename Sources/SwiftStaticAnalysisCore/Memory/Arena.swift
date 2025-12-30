@@ -319,6 +319,7 @@ extension Bool: ArenaAllocatable {}
 
 // MARK: - Scoped Arena
 
+// swa:ignore-unused - Advanced arena feature for future memory optimization patterns
 /// A scoped arena that automatically resets when the scope exits.
 ///
 /// Example:

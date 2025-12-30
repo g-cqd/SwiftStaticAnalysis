@@ -123,7 +123,7 @@ extension SWAConfiguration {
     /// - Returns: A new configuration with merged values.
     public func merging(with cli: SWAConfiguration) -> SWAConfiguration {
         SWAConfiguration(
-            version: cli.version,
+            version: cli.version ?? version,
             format: cli.format ?? format,
             excludePaths: mergeArrays(base: excludePaths, override: cli.excludePaths),
             unused: mergeUnused(base: unused, override: cli.unused),

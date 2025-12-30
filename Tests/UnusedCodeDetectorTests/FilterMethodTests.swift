@@ -53,6 +53,8 @@ private func makeUnusedCode(
     )
 }
 
+// MARK: - FilterMethodTests
+
 @Suite("Filter Method Tests")
 struct FilterMethodTests {
     @Test("Filters out excluded items")
@@ -112,6 +114,8 @@ struct FilterMethodTests {
     }
 }
 
+// MARK: - ArrayExtensionTests
+
 @Suite("Array Extension Tests")
 struct ArrayExtensionTests {
     @Test("Filtered with configuration works")
@@ -143,6 +147,8 @@ struct ArrayExtensionTests {
         #expect(filtered.first?.declaration.name == "realFunction")
     }
 }
+
+// MARK: - FilterIntegrationTests
 
 @Suite("Filter Integration Tests")
 struct FilterIntegrationTests {

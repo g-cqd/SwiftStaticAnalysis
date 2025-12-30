@@ -128,6 +128,7 @@ public struct XcodeFormatterConfiguration: Sendable {
 
 // MARK: - Diagnostic Conversion
 
+// swa:ignore-unused - Factory methods for API completeness and future Xcode integration
 public extension Diagnostic {
     /// Create a diagnostic from an unused code finding.
     ///

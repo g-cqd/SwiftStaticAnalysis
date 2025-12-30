@@ -55,6 +55,8 @@ private func makeUnusedCode(
     )
 }
 
+// MARK: - ShouldExcludeTests
+
 @Suite("Should Exclude Tests")
 struct ShouldExcludeTests {
     @Test("Excludes imports when configured")

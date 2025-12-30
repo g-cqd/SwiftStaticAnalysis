@@ -293,6 +293,7 @@ public actor ZeroCopyParser {
         return storage
     }
 
+    // swa:ignore-duplicates - Token classification is structurally similar across parsers by design
     private func classifyToken(_ token: TokenSyntax) -> TokenKindByte {
         switch token.tokenKind {
         case .keyword:

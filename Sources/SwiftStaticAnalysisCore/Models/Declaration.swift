@@ -220,7 +220,7 @@ public extension Declaration {
         swiftUIInfo?.hasImplicitBody ?? false
     }
 
-    /// The primary property wrapper kind (if any).
+    /// The primary property wrapper kind (if any). // swa:ignore-unused - Used in tests
     var primaryPropertyWrapper: PropertyWrapperKind? {
         propertyWrappers.first?.kind
     }

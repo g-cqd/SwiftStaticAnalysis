@@ -442,6 +442,7 @@ public struct MultiFileSoAStorage: Sendable {
 
 // MARK: - SIMD Operations on Token Arrays
 
+// swa:ignore-unused - Utility operations for advanced token analysis and future optimizations
 public extension SoATokenStorage {
     /// Count tokens of each kind using SIMD acceleration.
     ///

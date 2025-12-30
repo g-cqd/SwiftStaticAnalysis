@@ -112,6 +112,18 @@ for item in unused {
 }
 ```
 
+## Multiple Paths
+
+Analyze multiple directories or files in a single run:
+
+```bash
+swa analyze Sources/ Tests/Fixtures/
+
+swa unused path/to/ModuleA path/to/ModuleB
+
+swa duplicates Sources/Core Sources/Features
+```
+
 ## Reducing False Positives
 
 Use the `--sensible-defaults` flag to automatically exclude common false positives:
@@ -130,6 +142,30 @@ You can also exclude specific paths:
 ```bash
 swa unused . --exclude-paths "**/Tests/**" --exclude-paths "**/Fixtures/**"
 ```
+
+## Configuration File
+
+Create a `.swa.json` file for persistent configuration. Only include the settings you want to customize:
+
+```json
+{
+  "unused": {
+    "sensibleDefaults": true
+  }
+}
+```
+
+A minimal configuration file for duplication detection:
+
+```json
+{
+  "duplicates": {
+    "minTokens": 100
+  }
+}
+```
+
+The `version` field is optional and defaults to `1` when not specified. See <doc:CLIReference> for the full configuration schema.
 
 ## Next Steps
 

@@ -60,6 +60,7 @@ public struct DefinitionSite: Sendable, Hashable {
 
 // MARK: - Definition Site Set Extensions
 
+// swa:ignore-unused - Internal helper extension for reaching definitions algorithm
 extension Set<DefinitionSite> {
     /// Update definitions by killing old definitions for a variable and inserting a new one.
     mutating func updateDefinition(
@@ -495,6 +496,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
 
 // MARK: - Debug Output
 
+// swa:ignore-unused - Debug utilities for development and troubleshooting
 public extension ReachingDefinitionsResult {
     /// Generate a debug string showing reaching definitions information.
     func debugDescription() -> String {

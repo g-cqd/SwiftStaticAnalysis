@@ -682,6 +682,7 @@ public final class SCCPAnalysis: @unchecked Sendable { // swiftlint:disable:this
 
 // MARK: - Debug Output
 
+// swa:ignore-unused - Debug utilities for development and troubleshooting
 public extension SCCPResult {
     /// Generate a debug string showing SCCP results.
     func debugDescription() -> String {

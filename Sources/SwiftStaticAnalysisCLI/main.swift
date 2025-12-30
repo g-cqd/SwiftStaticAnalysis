@@ -38,8 +38,8 @@ struct Analyze: AsyncParsableCommand {
         abstract: "Run full analysis (duplicates + unused code)",
     )
 
-    @Argument(help: "Path to analyze (directory or file)")
-    var path: String = "."
+    @Argument(help: "Paths to analyze (directories or files)")
+    var paths: [String] = ["."]
 
     @Option(name: .long, help: "Path to configuration file (.swa.json)")
     var config: String?
@@ -48,13 +48,16 @@ struct Analyze: AsyncParsableCommand {
     var format: OutputFormat = .xcode
 
     func run() async throws {
+        // Use first path for configuration discovery
+        let primaryPath = paths.first ?? "."
+
         // Load configuration
-        let swaConfig = try loadConfiguration(configPath: config, analysisPath: path)
+        let swaConfig = try loadConfiguration(configPath: config, analysisPath: primaryPath)
 
         // Apply format from config if not specified on CLI
         let outputFormat = format
 
-        let files = try findSwiftFiles(in: path, excludePaths: swaConfig?.excludePaths)
+        let files = try findSwiftFiles(in: paths, excludePaths: swaConfig?.excludePaths)
 
         print("Analyzing \(files.count) Swift files...")
 
@@ -126,8 +129,8 @@ struct Duplicates: AsyncParsableCommand {
         abstract: "Detect code duplication",
     )
 
-    @Argument(help: "Path to analyze")
-    var path: String = "."
+    @Argument(help: "Paths to analyze (directories or files)")
+    var paths: [String] = ["."]
 
     @Option(name: .long, help: "Path to configuration file (.swa.json)")
     var config: String?
@@ -151,8 +154,11 @@ struct Duplicates: AsyncParsableCommand {
     var format: OutputFormat = .xcode
 
     func run() async throws {
+        // Use first path for configuration discovery
+        let primaryPath = paths.first ?? "."
+
         // Load configuration
-        let swaConfig = try loadConfiguration(configPath: config, analysisPath: path)
+        let swaConfig = try loadConfiguration(configPath: config, analysisPath: primaryPath)
         let dupConfig = swaConfig?.duplicates
 
         // Merge CLI args with config (CLI takes precedence)
@@ -165,7 +171,7 @@ struct Duplicates: AsyncParsableCommand {
         // Merge with global excludePaths
         let allExcludePaths = effectiveExcludePaths + (swaConfig?.excludePaths ?? [])
 
-        let files = try findSwiftFiles(in: path, excludePaths: allExcludePaths.isEmpty ? nil : allExcludePaths)
+        let files = try findSwiftFiles(in: paths, excludePaths: allExcludePaths.isEmpty ? nil : allExcludePaths)
 
         let detectorConfig = DuplicationConfiguration(
             minimumTokens: effectiveMinTokens,
@@ -198,8 +204,8 @@ struct Unused: AsyncParsableCommand {
         abstract: "Detect unused code",
     )
 
-    @Argument(help: "Path to analyze")
-    var path: String = "."
+    @Argument(help: "Paths to analyze (directories or files)")
+    var paths: [String] = ["."]
 
     @Option(name: .long, help: "Path to configuration file (.swa.json)")
     var config: String?
@@ -266,8 +272,11 @@ struct Unused: AsyncParsableCommand {
 
     // swiftlint:disable:next function_body_length
     func run() async throws {
+        // Use first path for configuration discovery
+        let primaryPath = paths.first ?? "."
+
         // Load configuration
-        let swaConfig = try loadConfiguration(configPath: config, analysisPath: path)
+        let swaConfig = try loadConfiguration(configPath: config, analysisPath: primaryPath)
         let unusedConfig = swaConfig?.unused
 
         // Merge CLI args with config (CLI takes precedence)
@@ -303,7 +312,7 @@ struct Unused: AsyncParsableCommand {
         let effectiveExcludePaths = excludePaths.isEmpty ? (unusedConfig?.excludePaths ?? []) : excludePaths
         let allExcludePaths = effectiveExcludePaths + (swaConfig?.excludePaths ?? [])
 
-        var files = try findSwiftFiles(in: path, excludePaths: allExcludePaths.isEmpty ? nil : allExcludePaths)
+        var files = try findSwiftFiles(in: paths, excludePaths: allExcludePaths.isEmpty ? nil : allExcludePaths)
 
         // Apply path exclusions
         if !allExcludePaths.isEmpty {
@@ -675,45 +684,57 @@ enum OutputFormatter {
     }
 }
 
-func findSwiftFiles(in path: String, excludePaths: [String]? = nil) throws -> [String] {
+func findSwiftFiles(in paths: [String], excludePaths: [String]? = nil) throws -> [String] {
     let fileManager = FileManager.default
-    let url = URL(fileURLWithPath: path)
-
-    var isDirectory: ObjCBool = false
-    guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory) else {
-        throw AnalysisError.fileNotFound(path)
-    }
-
-    if !isDirectory.boolValue {
-        // Single file
-        guard path.hasSuffix(".swift") else {
-            throw AnalysisError.invalidPath("Not a Swift file: \(path)")
-        }
-        return [path]
-    }
-
-    // Directory - find all Swift files
     var swiftFiles: [String] = []
 
-    if let enumerator = fileManager.enumerator(
-        at: url,
-        includingPropertiesForKeys: [.isRegularFileKey],
-        options: [.skipsHiddenFiles],
-    ) {
-        for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
-            let filePath = fileURL.path
+    for path in paths {
+        let url = URL(fileURLWithPath: path)
 
-            // Apply exclusion patterns
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory) else {
+            throw AnalysisError.fileNotFound(path)
+        }
+
+        if !isDirectory.boolValue {
+            // Single file
+            guard path.hasSuffix(".swift") else {
+                throw AnalysisError.invalidPath("Not a Swift file: \(path)")
+            }
+            // Apply exclusion patterns to single files too
             if let excludePaths, !excludePaths.isEmpty {
                 let shouldExclude = excludePaths.contains { pattern in
-                    UnusedCodeFilter.matchesGlobPattern(filePath, pattern: pattern)
+                    UnusedCodeFilter.matchesGlobPattern(path, pattern: pattern)
                 }
                 if shouldExclude {
                     continue
                 }
             }
+            swiftFiles.append(path)
+            continue
+        }
 
-            swiftFiles.append(filePath)
+        // Directory - find all Swift files
+        if let enumerator = fileManager.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles],
+        ) {
+            for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
+                let filePath = fileURL.path
+
+                // Apply exclusion patterns
+                if let excludePaths, !excludePaths.isEmpty {
+                    let shouldExclude = excludePaths.contains { pattern in
+                        UnusedCodeFilter.matchesGlobPattern(filePath, pattern: pattern)
+                    }
+                    if shouldExclude {
+                        continue
+                    }
+                }
+
+                swiftFiles.append(filePath)
+            }
         }
     }
 

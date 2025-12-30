@@ -329,6 +329,7 @@ public struct LiveVariableAnalysis: Sendable {
 
 // MARK: - Statement-Level Analysis
 
+// swa:ignore-unused - Advanced analysis utilities for debugging and future features
 public extension LiveVariableAnalysis {
     /// Compute live variables at each statement in a block.
     ///
@@ -424,6 +425,7 @@ private final class FunctionCollector: SyntaxVisitor {
 
 // MARK: - Debug Output
 
+// swa:ignore-unused - Debug utilities for development and troubleshooting
 public extension LiveVariableResult {
     /// Generate a debug string showing liveness information.
     func debugDescription() -> String {

@@ -221,6 +221,10 @@ public struct DuplicationDetector: Sendable {
     /// - Parameter files: Array of Swift file paths.
     /// - Returns: Array of clone groups found.
     public func detectClones(in files: [String]) async throws -> [CloneGroup] {
+        // Scan for ignore directives
+        let scanner = IgnoreDirectiveScanner()
+        let ignoreRegions = try scanner.scan(files: files)
+
         var cloneGroups: [CloneGroup] = []
 
         // Extract token sequences once if needed for exact or near detection
@@ -235,8 +239,11 @@ public struct DuplicationDetector: Sendable {
             cloneGroups.append(contentsOf: semanticClones)
         }
 
+        // Filter out clones in ignored regions
+        let filteredGroups = cloneGroups.filteringIgnored(ignoreRegions)
+
         // Add code snippets to all clones
-        return try await engine.addCodeSnippets(to: cloneGroups)
+        return try await engine.addCodeSnippets(to: filteredGroups)
     }
 
     // MARK: Private

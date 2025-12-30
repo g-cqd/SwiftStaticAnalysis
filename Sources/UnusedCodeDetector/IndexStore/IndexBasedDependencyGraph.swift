@@ -196,6 +196,7 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
 
     // MARK: - Reachability Analysis
 
+    // swa:ignore-duplicates - Standard BFS reachability algorithm used in multiple graph implementations
     /// Compute all reachable nodes from the root set using BFS.
     public func computeReachable() -> Set<String> {
         lock.lock()

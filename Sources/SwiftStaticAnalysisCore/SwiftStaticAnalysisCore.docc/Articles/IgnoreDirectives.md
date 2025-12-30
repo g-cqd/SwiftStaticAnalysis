@@ -13,6 +13,9 @@ Sometimes static analysis tools report issues that are intentional or unavoidabl
 | `// swa:ignore` | Ignore all warnings for this declaration |
 | `// swa:ignore-unused` | Ignore unused code warnings only |
 | `// swa:ignore-unused-cases` | Ignore unused enum case warnings |
+| `// swa:ignore-duplicates` | Ignore duplication warnings for this declaration |
+| `// swa:ignore-duplicates:begin` | Start of region to ignore for duplication |
+| `// swa:ignore-duplicates:end` | End of region to ignore for duplication |
 
 ## Comment Formats
 
@@ -73,6 +76,46 @@ class LegacyHandler: NSObject {
         // Called from Objective-C code
     }
 }
+```
+
+### Ignoring Generated or Intentionally Duplicated Code
+
+For code that is intentionally duplicated (generated code, copy-paste templates, etc.):
+
+```swift
+// swa:ignore-duplicates
+func generatedHandler1() {
+    // This won't be flagged as a duplicate
+    performStandardSetup()
+    processData()
+    cleanup()
+}
+
+// swa:ignore-duplicates
+func generatedHandler2() {
+    // Intentionally similar to handler1
+    performStandardSetup()
+    processData()
+    cleanup()
+}
+```
+
+For larger regions of generated code, use range markers:
+
+```swift
+// swa:ignore-duplicates:begin
+struct GeneratedModel1: Codable {
+    var id: String
+    var name: String
+    var createdAt: Date
+}
+
+struct GeneratedModel2: Codable {
+    var id: String
+    var name: String
+    var createdAt: Date
+}
+// swa:ignore-duplicates:end
 ```
 
 ## Enum Case Inheritance

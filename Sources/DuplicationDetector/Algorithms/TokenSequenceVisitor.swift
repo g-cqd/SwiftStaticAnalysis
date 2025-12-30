@@ -128,6 +128,7 @@ public struct TokenSequenceExtractor: Sendable {
 
     // MARK: Private
 
+    // swa:ignore-duplicates - Token classification is structurally similar across parsers by design
     /// Classify a Swift syntax token into our simplified categories.
     private func classifyToken(_ token: TokenSyntax) -> TokenKind {
         switch token.tokenKind {

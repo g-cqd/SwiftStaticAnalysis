@@ -888,6 +888,7 @@ private final class UseDefExtractor: SyntaxVisitor {
 
 // MARK: - CFG Utilities
 
+// swa:ignore-unused - Debug utilities for development and troubleshooting
 public extension ControlFlowGraph {
     /// Print the CFG for debugging.
     func debugPrint() -> String {
