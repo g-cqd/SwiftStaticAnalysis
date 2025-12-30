@@ -23,8 +23,9 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# Find project root (where .git is)
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+SCRIPTS_DIR="$PROJECT_ROOT/scripts"
 cd "$PROJECT_ROOT"
 
 # 1. Format (auto-fix)
@@ -42,7 +43,7 @@ echo -e "${GREEN}Format check passed${NC}"
 
 # 3. Version consistency check
 echo -e "\n${YELLOW}[3/7] Checking version consistency...${NC}"
-if ! "$SCRIPT_DIR/check-version.sh" 2>&1; then
+if ! "$SCRIPTS_DIR/check-version.sh" 2>&1; then
     echo -e "${RED}Version check failed!${NC}"
     exit 1
 fi
