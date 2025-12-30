@@ -456,13 +456,14 @@ struct Symbol: AsyncParsableCommand {
             pattern = try parser.parse(query)
         }
 
-        let mode: SymbolQuery.Mode = if definition {
-            .definition
-        } else if usages {
-            .usages
-        } else {
-            .all
-        }
+        let mode: SymbolQuery.Mode =
+            if definition {
+                .definition
+            } else if usages {
+                .usages
+            } else {
+                .all
+            }
 
         let kindFilter: Set<DeclarationKind>? = kind.isEmpty ? nil : Set(kind.map(\.toDeclarationKind))
         let accessFilter: Set<AccessLevel>? = access.isEmpty ? nil : Set(access.map(\.toAccessLevel))

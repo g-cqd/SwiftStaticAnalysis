@@ -27,15 +27,15 @@
 /// Implementations must be safe to call from any thread. The protocol is
 /// `Sendable` to enforce this requirement.
 public protocol SymbolResolver: Sendable {
-  /// Resolves a query pattern to matching symbols.
-  ///
-  /// - Parameter pattern: The query pattern to resolve.
-  /// - Returns: Array of matching symbols.
-  /// - Throws: Implementation-specific errors during resolution.
-  ///
-  /// - Complexity: Varies by implementation. `IndexStoreResolver` provides
-  ///   O(log n) for USR queries; `SyntaxResolver` provides O(n).
-  func resolve(_ pattern: SymbolQuery.Pattern) async throws -> [SymbolMatch]
+    /// Resolves a query pattern to matching symbols.
+    ///
+    /// - Parameter pattern: The query pattern to resolve.
+    /// - Returns: Array of matching symbols.
+    /// - Throws: Implementation-specific errors during resolution.
+    ///
+    /// - Complexity: Varies by implementation. `IndexStoreResolver` provides
+    ///   O(log n) for USR queries; `SyntaxResolver` provides O(n).
+    func resolve(_ pattern: SymbolQuery.Pattern) async throws -> [SymbolMatch]
 }
 
 /// Protocol for resolvers that can find symbol usages.
@@ -43,12 +43,12 @@ public protocol SymbolResolver: Sendable {
 /// Not all resolvers support usage finding. `IndexStoreResolver` can find
 /// usages via USR lookup, while `SyntaxResolver` uses text-based searching.
 public protocol UsageResolver: SymbolResolver {
-  /// Finds all occurrences (usages) of a symbol.
-  ///
-  /// - Parameter match: The symbol to find usages for.
-  /// - Returns: Array of occurrence locations.
-  /// - Throws: Implementation-specific errors during resolution.
-  func findUsages(of match: SymbolMatch) async throws -> [SymbolOccurrence]
+    /// Finds all occurrences (usages) of a symbol.
+    ///
+    /// - Parameter match: The symbol to find usages for.
+    /// - Returns: Array of occurrence locations.
+    /// - Throws: Implementation-specific errors during resolution.
+    func findUsages(of match: SymbolMatch) async throws -> [SymbolOccurrence]
 }
 
 /// Protocol for resolvers that can check for references.
@@ -56,11 +56,11 @@ public protocol UsageResolver: SymbolResolver {
 /// Provides an optimized path for checking if a symbol has any references
 /// without retrieving all of them.
 public protocol ReferenceChecker: SymbolResolver {
-  /// Checks if a symbol has any references.
-  ///
-  /// - Parameter usr: The USR of the symbol.
-  /// - Returns: `true` if the symbol is referenced.
-  ///
-  /// - Complexity: O(1) to O(log n) depending on implementation.
-  func hasReferences(usr: String) async -> Bool
+    /// Checks if a symbol has any references.
+    ///
+    /// - Parameter usr: The USR of the symbol.
+    /// - Returns: `true` if the symbol is referenced.
+    ///
+    /// - Complexity: O(1) to O(log n) depending on implementation.
+    func hasReferences(usr: String) async -> Bool
 }

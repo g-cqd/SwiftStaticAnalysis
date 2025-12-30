@@ -612,8 +612,9 @@ public final class DeclarationCollector: ScopeTrackingVisitor {  // swiftlint:di
             let type = param.type.description.trimmingCharacters(in: .whitespaces)
             let hasDefault = param.defaultValue != nil
             let isVariadic = param.ellipsis != nil
-            let isInout = param.type.is(AttributedTypeSyntax.self) &&
-                param.type.as(AttributedTypeSyntax.self)?.specifiers.contains { spec in
+            let isInout =
+                param.type.is(AttributedTypeSyntax.self)
+                && param.type.as(AttributedTypeSyntax.self)?.specifiers.contains { spec in
                     spec.as(SimpleTypeSpecifierSyntax.self)?.specifier.tokenKind == .keyword(.inout)
                 } ?? false
 
