@@ -10,6 +10,7 @@ import ArgumentParser
 import DuplicationDetector
 import Foundation
 import SwiftStaticAnalysisCore
+import SymbolLookup
 import UnusedCodeDetector
 
 // MARK: - SWA
@@ -24,6 +25,7 @@ struct SWA: AsyncParsableCommand {
             Analyze.self,
             Duplicates.self,
             Unused.self,
+            Symbol.self,
         ],
         defaultSubcommand: Analyze.self,
     )
@@ -386,6 +388,225 @@ struct Unused: AsyncParsableCommand {
 
         case .xcode:
             OutputFormatter.printUnusedXcode(unused)
+        }
+    }
+}
+
+// MARK: - Symbol
+
+struct Symbol: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Look up symbols in Swift source files",
+    )
+
+    @Argument(help: "Symbol name, qualified name (Type.member), or USR")
+    var query: String
+
+    @Argument(help: "Paths to analyze (directories or files)")
+    var paths: [String] = ["."]
+
+    @Flag(name: .long, help: "Treat query as USR directly")
+    var usr: Bool = false
+
+    @Option(name: .long, help: "Filter by kind (function, method, variable, class, struct, enum, protocol)")
+    var kind: [DeclarationKindArg] = []
+
+    @Option(name: .long, help: "Filter by access level (private, internal, public, open)")
+    var access: [AccessLevelArg] = []
+
+    @Option(name: .long, help: "Search within type scope")
+    var inType: String?
+
+    @Flag(name: .long, help: "Show only definitions")
+    var definition: Bool = false
+
+    @Flag(name: .long, help: "Show usages/references")
+    var usages: Bool = false
+
+    @Option(name: .long, help: "Path to index store")
+    var indexStorePath: String?
+
+    @Option(name: .long, help: "Maximum results to return")
+    var limit: Int?
+
+    @Option(name: .shortAndLong, help: "Output format")
+    var format: OutputFormat = .text
+
+    func run() async throws {
+        let files = try findSwiftFiles(in: paths, excludePaths: nil)
+
+        // Configure symbol finder
+        var config = SymbolFinder.Configuration.default
+        config.useSyntaxFallback = true
+        config.sourceFiles = files
+
+        let finder: SymbolFinder
+        if let indexPath = indexStorePath {
+            finder = try SymbolFinder(indexStorePath: indexPath, configuration: config)
+        } else {
+            finder = SymbolFinder(projectPath: paths.first ?? ".", configuration: config)
+        }
+
+        // Build query
+        let pattern: SymbolQuery.Pattern
+        if usr {
+            pattern = .usr(query)
+        } else {
+            let parser = QueryParser()
+            pattern = try parser.parse(query)
+        }
+
+        let mode: SymbolQuery.Mode = if definition {
+            .definition
+        } else if usages {
+            .usages
+        } else {
+            .all
+        }
+
+        let kindFilter: Set<DeclarationKind>? = kind.isEmpty ? nil : Set(kind.map(\.toDeclarationKind))
+        let accessFilter: Set<AccessLevel>? = access.isEmpty ? nil : Set(access.map(\.toAccessLevel))
+
+        let symbolQuery = SymbolQuery(
+            pattern: pattern,
+            kindFilter: kindFilter,
+            accessFilter: accessFilter,
+            scopeFilter: inType,
+            mode: mode,
+            limit: limit ?? 0,
+        )
+
+        let matches = try await finder.find(symbolQuery)
+
+        // If usages mode was requested, also find usages for each match
+        if usages, !matches.isEmpty {
+            var allUsages: [SymbolOccurrence] = []
+            for match in matches {
+                let occurrences = try await finder.findUsages(of: match)
+                allUsages.append(contentsOf: occurrences)
+            }
+            outputUsages(allUsages, matches: matches)
+            return
+        }
+
+        // Output results
+        outputMatches(matches)
+    }
+
+    private func outputMatches(_ matches: [SymbolMatch]) {
+        if matches.isEmpty {
+            print("No symbols found matching '\(query)'")
+            return
+        }
+
+        switch format {
+        case .text:
+            print("Found \(matches.count) symbol(s):\n")
+            for match in matches {
+                // Build symbol name with optional signature
+                var symbolName = match.name
+                if !match.genericParameters.isEmpty {
+                    symbolName += "<\(match.genericParameters.joined(separator: ", "))>"
+                }
+                if let sig = match.signature {
+                    symbolName += sig.selectorString
+                }
+
+                var line = "\(match.kind.rawValue) \(symbolName)"
+                if let containingType = match.containingType {
+                    line = "\(containingType).\(line)"
+                }
+                print("  \(line)")
+                print("    Location: \(match.file):\(match.line):\(match.column)")
+                print("    Access: \(match.accessLevel.rawValue)")
+                if let sig = match.signature {
+                    print("    Signature: \(sig.displayString)")
+                }
+                if let usr = match.usr {
+                    print("    USR: \(usr)")
+                }
+                print()
+            }
+
+        case .json:
+            OutputFormatter.printJSON(matches)
+
+        case .xcode:
+            for match in matches {
+                let desc = "\(match.kind.rawValue) '\(match.name)'"
+                print("\(match.file):\(match.line):\(match.column): note: \(desc)")
+            }
+        }
+    }
+
+    private func outputUsages(_ usages: [SymbolOccurrence], matches: [SymbolMatch]) {
+        if usages.isEmpty {
+            print("No usages found for '\(query)'")
+            return
+        }
+
+        switch format {
+        case .text:
+            print("Found \(usages.count) usage(s) of \(matches.count) symbol(s):\n")
+            for usage in usages {
+                print("  \(usage.locationString) (\(usage.kind.rawValue))")
+            }
+
+        case .json:
+            OutputFormatter.printJSON(usages)
+
+        case .xcode:
+            for usage in usages {
+                print("\(usage.file):\(usage.line):\(usage.column): note: Reference (\(usage.kind.rawValue))")
+            }
+        }
+    }
+}
+
+// MARK: - DeclarationKindArg
+
+enum DeclarationKindArg: String, ExpressibleByArgument, CaseIterable {
+    case function
+    case method
+    case variable
+    case constant
+    case `class`
+    case `struct`
+    case `enum`
+    case `protocol`
+    case initializer
+
+    var toDeclarationKind: DeclarationKind {
+        switch self {
+        case .function: .function
+        case .method: .method
+        case .variable: .variable
+        case .constant: .constant
+        case .class: .class
+        case .struct: .struct
+        case .enum: .enum
+        case .protocol: .protocol
+        case .initializer: .initializer
+        }
+    }
+}
+
+// MARK: - AccessLevelArg
+
+enum AccessLevelArg: String, ExpressibleByArgument, CaseIterable {
+    case `private`
+    case `fileprivate`
+    case `internal`
+    case `public`
+    case `open`
+
+    var toAccessLevel: AccessLevel {
+        switch self {
+        case .private: .private
+        case .fileprivate: .fileprivate
+        case .internal: .internal
+        case .public: .public
+        case .open: .open
         }
     }
 }

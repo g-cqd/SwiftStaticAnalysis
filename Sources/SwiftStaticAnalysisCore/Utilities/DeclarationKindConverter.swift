@@ -53,7 +53,8 @@ public struct DeclarationKindFilter: Sendable {
             .method,
             .subscript:
             detectFunctions
-        case .associatedtype,
+        case .actor,
+            .associatedtype,
             .class,
             .enum,
             .extension,

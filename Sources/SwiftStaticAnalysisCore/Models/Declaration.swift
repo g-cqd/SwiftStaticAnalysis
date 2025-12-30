@@ -31,6 +31,7 @@ public enum DeclarationKind: String, Sendable, Codable, CaseIterable {
     case `subscript`
     case `operator`
     case enumCase
+    case actor
 }
 
 // MARK: - AccessLevel
@@ -99,6 +100,145 @@ public struct DeclarationModifiers: OptionSet, Sendable, Codable, Hashable {
     public let rawValue: UInt32
 }
 
+// MARK: - FunctionSignature
+
+/// Represents a function or method signature.
+public struct FunctionSignature: Sendable, Hashable, Codable {
+    /// A single parameter in a function signature.
+    public struct Parameter: Sendable, Hashable, Codable {
+        /// External parameter label (nil for unlabeled, "_" for explicitly unlabeled).
+        public let label: String?
+
+        /// Internal parameter name.
+        public let name: String
+
+        /// Parameter type as string.
+        public let type: String
+
+        /// Whether parameter has default value.
+        public let hasDefaultValue: Bool
+
+        /// Whether parameter is variadic.
+        public let isVariadic: Bool
+
+        /// Whether parameter is inout.
+        public let isInout: Bool
+
+        public init(
+            label: String?,
+            name: String,
+            type: String,
+            hasDefaultValue: Bool = false,
+            isVariadic: Bool = false,
+            isInout: Bool = false
+        ) {
+            self.label = label
+            self.name = name
+            self.type = type
+            self.hasDefaultValue = hasDefaultValue
+            self.isVariadic = isVariadic
+            self.isInout = isInout
+        }
+
+        /// Display string for parameter (e.g., "id: String" or "_ value: Int").
+        public var displayString: String {
+            var parts: [String] = []
+
+            if let label {
+                if label != name {
+                    parts.append("\(label) \(name)")
+                } else {
+                    parts.append(name)
+                }
+            } else {
+                parts.append("_ \(name)")
+            }
+
+            parts.append(": ")
+
+            if isInout {
+                parts.append("inout ")
+            }
+
+            parts.append(type)
+
+            if isVariadic {
+                parts.append("...")
+            }
+
+            return parts.joined()
+        }
+
+        /// Short label for selector-style display (e.g., "id:" or "_:").
+        public var selectorLabel: String {
+            if let label {
+                return "\(label):"
+            }
+            return "_:"
+        }
+    }
+
+    /// Parameters of the function.
+    public let parameters: [Parameter]
+
+    /// Return type (nil for Void).
+    public let returnType: String?
+
+    /// Whether function is async.
+    public let isAsync: Bool
+
+    /// Whether function throws.
+    public let isThrowing: Bool
+
+    /// Whether function rethrows.
+    public let isRethrowing: Bool
+
+    public init(
+        parameters: [Parameter] = [],
+        returnType: String? = nil,
+        isAsync: Bool = false,
+        isThrowing: Bool = false,
+        isRethrowing: Bool = false
+    ) {
+        self.parameters = parameters
+        self.returnType = returnType
+        self.isAsync = isAsync
+        self.isThrowing = isThrowing
+        self.isRethrowing = isRethrowing
+    }
+
+    /// Selector-style representation (e.g., "fetch(id:)" or "init(name:email:)").
+    public var selectorString: String {
+        if parameters.isEmpty {
+            return "()"
+        }
+        return "(" + parameters.map(\.selectorLabel).joined() + ")"
+    }
+
+    /// Full signature display (e.g., "(id: String) async throws -> User").
+    public var displayString: String {
+        var result = "("
+        result += parameters.map(\.displayString).joined(separator: ", ")
+        result += ")"
+
+        if isAsync {
+            result += " async"
+        }
+
+        if isThrowing {
+            result += " throws"
+        } else if isRethrowing {
+            result += " rethrows"
+        }
+
+        if let returnType, returnType != "Void", returnType != "()" {
+            result += " -> \(returnType)"
+        }
+
+        return result
+    }
+}
+
 // MARK: - Declaration
 
 /// Represents a declaration in Swift source code.
@@ -115,6 +255,7 @@ public struct Declaration: Sendable, Hashable, Codable {
         scope: ScopeID,
         typeAnnotation: String? = nil,
         genericParameters: [String] = [],
+        signature: FunctionSignature? = nil,
         documentation: String? = nil,
         propertyWrappers: [PropertyWrapperInfo] = [],
         swiftUIInfo: SwiftUITypeInfo? = nil,
@@ -131,6 +272,7 @@ public struct Declaration: Sendable, Hashable, Codable {
         self.scope = scope
         self.typeAnnotation = typeAnnotation
         self.genericParameters = genericParameters
+        self.signature = signature
         self.documentation = documentation
         self.propertyWrappers = propertyWrappers
         self.swiftUIInfo = swiftUIInfo
@@ -167,6 +309,9 @@ public struct Declaration: Sendable, Hashable, Codable {
 
     /// Generic parameters (if any).
     public let genericParameters: [String]
+
+    /// Function/method signature (for functions, methods, initializers).
+    public let signature: FunctionSignature?
 
     /// Documentation comment (if any).
     public let documentation: String?

@@ -189,6 +189,29 @@ public struct IndexedSymbolRoles: OptionSet, Sendable {
 // MARK: - IndexStoreReader
 
 /// Reads symbol information from a Swift index store.
+///
+/// ## Thread Safety Design
+///
+/// This class uses `@unchecked Sendable` because the underlying `IndexStoreDB`
+/// from Apple's swift-package-manager repository is not marked as `Sendable`,
+/// even though it is documented to be thread-safe for read operations.
+///
+/// ## SAFETY
+///
+/// The `@unchecked Sendable` conformance is safe because:
+///
+/// 1. **IndexStoreDB Thread Safety**: According to Apple's documentation,
+///    `IndexStoreDB` is internally thread-safe for concurrent read operations.
+///    All methods on this class are read-only operations.
+///
+/// 2. **Immutable After Init**: The `db` property is set once in `init` and
+///    never mutated afterward. All operations are read-only queries.
+///
+/// 3. **No Mutable State**: This class has no mutable stored properties after
+///    initialization. The `indexStorePath` is a `let` constant.
+///
+/// - SeeAlso: `SymbolFinder` which wraps this type with additional locking.
+/// - SeeAlso: `IndexBasedDependencyGraph` which documents the full rationale.
 public final class IndexStoreReader: @unchecked Sendable {
     // MARK: Lifecycle
 

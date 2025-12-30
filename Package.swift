@@ -30,6 +30,11 @@ let package = Package(
             name: "UnusedCodeDetector",
             targets: ["UnusedCodeDetector"]
         ),
+        // Symbol lookup and actor isolation analysis
+        .library(
+            name: "SymbolLookup",
+            targets: ["SymbolLookup"]
+        ),
         // CLI tool
         .executable(
             name: "swa",
@@ -95,6 +100,20 @@ let package = Package(
             ]
         ),
 
+        // MARK: - Symbol Lookup
+        .target(
+            name: "SymbolLookup",
+            dependencies: [
+                "SwiftStaticAnalysisCore",
+                "UnusedCodeDetector",
+                .product(name: "IndexStoreDB", package: "indexstore-db"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+                .enableExperimentalFeature("StrictConcurrency"),
+            ]
+        ),
+
         // MARK: - CLI Tool
         .executableTarget(
             name: "swa",
@@ -102,6 +121,7 @@ let package = Package(
                 "SwiftStaticAnalysisCore",
                 "DuplicationDetector",
                 "UnusedCodeDetector",
+                "SymbolLookup",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             swiftSettings: [
@@ -139,6 +159,7 @@ let package = Package(
                 "SwiftStaticAnalysisCore",
                 "DuplicationDetector",
                 "UnusedCodeDetector",
+                "SymbolLookup",
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
@@ -163,6 +184,25 @@ let package = Package(
         .testTarget(
             name: "UnusedCodeDetectorTests",
             dependencies: ["UnusedCodeDetector"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .testTarget(
+            name: "SymbolLookupTests",
+            dependencies: ["SymbolLookup"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .testTarget(
+            name: "CLITests",
+            dependencies: [
+                "SwiftStaticAnalysisCore",
+                "DuplicationDetector",
+                "UnusedCodeDetector",
+                "SymbolLookup",
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
             ]

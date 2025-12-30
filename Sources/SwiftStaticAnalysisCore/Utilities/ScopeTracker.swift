@@ -166,6 +166,19 @@ open class ScopeTrackingVisitor: SyntaxVisitor {
         tracker.exitScope()
     }
 
+    override open func visit(_ node: ActorDeclSyntax) -> SyntaxVisitorContinueKind {
+        tracker.enterScope(
+            kind: .actor,
+            name: node.name.text,
+            location: location(of: node),
+        )
+        return .visitChildren
+    }
+
+    override open func visitPost(_ node: ActorDeclSyntax) {
+        tracker.exitScope()
+    }
+
     override open func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
         let name = node.extendedType.description.trimmingCharacters(in: .whitespaces)
         tracker.enterScope(

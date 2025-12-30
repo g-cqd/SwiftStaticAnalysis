@@ -44,6 +44,7 @@ public enum ScopeKind: String, Sendable, Codable {
     case `while`
     case `switch`
     case `do`
+    case actor
 }
 
 // MARK: - Scope

@@ -22,12 +22,18 @@ public final class DeclarationCollector: ScopeTrackingVisitor {  // swiftlint:di
     public private(set) var imports: [Declaration] = []
 
     override public func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
+        let attrs = extractAttributes(from: node.attributes)
+        let signature = extractFunctionSignature(from: node.signature)
+        let genericParams = extractGenericParameters(from: node.genericParameterClause)
         let declaration = makeDeclaration(
             name: node.name.text,
             kind: isInTypeContext ? .method : .function,
             modifiers: node.modifiers,
             node: node,
+            genericParameters: genericParams,
+            signature: signature,
             documentation: extractDocumentation(from: node),
+            attributes: attrs,
         )
         declarations.append(declaration)
 
@@ -38,11 +44,15 @@ public final class DeclarationCollector: ScopeTrackingVisitor {  // swiftlint:di
     // MARK: - Initializers
 
     override public func visit(_ node: InitializerDeclSyntax) -> SyntaxVisitorContinueKind {
+        let signature = extractFunctionSignature(from: node.signature)
+        let genericParams = extractGenericParameters(from: node.genericParameterClause)
         let declaration = makeDeclaration(
             name: "init",
             kind: .initializer,
             modifiers: node.modifiers,
             node: node,
+            genericParameters: genericParams,
+            signature: signature,
             documentation: extractDocumentation(from: node),
         )
         declarations.append(declaration)
@@ -254,6 +264,40 @@ public final class DeclarationCollector: ScopeTrackingVisitor {  // swiftlint:di
         super.visitPost(node)
     }
 
+    override public func visit(_ node: ActorDeclSyntax) -> SyntaxVisitorContinueKind {
+        let genericParams = extractGenericParameters(from: node.genericParameterClause)
+        let conformances = extractConformances(from: node.inheritanceClause)
+        let attrs = extractAttributes(from: node.attributes)
+
+        // Extract actor's ignore directives, combining with any inherited parent directives
+        var actorIgnoreDirectives = extractIgnoreCategories(from: node)
+        actorIgnoreDirectives.formUnion(currentTypeIgnoreDirectives)
+
+        let declaration = makeDeclaration(
+            name: node.name.text,
+            kind: .actor,
+            modifiers: node.modifiers,
+            node: node,
+            genericParameters: genericParams,
+            documentation: extractDocumentation(from: node),
+            conformances: conformances,
+            attributes: attrs,
+        )
+        declarations.append(declaration)
+
+        // Push combined ignore directives for its members to inherit
+        ignoreDirectiveStack.append(actorIgnoreDirectives)
+
+        return super.visit(node)
+    }
+
+    override public func visitPost(_ node: ActorDeclSyntax) {
+        if !ignoreDirectiveStack.isEmpty {
+            ignoreDirectiveStack.removeLast()
+        }
+        super.visitPost(node)
+    }
+
     override public func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
         let name = node.extendedType.description.trimmingCharacters(in: .whitespaces)
 
@@ -402,7 +446,8 @@ public final class DeclarationCollector: ScopeTrackingVisitor {  // swiftlint:di
         let ancestors = tracker.tree.ancestors(of: currentScope)
         return ancestors.contains { scope in
             switch scope.kind {
-            case .class,
+            case .actor,
+                .class,
                 .enum,
                 .extension,
                 .protocol,
@@ -422,6 +467,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {  // swiftlint:di
         node: some SyntaxProtocol,
         typeAnnotation: String? = nil,
         genericParameters: [String] = [],
+        signature: FunctionSignature? = nil,
         documentation: String? = nil,
         propertyWrappers: [PropertyWrapperInfo] = [],
         swiftUIInfo: SwiftUITypeInfo? = nil,
@@ -442,6 +488,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {  // swiftlint:di
             scope: currentScope,
             typeAnnotation: typeAnnotation,
             genericParameters: genericParameters,
+            signature: signature,
             documentation: documentation,
             propertyWrappers: propertyWrappers,
             swiftUIInfo: swiftUIInfo,
@@ -540,6 +587,59 @@ public final class DeclarationCollector: ScopeTrackingVisitor {  // swiftlint:di
     private func extractGenericParameters(from clause: GenericParameterClauseSyntax?) -> [String] {
         guard let clause else { return [] }
         return clause.parameters.map(\.name.text)
+    }
+
+    private func extractFunctionSignature(from signature: FunctionSignatureSyntax) -> FunctionSignature {
+        let parameters = signature.parameterClause.parameters.map { param in
+            // Handle external/internal parameter names
+            let firstName = param.firstName.text
+            let secondName = param.secondName?.text
+
+            // If there's a second name, first is the label, second is the internal name
+            // If firstName is "_", it means no label
+            // If there's only firstName, it's both the label and internal name
+            let label: String?
+            let name: String
+
+            if let secondName {
+                label = firstName == "_" ? nil : firstName
+                name = secondName
+            } else {
+                label = firstName == "_" ? nil : firstName
+                name = firstName
+            }
+
+            let type = param.type.description.trimmingCharacters(in: .whitespaces)
+            let hasDefault = param.defaultValue != nil
+            let isVariadic = param.ellipsis != nil
+            let isInout = param.type.is(AttributedTypeSyntax.self) &&
+                param.type.as(AttributedTypeSyntax.self)?.specifiers.contains { spec in
+                    spec.as(SimpleTypeSpecifierSyntax.self)?.specifier.tokenKind == .keyword(.inout)
+                } ?? false
+
+            return FunctionSignature.Parameter(
+                label: label,
+                name: name,
+                type: type,
+                hasDefaultValue: hasDefault,
+                isVariadic: isVariadic,
+                isInout: isInout
+            )
+        }
+
+        let returnType = signature.returnClause?.type.description.trimmingCharacters(in: .whitespaces)
+
+        let isAsync = signature.effectSpecifiers?.asyncSpecifier != nil
+        let isThrowing = signature.effectSpecifiers?.throwsClause?.throwsSpecifier.tokenKind == .keyword(.throws)
+        let isRethrowing = signature.effectSpecifiers?.throwsClause?.throwsSpecifier.tokenKind == .keyword(.rethrows)
+
+        return FunctionSignature(
+            parameters: parameters,
+            returnType: returnType,
+            isAsync: isAsync,
+            isThrowing: isThrowing,
+            isRethrowing: isRethrowing
+        )
     }
 
     private func extractDocumentation(from node: some SyntaxProtocol) -> String? {
