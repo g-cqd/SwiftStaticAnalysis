@@ -241,44 +241,11 @@ jobs:
         run: |
           swift package --allow-writing-to-directory ./docs \
             generate-documentation \
-            --target SwiftStaticAnalysisCore \
-            --target DuplicationDetector \
-            --target UnusedCodeDetector \
+            --target SwiftStaticAnalysis \
             --disable-indexing \
             --transform-for-static-hosting \
             --hosting-base-path SwiftStaticAnalysis \
             --output-path ./docs
-
-      - name: Create Index Page
-        run: |
-          cat > ./docs/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <title>SwiftStaticAnalysis Documentation</title>
-            <meta http-equiv="refresh" content="0; url=SwiftStaticAnalysisCore.doccarchive/documentation/swiftstaticanalysiscore/">
-            <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-              h1 { color: #333; }
-              ul { list-style: none; padding: 0; }
-              li { margin: 10px 0; }
-              a { color: #0066cc; text-decoration: none; }
-              a:hover { text-decoration: underline; }
-            </style>
-          </head>
-          <body>
-            <h1>SwiftStaticAnalysis Documentation</h1>
-            <p>Redirecting to SwiftStaticAnalysisCore documentation...</p>
-            <p>If not redirected automatically, choose a module:</p>
-            <ul>
-              <li><a href="SwiftStaticAnalysisCore.doccarchive/documentation/swiftstaticanalysiscore/">SwiftStaticAnalysisCore</a> - Core infrastructure and models</li>
-              <li><a href="DuplicationDetector.doccarchive/documentation/duplicationdetector/">DuplicationDetector</a> - Clone detection algorithms</li>
-              <li><a href="UnusedCodeDetector.doccarchive/documentation/unusedcodedetector/">UnusedCodeDetector</a> - Unused code detection</li>
-            </ul>
-          </body>
-          </html>
-          EOF
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3

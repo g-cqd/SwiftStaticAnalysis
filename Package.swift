@@ -10,6 +10,11 @@ let package = Package(
         .iOS(.v18)
     ],
     products: [
+        // Unified library (re-exports all components)
+        .library(
+            name: "SwiftStaticAnalysis",
+            targets: ["SwiftStaticAnalysis"]
+        ),
         // Core library for parsing and analysis infrastructure
         .library(
             name: "SwiftStaticAnalysisCore",
@@ -138,6 +143,19 @@ let package = Package(
                 permissions: []
             ),
             dependencies: ["SwiftStaticAnalysisCLI"]
+        ),
+
+        // MARK: - Unified Module (re-exports all components)
+        .target(
+            name: "SwiftStaticAnalysis",
+            dependencies: [
+                "SwiftStaticAnalysisCore",
+                "DuplicationDetector",
+                "UnusedCodeDetector",
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
         ),
 
         // MARK: - Tests

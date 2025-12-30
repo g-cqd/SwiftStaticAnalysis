@@ -4,7 +4,7 @@
 [![Platform](https://img.shields.io/badge/Platform-macOS%2015%2B-blue.svg)](https://developer.apple.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/g-cqd/SwiftStaticAnalysis/actions/workflows/ci.yml/badge.svg)](https://github.com/g-cqd/SwiftStaticAnalysis/actions/workflows/ci.yml)
-[![Documentation](https://img.shields.io/badge/Documentation-DocC-blue.svg)](https://g-cqd.github.io/SwiftStaticAnalysis/SwiftStaticAnalysisCore.doccarchive/documentation/swiftstaticanalysiscore/)
+[![Documentation](https://img.shields.io/badge/Documentation-DocC-blue.svg)](https://g-cqd.github.io/SwiftStaticAnalysis/documentation/swiftstaticanalysis/)
 
 A high-performance Swift static analysis framework for **code duplication detection** and **unused code elimination**.
 
@@ -364,11 +364,7 @@ SwiftStaticAnalysis/
 
 ## Documentation
 
-Full API documentation is available:
-
-- **[SwiftStaticAnalysisCore](https://g-cqd.github.io/SwiftStaticAnalysis/SwiftStaticAnalysisCore.doccarchive/documentation/swiftstaticanalysiscore/)** - Core infrastructure and models
-- **[DuplicationDetector](https://g-cqd.github.io/SwiftStaticAnalysis/DuplicationDetector.doccarchive/documentation/duplicationdetector/)** - Clone detection algorithms
-- **[UnusedCodeDetector](https://g-cqd.github.io/SwiftStaticAnalysis/UnusedCodeDetector.doccarchive/documentation/unusedcodedetector/)** - Unused code detection
+Full API documentation is available at **[g-cqd.github.io/SwiftStaticAnalysis](https://g-cqd.github.io/SwiftStaticAnalysis/documentation/swiftstaticanalysis/)**.
 
 The documentation includes:
 - **Getting Started Guide**: Installation and first analysis
