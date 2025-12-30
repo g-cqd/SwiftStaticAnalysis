@@ -65,6 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unused `makeLocationConverter` extension from SwiftFileParser
 
 ### Fixed
+- CLI version hardcoded as "0.1.0" instead of "0.0.14"
+- Crash (exit code 133) when file has exactly `minTokens` tokens due to invalid range `1...0` in ExactCloneDetector and NearCloneDetector
+- Auto-exclude common build directories: `.build`, `Build`, `DerivedData`, `.swiftpm`, `Pods`, `Carthage`, `.git`
 - Ignore directive parsing now correctly handles descriptions after ` - ` separator
 - Extension members now properly inherit ignore directives from their parent extension
 - Nested type members now inherit ignore directives from all ancestor types

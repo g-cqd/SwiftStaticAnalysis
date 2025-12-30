@@ -19,7 +19,7 @@ struct SWA: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "swa",
         abstract: "Swift Static Analysis - Analyze Swift code for issues",
-        version: "0.1.0",
+        version: "0.0.14",
         subcommands: [
             Analyze.self,
             Duplicates.self,
@@ -685,6 +685,18 @@ enum OutputFormatter {
     }
 }
 
+/// Default directories to always exclude from analysis.
+/// These contain build artifacts, dependencies, and auto-generated code.
+private let defaultExcludedDirectories: Set<String> = [
+    ".build",           // Swift Package Manager build artifacts
+    "Build",            // Xcode build directory
+    "DerivedData",      // Xcode derived data
+    ".swiftpm",         // SwiftPM metadata
+    "Pods",             // CocoaPods dependencies
+    "Carthage",         // Carthage dependencies
+    ".git",             // Git metadata
+]
+
 func findSwiftFiles(in paths: [String], excludePaths: [String]? = nil) throws -> [String] {
     let fileManager = FileManager.default
     var swiftFiles: [String] = []
@@ -721,7 +733,18 @@ func findSwiftFiles(in paths: [String], excludePaths: [String]? = nil) throws ->
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles],
         ) {
-            for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
+            for case let fileURL as URL in enumerator {
+                // Skip default excluded directories (even if not hidden)
+                let pathComponents = fileURL.pathComponents
+                if pathComponents.contains(where: { defaultExcludedDirectories.contains($0) }) {
+                    continue
+                }
+
+                // Only process Swift files
+                guard fileURL.pathExtension == "swift" else {
+                    continue
+                }
+
                 let filePath = fileURL.path
 
                 // Apply exclusion patterns

@@ -141,7 +141,8 @@ public struct NearCloneDetector: Sendable {
 
         // Roll through remaining windows
         let maxStartIndex = tokens.count - minimumTokens
-        for i in 1...maxStartIndex where maxStartIndex >= 1 {
+        guard maxStartIndex >= 1 else { return windows }
+        for i in 1...maxStartIndex {
             let outgoing = normalizedTexts[i - 1]
             let incoming = normalizedTexts[i + minimumTokens - 1]
             hash = rollingHash.roll(hash: hash, outgoing: outgoing, incoming: incoming)
