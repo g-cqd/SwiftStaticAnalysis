@@ -199,7 +199,34 @@ struct IgnoreDirectiveTests {
         }
     }
 
-    // MARK: - Block Comment Format
+    // MARK: - Comment Format Variations
+
+    @Test("Ignore directive with description after hyphen separator is recognized")
+    func ignoreDirectiveWithDescription() throws {
+        let source = """
+        // swa:ignore-unused - Utility operations for advanced token analysis
+        public extension SomeType {
+            func countByKind() {}
+            func tokensInRange() {}
+        }
+        """
+
+        let tree = Parser.parse(source: source)
+        let collector = DeclarationCollector(file: "test.swift", tree: tree)
+        collector.walk(tree)
+
+        let allDecls = collector.declarations.map { "\($0.name):\($0.kind)" }
+        let methods = collector.declarations.filter { $0.kind == .method || $0.kind == .function }
+        #expect(methods.count == 2, "Expected 2 functions, got \(methods.count). All: \(allDecls)")
+
+        for method in methods {
+            #expect(
+                method.ignoreDirectives.contains("unused"),
+                "Method '\(method.name)' should have 'unused' directive but has: \(method.ignoreDirectives)",
+            )
+            #expect(method.shouldIgnoreUnused, "Method '\(method.name)' should be ignored for unused")
+        }
+    }
 
     @Test("Block comment swa:ignore directive is recognized")
     func blockCommentIgnoreDirective() throws {
@@ -256,5 +283,104 @@ struct IgnoreDirectiveTests {
         #expect(funcDecl.hasIgnoreDirective(for: "unused"))
         #expect(funcDecl.hasIgnoreDirective(for: "unused_cases"))
         #expect(funcDecl.hasIgnoreDirective(for: "anything"))
+    }
+
+    // MARK: - Extension Inheritance
+
+    @Test("Functions in extension inherit ignore directive from extension")
+    func extensionIgnoreDirectiveInheritance() throws {
+        let source = """
+        // swa:ignore-unused
+        public extension SomeType {
+            func method1() {}
+            func method2() {}
+        }
+        """
+
+        let tree = Parser.parse(source: source)
+        let collector = DeclarationCollector(file: "test.swift", tree: tree)
+        collector.walk(tree)
+
+        // Debug: check all declarations
+        let allDecls = collector.declarations.map { "\($0.name):\($0.kind)" }
+        print("All declarations: \(allDecls)")
+
+        // Functions inside extensions should be detected as methods
+        let methods = collector.declarations.filter { $0.kind == .method || $0.kind == .function }
+        #expect(methods.count == 2, "Expected 2 functions, got \(methods.count). All: \(allDecls)")
+
+        for method in methods {
+            #expect(
+                method.ignoreDirectives.contains("unused"),
+                "Method '\(method.name)' should inherit 'unused' directive from extension but has: \(method.ignoreDirectives)",
+            )
+            #expect(method.shouldIgnoreUnused, "Method '\(method.name)' should be ignored for unused")
+        }
+    }
+
+    @Test("Functions in extension with MARK comment inherit ignore directive")
+    func extensionWithMarkCommentInheritance() throws {
+        let source = """
+        // MARK: - Utilities
+
+        // swa:ignore-unused
+        public extension SomeType {
+            func countByKind() {}
+            func tokensInRange() {}
+        }
+        """
+
+        let tree = Parser.parse(source: source)
+        let collector = DeclarationCollector(file: "test.swift", tree: tree)
+        collector.walk(tree)
+
+        let allDecls = collector.declarations.map { "\($0.name):\($0.kind)" }
+        let methods = collector.declarations.filter { $0.kind == .method || $0.kind == .function }
+        #expect(methods.count == 2, "Expected 2 functions, got \(methods.count). All: \(allDecls)")
+
+        for method in methods {
+            #expect(
+                method.shouldIgnoreUnused,
+                "Method '\(method.name)' should be ignored for unused",
+            )
+        }
+    }
+
+    @Test("Nested struct in class inherits ignore directive")
+    func nestedStructInheritance() throws {
+        let source = """
+        // swa:ignore
+        class Container {
+            struct Nested {
+                var value: Int
+            }
+            func helper() {}
+        }
+        """
+
+        let tree = Parser.parse(source: source)
+        let collector = DeclarationCollector(file: "test.swift", tree: tree)
+        collector.walk(tree)
+
+        let allDecls = collector.declarations.map { "\($0.name):\($0.kind)" }
+        print("Nested test declarations: \(allDecls)")
+
+        let structs = collector.declarations.filter { $0.kind == .struct }
+        let methods = collector.declarations.filter { $0.kind == .method || $0.kind == .function }
+        let variables = collector.declarations.filter { $0.kind == .variable }
+
+        #expect(structs.count == 1, "Expected 1 struct. All: \(allDecls)")
+        #expect(methods.count == 1, "Expected 1 method. All: \(allDecls)")
+        #expect(variables.count == 1, "Expected 1 variable. All: \(allDecls)")
+
+        if let s = structs.first {
+            #expect(s.shouldIgnoreUnused, "Nested struct should inherit ignore from class")
+        }
+        if let m = methods.first {
+            #expect(m.shouldIgnoreUnused, "Method should inherit ignore from class")
+        }
+        if let v = variables.first {
+            #expect(v.shouldIgnoreUnused, "Variable should inherit ignore from struct which inherits from class")
+        }
     }
 }

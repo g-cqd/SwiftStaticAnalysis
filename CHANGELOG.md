@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Ignore directive description support: `// swa:ignore-unused - Reason for ignoring`
+- Type member inheritance: members of extensions, classes, structs, and protocols now inherit ignore directives from their parent
 - CLI Reference documentation article with complete command-line options
 - Configuration file section in README with `.swa.json` example
 - Full CLI Reference section in README documenting all flags
@@ -53,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unused `makeLocationConverter` extension from SwiftFileParser
 
 ### Fixed
+- Ignore directive parsing now correctly handles descriptions after ` - ` separator
+- Extension members now properly inherit ignore directives from their parent extension
+- Nested type members now inherit ignore directives from all ancestor types
 - Silent-pass tests that used `Issue.record()` + return pattern now use `try #require()`
 - README version in installation instructions (1.0.0 → 0.1.0)
 - CLI `--types` argument syntax in README examples

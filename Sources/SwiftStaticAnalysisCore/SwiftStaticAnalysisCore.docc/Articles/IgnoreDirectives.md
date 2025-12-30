@@ -28,6 +28,23 @@ All standard Swift comment formats are supported:
 /** swa:ignore */                // Doc block comment
 ```
 
+### Adding Descriptions
+
+You can add explanatory text after the directive using a ` - ` separator:
+
+```swift
+// swa:ignore-unused - Required for Objective-C interop
+@objc func handleCallback() {}
+
+// swa:ignore-unused - Used by SwiftUI @Environment injection
+var environmentValue: String
+
+// swa:ignore-duplicates - Intentionally duplicated for performance
+func optimizedHelper() {}
+```
+
+The description is ignored by the parser and serves as documentation for why the directive is needed.
+
 ## Usage Examples
 
 ### Ignoring a Function
@@ -118,7 +135,9 @@ struct GeneratedModel2: Codable {
 // swa:ignore-duplicates:end
 ```
 
-## Enum Case Inheritance
+## Directive Inheritance
+
+### Enum Case Inheritance
 
 When you mark an enum with `// swa:ignore-unused-cases`, all its cases automatically inherit the directive:
 
@@ -135,6 +154,28 @@ This is useful for:
 - Codable enums with all cases defined
 - State machines with reserved states
 - Protocol definitions requiring exhaustive cases
+
+### Type Member Inheritance
+
+Members of classes, structs, extensions, and protocols inherit ignore directives from their parent type:
+
+```swift
+// swa:ignore-unused - SIMD utility operations
+public extension SIMDStorage {
+    func optimizedSum() -> Float { ... }    // Inherits ignore-unused
+    func vectorMultiply() -> Float { ... }  // Inherits ignore-unused
+}
+
+// swa:ignore - Debug helpers
+class DebugUtilities {
+    func printState() { ... }     // Inherits ignore
+    func dumpMemory() { ... }     // Inherits ignore
+
+    struct Formatter {
+        var prefix: String        // Also inherits ignore (nested type)
+    }
+}
+```
 
 ## Placement Rules
 

@@ -197,6 +197,7 @@ Suppress false positives directly in your source code using `// swa:ignore` comm
 // swa:ignore                    - Ignore all warnings for this declaration
 // swa:ignore-unused             - Ignore unused code warnings
 // swa:ignore-unused-cases       - Ignore unused enum case warnings (for exhaustive enums)
+// swa:ignore-unused - Reason    - Add description after hyphen separator
 /// Doc comment. // swa:ignore   - Also works in doc comments
 /* swa:ignore */                 - Block comments work too
 ```
@@ -219,16 +220,21 @@ func debugHelper() {
 }
 ```
 
-### Enum Case Inheritance
+### Directive Inheritance
 
-When you mark an enum with `// swa:ignore-unused-cases`, all its cases automatically inherit the directive:
+Ignore directives are inherited by nested declarations:
 
 ```swift
 /// Protocol message types. // swa:ignore-unused-cases
 enum MessageType {
     case request    // ← Automatically ignored
     case response   // ← Automatically ignored
-    case error      // ← Automatically ignored
+}
+
+// swa:ignore-unused - SIMD utility operations
+public extension SIMDStorage {
+    func optimizedSum() -> Float { ... }    // ← Inherits ignore-unused
+    func vectorMultiply() -> Float { ... }  // ← Inherits ignore-unused
 }
 ```
 

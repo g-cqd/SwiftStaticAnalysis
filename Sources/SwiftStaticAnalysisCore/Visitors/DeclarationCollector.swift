@@ -124,6 +124,10 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
         let swiftUIInfo = extractSwiftUIInfo(from: conformances)
         let attrs = extractAttributes(from: node.attributes)
 
+        // Extract class's ignore directives, combining with any inherited parent directives
+        var classIgnoreDirectives = extractIgnoreCategories(from: node)
+        classIgnoreDirectives.formUnion(currentTypeIgnoreDirectives)
+
         let declaration = makeDeclaration(
             name: node.name.text,
             kind: .class,
@@ -134,10 +138,20 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
             swiftUIInfo: swiftUIInfo,
             conformances: conformances,
             attributes: attrs,
-            )
+        )
         declarations.append(declaration)
 
+        // Push combined ignore directives for its members to inherit
+        ignoreDirectiveStack.append(classIgnoreDirectives)
+
         return super.visit(node)
+    }
+
+    override public func visitPost(_ node: ClassDeclSyntax) {
+        if !ignoreDirectiveStack.isEmpty {
+            ignoreDirectiveStack.removeLast()
+        }
+        super.visitPost(node)
     }
 
     override public func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
@@ -145,6 +159,10 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
         let conformances = extractConformances(from: node.inheritanceClause)
         let swiftUIInfo = extractSwiftUIInfo(from: conformances)
         let attrs = extractAttributes(from: node.attributes)
+
+        // Extract struct's ignore directives, combining with any inherited parent directives
+        var structIgnoreDirectives = extractIgnoreCategories(from: node)
+        structIgnoreDirectives.formUnion(currentTypeIgnoreDirectives)
 
         let declaration = makeDeclaration(
             name: node.name.text,
@@ -156,10 +174,20 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
             swiftUIInfo: swiftUIInfo,
             conformances: conformances,
             attributes: attrs,
-            )
+        )
         declarations.append(declaration)
 
+        // Push combined ignore directives for its members to inherit
+        ignoreDirectiveStack.append(structIgnoreDirectives)
+
         return super.visit(node)
+    }
+
+    override public func visitPost(_ node: StructDeclSyntax) {
+        if !ignoreDirectiveStack.isEmpty {
+            ignoreDirectiveStack.removeLast()
+        }
+        super.visitPost(node)
     }
 
     override public func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind {
@@ -167,7 +195,10 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
         let conformances = extractConformances(from: node.inheritanceClause)
         let swiftUIInfo = extractSwiftUIInfo(from: conformances)
         let attrs = extractAttributes(from: node.attributes)
-        let enumIgnoreDirectives = extractIgnoreCategories(from: node)
+
+        // Extract enum's ignore directives, combining with any inherited parent directives
+        var enumIgnoreDirectives = extractIgnoreCategories(from: node)
+        enumIgnoreDirectives.formUnion(currentTypeIgnoreDirectives)
 
         let declaration = makeDeclaration(
             name: node.name.text,
@@ -179,10 +210,10 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
             swiftUIInfo: swiftUIInfo,
             conformances: conformances,
             attributes: attrs,
-            )
+        )
         declarations.append(declaration)
 
-        // Push enum's ignore directives for its cases to inherit
+        // Push combined ignore directives for its cases to inherit
         ignoreDirectiveStack.append(enumIgnoreDirectives)
 
         return super.visit(node)
@@ -197,30 +228,59 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
     }
 
     override public func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind {
+        // Extract protocol's ignore directives, combining with any inherited parent directives
+        var protocolIgnoreDirectives = extractIgnoreCategories(from: node)
+        protocolIgnoreDirectives.formUnion(currentTypeIgnoreDirectives)
+
         let declaration = makeDeclaration(
             name: node.name.text,
             kind: .protocol,
             modifiers: node.modifiers,
             node: node,
             documentation: extractDocumentation(from: node),
-            )
+        )
         declarations.append(declaration)
+
+        // Push combined ignore directives for its members to inherit
+        ignoreDirectiveStack.append(protocolIgnoreDirectives)
 
         return super.visit(node)
     }
 
+    override public func visitPost(_ node: ProtocolDeclSyntax) {
+        if !ignoreDirectiveStack.isEmpty {
+            ignoreDirectiveStack.removeLast()
+        }
+        super.visitPost(node)
+    }
+
     override public func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
         let name = node.extendedType.description.trimmingCharacters(in: .whitespaces)
+
+        // Extract extension's ignore directives, combining with any inherited parent directives
+        var extensionIgnoreDirectives = extractIgnoreCategories(from: node)
+        extensionIgnoreDirectives.formUnion(currentTypeIgnoreDirectives)
 
         let declaration = makeDeclaration(
             name: name,
             kind: .extension,
             modifiers: node.modifiers,
             node: node,
-            )
+        )
         declarations.append(declaration)
 
+        // Push combined ignore directives for its members to inherit
+        ignoreDirectiveStack.append(extensionIgnoreDirectives)
+
         return super.visit(node)
+    }
+
+    override public func visitPost(_ node: ExtensionDeclSyntax) {
+        // Pop the ignore directives after visiting children
+        if !ignoreDirectiveStack.isEmpty {
+            ignoreDirectiveStack.removeLast()
+        }
+        super.visitPost(node)
     }
 
     // MARK: - Type Aliases
@@ -368,7 +428,11 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
         conformances: [String] = [],
         attributes: [String] = [],
         ) -> Declaration {
-        Declaration(
+        // Combine node's own ignore directives with inherited parent directives
+        var ignoreDirectives = extractIgnoreCategories(from: node)
+        ignoreDirectives.formUnion(currentTypeIgnoreDirectives)
+
+        return Declaration(
             name: name,
             kind: kind,
             accessLevel: extractAccessLevel(from: modifiers),
@@ -383,8 +447,8 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
             swiftUIInfo: swiftUIInfo,
             conformances: conformances,
             attributes: attributes,
-            ignoreDirectives: extractIgnoreCategories(from: node),
-            )
+            ignoreDirectives: ignoreDirectives,
+        )
     }
 
     private func extractAccessLevel(from modifiers: DeclModifierListSyntax) -> AccessLevel {
@@ -562,9 +626,21 @@ public final class DeclarationCollector: ScopeTrackingVisitor { // swiftlint:dis
                     // Generic ignore - ignore everything
                     categories.insert("all")
                 } else if afterDirective.hasPrefix("-") {
-                    // Specific category like "swa:ignore-unused-cases"
-                    let category = afterDirective
-                        .trimmingCharacters(in: CharacterSet(charactersIn: "- \n*/"))
+                    // Specific category like "swa:ignore-unused-cases" or "swa:ignore-unused - description"
+                    // First, drop the leading hyphen
+                    var remaining = String(afterDirective.dropFirst())
+
+                    // Take only the category portion: hyphen-separated words until a space followed by more text
+                    // e.g., "-unused-cases - description" → "unused_cases"
+                    // e.g., "-unused" → "unused"
+                    if let spaceHyphenRange = remaining.range(of: " -") {
+                        remaining = String(remaining[..<spaceHyphenRange.lowerBound])
+                    } else if let endCommentRange = remaining.range(of: "*/") {
+                        remaining = String(remaining[..<endCommentRange.lowerBound])
+                    }
+
+                    let category = remaining
+                        .trimmingCharacters(in: .whitespaces)
                         .lowercased()
                         .replacingOccurrences(of: "-", with: "_")
                     if !category.isEmpty {
