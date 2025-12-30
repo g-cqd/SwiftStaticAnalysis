@@ -7,21 +7,52 @@
 //  and other syntactic variations.
 //
 
-import Foundation
+import RegexBuilder
 import SwiftSyntax
+
+// MARK: - Compile-Time Regex Patterns
+
+/// Matches string literals: "anything"
+/// Safe as global constant - regex is immutable after initialization.
+private nonisolated(unsafe) let stringLiteralRegex = Regex {
+    "\""
+    ZeroOrMore {
+        CharacterClass.anyOf("\"").inverted
+    }
+    "\""
+}
+
+/// Matches numeric literals: integers (123) and floats (123.456)
+/// Safe as global constant - regex is immutable after initialization.
+private nonisolated(unsafe) let numericLiteralRegex = Regex {
+    Anchor.wordBoundary
+    OneOrMore(.digit)
+    Optionally {
+        "."
+        OneOrMore(.digit)
+    }
+    Anchor.wordBoundary
+}
+
+/// Matches shorthand parameters: $0, $1, $2, etc.
+/// Safe as global constant - regex is immutable after initialization.
+private nonisolated(unsafe) let shorthandParameterRegex = Regex {
+    "$"
+    OneOrMore(.digit)
+}
 
 // MARK: - String Normalization Utilities
 
 extension String {
     /// Normalize string and numeric literals for clone detection.
     func normalizingLiterals() -> String {
-        replacingOccurrences(of: #""[^"]*""#, with: "\"$STR\"", options: .regularExpression)
-            .replacingOccurrences(of: #"\b\d+(\.\d+)?\b"#, with: "$NUM", options: .regularExpression)
+        replacing(stringLiteralRegex, with: "\"$STR\"")
+            .replacing(numericLiteralRegex, with: "$NUM")
     }
 
     /// Normalize shorthand parameters ($0, $1, etc.) to canonical form.
     func normalizingShorthandParameters() -> String {
-        replacingOccurrences(of: #"\$\d+"#, with: "$X", options: .regularExpression)
+        replacing(shorthandParameterRegex, with: "$X")
     }
 }
 

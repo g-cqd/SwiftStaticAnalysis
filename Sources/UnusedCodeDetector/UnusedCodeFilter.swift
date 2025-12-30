@@ -5,7 +5,7 @@
 //  Filters for excluding false positives from unused code detection results.
 //
 
-import Foundation
+import RegexBuilder
 import SwiftStaticAnalysisCore
 
 // MARK: - UnusedCodeFilterConfiguration
@@ -86,15 +86,13 @@ public struct UnusedCodeFilter: Sendable {
     public init(configuration: UnusedCodeFilterConfiguration = .none) {
         self.configuration = configuration
 
-        // Compile path patterns to regexes
-        pathRegexes = configuration.excludePathPatterns.compactMap { pattern in
-            Self.compileGlobPattern(pattern)
+        // Pre-compile glob patterns to regex pattern strings
+        compiledPathPatterns = configuration.excludePathPatterns.compactMap { pattern in
+            Self.globToRegexPattern(pattern)
         }
 
-        // Compile name patterns to regexes
-        nameRegexes = configuration.excludeNamePatterns.compactMap { pattern in
-            try? NSRegularExpression(pattern: pattern, options: [])
-        }
+        // Store name patterns for on-demand compilation
+        namePatterns = configuration.excludeNamePatterns
     }
 
     // MARK: Public
@@ -116,11 +114,11 @@ public struct UnusedCodeFilter: Sendable {
 
     /// Check if a path matches a glob pattern.
     public static func matchesGlobPattern(_ path: String, pattern: String) -> Bool {
-        guard let regex = compileGlobPattern(pattern) else {
+        let regexPattern = globToRegexPattern(pattern)
+        guard let regex = try? Regex(regexPattern) else {
             return false
         }
-        let range = NSRange(path.startIndex..., in: path)
-        return regex.firstMatch(in: path, options: [], range: range) != nil
+        return path.contains(regex)
     }
 
     // MARK: - Filtering
@@ -167,17 +165,17 @@ public struct UnusedCodeFilter: Sendable {
         }
 
         // Check path patterns
-        for regex in pathRegexes {
-            let range = NSRange(filePath.startIndex..., in: filePath)
-            if regex.firstMatch(in: filePath, options: [], range: range) != nil {
+        for pattern in compiledPathPatterns {
+            if let regex = try? Regex(pattern),
+               filePath.contains(regex) {
                 return true
             }
         }
 
         // Check name patterns
-        for regex in nameRegexes {
-            let range = NSRange(name.startIndex..., in: name)
-            if regex.firstMatch(in: name, options: [], range: range) != nil {
+        for pattern in namePatterns {
+            if let regex = try? Regex(pattern),
+               name.contains(regex) {
                 return true
             }
         }
@@ -187,22 +185,20 @@ public struct UnusedCodeFilter: Sendable {
 
     // MARK: Private
 
-    /// Compiled path pattern regexes.
-    private let pathRegexes: [NSRegularExpression]
+    /// Pre-compiled glob-to-regex pattern strings (Sendable).
+    private let compiledPathPatterns: [String]
 
-    /// Compiled name pattern regexes.
-    private let nameRegexes: [NSRegularExpression]
+    /// Name pattern strings for on-demand compilation (Sendable).
+    private let namePatterns: [String]
 
-    /// Compile a glob pattern to a regex.
-    private static func compileGlobPattern(_ pattern: String) -> NSRegularExpression? {
-        let regexPattern = pattern
+    /// Convert a glob pattern to a regex pattern string.
+    private static func globToRegexPattern(_ pattern: String) -> String {
+        pattern
             .replacingOccurrences(of: ".", with: "\\.")
             .replacingOccurrences(of: "**", with: "<<<DOUBLESTAR>>>")
             .replacingOccurrences(of: "*", with: "[^/]*")
             .replacingOccurrences(of: "<<<DOUBLESTAR>>>", with: ".*")
             .replacingOccurrences(of: "?", with: ".")
-
-        return try? NSRegularExpression(pattern: regexPattern, options: [])
     }
 }
 

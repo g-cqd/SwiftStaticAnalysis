@@ -5,7 +5,7 @@
 //  Incremental unused code detector with caching support.
 //
 
-import Foundation
+import RegexBuilder
 import SwiftStaticAnalysisCore
 
 // MARK: - IncrementalUnusedCodeResult
@@ -216,11 +216,8 @@ public actor IncrementalUnusedCodeDetector {
 
         // Check ignored patterns
         for pattern in configuration.ignoredPatterns {
-            if let regex = try? NSRegularExpression(pattern: pattern),
-               regex.firstMatch(
-                   in: declaration.name,
-                   range: NSRange(declaration.name.startIndex..., in: declaration.name),
-               ) != nil {
+            if let regex = try? Regex(pattern),
+               declaration.name.contains(regex) {
                 return false
             }
         }
