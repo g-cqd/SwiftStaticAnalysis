@@ -24,19 +24,30 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.1.0")
+    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.0.13")
 ]
 ```
 
-Then add the products you need:
+Then add the dependency to your target:
 
 ```swift
 .target(
     name: "YourTarget",
     dependencies: [
-        .product(name: "SwiftStaticAnalysisCore", package: "SwiftStaticAnalysis"),
-        .product(name: "DuplicationDetector", package: "SwiftStaticAnalysis"),
-        .product(name: "UnusedCodeDetector", package: "SwiftStaticAnalysis"),
+        .product(name: "SwiftStaticAnalysis", package: "SwiftStaticAnalysis"),
+    ]
+)
+```
+
+This gives you access to all components. Alternatively, import individual modules:
+
+```swift
+.target(
+    name: "YourTarget",
+    dependencies: [
+        .product(name: "SwiftStaticAnalysisCore", package: "SwiftStaticAnalysis"),  // Core only
+        .product(name: "DuplicationDetector", package: "SwiftStaticAnalysis"),      // Clone detection
+        .product(name: "UnusedCodeDetector", package: "SwiftStaticAnalysis"),       // Unused code
     ]
 )
 ```
@@ -89,8 +100,7 @@ swa analyze . --format json > report.json
 ### Using the API
 
 ```swift
-import DuplicationDetector
-import UnusedCodeDetector
+import SwiftStaticAnalysis
 
 // Find all Swift files
 let files = try findSwiftFiles(in: "/path/to/project")
