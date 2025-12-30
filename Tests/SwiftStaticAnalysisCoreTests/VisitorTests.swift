@@ -410,9 +410,6 @@ struct ReferenceCollectorTests {
 
         // Note: Inheritance types are tracked as type annotations or inheritance
         let allRefs = collector.references
-        let typeRefs = allRefs.filter {
-            $0.context == .inheritance || $0.context == .typeAnnotation
-        }
         let allNames = Set(allRefs.map(\.identifier))
 
         // Verify at least some inheritance types are captured

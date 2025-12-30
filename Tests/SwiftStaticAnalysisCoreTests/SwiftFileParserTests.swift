@@ -1,8 +1,18 @@
 //
-//  ParserTests.swift
+//  SwiftFileParserTests.swift
 //  SwiftStaticAnalysis
 //
-//  Tests for SwiftFileParser and parsing infrastructure.
+//  ## Test Goals
+//  - Verify SwiftFileParser correctly parses valid Swift source code
+//  - Test graceful handling of syntax errors
+//  - Validate line counting accuracy
+//  - Test parsing of modern Swift features
+//
+//  ## Coverage
+//  - parse(source:): valid source, syntax errors, empty, only comments
+//  - parse(file:): parsing from disk
+//  - lineCount(source:): with and without empty lines
+//  - Complex structures: nested types, async/await, generics, property wrappers
 //
 
 import Foundation
@@ -11,10 +21,8 @@ import SwiftSyntax
 import Testing
 @testable import SwiftStaticAnalysisCore
 
-// MARK: - ParserTests
-
 @Suite("SwiftFileParser Tests")
-struct ParserTests {
+struct SwiftFileParserTests {
     // MARK: - Basic Parsing
 
     @Test("Parse valid Swift source code")
@@ -91,10 +99,10 @@ struct ParserTests {
             .appendingPathComponent("ExactClones")
             .appendingPathComponent("NetworkingDuplication.swift")
 
-        guard FileManager.default.fileExists(atPath: fixturesPath.path) else {
-            Issue.record("Fixture file not found at: \(fixturesPath.path)")
-            return
-        }
+        try #require(
+            FileManager.default.fileExists(atPath: fixturesPath.path),
+            "Fixture file required at: \(fixturesPath.path)"
+        )
 
         let parser = SwiftFileParser()
         let tree = try await parser.parse(fixturesPath.path)
@@ -254,38 +262,5 @@ struct ParserTests {
         let tree = try await parser.parse(source: source)
 
         #expect(!tree.statements.isEmpty)
-    }
-}
-
-// MARK: - ConcurrentParsingTests
-
-@Suite("Concurrent Parsing Tests")
-struct ConcurrentParsingTests {
-    @Test("Parse multiple sources concurrently")
-    func parseConcurrently() async throws {
-        let sources = (1 ... 10).map { i in
-            """
-            struct Type\(i) {
-                let value: Int = \(i)
-            }
-            """
-        }
-
-        let parser = SwiftFileParser()
-
-        try await withThrowingTaskGroup(of: SourceFileSyntax.self) { group in
-            for source in sources {
-                group.addTask {
-                    try await parser.parse(source: source)
-                }
-            }
-
-            var results: [SourceFileSyntax] = []
-            for try await tree in group {
-                results.append(tree)
-            }
-
-            #expect(results.count == 10)
-        }
     }
 }

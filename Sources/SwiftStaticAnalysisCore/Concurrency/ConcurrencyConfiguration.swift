@@ -65,62 +65,6 @@ public struct ConcurrencyConfiguration: Sendable {
     public let batchSize: Int
 }
 
-// MARK: - AsyncSemaphore
-
-/// A simple async semaphore for limiting concurrent operations.
-public actor AsyncSemaphore {
-    // MARK: Lifecycle
-
-    public init(value: Int) {
-        count = value
-    }
-
-    // MARK: Public
-
-    /// Current number of available permits.
-    public var available: Int {
-        count
-    }
-
-    /// Wait to acquire a permit.
-    public func wait() async {
-        // swiftlint:disable:next empty_count
-        if count > 0 {
-            count -= 1
-            return
-        }
-
-        await withCheckedContinuation { continuation in
-            waiters.append(continuation)
-        }
-    }
-
-    /// Signal that a permit is available.
-    public func signal() {
-        if let waiter = waiters.first {
-            waiters.removeFirst()
-            waiter.resume()
-        } else {
-            count += 1
-        }
-    }
-
-    /// Try to acquire a permit without waiting.
-    public func tryWait() -> Bool {
-        // swiftlint:disable:next empty_count
-        if count > 0 {
-            count -= 1
-            return true
-        }
-        return false
-    }
-
-    // MARK: Private
-
-    private var count: Int
-    private var waiters: [CheckedContinuation<Void, Never>] = []
-}
-
 // MARK: - ParallelProcessor
 
 /// Utilities for parallel file processing with concurrency limits.

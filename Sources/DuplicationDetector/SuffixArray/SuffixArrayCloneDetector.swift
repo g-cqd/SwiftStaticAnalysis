@@ -25,7 +25,6 @@ struct TokenAccessorResult: Sendable {
 struct TokenStreamResult: Sendable {
     let tokens: [Int]
     let infos: [TokenStreamInfo]
-    let boundaries: [FileBoundary]
 }
 
 // MARK: - SuffixArrayCloneDetector
@@ -77,7 +76,6 @@ public struct SuffixArrayCloneDetector: Sendable {
         return convertToCloneGroups(
             repeatGroups: repeatGroups,
             tokenInfos: streamResult.infos,
-            fileBoundaries: streamResult.boundaries,
             sequences: sequences,
         )
     }
@@ -108,7 +106,6 @@ public struct SuffixArrayCloneDetector: Sendable {
         return convertNormalizedToCloneGroups(
             repeatGroups: repeatGroups,
             tokenInfos: streamResult.infos,
-            fileBoundaries: streamResult.boundaries,
             sequences: normalizedSequences,
         )
     }
@@ -151,18 +148,10 @@ public struct SuffixArrayCloneDetector: Sendable {
     ) -> TokenStreamResult where S.Element: TokenSequenceProtocol {
         var tokens: [Int] = []
         var infos: [TokenStreamInfo] = []
-        var boundaries: [FileBoundary] = []
         var tokenIdMap: [String: Int] = [:]
         var nextTokenId = 1 // 0 reserved for separators
 
         for (fileIndex, sequence) in sequences.enumerated() {
-            let startIndex = tokens.count
-            boundaries.append(FileBoundary(
-                fileIndex: fileIndex,
-                file: sequence.file,
-                startIndex: startIndex,
-            ))
-
             for tokenIdx in 0 ..< sequence.tokenCount {
                 let accessor = tokenAccessor(sequence, tokenIdx)
                 let tokenId: Int
@@ -197,83 +186,59 @@ public struct SuffixArrayCloneDetector: Sendable {
             ))
         }
 
-        return TokenStreamResult(tokens: tokens, infos: infos, boundaries: boundaries)
+        return TokenStreamResult(tokens: tokens, infos: infos)
     }
 
     // MARK: - Clone Group Conversion
 
     /// Convert repeat groups to clone groups with full location information.
-    /// - Note: `fileBoundaries` is kept for API consistency but file boundary checking
-    ///   is done via `tokenInfos[pos].fileIndex` comparison.
     private func convertToCloneGroups(
         repeatGroups: [RepeatGroup],
         tokenInfos: [TokenStreamInfo],
-        fileBoundaries _: [FileBoundary],
         sequences: [TokenSequence],
     ) -> [CloneGroup] {
-        var cloneGroups: [CloneGroup] = []
-
-        for group in repeatGroups {
-            // Filter out positions that cross file boundaries or are too short
-            let validPositions = group.positions.filter { pos in
-                isValidPosition(pos, length: group.length, tokenInfos: tokenInfos)
-            }
-
-            guard validPositions.count >= 2 else { continue }
-
-            // Check if these are same-file overlapping clones (should skip)
-            let cloneLocations = validPositions.compactMap { pos -> CloneLocation? in
+        buildCloneGroups(
+            repeatGroups: repeatGroups,
+            tokenInfos: tokenInfos,
+            cloneType: .exact,
+            locationCreator: { pos, length in
                 createCloneLocation(
                     position: pos,
-                    length: group.length,
+                    length: length,
                     tokenInfos: tokenInfos,
                     sequences: sequences,
                 )
-            }
-
-            // Filter overlapping clones in same file
-            let filteredLocations = filterOverlappingClones(cloneLocations)
-
-            guard filteredLocations.count >= 2 else { continue }
-
-            // Create clones
-            let clones = filteredLocations.map { loc in
-                Clone(
-                    file: loc.file,
-                    startLine: loc.startLine,
-                    endLine: loc.endLine,
-                    tokenCount: group.length,
-                    codeSnippet: "", // Filled in later
-                )
-            }
-
-            // Generate fingerprint from first occurrence
-            let fingerprint = generateFingerprint(
-                position: validPositions[0],
-                length: min(group.length, 20),
-                tokenInfos: tokenInfos,
-            )
-
-            cloneGroups.append(CloneGroup(
-                type: .exact,
-                clones: clones,
-                similarity: 1.0,
-                fingerprint: fingerprint,
-            ))
-        }
-
-        // Deduplicate and merge overlapping groups
-        return deduplicateGroups(cloneGroups)
+            },
+        )
     }
 
     /// Convert normalized repeat groups to clone groups.
-    /// - Note: `fileBoundaries` is kept for API consistency but file boundary checking
-    ///   is done via `tokenInfos[pos].fileIndex` comparison.
     private func convertNormalizedToCloneGroups(
         repeatGroups: [RepeatGroup],
         tokenInfos: [TokenStreamInfo],
-        fileBoundaries _: [FileBoundary],
         sequences: [NormalizedSequence],
+    ) -> [CloneGroup] {
+        buildCloneGroups(
+            repeatGroups: repeatGroups,
+            tokenInfos: tokenInfos,
+            cloneType: .near,
+            locationCreator: { pos, length in
+                createCloneLocationFromNormalized(
+                    position: pos,
+                    length: length,
+                    tokenInfos: tokenInfos,
+                    sequences: sequences,
+                )
+            },
+        )
+    }
+
+    /// Common clone group building logic.
+    private func buildCloneGroups(
+        repeatGroups: [RepeatGroup],
+        tokenInfos: [TokenStreamInfo],
+        cloneType: CloneType,
+        locationCreator: (Int, Int) -> CloneLocation?,
     ) -> [CloneGroup] {
         var cloneGroups: [CloneGroup] = []
 
@@ -284,13 +249,8 @@ public struct SuffixArrayCloneDetector: Sendable {
 
             guard validPositions.count >= 2 else { continue }
 
-            let cloneLocations = validPositions.compactMap { pos -> CloneLocation? in
-                createCloneLocationFromNormalized(
-                    position: pos,
-                    length: group.length,
-                    tokenInfos: tokenInfos,
-                    sequences: sequences,
-                )
+            let cloneLocations = validPositions.compactMap { pos in
+                locationCreator(pos, group.length)
             }
 
             let filteredLocations = filterOverlappingClones(cloneLocations)
@@ -312,9 +272,6 @@ public struct SuffixArrayCloneDetector: Sendable {
                 length: min(group.length, 20),
                 tokenInfos: tokenInfos,
             )
-
-            // Determine if this is exact or near clone based on normalization
-            let cloneType: CloneType = .near // Normalized detection finds parameterized clones
 
             cloneGroups.append(CloneGroup(
                 type: cloneType,
@@ -465,15 +422,6 @@ struct TokenStreamInfo: Sendable {
     let line: Int
     let column: Int
     let originalText: String
-}
-
-// MARK: - FileBoundary
-
-/// File boundary in the concatenated stream.
-struct FileBoundary: Sendable {
-    let fileIndex: Int
-    let file: String
-    let startIndex: Int
 }
 
 // MARK: - CloneLocation

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- CLI Reference documentation article with complete command-line options
+- Configuration file section in README with `.swa.json` example
+- Full CLI Reference section in README documenting all flags
 - Full DocC documentation with API reference and guides
 - GitHub Pages documentation hosting at https://g-cqd.github.io/SwiftStaticAnalysis/
 - Documentation articles: Getting Started, Clone Detection, Unused Code Detection, Ignore Directives, Performance Optimization, CI Integration
@@ -39,9 +42,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Upgraded to Swift 6.2
 - Minimum platform requirements: macOS 15.0+, iOS 18.0+
-- Improved test coverage (488 tests across 119 suites)
+- Improved test coverage (511 tests across 125 suites)
+- Reorganized test files into single-test-suite-per-file structure
+- Refactored SemanticCloneDetector to extract common detection logic
+- Refactored SuffixArrayCloneDetector to eliminate duplicate clone group building
+
+### Removed
+- Unused `AsyncSemaphore` actor from ConcurrencyConfiguration
+- Unused `FileBoundary` struct and related code from SuffixArrayCloneDetector
+- Unused `makeLocationConverter` extension from SwiftFileParser
 
 ### Fixed
+- Silent-pass tests that used `Issue.record()` + return pattern now use `try #require()`
 - README version in installation instructions (1.0.0 → 0.1.0)
 - CLI `--types` argument syntax in README examples
 - CLI argument validation now properly rejects invalid `--types` and `--mode` values

@@ -24,6 +24,7 @@ The framework consists of three main modules:
 ### Essentials
 
 - <doc:GettingStarted>
+- <doc:CLIReference>
 - <doc:CloneDetection>
 - <doc:UnusedCodeDetection>
 

@@ -2,6 +2,21 @@
 //  UnusedCodeDetectorTests.swift
 //  SwiftStaticAnalysis
 //
+//  ## Test Goals
+//  - Verify UnusedCodeDetector and related model types initialize correctly
+//  - Test UnusedReason and Confidence enums
+//  - Validate UnusedCode model behavior
+//  - Test UnusedCodeConfiguration defaults and presets
+//  - Verify UnusedCodeReport summary calculations
+//
+//  ## Coverage
+//  - UnusedReason: raw values
+//  - Confidence: comparison operators
+//  - UnusedCode: initialization with declaration, reason, confidence
+//  - UnusedCodeConfiguration: defaults, detectVariables/Functions/Types/Imports
+//  - UnusedCodeDetector: initialization with configuration
+//  - UnusedCodeReport: summaryByKind, summaryByConfidence
+//
 
 import Testing
 @testable import SwiftStaticAnalysisCore

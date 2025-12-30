@@ -146,16 +146,6 @@ public actor SwiftFileParser {
     }
 }
 
-// MARK: - Source Location Converter Helper
-
-/// Extension to help convert SwiftSyntax positions to SourceLocation.
-public extension SourceFileSyntax {
-    /// Create a source location converter for this file.
-    func makeLocationConverter(fileName: String) -> SourceLocationConverter {
-        SourceLocationConverter(fileName: fileName, tree: self)
-    }
-}
-
 // MARK: - Syntax Position Extensions
 
 public extension AbsolutePosition {

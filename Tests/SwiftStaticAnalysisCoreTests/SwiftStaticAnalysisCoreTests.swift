@@ -2,6 +2,22 @@
 //  SwiftStaticAnalysisCoreTests.swift
 //  SwiftStaticAnalysis
 //
+//  ## Test Goals
+//  - Verify core model types initialize correctly (SourceLocation, SourceRange, Scope)
+//  - Test ScopeTree add/retrieve operations
+//  - Validate DeclarationKind and AccessLevel enums
+//  - Test DeclarationIndex and ReferenceIndex operations
+//
+//  ## Coverage
+//  - SourceLocation: initialization, description format
+//  - SourceRange: line count calculation
+//  - ScopeID: equality comparison
+//  - ScopeTree: add and retrieve scopes
+//  - DeclarationKind: raw values
+//  - AccessLevel: comparison operators
+//  - DeclarationIndex: add, find by name/kind/file
+//  - ReferenceIndex: add, find by identifier/context
+//
 
 import Testing
 @testable import SwiftStaticAnalysisCore

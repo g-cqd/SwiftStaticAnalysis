@@ -4,6 +4,18 @@
 //
 //  End-to-end integration tests for the duplication detector.
 //
+//  ## Test Goals
+//  - Verify full detection pipeline works with real Swift files
+//  - Test exact, near, and semantic clone detection on fixture files
+//  - Validate cross-file clone detection across multiple sources
+//  - Ensure report generation produces correct metrics
+//  - Test edge cases: non-existent files, empty file lists
+//
+//  ## Coverage
+//  - DuplicationDetector.detectClones() with various configurations
+//  - Multi-file analysis with cross-file clone detection
+//  - DuplicationReport metric calculations
+//
 
 import Foundation
 import Testing
@@ -26,10 +38,10 @@ struct DuplicationDetectorIntegrationTests {
             .appendingPathComponent("ExactClones")
             .appendingPathComponent("NetworkingDuplication.swift")
 
-        guard FileManager.default.fileExists(atPath: fixturesPath.path) else {
-            Issue.record("Fixture file not found at \(fixturesPath.path)")
-            return
-        }
+        try #require(
+            FileManager.default.fileExists(atPath: fixturesPath.path),
+            "Fixture file required at \(fixturesPath.path)"
+        )
 
         let config = DuplicationConfiguration(
             minimumTokens: 20,
@@ -59,10 +71,10 @@ struct DuplicationDetectorIntegrationTests {
             .appendingPathComponent("NearClones")
             .appendingPathComponent("ViewModelDuplication.swift")
 
-        guard FileManager.default.fileExists(atPath: fixturesPath.path) else {
-            Issue.record("Fixture file not found")
-            return
-        }
+        try #require(
+            FileManager.default.fileExists(atPath: fixturesPath.path),
+            "Fixture file required for near clone detection test"
+        )
 
         let config = DuplicationConfiguration(
             minimumTokens: 15,
@@ -91,10 +103,10 @@ struct DuplicationDetectorIntegrationTests {
             .appendingPathComponent("SemanticClones")
             .appendingPathComponent("AlgorithmicEquivalence.swift")
 
-        guard FileManager.default.fileExists(atPath: fixturesPath.path) else {
-            Issue.record("Fixture file not found")
-            return
-        }
+        try #require(
+            FileManager.default.fileExists(atPath: fixturesPath.path),
+            "Fixture file required for semantic clone detection test"
+        )
 
         let config = DuplicationConfiguration(
             minimumTokens: 10,
@@ -130,10 +142,10 @@ struct DuplicationDetectorIntegrationTests {
         ]
 
         for file in files {
-            guard FileManager.default.fileExists(atPath: file) else {
-                Issue.record("Fixture file not found: \(file)")
-                return
-            }
+            try #require(
+                FileManager.default.fileExists(atPath: file),
+                "Fixture file required: \(file)"
+            )
         }
 
         let config = DuplicationConfiguration(
@@ -169,10 +181,10 @@ struct DuplicationDetectorIntegrationTests {
             .appendingPathComponent("ExactClones")
             .appendingPathComponent("NetworkingDuplication.swift")
 
-        guard FileManager.default.fileExists(atPath: fixturesPath.path) else {
-            Issue.record("Fixture file not found")
-            return
-        }
+        try #require(
+            FileManager.default.fileExists(atPath: fixturesPath.path),
+            "Fixture file required for multi-type clone detection test"
+        )
 
         let config = DuplicationConfiguration(
             minimumTokens: 15,
@@ -205,10 +217,10 @@ struct DuplicationDetectorIntegrationTests {
             .appendingPathComponent("ExactClones")
             .appendingPathComponent("NetworkingDuplication.swift")
 
-        guard FileManager.default.fileExists(atPath: fixturesPath.path) else {
-            Issue.record("Fixture file not found")
-            return
-        }
+        try #require(
+            FileManager.default.fileExists(atPath: fixturesPath.path),
+            "Fixture file required for report generation test"
+        )
 
         let config = DuplicationConfiguration(
             minimumTokens: 20,

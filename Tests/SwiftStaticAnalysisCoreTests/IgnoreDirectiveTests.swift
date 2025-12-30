@@ -1,3 +1,24 @@
+//
+//  IgnoreDirectiveTests.swift
+//  SwiftStaticAnalysis
+//
+//  ## Test Goals
+//  - Verify swa:ignore directive parsing from source comments
+//  - Test directive inheritance (enum cases inherit from parent enum)
+//  - Validate different directive formats (line, block, doc comments)
+//  - Test specific directive types (ignore, ignore-unused, ignore-unused-cases)
+//  - Verify declarations without directives are not affected
+//
+//  ## Coverage
+//  - Basic parsing: swa:ignore, swa:ignore-unused, swa:ignore-unused-cases
+//  - Enum case inheritance from parent enum's ignore-unused-cases
+//  - Generic swa:ignore marks declaration as ignored
+//  - Block comment format (/* swa:ignore */)
+//  - Multiple enums with mixed directives
+//  - hasIgnoreDirective() method for specific categories
+//  - 'all' directive matches any category
+//
+
 import SwiftParser
 import SwiftStaticAnalysisCore
 import SwiftSyntax

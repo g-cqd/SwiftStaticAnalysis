@@ -42,13 +42,47 @@ public struct SemanticCloneDetector: Sendable {
     /// - Parameter nodes: Array of fingerprinted nodes.
     /// - Returns: Array of clone groups found.
     public func detect(in nodes: [FingerprintedNode]) -> [CloneGroup] {
-        // Group nodes by fingerprint hash
+        let hashGroups = groupByFingerprint(nodes)
+        return buildCloneGroups(from: hashGroups)
+    }
+
+    /// Detect semantic clones in the given files.
+    public func detect(in files: [String]) async throws -> [CloneGroup] {
+        // Collect all fingerprinted nodes from all files
+        var allNodes: [FingerprintedNode] = []
+
+        for file in files {
+            let tree = try await parser.parse(file)
+            let visitor = ASTFingerprintVisitor(
+                file: file,
+                tree: tree,
+                minimumNodes: minimumNodes,
+                normalizeResultBuilders: normalizeResultBuilders,
+            )
+            visitor.walk(tree)
+            allNodes.append(contentsOf: visitor.fingerprintedNodes)
+        }
+
+        let hashGroups = groupByFingerprint(allNodes)
+        return buildCloneGroups(from: hashGroups)
+    }
+
+    // MARK: Private
+
+    /// The file parser.
+    private let parser: SwiftFileParser
+
+    /// Group nodes by their fingerprint hash.
+    private func groupByFingerprint(_ nodes: [FingerprintedNode]) -> [UInt64: [FingerprintedNode]] {
         var hashGroups: [UInt64: [FingerprintedNode]] = [:]
         for node in nodes {
             hashGroups[node.fingerprint.hash, default: []].append(node)
         }
+        return hashGroups
+    }
 
-        // Find groups with matching fingerprints
+    /// Build clone groups from hash-grouped fingerprinted nodes.
+    private func buildCloneGroups(from hashGroups: [UInt64: [FingerprintedNode]]) -> [CloneGroup] {
         var cloneGroups: [CloneGroup] = []
 
         for (hash, groupNodes) in hashGroups where groupNodes.count >= 2 {
@@ -82,69 +116,6 @@ public struct SemanticCloneDetector: Sendable {
 
         return cloneGroups.deduplicated()
     }
-
-    /// Detect semantic clones in the given files.
-    public func detect(in files: [String]) async throws -> [CloneGroup] {
-        // Collect all fingerprinted nodes from all files
-        var allNodes: [FingerprintedNode] = []
-
-        for file in files {
-            let tree = try await parser.parse(file)
-            let visitor = ASTFingerprintVisitor(
-                file: file,
-                tree: tree,
-                minimumNodes: minimumNodes,
-                normalizeResultBuilders: normalizeResultBuilders,
-            )
-            visitor.walk(tree)
-            allNodes.append(contentsOf: visitor.fingerprintedNodes)
-        }
-
-        // Group nodes by fingerprint hash
-        var hashGroups: [UInt64: [FingerprintedNode]] = [:]
-        for node in allNodes {
-            hashGroups[node.fingerprint.hash, default: []].append(node)
-        }
-
-        // Find groups with matching fingerprints
-        var cloneGroups: [CloneGroup] = []
-
-        for (hash, nodes) in hashGroups where nodes.count >= 2 {
-            let verified = verifySemanticClones(nodes)
-
-            for group in verified {
-                let clones = group.map { node in
-                    Clone(
-                        file: node.file,
-                        startLine: node.startLine,
-                        endLine: node.endLine,
-                        tokenCount: node.tokenCount,
-                        codeSnippet: "",
-                    )
-                }
-
-                if clones.count >= 2 {
-                    let similarity = calculateSimilarity(group)
-
-                    if similarity >= minimumSimilarity {
-                        cloneGroups.append(CloneGroup(
-                            type: .semantic,
-                            clones: clones,
-                            similarity: similarity,
-                            fingerprint: String(hash),
-                        ))
-                    }
-                }
-            }
-        }
-
-        return cloneGroups.deduplicated()
-    }
-
-    // MARK: Private
-
-    /// The file parser.
-    private let parser: SwiftFileParser
 
     /// Verify fingerprint matches are actual semantic clones.
     private func verifySemanticClones(_ nodes: [FingerprintedNode]) -> [[FingerprintedNode]] {

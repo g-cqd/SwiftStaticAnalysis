@@ -100,6 +100,36 @@ swa analyze . --format json > report.json
 swa unused . --format xcode
 ```
 
+### Configuration File
+
+Create a `.swa.json` file in your project root for persistent configuration:
+
+```json
+{
+  "unused": {
+    "mode": "reachability",
+    "minConfidence": "medium",
+    "excludePaths": ["**/Tests/**", "**/Fixtures/**"],
+    "excludeImports": true,
+    "excludeTestSuites": true,
+    "treatPublicAsRoot": true,
+    "treatSwiftUIViewsAsRoot": true
+  },
+  "duplicates": {
+    "types": ["exact", "near"],
+    "minTokens": 50,
+    "minSimilarity": 0.8,
+    "algorithm": "suffixArray"
+  }
+}
+```
+
+Then run with:
+
+```bash
+swa analyze --config .swa.json
+```
+
 ### Programmatic API
 
 #### Duplication Detection
@@ -242,6 +272,70 @@ swa unused . --exclude-paths "**/Tests/**" --exclude-paths "**/Fixtures/**"
 swa unused . --sensible-defaults
 ```
 
+## CLI Reference
+
+### `swa analyze`
+
+Run full analysis (duplicates + unused code).
+
+```bash
+swa analyze [<path>] [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--config <path>` | Path to configuration file (.swa.json) |
+| `-f, --format <format>` | Output format: `text`, `json`, `xcode` (default: xcode) |
+
+### `swa unused`
+
+Detect unused code.
+
+```bash
+swa unused [<path>] [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--config <path>` | Path to configuration file |
+| `--mode <mode>` | Detection mode: `simple`, `reachability`, `indexStore` |
+| `--min-confidence <level>` | Minimum confidence: `low`, `medium`, `high` |
+| `--index-store-path <path>` | Path to index store (for indexStore mode) |
+| `--report` | Generate reachability report |
+| `-f, --format <format>` | Output format: `text`, `json`, `xcode` |
+| `--exclude-paths <glob>` | Paths to exclude (repeatable) |
+| `--exclude-imports` | Exclude import statements |
+| `--exclude-test-suites` | Exclude test suite declarations |
+| `--exclude-enum-cases` | Exclude backticked enum cases |
+| `--exclude-deinit` | Exclude deinit methods |
+| `--sensible-defaults` | Apply all sensible defaults |
+| `--ignore-public` | Ignore public API |
+| `--treat-public-as-root` | Treat public API as entry points |
+| `--treat-objc-as-root` | Treat @objc declarations as entry points |
+| `--treat-tests-as-root` | Treat test methods as entry points |
+| `--treat-swift-ui-views-as-root` | Treat SwiftUI Views as entry points |
+| `--ignore-swift-ui-property-wrappers` | Ignore SwiftUI property wrappers |
+| `--ignore-preview-providers` | Ignore PreviewProvider implementations |
+| `--ignore-view-body` | Ignore View body properties |
+
+### `swa duplicates`
+
+Detect code duplication.
+
+```bash
+swa duplicates [<path>] [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--config <path>` | Path to configuration file |
+| `--types <type>` | Clone types: `exact`, `near`, `semantic` (repeatable) |
+| `--min-tokens <n>` | Minimum tokens for a clone |
+| `--min-similarity <n>` | Minimum similarity (0.0-1.0) |
+| `--algorithm <algo>` | Algorithm: `rollingHash`, `suffixArray`, `minHashLSH` |
+| `--exclude-paths <glob>` | Paths to exclude (repeatable) |
+| `-f, --format <format>` | Output format: `text`, `json`, `xcode` |
+
 ## Architecture
 
 ```
@@ -268,6 +362,7 @@ Full API documentation is available at **[g-cqd.github.io/SwiftStaticAnalysis](h
 
 The documentation includes:
 - **Getting Started Guide**: Installation and first analysis
+- **CLI Reference**: Complete command-line options for the `swa` tool
 - **Clone Detection**: Algorithm details and configuration
 - **Unused Code Detection**: Detection modes and filtering
 - **Ignore Directives**: Reference for suppressing false positives
