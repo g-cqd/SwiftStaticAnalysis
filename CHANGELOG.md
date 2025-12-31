@@ -5,6 +5,31 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.19] - 2025-12-31
+
+### Added
+- **SymbolLookup module**: New module for symbol resolution and lookup in Swift codebases
+  - `SymbolFinder` with IndexStore and Syntax-based resolvers
+  - `QueryParser` for flexible symbol query patterns (simple names, qualified names, selectors, USRs, regex)
+  - `USRDecoder` for Unified Symbol Resolution decoding
+  - `SymbolResolver` protocol for dependency injection and testability
+- **`swa symbol` CLI command**: Look up symbols by name, qualified name, or USR
+  - Filter by kind (`--kind class,struct,function`)
+  - Filter by access level (`--access public,internal`)
+  - Show definitions only (`--definition`) or usages (`--usages`)
+  - Scope to containing type (`--in-type`)
+- **CLI integration tests**: 22 tests covering all CLI commands with proper assertions
+  - Structured `CLIOutput` with separate stdout/stderr and exit code verification
+  - Test fixtures for duplication detection validation
+
+### Fixed
+- Force-unwrap violations in `IndexStoreResolver`, `SyntaxResolver`, and `QueryParser`
+- Added comprehensive thread safety documentation for `@unchecked Sendable` usages
+
+### Technical Notes
+- 120+ SymbolLookup tests covering disambiguation, selectors, and qualified name resolution
+- `SymbolFinder` uses `NSLock` (not actor) because `IndexStoreDB` is not `Sendable`
+
 ## [0.0.18] - 2025-12-30
 
 ### Changed
