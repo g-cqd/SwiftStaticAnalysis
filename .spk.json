@@ -1,0 +1,93 @@
+{
+  "version": "1.0",
+  "swiftVersion": "6.2",
+  "project": {
+    "version": "0.0.21"
+  },
+  "platforms": {
+    "macOS": "15.0",
+    "iOS": "18.0"
+  },
+  "hooks": {
+    "fixMode": "safe",
+    "restageFixed": true,
+    "failFast": false,
+    "preCommit": {
+      "enabled": true,
+      "scope": "staged",
+      "tasks": ["format", "versionSync", "build", "test", "unused"]
+    },
+    "prePush": {
+      "enabled": true,
+      "scope": "changed",
+      "baseBranch": "main",
+      "tasks": ["test", "unused", "duplicates"]
+    },
+    "ci": {
+      "enabled": true,
+      "scope": "all",
+      "tasks": ["format:check", "versionSync:check", "build", "test"]
+    },
+    "tasks": {
+      "format": {
+        "enabled": true,
+        "paths": ["Sources/", "Tests/"],
+        "excludePaths": ["Tests/Fixtures/"]
+      },
+      "versionSync": {
+        "enabled": true,
+        "options": {
+          "syncTargets": [
+            {
+              "file": "Sources/swa/main.swift",
+              "pattern": "version: \"(\\d+\\.\\d+\\.\\d+)\""
+            },
+            {
+              "file": "README.md",
+              "pattern": "from: \"(\\d+\\.\\d+\\.\\d+)\""
+            },
+            {
+              "file": "Sources/SwiftStaticAnalysis/SwiftStaticAnalysis.docc/Articles/CLIReference.md",
+              "pattern": "swa (\\d+\\.\\d+\\.\\d+)"
+            },
+            {
+              "file": "Sources/SwiftStaticAnalysis/SwiftStaticAnalysis.docc/GettingStarted.md",
+              "pattern": "from: \"(\\d+\\.\\d+\\.\\d+)\""
+            }
+          ]
+        }
+      },
+      "unused": {
+        "enabled": true,
+        "blocking": true,
+        "paths": ["Sources/"],
+        "excludePaths": ["Sources/StaticAnalysisBuildPlugin/", "Sources/StaticAnalysisCommandPlugin/"]
+      },
+      "duplicates": {
+        "enabled": true,
+        "blocking": false,
+        "paths": ["Sources/"],
+        "options": {
+          "minTokens": 50
+        }
+      },
+      "test": {
+        "enabled": true,
+        "blocking": true
+      },
+      "build": {
+        "enabled": true,
+        "blocking": true
+      }
+    }
+  },
+  "swiftformat": {
+    "enabled": true,
+    "configPath": ".swift-format"
+  },
+  "workflows": {
+    "ci": true,
+    "release": true,
+    "docs": true
+  }
+}

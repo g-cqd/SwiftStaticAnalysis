@@ -18,17 +18,22 @@ Thank you for your interest in contributing to SwiftStaticAnalysis! This documen
    cd SwiftStaticAnalysis
    ```
 
-2. Build the project:
+2. Enable git hooks:
+   ```bash
+   git config core.hooksPath .githooks
+   ```
+
+3. Build the project:
    ```bash
    swift build
    ```
 
-3. Run tests:
+4. Run tests:
    ```bash
    swift test --parallel
    ```
 
-4. Build and run the CLI:
+5. Build and run the CLI:
    ```bash
    swift run swa --help
    ```

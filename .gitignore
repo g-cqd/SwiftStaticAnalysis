@@ -4,6 +4,9 @@
 Package.resolved
 DerivedData/
 
+# Local tool binaries
+.bin/
+
 # Xcode
 *.xcodeproj/
 *.xcworkspace/

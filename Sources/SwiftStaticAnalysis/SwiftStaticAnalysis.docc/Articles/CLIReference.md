@@ -23,7 +23,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.0.20")
+    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.0.21")
 ]
 ```
 
