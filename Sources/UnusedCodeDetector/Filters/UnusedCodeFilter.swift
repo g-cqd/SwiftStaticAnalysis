@@ -139,6 +139,11 @@ public struct UnusedCodeFilter: Sendable {
         let name = item.declaration.name
         let filePath = item.declaration.location.file
 
+        // Underscore is Swift's "discard this value" identifier - never report as unused
+        if name == "_" {
+            return true
+        }
+
         // Check ignore directives first (// swa:ignore comments)
         if configuration.respectIgnoreDirectives, item.declaration.shouldIgnoreUnused {
             return true

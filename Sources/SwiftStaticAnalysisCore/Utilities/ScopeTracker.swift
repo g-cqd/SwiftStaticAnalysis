@@ -320,8 +320,10 @@ open class ScopeTrackingVisitor: SyntaxVisitor {
     }
 
     /// Get source location for a syntax node.
+    /// Uses positionAfterSkippingLeadingTrivia to point to the actual declaration
+    /// keyword, not the preceding comments/whitespace.
     public func location(of node: some SyntaxProtocol) -> SourceLocation {
-        node.position.toSourceLocation(using: converter, file: file)
+        node.positionAfterSkippingLeadingTrivia.toSourceLocation(using: converter, file: file)
     }
 
     /// Get source range for a syntax node.

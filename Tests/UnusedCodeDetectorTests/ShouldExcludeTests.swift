@@ -60,6 +60,43 @@ private func makeUnusedCode(
 
 @Suite("Should Exclude Tests")
 struct ShouldExcludeTests {
+    @Test("Always excludes underscore identifier regardless of configuration")
+    func alwaysExcludesUnderscore() {
+        // Underscore is Swift's "discard this value" identifier - should always be excluded
+        let filter = UnusedCodeFilter(configuration: .none)
+
+        let underscoreVar = makeUnusedCode(name: "_", kind: .variable)
+        #expect(filter.shouldExclude(underscoreVar) == true)
+
+        let underscoreParam = makeUnusedCode(name: "_", kind: .parameter)
+        #expect(filter.shouldExclude(underscoreParam) == true)
+
+        // Normal identifiers should not be excluded with .none config
+        let normalVar = makeUnusedCode(name: "value", kind: .variable)
+        #expect(filter.shouldExclude(normalVar) == false)
+    }
+
+    @Test("Does not exclude identifiers that merely contain underscores")
+    func doesNotExcludePartialUnderscoreNames() {
+        let filter = UnusedCodeFilter(configuration: .none)
+
+        // Leading underscore (private convention)
+        let leadingUnderscore = makeUnusedCode(name: "_privateVar", kind: .variable)
+        #expect(filter.shouldExclude(leadingUnderscore) == false)
+
+        // Trailing underscore
+        let trailingUnderscore = makeUnusedCode(name: "value_", kind: .variable)
+        #expect(filter.shouldExclude(trailingUnderscore) == false)
+
+        // Double underscore (valid Swift identifier)
+        let doubleUnderscore = makeUnusedCode(name: "__", kind: .variable)
+        #expect(filter.shouldExclude(doubleUnderscore) == false)
+
+        // Snake case
+        let snakeCase = makeUnusedCode(name: "my_variable", kind: .variable)
+        #expect(filter.shouldExclude(snakeCase) == false)
+    }
+
     @Test("Excludes imports when configured")
     func excludesImports() {
         let config = UnusedCodeFilterConfiguration(excludeImports: true)
