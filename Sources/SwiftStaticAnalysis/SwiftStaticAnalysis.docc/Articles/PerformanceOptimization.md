@@ -138,7 +138,7 @@ Clone detection (exact only):
 ### Configuring Concurrency
 
 ```swift
-import SwiftStaticAnalysisCore
+import SwiftStaticAnalysis
 
 // Limit concurrent file parsing
 let config = ConcurrencyConfiguration(
@@ -146,7 +146,7 @@ let config = ConcurrencyConfiguration(
     maxConcurrentTasks: 16
 )
 
-let parser = ConcurrentParser(configuration: config)
+let parser = SwiftFileParser(configuration: config)
 ```
 
 ### Streaming Results
@@ -154,7 +154,7 @@ let parser = ConcurrentParser(configuration: config)
 For very large codebases, process results as they're generated:
 
 ```swift
-import UnusedCodeDetector
+import SwiftStaticAnalysis
 
 let detector = UnusedCodeDetector()
 
@@ -171,7 +171,7 @@ for try await item in detector.detectUnusedStream(in: files) {
 For incremental analysis, cache results between runs:
 
 ```swift
-import DuplicationDetector
+import SwiftStaticAnalysis
 
 let detector = IncrementalDuplicationDetector(
     cachePath: ".swa-cache"

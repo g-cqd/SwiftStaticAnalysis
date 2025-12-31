@@ -125,7 +125,7 @@ swa unused . --ignore-public
 ### Basic Usage
 
 ```swift
-import UnusedCodeDetector
+import SwiftStaticAnalysis
 
 let detector = UnusedCodeDetector()
 let unused = try await detector.detectUnused(in: swiftFiles)
@@ -138,7 +138,7 @@ for item in unused {
 ### With Configuration
 
 ```swift
-import UnusedCodeDetector
+import SwiftStaticAnalysis
 
 // Reachability mode
 let config = UnusedCodeConfiguration(
@@ -153,7 +153,7 @@ let unused = try await detector.detectUnused(in: swiftFiles)
 ### IndexStore Mode
 
 ```swift
-import UnusedCodeDetector
+import SwiftStaticAnalysis
 
 var config = UnusedCodeConfiguration.indexStore
 config.indexStorePath = ".build/debug/index/store"

@@ -6,6 +6,23 @@ Find and resolve symbols in Swift codebases using flexible query patterns.
 
 The SymbolLookup module provides powerful capabilities for finding symbols (classes, functions, properties, etc.) in Swift source files. It supports multiple query patterns and can resolve symbols using either IndexStore (fast) or syntax analysis (accurate).
 
+## Basic Usage
+
+```swift
+import SwiftStaticAnalysis
+
+// Create a symbol finder for your project
+let finder = SymbolFinder(projectPath: "/path/to/project")
+
+// Find symbols by name
+let query = SymbolQuery.name("NetworkManager")
+let matches = try await finder.find(query)
+
+for match in matches {
+    print("\(match.kind) \(match.name) at \(match.file):\(match.line)")
+}
+```
+
 ## Query Patterns
 
 SymbolLookup supports five query pattern types:

@@ -60,3 +60,35 @@ Symbol resolution and lookup capabilities:
 ### Advanced
 
 - <doc:PerformanceOptimization>
+
+### Core Types
+
+- ``Declaration``
+- ``DeclarationKind``
+- ``Reference``
+- ``SourceLocation``
+- ``AnalysisResult``
+
+### Duplication Detection
+
+- ``DuplicationDetector``
+- ``DuplicationConfiguration``
+- ``CloneType``
+- ``Clone``
+- ``CloneGroup``
+
+### Unused Code Detection
+
+- ``UnusedCodeDetector``
+- ``UnusedCodeConfiguration``
+- ``UnusedCode``
+- ``Confidence``
+- ``DetectionMode``
+- ``ReachabilityGraph``
+
+### Symbol Lookup
+
+- ``SymbolFinder``
+- ``SymbolQuery``
+- ``SymbolMatch``
+- ``SymbolResolver``

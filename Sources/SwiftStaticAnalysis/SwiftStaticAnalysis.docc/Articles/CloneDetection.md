@@ -112,7 +112,7 @@ swa duplicates . --types exact --types near --types semantic
 ### Programmatic Configuration
 
 ```swift
-import DuplicationDetector
+import SwiftStaticAnalysis
 
 let config = DuplicationConfiguration(
     minimumTokens: 50,

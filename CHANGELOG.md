@@ -5,6 +5,18 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.20] - 2025-12-31
+
+### Changed
+- **Umbrella module now exports SymbolLookup**: `import SwiftStaticAnalysis` now provides access to all four modules including SymbolLookup
+- **Documentation API references**: SwiftStaticAnalysis.md now lists key types from all modules
+
+### Fixed
+- All documentation now consistently uses `import SwiftStaticAnalysis` instead of individual module imports
+- Fixed outdated imports in UnusedCodeDetection.md, PerformanceOptimization.md, CloneDetection.md, and SymbolLookup.md
+- Fixed `ConcurrentParser` reference to correct `SwiftFileParser` in PerformanceOptimization.md
+- Fixed test file formatting (2-space to 4-space indentation in SourceLocationTests.swift)
+
 ## [0.0.19] - 2025-12-31
 
 ### Added

@@ -20,7 +20,7 @@ struct SWA: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "swa",
         abstract: "Swift Static Analysis - Analyze Swift code for issues",
-        version: "0.0.19",
+        version: "0.0.20",
         subcommands: [
             Analyze.self,
             Duplicates.self,

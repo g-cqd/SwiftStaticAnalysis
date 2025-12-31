@@ -34,7 +34,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.0.19")
+    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.0.20")
 ]
 ```
 
@@ -210,7 +210,7 @@ let unused = try await detector.detectUnused(in: swiftFiles)
 #### Symbol Lookup
 
 ```swift
-import SymbolLookup
+import SwiftStaticAnalysis
 
 // Create a symbol finder
 let finder = SymbolFinder(projectPath: "/path/to/project")
