@@ -35,6 +35,73 @@ swift package plugin analyze
 
 ## Commands
 
+### symbol
+
+Look up symbols in Swift source files.
+
+```bash
+swa symbol [OPTIONS] <QUERY> <PATHS>...
+```
+
+#### Arguments
+
+- `<QUERY>`: Symbol name, qualified name (Type.member), selector (method(param:)), or USR.
+- `<PATHS>`: One or more paths to Swift files or directories to analyze.
+
+#### Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--usr` | Treat query as USR directly | `false` |
+| `--kind <KIND>` | Filter by kind: `function`, `method`, `variable`, `class`, `struct`, `enum`, `protocol`, `initializer` | - |
+| `--access <LEVEL>` | Filter by access: `private`, `fileprivate`, `internal`, `public`, `open` | - |
+| `--in-type <TYPE>` | Search within type scope | - |
+| `--definition` | Show only definitions | `false` |
+| `--usages` | Show usages/references | `false` |
+| `--index-store-path <PATH>` | Path to IndexStore database | - |
+| `--limit <N>` | Maximum results to return | - |
+| `--format <FORMAT>` | Output format: `text`, `json`, `xcode` | `text` |
+
+#### Query Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| Simple name | `NetworkManager` | Find by symbol name |
+| Qualified name | `APIClient.shared` | Find member in type |
+| Selector | `fetch(id:completion:)` | Find method by signature |
+| USR | `s:14NetworkMonitor6sharedACvpZ` | Find by compiler USR (with `--usr`) |
+
+#### Examples
+
+```bash
+# Find class by name
+swa symbol NetworkManager Sources/
+
+# Find qualified member
+swa symbol "APIClient.shared" Sources/
+
+# Find method by selector
+swa symbol "fetch(id:completion:)" Sources/
+
+# Filter by kind
+swa symbol shared --kind variable --kind property Sources/
+
+# Filter by access level
+swa symbol Manager --access public Sources/
+
+# Show only definitions
+swa symbol NetworkManager --definition Sources/
+
+# Show all usages of a symbol
+swa symbol "Cache.shared" --usages Sources/
+
+# Use IndexStore for faster lookup
+swa symbol NetworkManager --index-store-path .build/debug/index/store Sources/
+
+# JSON output for tooling
+swa symbol "APIClient" --format json Sources/
+```
+
 ### unused
 
 Detect unused code in Swift files.

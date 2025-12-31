@@ -1,14 +1,14 @@
 # ``SwiftStaticAnalysis``
 
-A high-performance Swift static analysis framework for code duplication detection and unused code elimination.
+A high-performance Swift static analysis framework for code duplication detection, unused code elimination, and symbol lookup.
 
 ## Overview
 
-SwiftStaticAnalysis provides comprehensive tools for analyzing Swift codebases to find duplicated code patterns and unused declarations. The framework is designed for performance with memory-mapped I/O, arena allocation, and parallel processing.
+SwiftStaticAnalysis provides comprehensive tools for analyzing Swift codebases to find duplicated code patterns, unused declarations, and look up symbols. The framework is designed for performance with memory-mapped I/O, arena allocation, and parallel processing.
 
 ## Modules
 
-The framework consists of three main modules:
+The framework consists of four main modules:
 
 ### SwiftStaticAnalysisCore
 
@@ -32,6 +32,13 @@ Unused code detection with configurable modes:
 - **Reachability Mode**: Graph-based dead code analysis
 - **IndexStore Mode**: Cross-module accuracy using compiler index
 
+### SymbolLookup
+
+Symbol resolution and lookup capabilities:
+- **Query Patterns**: Simple names, qualified names, selectors, USRs, regex
+- **Dual Resolution**: IndexStore for speed, Syntax for accuracy
+- **Usage Tracking**: Find all references to a symbol
+
 ## Topics
 
 ### Essentials
@@ -43,6 +50,7 @@ Unused code detection with configurable modes:
 
 - <doc:CloneDetection>
 - <doc:UnusedCodeDetection>
+- <doc:SymbolLookup>
 
 ### Configuration
 

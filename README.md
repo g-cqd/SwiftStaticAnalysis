@@ -6,13 +6,14 @@
 [![CI](https://github.com/g-cqd/SwiftStaticAnalysis/actions/workflows/ci.yml/badge.svg)](https://github.com/g-cqd/SwiftStaticAnalysis/actions/workflows/ci.yml)
 [![Documentation](https://img.shields.io/badge/Documentation-DocC-blue.svg)](https://g-cqd.github.io/SwiftStaticAnalysis/documentation/swiftstaticanalysis/)
 
-A high-performance Swift static analysis framework for **code duplication detection** and **unused code elimination**.
+A high-performance Swift static analysis framework for **code duplication detection**, **unused code elimination**, and **symbol lookup**.
 
 ## Features
 
 - **Multi-Algorithm Clone Detection**: Exact (Type-1), near (Type-2), and semantic (Type-3/4) clone detection
 - **IndexStoreDB Integration**: Accurate cross-module unused code detection using compiler index data
 - **Reachability Analysis**: Graph-based dead code detection with entry point tracking
+- **Symbol Lookup**: Find symbols by name, qualified name, selector, USR, or regex pattern
 - **Ignore Directives**: Suppress false positives with `// swa:ignore` comments
 - **High-Performance Parsing**: Memory-mapped I/O, SoA token storage, and arena allocation
 - **Zero-Boilerplate CLI**: Full-featured `swa` command with JSON/text/Xcode output formats
@@ -57,6 +58,7 @@ This gives you access to all components. Alternatively, import individual module
         .product(name: "SwiftStaticAnalysisCore", package: "SwiftStaticAnalysis"),  // Core only
         .product(name: "DuplicationDetector", package: "SwiftStaticAnalysis"),      // Clone detection
         .product(name: "UnusedCodeDetector", package: "SwiftStaticAnalysis"),       // Unused code
+        .product(name: "SymbolLookup", package: "SwiftStaticAnalysis"),             // Symbol lookup
     ]
 )
 ```
@@ -103,6 +105,15 @@ swa unused /path/to/project --mode reachability
 
 # Apply sensible filters to reduce false positives
 swa unused . --sensible-defaults --exclude-paths "**/Tests/**"
+
+# Look up symbols by name
+swa symbol NetworkManager /path/to/project
+
+# Look up with filters
+swa symbol "fetch" --kind method --access public /path/to/project
+
+# Find symbol usages
+swa symbol "SharedCache.instance" --usages /path/to/project
 
 # Output as JSON for CI integration
 swa analyze . --format json > report.json
@@ -194,6 +205,39 @@ config.autoBuild = true  // Build if index is stale
 
 let detector = UnusedCodeDetector(configuration: config)
 let unused = try await detector.detectUnused(in: swiftFiles)
+```
+
+#### Symbol Lookup
+
+```swift
+import SymbolLookup
+
+// Create a symbol finder
+let finder = SymbolFinder(projectPath: "/path/to/project")
+
+// Find symbols by name
+let query = SymbolQuery.name("NetworkManager")
+let matches = try await finder.find(query)
+
+for match in matches {
+    print("\(match.kind) \(match.name) at \(match.file):\(match.line)")
+}
+
+// Find by qualified name
+let qualified = SymbolQuery.qualifiedName("APIClient", "shared")
+let results = try await finder.find(qualified)
+
+// Find method by selector (with parameter labels)
+let selector = SymbolQuery.selector("fetch", labels: ["id", "completion"])
+let methods = try await finder.find(selector)
+
+// Find usages of a symbol
+if let match = matches.first {
+    let usages = try await finder.findUsages(of: match)
+    for usage in usages {
+        print("  Referenced at \(usage.file):\(usage.line)")
+    }
+}
 ```
 
 ## Ignore Directives
@@ -351,6 +395,36 @@ swa duplicates [<path>] [options]
 | `--exclude-paths <glob>` | Paths to exclude (repeatable) |
 | `-f, --format <format>` | Output format: `text`, `json`, `xcode` |
 
+### `swa symbol`
+
+Look up symbols in Swift source files.
+
+```bash
+swa symbol <query> [<path>] [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--usr` | Treat query as USR (Unified Symbol Resolution) directly |
+| `--kind <kind>` | Filter by kind: `function`, `method`, `variable`, `class`, `struct`, `enum`, `protocol` (repeatable) |
+| `--access <level>` | Filter by access: `private`, `internal`, `public`, `open` (repeatable) |
+| `--in-type <type>` | Search within type scope |
+| `--definition` | Show only definitions |
+| `--usages` | Show usages/references |
+| `--index-store-path <path>` | Path to index store |
+| `--limit <n>` | Maximum results to return |
+| `-f, --format <format>` | Output format: `text`, `json`, `xcode` |
+
+#### Query Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| Simple name | `NetworkManager` | Find by symbol name |
+| Qualified name | `APIClient.shared` | Find member in type |
+| Selector | `fetch(id:completion:)` | Find method by signature |
+| Regex | `/^handle.*Event$/` | Find by pattern match |
+| USR | `s:14NetworkMonitor6sharedACvpZ` | Find by compiler USR |
+
 ## Architecture
 
 ```
@@ -369,6 +443,10 @@ Sources/
 │   ├── IndexStore/               # IndexStoreDB integration
 │   ├── Reachability/             # Graph-based analysis
 │   └── Filters/                  # False positive reduction
+├── SymbolLookup/                 # Symbol resolution
+│   ├── Models/                   # SymbolQuery, SymbolMatch
+│   ├── Query/                    # QueryParser, USRDecoder
+│   └── Resolution/               # SymbolFinder, IndexStore/Syntax resolvers
 ├── swa/                          # CLI tool
 ├── StaticAnalysisBuildPlugin/    # Build-time analysis plugin
 └── StaticAnalysisCommandPlugin/  # On-demand analysis plugin
