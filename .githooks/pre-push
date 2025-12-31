@@ -1,15 +1,13 @@
 #!/bin/sh
 # SwiftProjectKit pre-push hook
-# Uses pre-built SPK binary
 
 SPK_VERSION="0.0.21"
 SPK_DIR=".bin"
 SPK="$SPK_DIR/spk"
 
-# Download SPK if not present
 if [ ! -x "$SPK" ]; then
     mkdir -p "$SPK_DIR"
-    echo "Downloading spk $SPK_VERSION..."
+    echo "Downloading spk v$SPK_VERSION..."
     curl -sL "https://github.com/g-cqd/SwiftProjectKit/releases/download/v$SPK_VERSION/spk-$SPK_VERSION-macos-universal.tar.gz" | tar xz -C "$SPK_DIR"
     chmod +x "$SPK"
 fi
