@@ -2,7 +2,7 @@
   "version": "1.0",
   "swiftVersion": "6.2",
   "project": {
-    "version": "0.0.21"
+    "version": "0.0.22"
   },
   "platforms": {
     "macOS": "15.0",
@@ -15,27 +15,32 @@
     "preCommit": {
       "enabled": true,
       "scope": "staged",
-      "tasks": ["format", "versionSync", "build", "test", "unused"]
+      "parallel": false,
+      "tasks": ["format", "versionSync", "build", "test"]
     },
     "prePush": {
       "enabled": true,
       "scope": "changed",
       "baseBranch": "main",
+      "parallel": true,
       "tasks": ["test", "unused", "duplicates"]
     },
     "ci": {
       "enabled": true,
       "scope": "all",
-      "tasks": ["format:check", "versionSync:check", "build", "test"]
+      "parallel": true,
+      "tasks": ["format:check", "versionSync:check", "build", "test", "unused", "duplicates"]
     },
     "tasks": {
       "format": {
         "enabled": true,
+        "blocking": true,
         "paths": ["Sources/", "Tests/"],
         "excludePaths": ["Tests/Fixtures/"]
       },
       "versionSync": {
         "enabled": true,
+        "blocking": true,
         "options": {
           "syncTargets": [
             {
@@ -48,7 +53,7 @@
             },
             {
               "file": "Sources/SwiftStaticAnalysis/SwiftStaticAnalysis.docc/Articles/CLIReference.md",
-              "pattern": "swa (\\d+\\.\\d+\\.\\d+)"
+              "pattern": "from: \"(\\d+\\.\\d+\\.\\d+)\""
             },
             {
               "file": "Sources/SwiftStaticAnalysis/SwiftStaticAnalysis.docc/GettingStarted.md",
@@ -57,11 +62,26 @@
           ]
         }
       },
-      "unused": {
+      "build": {
+        "enabled": true,
+        "blocking": true
+      },
+      "test": {
         "enabled": true,
         "blocking": true,
+        "options": {
+          "parallel": true
+        }
+      },
+      "unused": {
+        "enabled": true,
+        "blocking": false,
         "paths": ["Sources/"],
-        "excludePaths": ["Sources/StaticAnalysisBuildPlugin/", "Sources/StaticAnalysisCommandPlugin/"]
+        "excludePaths": ["Sources/StaticAnalysisBuildPlugin/", "Sources/StaticAnalysisCommandPlugin/"],
+        "options": {
+          "mode": "reachability",
+          "sensibleDefaults": true
+        }
       },
       "duplicates": {
         "enabled": true,
@@ -70,14 +90,6 @@
         "options": {
           "minTokens": 50
         }
-      },
-      "test": {
-        "enabled": true,
-        "blocking": true
-      },
-      "build": {
-        "enabled": true,
-        "blocking": true
       }
     }
   },
