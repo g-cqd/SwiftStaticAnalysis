@@ -118,7 +118,7 @@ jobs:
         run: |
           swift format lint --strict --parallel --recursive Sources/
           # Exclude test fixtures (intentionally bad code for testing)
-          find Tests -type f -name "*.swift" ! -path "*/Fixtures/*" -print0 | xargs -0 swift format lint --strict --parallel
+          find Tests -type f -name "*.swift" -not -path "*/Fixtures/*" -print0 | xargs -0 swift format lint --strict --parallel
 
       - name: Check for Warnings
         run: |

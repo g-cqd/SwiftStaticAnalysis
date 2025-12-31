@@ -31,12 +31,19 @@ cd "$PROJECT_ROOT"
 # 1. Format (auto-fix)
 echo -e "\n${YELLOW}[1/7] Formatting code...${NC}"
 swift format format --in-place --parallel --recursive Sources/
+# Format test files (excluding fixtures - intentionally bad code for testing)
+find Tests -type f -name "*.swift" -not -path "*/Fixtures/*" -print0 | xargs -0 swift format format --in-place --parallel
 echo -e "${GREEN}Format applied${NC}"
 
 # 2. Format check (verify)
 echo -e "\n${YELLOW}[2/7] Checking format...${NC}"
 if ! swift format lint --strict --parallel --recursive Sources/ 2>&1; then
     echo -e "${RED}Format check failed!${NC}"
+    exit 1
+fi
+# Lint test files (excluding fixtures)
+if ! find Tests -type f -name "*.swift" -not -path "*/Fixtures/*" -print0 | xargs -0 swift format lint --strict --parallel 2>&1; then
+    echo -e "${RED}Test format check failed!${NC}"
     exit 1
 fi
 echo -e "${GREEN}Format check passed${NC}"
