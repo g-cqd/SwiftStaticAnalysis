@@ -12,8 +12,9 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
-import Testing
 import SwiftStaticAnalysisCore
+import Testing
+
 @testable import SymbolLookup
 
 /// Fixture path helper
@@ -32,10 +33,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds class by simple name")
     func findsClassBySimpleName() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let results = try await finder.findByName("NetworkMonitor")
 
@@ -46,10 +48,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds struct by simple name")
     func findsStructBySimpleName() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let results = try await finder.findByName("User")
 
@@ -60,10 +63,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds protocol by simple name")
     func findsProtocolBySimpleName() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let results = try await finder.findByName("Cacheable")
 
@@ -74,10 +78,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds enum by simple name")
     func findsEnumBySimpleName() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let results = try await finder.findByName("NetworkError")
 
@@ -88,10 +93,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds actor by simple name")
     func findsActorBySimpleName() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let results = try await finder.findByName("CacheManager")
 
@@ -102,10 +108,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds free function by name")
     func findsFreeFunction() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let results = try await finder.findByName("createDefaultUser")
 
@@ -118,10 +125,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds static property with qualified name")
     func findsStaticPropertyQualified() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let query = SymbolQuery.qualified("NetworkMonitor.shared")
         let results = try await finder.find(query)
@@ -134,10 +142,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds nested type with qualified name")
     func findsNestedTypeQualified() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let query = SymbolQuery.qualified("APIClient.Request")
         let results = try await finder.find(query)
@@ -150,10 +159,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds deeply nested enum case")
     func findsDeeplyNestedType() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let query = SymbolQuery.qualified("APIClient.Request.Method")
         let results = try await finder.find(query)
@@ -165,10 +175,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds instance method with qualified name")
     func findsInstanceMethodQualified() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let query = SymbolQuery.qualified("NetworkMonitor.checkConnection")
         let results = try await finder.find(query)
@@ -183,10 +194,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Filters by function kind")
     func filtersByFunctionKind() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let query = SymbolQuery(
             pattern: .simpleName("store"),
@@ -202,10 +214,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Filters by class kind only")
     func filtersByClassKind() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let query = SymbolQuery(
             pattern: .simpleName("Observable"),
@@ -221,10 +234,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Filters by public access")
     func filtersByPublicAccess() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let query = SymbolQuery(
             pattern: .simpleName("User"),
@@ -240,10 +254,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds multiple symbols with same name")
     func findsMultipleSymbolsWithSameName() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         // "store" appears in DataManager and CacheManager
         let results = try await finder.findByName("store")
@@ -253,10 +268,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds all methods named 'clear'")
     func findsAllMethodsNamedClear() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let results = try await finder.findByName("clear")
 
@@ -267,10 +283,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds generic class")
     func findsGenericClass() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let results = try await finder.findByName("Observable")
 
@@ -280,10 +297,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds generic struct")
     func findsGenericStruct() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let results = try await finder.findByName("Container")
 
@@ -295,10 +313,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds extension property")
     func findsExtensionProperty() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let query = SymbolQuery.qualified("User.displayName")
         let results = try await finder.find(query)
@@ -309,10 +328,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Finds static extension property")
     func findsStaticExtensionProperty() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let query = SymbolQuery.qualified("User.guest")
         let results = try await finder.find(query)
@@ -326,10 +346,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Definition mode returns only definitions")
     func definitionModeReturnsDefinitionsOnly() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let query = SymbolQuery.definition(of: "NetworkMonitor")
         let results = try await finder.find(query)
@@ -341,10 +362,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Returns empty for nonexistent symbol")
     func returnsEmptyForNonexistent() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let results = try await finder.findByName("NonexistentSymbol")
 
@@ -353,10 +375,11 @@ struct SymbolLookupIntegrationTests {
 
     @Test("Returns empty for wrong qualified name")
     func returnsEmptyForWrongQualifiedName() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [fixtureFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
 
         let query = SymbolQuery.qualified("User.nonexistent")
         let results = try await finder.find(query)
@@ -405,7 +428,7 @@ struct SyntaxResolverIntegrationTests {
             in: [fixtureFile]
         )
 
-        #expect(results.count >= 2) // NetworkMonitor and NetworkError at least
+        #expect(results.count >= 2)  // NetworkMonitor and NetworkError at least
     }
 
     @Test("Finds references to symbol")
@@ -599,10 +622,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Finds all 'id' properties across types")
     func findsAllIdProperties() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.findByName("id")
 
@@ -617,10 +641,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Distinguishes User.id from Product.id via qualified lookup")
     func distinguishesUserIdFromProductId() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let userIdResults = try await finder.find(SymbolQuery.qualified("User.id"))
         let productIdResults = try await finder.find(SymbolQuery.qualified("Product.id"))
@@ -637,10 +662,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Finds all 'validate' methods across types")
     func findsAllValidateMethods() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.findByName("validate")
 
@@ -655,10 +681,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Distinguishes validate methods via qualified name")
     func distinguishesValidateMethodsViaQualifiedName() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let userValidate = try await finder.find(SymbolQuery.qualified("User.validate"))
         let productValidate = try await finder.find(SymbolQuery.qualified("Product.validate"))
@@ -678,10 +705,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Finds all 'shared' singletons")
     func findsAllSharedSingletons() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.findByName("shared")
 
@@ -701,10 +729,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Distinguishes NetworkManager.shared from CacheManager.shared")
     func distinguishesSharedSingletons() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let networkShared = try await finder.find(SymbolQuery.qualified("NetworkManager.shared"))
         let cacheShared = try await finder.find(SymbolQuery.qualified("CacheManager.shared"))
@@ -721,10 +750,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Finds all 'defaultTimeout' across managers")
     func findsAllDefaultTimeouts() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.findByName("defaultTimeout")
 
@@ -739,10 +769,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Finds all nested 'Error' types")
     func findsAllNestedErrorTypes() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.findByName("Error")
 
@@ -757,10 +788,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Distinguishes APIResponse.Error from ValidationResult.Error")
     func distinguishesNestedErrorTypes() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let apiError = try await finder.find(SymbolQuery.qualified("APIResponse.Error"))
         let validationError = try await finder.find(SymbolQuery.qualified("ValidationResult.Error"))
@@ -779,10 +811,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Finds all 'active' enum cases")
     func findsAllActiveCases() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.findByName("active")
 
@@ -792,10 +825,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Distinguishes enum cases via qualified name")
     func distinguishesEnumCasesViaQualifiedName() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let userActive = try await finder.find(SymbolQuery.qualified("UserStatus.active"))
         let orderActive = try await finder.find(SymbolQuery.qualified("OrderStatus.active"))
@@ -811,10 +845,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Finds all 'fetch' methods across data sources")
     func findsAllFetchMethods() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.findByName("fetch")
 
@@ -824,10 +859,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Distinguishes LocalDataSource.fetch from RemoteDataSource.fetch")
     func distinguishesFetchMethodsAcrossTypes() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let localFetch = try await finder.find(SymbolQuery.qualified("LocalDataSource.fetch"))
         let remoteFetch = try await finder.find(SymbolQuery.qualified("RemoteDataSource.fetch"))
@@ -850,10 +886,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Finds all 'format' extension methods")
     func findsAllFormatMethods() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.findByName("format")
 
@@ -863,10 +900,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Distinguishes format methods via containing type")
     func distinguishesFormatMethodsViaType() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.findByName("format")
 
@@ -887,10 +925,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Finds all 'describe' protocol implementations")
     func findsAllDescribeMethods() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.findByName("describe")
 
@@ -902,10 +941,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Finds all 'process' free functions")
     func findsAllProcessFunctions() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.findByName("process")
 
@@ -926,10 +966,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Returns empty for wrong type.member combination")
     func returnsEmptyForWrongCombination() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         // User doesn't have 'price' (that's Product)
         let results = try await finder.find(SymbolQuery.qualified("User.price"))
@@ -938,10 +979,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Returns empty for nonexistent nested type")
     func returnsEmptyForNonexistentNestedType() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         // User doesn't have a nested Error type
         let results = try await finder.find(SymbolQuery.qualified("User.Error"))
@@ -952,10 +994,11 @@ struct SymbolDisambiguationTests {
 
     @Test("Returns exactly one result for unique qualified name")
     func returnsExactlyOneForUniqueQualified() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         // NetworkManager.isConnected should be unique
         let results = try await finder.find(SymbolQuery.qualified("NetworkManager.isConnected"))
@@ -977,10 +1020,11 @@ struct FunctionSignatureTests {
 
     @Test("Captures function signature with no parameters")
     func capturesFunctionSignatureNoParams() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.find(SymbolQuery.qualified("DataSource.fetch"))
 
@@ -996,10 +1040,11 @@ struct FunctionSignatureTests {
 
     @Test("Captures function signature with parameters")
     func capturesFunctionSignatureWithParams() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.find(SymbolQuery.qualified("DataSource.fetch"))
 
@@ -1016,10 +1061,11 @@ struct FunctionSignatureTests {
 
     @Test("Captures function signature with array parameter")
     func capturesFunctionSignatureWithArrayParam() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.find(SymbolQuery.qualified("DataSource.fetch"))
 
@@ -1036,10 +1082,11 @@ struct FunctionSignatureTests {
 
     @Test("Distinguishes overloaded methods by selector name")
     func distinguishesOverloadedMethodsBySelectorName() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.find(SymbolQuery.qualified("LocalDataSource.fetch"))
 
@@ -1053,10 +1100,11 @@ struct FunctionSignatureTests {
 
     @Test("Captures initializer signature")
     func capturesInitializerSignature() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [varietyFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [varietyFile]
+            ))
 
         let results = try await finder.find(SymbolQuery.qualified("User.init"))
 
@@ -1077,10 +1125,11 @@ struct FunctionSignatureTests {
 
     @Test("Captures generic type parameters")
     func capturesGenericTypeParameters() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [varietyFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [varietyFile]
+            ))
 
         let results = try await finder.findByName("Container")
 
@@ -1090,10 +1139,11 @@ struct FunctionSignatureTests {
 
     @Test("Captures multiple generic type parameters")
     func capturesMultipleGenericParams() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [varietyFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [varietyFile]
+            ))
 
         let results = try await finder.findByName("Observable")
 
@@ -1103,10 +1153,11 @@ struct FunctionSignatureTests {
 
     @Test("Display name includes generics")
     func displayNameIncludesGenerics() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [varietyFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [varietyFile]
+            ))
 
         let results = try await finder.findByName("Container")
 
@@ -1116,10 +1167,11 @@ struct FunctionSignatureTests {
 
     @Test("Captures generic function parameters")
     func capturesGenericFunctionParameters() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [varietyFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [varietyFile]
+            ))
 
         let results = try await finder.find(SymbolQuery.qualified("Container.map"))
 
@@ -1131,10 +1183,11 @@ struct FunctionSignatureTests {
 
     @Test("Display string shows full signature")
     func displayStringShowsFullSignature() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.find(SymbolQuery.qualified("DataSource.fetch"))
 
@@ -1149,10 +1202,11 @@ struct FunctionSignatureTests {
 
     @Test("Selector string shows parameter labels")
     func selectorStringShowsParameterLabels() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let results = try await finder.find(SymbolQuery.qualified("LocalDataSource.fetch"))
 
@@ -1280,10 +1334,11 @@ struct SelectorQueryTests {
 
     @Test("Finds method by selector with one parameter")
     func findsMethodBySelectorOneParam() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let parser = QueryParser()
         let pattern = try parser.parse("fetch(id:)")
@@ -1300,10 +1355,11 @@ struct SelectorQueryTests {
 
     @Test("Finds method by selector with no parameters")
     func findsMethodBySelectorNoParams() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let parser = QueryParser()
         let pattern = try parser.parse("fetch()")
@@ -1318,10 +1374,11 @@ struct SelectorQueryTests {
 
     @Test("Finds qualified method by selector")
     func findsQualifiedMethodBySelector() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let parser = QueryParser()
         let pattern = try parser.parse("LocalDataSource.fetch(id:)")
@@ -1337,10 +1394,11 @@ struct SelectorQueryTests {
 
     @Test("Selector query distinguishes overloads")
     func selectorQueryDistinguishesOverloads() async throws {
-        let finder = SymbolFinder(configuration: .init(
-            useSyntaxFallback: true,
-            sourceFiles: [disambiguationFile]
-        ))
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [disambiguationFile]
+            ))
 
         let parser = QueryParser()
 
