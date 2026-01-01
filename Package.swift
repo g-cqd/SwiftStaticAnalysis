@@ -7,7 +7,7 @@ let package = Package(
     name: "SwiftStaticAnalysis",
     platforms: [
         .macOS(.v15),
-        .iOS(.v18)
+        .iOS(.v18),
     ],
     products: [
         // Unified library (re-exports all components)
@@ -79,7 +79,7 @@ let package = Package(
         .target(
             name: "DuplicationDetector",
             dependencies: [
-                "SwiftStaticAnalysisCore",
+                "SwiftStaticAnalysisCore"
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
@@ -162,7 +162,7 @@ let package = Package(
                 "SymbolLookup",
             ],
             swiftSettings: [
-                .swiftLanguageMode(.v6),
+                .swiftLanguageMode(.v6)
             ]
         ),
 
@@ -171,28 +171,28 @@ let package = Package(
             name: "SwiftStaticAnalysisCoreTests",
             dependencies: ["SwiftStaticAnalysisCore"],
             swiftSettings: [
-                .swiftLanguageMode(.v6),
+                .swiftLanguageMode(.v6)
             ]
         ),
         .testTarget(
             name: "DuplicationDetectorTests",
             dependencies: ["DuplicationDetector"],
             swiftSettings: [
-                .swiftLanguageMode(.v6),
+                .swiftLanguageMode(.v6)
             ]
         ),
         .testTarget(
             name: "UnusedCodeDetectorTests",
             dependencies: ["UnusedCodeDetector"],
             swiftSettings: [
-                .swiftLanguageMode(.v6),
+                .swiftLanguageMode(.v6)
             ]
         ),
         .testTarget(
             name: "SymbolLookupTests",
             dependencies: ["SymbolLookup"],
             swiftSettings: [
-                .swiftLanguageMode(.v6),
+                .swiftLanguageMode(.v6)
             ]
         ),
         .testTarget(
@@ -204,7 +204,7 @@ let package = Package(
                 "SymbolLookup",
             ],
             swiftSettings: [
-                .swiftLanguageMode(.v6),
+                .swiftLanguageMode(.v6)
             ]
         ),
     ]
