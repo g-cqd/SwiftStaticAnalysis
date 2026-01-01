@@ -43,37 +43,11 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
 
-      - name: Cache SPM Dependencies
-        uses: actions/cache@v4
-        with:
-          path: .build
-          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-
-
-      - name: Setup SPK
-        id: setup-spk
-        run: |
-          SPK_BINARY=".build/debug/spk"
-          echo "Fetching latest spk release..."
-          LATEST_TAG=$(curl -sI "https://github.com/g-cqd/SwiftProjectKit/releases/latest" | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
-          if [[ -n "$LATEST_TAG" ]]; then
-            SPK_VERSION="${LATEST_TAG#v}"
-            DOWNLOAD_URL="https://github.com/g-cqd/SwiftProjectKit/releases/download/${LATEST_TAG}/spk-${SPK_VERSION}-macos-universal.tar.gz"
-            if curl -fsSL "$DOWNLOAD_URL" -o /tmp/spk.tar.gz 2>/dev/null; then
-              mkdir -p .build/debug
-              tar -xzf /tmp/spk.tar.gz -C .build/debug
-              chmod +x "$SPK_BINARY"
-              echo "Downloaded spk ${LATEST_TAG}"
-            else
-              swift build --product spk
-            fi
-          else
-            swift build --product spk
-          fi
-          echo "spk_path=$SPK_BINARY" >> $GITHUB_OUTPUT
-
       - name: Check Formatting
-        run: ${{ steps.setup-spk.outputs.spk_path }} hooks --only format
+        run: |
+          swift format lint --strict --recursive \
+            --ignore-unparsable-files \
+            Sources Tests
 
   duplicates-check:
     name: Duplicates Check
@@ -82,40 +56,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-
-      - name: Cache SPM Dependencies
+      - name: Cache SWA Binary
+        id: cache-swa
         uses: actions/cache@v4
         with:
-          path: .build
-          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-
+          path: /usr/local/bin/swa
+          key: swa-${{ runner.os }}-latest
 
-      - name: Setup SPK
-        id: setup-spk
+      - name: Setup SWA
+        if: steps.cache-swa.outputs.cache-hit != 'true'
         run: |
-          SPK_BINARY=".build/debug/spk"
-          echo "Fetching latest spk release..."
-          LATEST_TAG=$(curl -sI "https://github.com/g-cqd/SwiftProjectKit/releases/latest" | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
+          echo "Fetching latest swa release..."
+          LATEST_TAG=$(curl -sI "https://github.com/g-cqd/SwiftStaticAnalysis/releases/latest" | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
           if [[ -n "$LATEST_TAG" ]]; then
-            SPK_VERSION="${LATEST_TAG#v}"
-            DOWNLOAD_URL="https://github.com/g-cqd/SwiftProjectKit/releases/download/${LATEST_TAG}/spk-${SPK_VERSION}-macos-universal.tar.gz"
-            if curl -fsSL "$DOWNLOAD_URL" -o /tmp/spk.tar.gz 2>/dev/null; then
-              mkdir -p .build/debug
-              tar -xzf /tmp/spk.tar.gz -C .build/debug
-              chmod +x "$SPK_BINARY"
-              echo "Downloaded spk ${LATEST_TAG}"
-            else
-              swift build --product spk
-            fi
+            SWA_VERSION="${LATEST_TAG#v}"
+            DOWNLOAD_URL="https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/${LATEST_TAG}/swa-${SWA_VERSION}-macos-universal.tar.gz"
+            echo "Downloading swa ${LATEST_TAG}..."
+            curl -fsSL "$DOWNLOAD_URL" -o /tmp/swa.tar.gz
+            tar -xzf /tmp/swa.tar.gz -C /tmp
+            sudo mv /tmp/swa /usr/local/bin/swa
+            sudo chmod +x /usr/local/bin/swa
+            echo "Installed swa ${LATEST_TAG}"
           else
-            swift build --product spk
+            echo "Failed to fetch latest release"
+            exit 1
           fi
-          echo "spk_path=$SPK_BINARY" >> $GITHUB_OUTPUT
 
       - name: Check Duplicates
-        run: ${{ steps.setup-spk.outputs.spk_path }} hooks --only duplicates
+        run: |
+          swa duplicates Sources \
+            --min-tokens 100 \
+            --format text
 
   unused-check:
     name: Unused Code Check
@@ -124,40 +95,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-
-      - name: Cache SPM Dependencies
+      - name: Cache SWA Binary
+        id: cache-swa
         uses: actions/cache@v4
         with:
-          path: .build
-          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-
+          path: /usr/local/bin/swa
+          key: swa-${{ runner.os }}-latest
 
-      - name: Setup SPK
-        id: setup-spk
+      - name: Setup SWA
+        if: steps.cache-swa.outputs.cache-hit != 'true'
         run: |
-          SPK_BINARY=".build/debug/spk"
-          echo "Fetching latest spk release..."
-          LATEST_TAG=$(curl -sI "https://github.com/g-cqd/SwiftProjectKit/releases/latest" | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
+          echo "Fetching latest swa release..."
+          LATEST_TAG=$(curl -sI "https://github.com/g-cqd/SwiftStaticAnalysis/releases/latest" | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
           if [[ -n "$LATEST_TAG" ]]; then
-            SPK_VERSION="${LATEST_TAG#v}"
-            DOWNLOAD_URL="https://github.com/g-cqd/SwiftProjectKit/releases/download/${LATEST_TAG}/spk-${SPK_VERSION}-macos-universal.tar.gz"
-            if curl -fsSL "$DOWNLOAD_URL" -o /tmp/spk.tar.gz 2>/dev/null; then
-              mkdir -p .build/debug
-              tar -xzf /tmp/spk.tar.gz -C .build/debug
-              chmod +x "$SPK_BINARY"
-              echo "Downloaded spk ${LATEST_TAG}"
-            else
-              swift build --product spk
-            fi
+            SWA_VERSION="${LATEST_TAG#v}"
+            DOWNLOAD_URL="https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/${LATEST_TAG}/swa-${SWA_VERSION}-macos-universal.tar.gz"
+            echo "Downloading swa ${LATEST_TAG}..."
+            curl -fsSL "$DOWNLOAD_URL" -o /tmp/swa.tar.gz
+            tar -xzf /tmp/swa.tar.gz -C /tmp
+            sudo mv /tmp/swa /usr/local/bin/swa
+            sudo chmod +x /usr/local/bin/swa
+            echo "Installed swa ${LATEST_TAG}"
           else
-            swift build --product spk
+            echo "Failed to fetch latest release"
+            exit 1
           fi
-          echo "spk_path=$SPK_BINARY" >> $GITHUB_OUTPUT
 
       - name: Check Unused Code
-        run: ${{ steps.setup-spk.outputs.spk_path }} hooks --only unused
+        run: |
+          swa unused Sources \
+            --mode reachability \
+            --sensible-defaults \
+            --format text
 
   # ============================================================================
   # STAGE 2: Build Release Binary
@@ -193,7 +162,7 @@ jobs:
           retention-days: 1
 
   # ============================================================================
-  # STAGE 3: Test & CodeQL (run in parallel after build)
+  # STAGE 3: Test (after build)
   # ============================================================================
   test:
     name: Test
@@ -236,6 +205,9 @@ jobs:
             --exclude-paths "**/Fixtures/**" \
             --format text
 
+  # ============================================================================
+  # STAGE 4: CodeQL Analysis (after tests)
+  # ============================================================================
   codeql:
     name: CodeQL Analysis
     runs-on: macos-15
@@ -271,7 +243,7 @@ jobs:
           category: "/language:swift"
 
   # ============================================================================
-  # STAGE 4: Prepare Release (after tests pass)
+  # STAGE 5: Prepare Release (after tests)
   # ============================================================================
   prepare-release:
     name: Prepare Release
@@ -289,44 +261,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-
-      - name: Cache SPM Dependencies
-        uses: actions/cache@v4
-        with:
-          path: .build
-          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-
-
-      - name: Setup SPK
-        id: setup-spk
-        run: |
-          SPK_BINARY=".build/debug/spk"
-          echo "Fetching latest spk release..."
-          LATEST_TAG=$(curl -sI "https://github.com/g-cqd/SwiftProjectKit/releases/latest" | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
-          if [[ -n "$LATEST_TAG" ]]; then
-            SPK_VERSION="${LATEST_TAG#v}"
-            DOWNLOAD_URL="https://github.com/g-cqd/SwiftProjectKit/releases/download/${LATEST_TAG}/spk-${SPK_VERSION}-macos-universal.tar.gz"
-            if curl -fsSL "$DOWNLOAD_URL" -o /tmp/spk.tar.gz 2>/dev/null; then
-              mkdir -p .build/debug
-              tar -xzf /tmp/spk.tar.gz -C .build/debug
-              chmod +x "$SPK_BINARY"
-              echo "Downloaded spk ${LATEST_TAG}"
-            else
-              swift build --product spk
-            fi
-          else
-            swift build --product spk
-          fi
-          echo "spk_path=$SPK_BINARY" >> $GITHUB_OUTPUT
-
       - name: Determine Version
         id: version
         run: |
-          if VERSION=$(${{ steps.setup-spk.outputs.spk_path }} version --quiet 2>/dev/null); then
-            echo "Got version from spk: ${VERSION}"
-          elif [[ -f ".spk.json" ]] && command -v jq &> /dev/null; then
+          if [[ -f ".spk.json" ]]; then
             VERSION=$(jq -r '.project.version // empty' .spk.json)
           elif [[ -n "${{ inputs.version }}" ]]; then
             VERSION="${{ inputs.version }}"
@@ -390,7 +328,7 @@ jobs:
           } >> $GITHUB_OUTPUT
 
   # ============================================================================
-  # STAGE 5: Create Release (package and publish)
+  # STAGE 6: Create Release (package and publish)
   # ============================================================================
   release:
     name: Create Release
@@ -500,7 +438,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ============================================================================
-  # Documentation (runs after build, deploys on main)
+  # Documentation (runs after tests, deploys on main)
   # ============================================================================
   docs:
     name: Build Documentation
