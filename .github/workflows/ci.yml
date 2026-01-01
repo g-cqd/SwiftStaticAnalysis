@@ -31,8 +31,52 @@ env:
 
 jobs:
   # ============================================================================
-  # STAGE 1: Code Quality Checks (run in parallel)
+  # STAGE 1: Setup & Code Quality Checks (run in parallel)
   # ============================================================================
+  setup-swa:
+    name: Setup SWA
+    runs-on: macos-15
+    outputs:
+      swa-path: ${{ steps.setup.outputs.swa_path }}
+    steps:
+      - name: Cache SWA Binary
+        id: cache-swa
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/swa
+          key: swa-${{ runner.os }}-latest
+
+      - name: Download SWA
+        id: setup
+        run: |
+          if [[ -f "/usr/local/bin/swa" ]]; then
+            echo "SWA already cached"
+          else
+            echo "Fetching latest swa release..."
+            LATEST_TAG=$(curl -sI "https://github.com/g-cqd/SwiftStaticAnalysis/releases/latest" | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
+            if [[ -n "$LATEST_TAG" ]]; then
+              SWA_VERSION="${LATEST_TAG#v}"
+              DOWNLOAD_URL="https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/${LATEST_TAG}/swa-${SWA_VERSION}-macos-universal.tar.gz"
+              echo "Downloading swa ${LATEST_TAG}..."
+              curl -fsSL "$DOWNLOAD_URL" -o /tmp/swa.tar.gz
+              tar -xzf /tmp/swa.tar.gz -C /tmp
+              sudo mv /tmp/swa /usr/local/bin/swa
+              sudo chmod +x /usr/local/bin/swa
+              echo "Installed swa ${LATEST_TAG}"
+            else
+              echo "Failed to fetch latest release"
+              exit 1
+            fi
+          fi
+          echo "swa_path=/usr/local/bin/swa" >> $GITHUB_OUTPUT
+
+      - name: Upload SWA Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: swa-binary
+          path: /usr/local/bin/swa
+          retention-days: 1
+
   format-check:
     name: Format Check
     runs-on: macos-15
@@ -45,42 +89,47 @@ jobs:
 
       - name: Check Formatting
         run: |
-          swift format lint --strict --recursive \
-            --ignore-unparsable-files \
-            Sources Tests
+          # Read paths and excludePaths from .spk.json
+          PATHS=$(jq -r '.hooks.tasks.format.paths // ["Sources/", "Tests/"] | .[]' .spk.json)
+          EXCLUDE_PATTERNS=$(jq -r '.hooks.tasks.format.excludePaths // [] | .[]' .spk.json)
+
+          # Build find command with exclusions
+          FIND_CMD="find"
+          for path in $PATHS; do
+            FIND_CMD="$FIND_CMD $path"
+          done
+          FIND_CMD="$FIND_CMD -name '*.swift'"
+
+          for pattern in $EXCLUDE_PATTERNS; do
+            FIND_CMD="$FIND_CMD -not -path '$pattern'"
+          done
+
+          # Get list of files and run swift-format
+          FILES=$(eval $FIND_CMD 2>/dev/null || true)
+          if [[ -n "$FILES" ]]; then
+            echo "$FILES" | xargs swift format lint --strict --ignore-unparsable-files
+          else
+            echo "No Swift files to check"
+          fi
 
   duplicates-check:
     name: Duplicates Check
     runs-on: macos-15
+    needs: setup-swa
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Cache SWA Binary
-        id: cache-swa
-        uses: actions/cache@v4
+      - name: Download SWA Binary
+        uses: actions/download-artifact@v4
         with:
-          path: /usr/local/bin/swa
-          key: swa-${{ runner.os }}-latest
+          name: swa-binary
+          path: /tmp
 
       - name: Setup SWA
-        if: steps.cache-swa.outputs.cache-hit != 'true'
         run: |
-          echo "Fetching latest swa release..."
-          LATEST_TAG=$(curl -sI "https://github.com/g-cqd/SwiftStaticAnalysis/releases/latest" | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
-          if [[ -n "$LATEST_TAG" ]]; then
-            SWA_VERSION="${LATEST_TAG#v}"
-            DOWNLOAD_URL="https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/${LATEST_TAG}/swa-${SWA_VERSION}-macos-universal.tar.gz"
-            echo "Downloading swa ${LATEST_TAG}..."
-            curl -fsSL "$DOWNLOAD_URL" -o /tmp/swa.tar.gz
-            tar -xzf /tmp/swa.tar.gz -C /tmp
-            sudo mv /tmp/swa /usr/local/bin/swa
-            sudo chmod +x /usr/local/bin/swa
-            echo "Installed swa ${LATEST_TAG}"
-          else
-            echo "Failed to fetch latest release"
-            exit 1
-          fi
+          sudo mv /tmp/swa /usr/local/bin/swa
+          sudo chmod +x /usr/local/bin/swa
 
       - name: Check Duplicates
         run: |
@@ -91,35 +140,21 @@ jobs:
   unused-check:
     name: Unused Code Check
     runs-on: macos-15
+    needs: setup-swa
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Cache SWA Binary
-        id: cache-swa
-        uses: actions/cache@v4
+      - name: Download SWA Binary
+        uses: actions/download-artifact@v4
         with:
-          path: /usr/local/bin/swa
-          key: swa-${{ runner.os }}-latest
+          name: swa-binary
+          path: /tmp
 
       - name: Setup SWA
-        if: steps.cache-swa.outputs.cache-hit != 'true'
         run: |
-          echo "Fetching latest swa release..."
-          LATEST_TAG=$(curl -sI "https://github.com/g-cqd/SwiftStaticAnalysis/releases/latest" | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
-          if [[ -n "$LATEST_TAG" ]]; then
-            SWA_VERSION="${LATEST_TAG#v}"
-            DOWNLOAD_URL="https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/${LATEST_TAG}/swa-${SWA_VERSION}-macos-universal.tar.gz"
-            echo "Downloading swa ${LATEST_TAG}..."
-            curl -fsSL "$DOWNLOAD_URL" -o /tmp/swa.tar.gz
-            tar -xzf /tmp/swa.tar.gz -C /tmp
-            sudo mv /tmp/swa /usr/local/bin/swa
-            sudo chmod +x /usr/local/bin/swa
-            echo "Installed swa ${LATEST_TAG}"
-          else
-            echo "Failed to fetch latest release"
-            exit 1
-          fi
+          sudo mv /tmp/swa /usr/local/bin/swa
+          sudo chmod +x /usr/local/bin/swa
 
       - name: Check Unused Code
         run: |
