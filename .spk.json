@@ -36,7 +36,7 @@
         "enabled": true,
         "blocking": true,
         "paths": ["Sources/", "Tests/"],
-        "excludePaths": ["Tests/Fixtures/"]
+        "excludePaths": ["**/Fixtures/**"]
       },
       "versionSync": {
         "enabled": true,

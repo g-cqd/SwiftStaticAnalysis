@@ -83,7 +83,7 @@ jobs:
           echo "spk_path=$SPK_BINARY" >> $GITHUB_OUTPUT
 
       - name: Check Formatting
-        run: ${{ steps.setup-spk.outputs.spk_path }} format --lint
+        run: ${{ steps.setup-spk.outputs.spk_path }} hooks --only format
 
   # ============================================================================
   # STAGE 2: Build & Test (depends on format check)
