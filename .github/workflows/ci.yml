@@ -36,8 +36,6 @@ jobs:
   setup-swa:
     name: Setup SWA
     runs-on: macos-15
-    outputs:
-      swa-path: ${{ steps.setup.outputs.swa_path }}
     steps:
       - name: Cache SWA Binary
         id: cache-swa
@@ -47,28 +45,23 @@ jobs:
           key: swa-${{ runner.os }}-latest
 
       - name: Download SWA
-        id: setup
+        if: steps.cache-swa.outputs.cache-hit != 'true'
         run: |
-          if [[ -f "/usr/local/bin/swa" ]]; then
-            echo "SWA already cached"
+          echo "Fetching latest swa release..."
+          LATEST_TAG=$(curl -sI "https://github.com/g-cqd/SwiftStaticAnalysis/releases/latest" | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
+          if [[ -n "$LATEST_TAG" ]]; then
+            SWA_VERSION="${LATEST_TAG#v}"
+            DOWNLOAD_URL="https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/${LATEST_TAG}/swa-${SWA_VERSION}-macos-universal.tar.gz"
+            echo "Downloading swa ${LATEST_TAG}..."
+            curl -fsSL "$DOWNLOAD_URL" -o /tmp/swa.tar.gz
+            tar -xzf /tmp/swa.tar.gz -C /tmp
+            sudo mv /tmp/swa /usr/local/bin/swa
+            sudo chmod +x /usr/local/bin/swa
+            echo "Installed swa ${LATEST_TAG}"
           else
-            echo "Fetching latest swa release..."
-            LATEST_TAG=$(curl -sI "https://github.com/g-cqd/SwiftStaticAnalysis/releases/latest" | grep -i "^location:" | sed 's/.*tag\///' | tr -d '\r\n')
-            if [[ -n "$LATEST_TAG" ]]; then
-              SWA_VERSION="${LATEST_TAG#v}"
-              DOWNLOAD_URL="https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/${LATEST_TAG}/swa-${SWA_VERSION}-macos-universal.tar.gz"
-              echo "Downloading swa ${LATEST_TAG}..."
-              curl -fsSL "$DOWNLOAD_URL" -o /tmp/swa.tar.gz
-              tar -xzf /tmp/swa.tar.gz -C /tmp
-              sudo mv /tmp/swa /usr/local/bin/swa
-              sudo chmod +x /usr/local/bin/swa
-              echo "Installed swa ${LATEST_TAG}"
-            else
-              echo "Failed to fetch latest release"
-              exit 1
-            fi
+            echo "Failed to fetch latest release"
+            exit 1
           fi
-          echo "swa_path=/usr/local/bin/swa" >> $GITHUB_OUTPUT
 
       - name: Upload SWA Binary
         uses: actions/upload-artifact@v4
@@ -103,7 +96,7 @@ jobs:
 
           # Run swift-format on remaining files
           if [[ -n "$FILES" ]]; then
-            echo "$FILES" | xargs swift format lint --strict --ignore-unparsable-files
+            echo "$FILES" | xargs swift format lint --strict --parallel --ignore-unparsable-files
           else
             echo "No Swift files to check"
           fi
@@ -160,10 +153,10 @@ jobs:
             --format text
 
   # ============================================================================
-  # STAGE 2: Build Release Binary
+  # STAGE 2: Test with Coverage
   # ============================================================================
-  build:
-    name: Build Release
+  test:
+    name: Test
     runs-on: macos-15
     needs: [format-check, duplicates-check, unused-check]
     steps:
@@ -182,62 +175,53 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
 
-      - name: Build Release
-        run: swift build -c release
+      - name: Run Tests with Coverage
+        run: swift test --parallel --enable-code-coverage
 
-      - name: Upload Build Artifact
+      - name: Generate Coverage Report
+        run: |
+          BIN_PATH=$(swift build --show-bin-path)
+          XCTEST_PATH=$(find "$BIN_PATH" -name '*.xctest' -type d | head -1)
+          PROFDATA_PATH=$(find .build -name 'default.profdata' -type f | head -1)
+
+          if [[ -n "$XCTEST_PATH" && -n "$PROFDATA_PATH" ]]; then
+            # Get the executable inside the xctest bundle
+            EXEC_NAME=$(basename "$XCTEST_PATH" .xctest)
+            EXEC_PATH="$XCTEST_PATH/Contents/MacOS/$EXEC_NAME"
+
+            # Generate lcov report
+            xcrun llvm-cov export \
+              "$EXEC_PATH" \
+              -instr-profile="$PROFDATA_PATH" \
+              -format=lcov \
+              -ignore-filename-regex='.build|Tests|Fixtures' \
+              > coverage.lcov
+
+            # Generate text summary
+            xcrun llvm-cov report \
+              "$EXEC_PATH" \
+              -instr-profile="$PROFDATA_PATH" \
+              -ignore-filename-regex='.build|Tests|Fixtures' \
+              > coverage.txt
+
+            echo "Coverage Summary:"
+            cat coverage.txt
+          else
+            echo "Could not find xctest or profdata files"
+            exit 1
+          fi
+
+      - name: Upload Coverage Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-release
-          path: .build/release/swa
-          retention-days: 1
-
-  # ============================================================================
-  # STAGE 3: Test (after build)
-  # ============================================================================
-  test:
-    name: Test
-    runs-on: macos-15
-    needs: build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-
-      - name: Cache SPM Dependencies
-        uses: actions/cache@v4
-        with:
+          name: coverage-report
           path: |
-            .build
-            ~/Library/Developer/Xcode/DerivedData
-          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-
-
-      - name: Download Build Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: build-release
-          path: .build/release
-
-      - name: Make Binary Executable
-        run: chmod +x .build/release/swa
-
-      - name: Run Tests
-        run: swift test --parallel
-
-      - name: Self Analysis
-        run: |
-          .build/release/swa unused . \
-            --mode reachability \
-            --sensible-defaults \
-            --exclude-paths "**/Tests/**" \
-            --exclude-paths "**/Fixtures/**" \
-            --format text
+            coverage.lcov
+            coverage.txt
+          retention-days: 30
 
   # ============================================================================
-  # STAGE 4: CodeQL Analysis (after tests)
+  # STAGE 3: CodeQL, Prepare Release, Docs (after tests)
   # ============================================================================
   codeql:
     name: CodeQL Analysis
@@ -273,9 +257,6 @@ jobs:
         with:
           category: "/language:swift"
 
-  # ============================================================================
-  # STAGE 5: Prepare Release (after tests)
-  # ============================================================================
   prepare-release:
     name: Prepare Release
     runs-on: macos-15
@@ -358,8 +339,44 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
+  docs:
+    name: Build Documentation
+    runs-on: macos-15
+    needs: test
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Restore SPM Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Developer/Xcode/DerivedData
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Build Documentation
+        run: |
+          swift package --allow-writing-to-directory ./docs \
+            generate-documentation \
+            --target SwiftStaticAnalysis \
+            --disable-indexing \
+            --transform-for-static-hosting \
+            --hosting-base-path SwiftStaticAnalysis \
+            --output-path ./docs
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs
+
   # ============================================================================
-  # STAGE 6: Create Release (package and publish)
+  # STAGE 4: Release (after prepare-release)
   # ============================================================================
   release:
     name: Create Release
@@ -469,44 +486,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ============================================================================
-  # Documentation (runs after tests, deploys on main)
+  # Deploy Documentation (after docs build)
   # ============================================================================
-  docs:
-    name: Build Documentation
-    runs-on: macos-15
-    needs: test
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
-
-      - name: Restore SPM Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            .build
-            ~/Library/Developer/Xcode/DerivedData
-          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-
-
-      - name: Build Documentation
-        run: |
-          swift package --allow-writing-to-directory ./docs \
-            generate-documentation \
-            --target SwiftStaticAnalysis \
-            --disable-indexing \
-            --transform-for-static-hosting \
-            --hosting-base-path SwiftStaticAnalysis \
-            --output-path ./docs
-
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./docs
-
   deploy-docs:
     name: Deploy Documentation
     runs-on: ubuntu-latest
