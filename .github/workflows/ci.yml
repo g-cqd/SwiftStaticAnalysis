@@ -90,25 +90,18 @@ jobs:
       - name: Check Formatting
         run: |
           # Read paths and excludePaths from .spk.json
-          PATHS=$(jq -r '.hooks.tasks.format.paths // ["Sources/", "Tests/"] | .[]' .spk.json)
-          EXCLUDE_PATTERNS=$(jq -r '.hooks.tasks.format.excludePaths // [] | .[]' .spk.json)
+          PATHS=$(jq -r '.hooks.tasks.format.paths // ["Sources/", "Tests/"] | .[]' .spk.json | tr '\n' ' ')
+          EXCLUDE_PATTERNS=$(jq -r '.hooks.tasks.format.excludePaths // [] | .[] | gsub("\\*\\*/"; "") | gsub("/\\*\\*"; "")' .spk.json)
 
-          # Build find command with exclusions
-          # Convert glob patterns: **/ -> */ for find compatibility
-          FIND_ARGS=()
-          for path in $PATHS; do
-            FIND_ARGS+=("$path")
-          done
-          FIND_ARGS+=("-name" "*.swift")
+          # Find all Swift files
+          FILES=$(find $PATHS -name '*.swift' 2>/dev/null)
 
+          # Filter out excluded patterns using grep
           for pattern in $EXCLUDE_PATTERNS; do
-            # Convert **/X/** to */X/* for find -path compatibility
-            CONVERTED=$(echo "$pattern" | sed 's/\*\*\//*/g' | sed 's/\/\*\*$/\/*/g')
-            FIND_ARGS+=("-not" "-path" "$CONVERTED")
+            FILES=$(echo "$FILES" | grep -v "$pattern" || true)
           done
 
-          # Get list of files and run swift-format
-          FILES=$(find "${FIND_ARGS[@]}" 2>/dev/null || true)
+          # Run swift-format on remaining files
           if [[ -n "$FILES" ]]; then
             echo "$FILES" | xargs swift format lint --strict --ignore-unparsable-files
           else
