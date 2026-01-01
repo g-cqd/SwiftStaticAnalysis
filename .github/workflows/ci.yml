@@ -94,18 +94,21 @@ jobs:
           EXCLUDE_PATTERNS=$(jq -r '.hooks.tasks.format.excludePaths // [] | .[]' .spk.json)
 
           # Build find command with exclusions
-          FIND_CMD="find"
+          # Convert glob patterns: **/ -> */ for find compatibility
+          FIND_ARGS=()
           for path in $PATHS; do
-            FIND_CMD="$FIND_CMD $path"
+            FIND_ARGS+=("$path")
           done
-          FIND_CMD="$FIND_CMD -name '*.swift'"
+          FIND_ARGS+=("-name" "*.swift")
 
           for pattern in $EXCLUDE_PATTERNS; do
-            FIND_CMD="$FIND_CMD -not -path '$pattern'"
+            # Convert **/X/** to */X/* for find -path compatibility
+            CONVERTED=$(echo "$pattern" | sed 's/\*\*\//*/g' | sed 's/\/\*\*$/\/*/g')
+            FIND_ARGS+=("-not" "-path" "$CONVERTED")
           done
 
           # Get list of files and run swift-format
-          FILES=$(eval $FIND_CMD 2>/dev/null || true)
+          FILES=$(find "${FIND_ARGS[@]}" 2>/dev/null || true)
           if [[ -n "$FILES" ]]; then
             echo "$FILES" | xargs swift format lint --strict --ignore-unparsable-files
           else
