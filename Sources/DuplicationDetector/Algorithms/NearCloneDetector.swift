@@ -6,6 +6,7 @@
 //  may be renamed but structure is identical.
 //
 
+import Algorithms
 import Foundation
 import SwiftStaticAnalysisCore
 import SwiftSyntax
@@ -176,14 +177,12 @@ public struct NearCloneDetector: Sendable {
         var totalSimilarity = 0.0
         var comparisons = 0
 
-        for i in 0..<group.count {
-            for j in (i + 1)..<group.count {
-                totalSimilarity += CloneDetectionUtilities.jaccardSimilarity(
-                    group[i].originalTokens,
-                    group[j].originalTokens,
-                )
-                comparisons += 1
-            }
+        for pair in group.combinations(ofCount: 2) {
+            totalSimilarity += CloneDetectionUtilities.jaccardSimilarity(
+                pair[0].originalTokens,
+                pair[1].originalTokens,
+            )
+            comparisons += 1
         }
 
         return comparisons > 0 ? totalSimilarity / Double(comparisons) : 0

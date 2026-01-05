@@ -6,6 +6,7 @@
 //  Uses actor isolation for thread-safe access.
 //
 
+import Algorithms
 import Foundation
 
 // MARK: - CacheData
@@ -401,7 +402,7 @@ public actor AnalysisCache {
     /// - Parameter changes: Change detection result.
     public func invalidate(for changes: ChangeDetectionResult) {
         // Remove data for modified and deleted files
-        for file in changes.modifiedFiles + changes.deletedFiles {
+        for file in chain(changes.modifiedFiles, changes.deletedFiles) {
             removeFileState(for: file)
             removeDeclarations(for: file)
             removeReferences(for: file)

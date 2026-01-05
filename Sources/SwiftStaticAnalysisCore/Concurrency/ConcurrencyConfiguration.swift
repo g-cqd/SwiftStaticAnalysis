@@ -5,6 +5,7 @@
 //  Configuration for parallel processing limits and concurrency control.
 //
 
+import Algorithms
 import Foundation
 
 // MARK: - ConcurrencyConfiguration
@@ -107,13 +108,9 @@ public enum ParallelProcessor {
         var allResults: [R?] = Array(repeating: nil, count: items.count)
         let batchSize = maxConcurrency
 
-        for batchStart in stride(from: 0, to: items.count, by: batchSize) {
-            let batchEnd = min(batchStart + batchSize, items.count)
-            let batch = Array(items[batchStart..<batchEnd])
-
+        for chunk in items.chunks(ofCount: batchSize) {
             try await withThrowingTaskGroup(of: (Int, R).self) { group in
-                for (localIndex, item) in batch.enumerated() {
-                    let globalIndex = batchStart + localIndex
+                for (globalIndex, item) in chunk.indexed() {
                     group.addTask {
                         let result = try await operation(item)
                         return (globalIndex, result)
@@ -126,7 +123,7 @@ public enum ParallelProcessor {
             }
         }
 
-        return allResults.compactMap(\.self)
+        return Array(allResults.compacted())
     }
 
     /// Process items in parallel, collecting only successful results.
@@ -147,12 +144,9 @@ public enum ParallelProcessor {
 
         // Process in batches
         let batchSize = max(1, maxConcurrency)
-        for batchStart in stride(from: 0, to: items.count, by: batchSize) {
-            let batchEnd = min(batchStart + batchSize, items.count)
-            let batch = Array(items[batchStart..<batchEnd])
-
+        for chunk in items.chunks(ofCount: batchSize) {
             await withTaskGroup(of: R?.self) { group in
-                for item in batch {
+                for item in chunk {
                     group.addTask {
                         await operation(item)
                     }
@@ -184,12 +178,9 @@ public enum ParallelProcessor {
 
         // Process in batches
         let batchSize = max(1, maxConcurrency)
-        for batchStart in stride(from: 0, to: items.count, by: batchSize) {
-            let batchEnd = min(batchStart + batchSize, items.count)
-            let batch = Array(items[batchStart..<batchEnd])
-
+        for chunk in items.chunks(ofCount: batchSize) {
             try await withThrowingTaskGroup(of: Void.self) { group in
-                for item in batch {
+                for item in chunk {
                     group.addTask {
                         try await operation(item)
                     }

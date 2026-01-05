@@ -5,6 +5,7 @@
 //  Multi-probe LSH for improved recall without increasing index size.
 //
 
+import Algorithms
 import Foundation
 
 // MARK: - MultiProbeLSH
@@ -386,7 +387,7 @@ public struct MultiProbeLSHPipeline: Sendable {
 
         // Optionally verify with exact Jaccard
         if verifyWithExact {
-            let documentMap = Dictionary(uniqueKeysWithValues: documents.map { ($0.id, $0) })
+            let documentMap = documents.keyed(by: \.id)
 
             results = results.compactMap { pair in
                 guard let doc1 = documentMap[pair.documentId1],

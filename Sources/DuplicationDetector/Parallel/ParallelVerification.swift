@@ -6,6 +6,7 @@
 //  Computes exact Jaccard similarity for candidates concurrently.
 //
 
+import Algorithms
 import Foundation
 
 // MARK: - ParallelVerifier
@@ -76,12 +77,9 @@ public struct ParallelVerifier: Sendable {
         let chunkSize = max(1, pairs.count / maxConcurrency)
 
         return await withTaskGroup(of: [ClonePairInfo].self) { group in
-            for chunkStart in stride(from: 0, to: pairs.count, by: chunkSize) {
-                let chunkEnd = min(chunkStart + chunkSize, pairs.count)
-                let chunk = Array(pairs[chunkStart..<chunkEnd])
-
+            for chunk in pairs.chunks(ofCount: chunkSize) {
                 group.addTask {
-                    self.verifySequential(chunk, documentMap: documentMap)
+                    self.verifySequential(Array(chunk), documentMap: documentMap)
                 }
             }
 
@@ -187,9 +185,8 @@ public struct BatchVerifier: Sendable {
         var allResults: [ClonePairInfo] = []
         var processedCount = 0
 
-        for batchStart in stride(from: 0, to: pairs.count, by: batchSize) {
-            let batchEnd = min(batchStart + batchSize, pairs.count)
-            let batch = Set(pairs[batchStart..<batchEnd])
+        for chunk in pairs.chunks(ofCount: batchSize) {
+            let batch = Set(chunk)
 
             let batchResults = await verifier.verifyCandidatePairs(
                 batch,
@@ -197,7 +194,7 @@ public struct BatchVerifier: Sendable {
             )
 
             allResults.append(contentsOf: batchResults)
-            processedCount = batchEnd
+            processedCount += chunk.count
 
             if let handler = progressHandler {
                 await handler(processedCount, pairs.count)

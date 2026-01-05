@@ -10,6 +10,7 @@
 //  same MinHash value equals their Jaccard similarity.
 //
 
+import Algorithms
 import Foundation
 
 #if canImport(simd)
@@ -312,17 +313,15 @@ extension MinHashGenerator {
     ) -> [SimilarityPair] {
         var results: [SimilarityPair] = []
 
-        for i in 0..<signatures.count {
-            for j in (i + 1)..<signatures.count {
-                let similarity = signatures[i].estimateSimilarity(with: signatures[j])
-                if similarity >= threshold {
-                    results.append(
-                        SimilarityPair(
-                            documentId1: signatures[i].documentId,
-                            documentId2: signatures[j].documentId,
-                            similarity: similarity,
-                        ))
-                }
+        for pair in signatures.combinations(ofCount: 2) {
+            let similarity = pair[0].estimateSimilarity(with: pair[1])
+            if similarity >= threshold {
+                results.append(
+                    SimilarityPair(
+                        documentId1: pair[0].documentId,
+                        documentId2: pair[1].documentId,
+                        similarity: similarity,
+                    ))
             }
         }
 

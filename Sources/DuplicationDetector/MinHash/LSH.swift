@@ -13,6 +13,7 @@
 //  where b = number of bands, r = rows per band.
 //
 
+import Algorithms
 import Foundation
 
 // MARK: - LSHQueryable
@@ -163,11 +164,8 @@ public struct LSHIndex: Sendable, LSHQueryable {
         for band in 0..<bands {
             for (_, docIds) in buckets[band] {
                 // All pairs in the same bucket are candidates
-                for i in 0..<docIds.count {
-                    for j in (i + 1)..<docIds.count {
-                        let pair = DocumentPair(id1: docIds[i], id2: docIds[j])
-                        candidates.insert(pair)
-                    }
+                for pair in docIds.combinations(ofCount: 2) {
+                    candidates.insert(DocumentPair(id1: pair[0], id2: pair[1]))
                 }
             }
         }
@@ -216,10 +214,8 @@ public struct LSHIndex: Sendable, LSHQueryable {
 
         for band in startBand..<min(endBand, bands) {
             for (_, docIds) in buckets[band] {
-                for i in 0..<docIds.count {
-                    for j in (i + 1)..<docIds.count {
-                        candidates.insert(DocumentPair(id1: docIds[i], id2: docIds[j]))
-                    }
+                for pair in docIds.combinations(ofCount: 2) {
+                    candidates.insert(DocumentPair(id1: pair[0], id2: pair[1]))
                 }
             }
         }
@@ -244,11 +240,12 @@ public struct LSHIndex: Sendable, LSHQueryable {
         let bandsPerChunk = max(1, bands / maxConcurrency)
 
         return await withTaskGroup(of: Set<DocumentPair>.self) { group in
-            for chunkStart in stride(from: 0, to: bands, by: bandsPerChunk) {
-                let chunkEnd = min(chunkStart + bandsPerChunk, bands)
+            for chunk in (0..<bands).chunks(ofCount: bandsPerChunk) {
+                let startBand = chunk.lowerBound
+                let endBand = chunk.upperBound
 
                 group.addTask {
-                    self.findCandidatePairsInBands(from: chunkStart, to: chunkEnd)
+                    self.findCandidatePairsInBands(from: startBand, to: endBand)
                 }
             }
 

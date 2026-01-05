@@ -5,6 +5,7 @@
 //  Code duplication detection module.
 //
 
+import Algorithms
 import Foundation
 import SwiftStaticAnalysisCore
 
@@ -356,22 +357,12 @@ extension [CloneGroup] {
     /// Two clone groups are considered duplicates if they contain clones
     /// at the exact same file locations.
     public func deduplicated() -> [CloneGroup] {
-        var seen = Set<String>()
-        var result: [CloneGroup] = []
-
-        for group in self {
-            let locationFingerprint = group.clones
+        Array(self.uniqued(on: { group in
+            group.clones
                 .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
                 .sorted()
                 .joined(separator: "|")
-
-            if !seen.contains(locationFingerprint) {
-                seen.insert(locationFingerprint)
-                result.append(group)
-            }
-        }
-
-        return result
+        }))
     }
 }
 

@@ -6,6 +6,7 @@
 //  Extracted from ParallelBFS and ParallelConnectedComponents to eliminate duplication.
 //
 
+import Algorithms
 import Foundation
 
 // MARK: - ParallelFrontierExpansion
@@ -35,10 +36,7 @@ public enum ParallelFrontierExpansion {
         let chunkSize = max(1, frontier.count / maxConcurrency)
 
         return await withTaskGroup(of: [Int].self) { group in
-            for chunkStart in stride(from: 0, to: frontier.count, by: chunkSize) {
-                let chunkEnd = min(chunkStart + chunkSize, frontier.count)
-                let chunk = Array(frontier[chunkStart..<chunkEnd])
-
+            for chunk in frontier.chunks(ofCount: chunkSize) {
                 group.addTask {
                     var localNext: [Int] = []
                     for node in chunk {
@@ -78,12 +76,10 @@ public enum ParallelFrontierExpansion {
         let chunkSize = max(1, nodeCount / maxConcurrency)
 
         return await withTaskGroup(of: [Int].self) { group in
-            for chunkStart in stride(from: 0, to: nodeCount, by: chunkSize) {
-                let chunkEnd = min(chunkStart + chunkSize, nodeCount)
-
+            for chunk in (0..<nodeCount).chunks(ofCount: chunkSize) {
                 group.addTask {
                     var localNext: [Int] = []
-                    for node in chunkStart..<chunkEnd {
+                    for node in chunk {
                         if shouldExpand(node) {
                             localNext.append(node)
                         }

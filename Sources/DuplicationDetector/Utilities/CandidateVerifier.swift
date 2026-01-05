@@ -6,6 +6,7 @@
 //  Extracted from LSH and ParallelLSH to eliminate code duplication.
 //
 
+import Algorithms
 import Foundation
 
 // MARK: - CandidateVerifier
@@ -29,7 +30,7 @@ public enum CandidateVerifier {
         verifyWithExact: Bool
     ) -> [SimilarPair] {
         // Build document lookup
-        let documentMap = Dictionary(uniqueKeysWithValues: documents.map { ($0.id, $0) })
+        let documentMap = documents.keyed(by: \.id)
 
         // Verify and filter
         var results: [SimilarPair] = []

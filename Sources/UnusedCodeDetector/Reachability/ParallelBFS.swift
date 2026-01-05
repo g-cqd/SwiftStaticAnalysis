@@ -6,6 +6,7 @@
 //  Based on Beamer et al. "Direction-Optimizing Breadth-First Search" (SC 2012).
 //
 
+import Algorithms
 import Foundation
 import SwiftStaticAnalysisCore  // For ParallelFrontierExpansion
 
@@ -326,14 +327,12 @@ public enum ParallelBFS {
         let chunkSize = max(1, graph.nodeCount / maxConcurrency)
 
         return await withTaskGroup(of: [Int].self) { group in
-            for chunkStart in stride(from: 0, to: graph.nodeCount, by: chunkSize) {
-                let chunkEnd = min(chunkStart + chunkSize, graph.nodeCount)
-
+            for chunk in (0..<graph.nodeCount).chunks(ofCount: chunkSize) {
                 group.addTask {
                     var localNext: [Int] = []
 
                     // Iterate over node range, skip visited nodes inline
-                    for node in chunkStart..<chunkEnd {
+                    for node in chunk {
                         // Skip already visited nodes
                         guard !visited.test(node) else { continue }
 

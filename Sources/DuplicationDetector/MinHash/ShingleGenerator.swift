@@ -6,6 +6,7 @@
 //  Shingles capture local structure while being robust to insertions/deletions.
 //
 
+import Algorithms
 import Foundation
 
 // MARK: - Shingle
@@ -116,10 +117,9 @@ public struct ShingleGenerator: Sendable {
             }
 
         var shingles: [Shingle] = []
-        let maxStart = normalizedTokens.count - shingleSize
 
-        for i in 0...maxStart {
-            let shingleTokens = Array(normalizedTokens[i..<(i + shingleSize)])
+        for (i, window) in normalizedTokens.windows(ofCount: shingleSize).enumerated() {
+            let shingleTokens = Array(window)
             let hash = computeShingleHash(shingleTokens)
             shingles.append(Shingle(hash: hash, position: i, tokens: shingleTokens))
         }
@@ -283,8 +283,8 @@ extension ShingleGenerator {
 
         var hashes = Set<UInt64>()
 
-        for i in 0...(chars.count - k) {
-            let shingle = String(chars[i..<(i + k)])
+        for window in chars.windows(ofCount: k) {
+            let shingle = String(window)
             hashes.insert(computeStringHash(shingle))
         }
 

@@ -6,6 +6,7 @@
 //  Detects Type-1 (exact) and Type-2 (parameterized) clones with O(n) complexity.
 //
 
+import Algorithms
 import Foundation
 import SwiftStaticAnalysisCore
 
@@ -377,22 +378,12 @@ public struct SuffixArrayCloneDetector: Sendable {
 
     /// Deduplicate clone groups with same locations.
     private func deduplicateGroups(_ groups: [CloneGroup]) -> [CloneGroup] {
-        var seen: Set<String> = []
-        var result: [CloneGroup] = []
-
-        for group in groups {
-            let key = group.clones
+        Array(groups.uniqued(on: { group in
+            group.clones
                 .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
                 .sorted()
                 .joined(separator: "|")
-
-            if !seen.contains(key) {
-                seen.insert(key)
-                result.append(group)
-            }
-        }
-
-        return result
+        }))
     }
 }
 

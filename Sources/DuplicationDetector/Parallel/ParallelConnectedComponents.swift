@@ -10,6 +10,7 @@
 //  - Atomic root claiming for global parallelism
 //
 
+import Algorithms
 import Collections
 import Foundation
 import SwiftStaticAnalysisCore  // For ParallelFrontierExpansion
@@ -236,13 +237,11 @@ public enum ParallelConnectedComponents {
         let chunkSize = max(1, nodeCount / maxConcurrency)
 
         return await withTaskGroup(of: [Int].self) { group in
-            for chunkStart in stride(from: 0, to: nodeCount, by: chunkSize) {
-                let chunkEnd = min(chunkStart + chunkSize, nodeCount)
-
+            for chunk in (0..<nodeCount).chunks(ofCount: chunkSize) {
                 group.addTask {
                     var localNext: [Int] = []
 
-                    for node in chunkStart..<chunkEnd {
+                    for node in chunk {
                         // Skip already visited
                         guard !visited.test(node) else { continue }
 

@@ -5,6 +5,7 @@
 //  Deduplication and merging of diagnostics.
 //
 
+import Algorithms
 import Foundation
 
 // MARK: - DiagnosticDeduplicator
@@ -27,17 +28,7 @@ public struct DiagnosticDeduplicator: Sendable {
     /// - Parameter diagnostics: Diagnostics to deduplicate.
     /// - Returns: Deduplicated diagnostics.
     public func deduplicate(_ diagnostics: [Diagnostic]) -> [Diagnostic] {
-        var seen = Set<String>()
-        var result: [Diagnostic] = []
-
-        for diagnostic in diagnostics {
-            let key = deduplicationKey(for: diagnostic)
-
-            if !seen.contains(key) {
-                seen.insert(key)
-                result.append(diagnostic)
-            }
-        }
+        var result = Array(diagnostics.uniqued(on: { deduplicationKey(for: $0) }))
 
         // Apply per-file limit if configured
         if let limit = configuration.maxDiagnosticsPerFile {

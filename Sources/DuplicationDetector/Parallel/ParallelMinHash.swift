@@ -6,6 +6,7 @@
 //  Computes signatures for multiple documents concurrently.
 //
 
+import Algorithms
 import Foundation
 
 // MARK: - ParallelMinHashGenerator
@@ -78,7 +79,7 @@ public struct ParallelMinHashGenerator: Sendable {
                 signatures[index] = signature
             }
 
-            return signatures.compactMap { $0 }
+            return Array(signatures.compacted())
         }
     }
 
@@ -103,10 +104,7 @@ public struct ParallelMinHashGenerator: Sendable {
         var allSignatures: [MinHashSignature] = []
         allSignatures.reserveCapacity(documents.count)
 
-        for chunkStart in stride(from: 0, to: documents.count, by: effectiveChunkSize) {
-            let chunkEnd = min(chunkStart + effectiveChunkSize, documents.count)
-            let chunk = Array(documents[chunkStart..<chunkEnd])
-
+        for chunk in documents.chunks(ofCount: effectiveChunkSize) {
             let chunkSignatures = await withTaskGroup(of: (Int, MinHashSignature).self) { group in
                 for (localIndex, document) in chunk.enumerated() {
                     group.addTask {
@@ -119,7 +117,7 @@ public struct ParallelMinHashGenerator: Sendable {
                     results[index] = signature
                 }
 
-                return results.compactMap { $0 }
+                return Array(results.compacted())
             }
 
             allSignatures.append(contentsOf: chunkSignatures)

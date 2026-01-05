@@ -6,6 +6,7 @@
 //  Uses content hashing and modification time tracking for efficient detection.
 //
 
+import Algorithms
 import Foundation
 
 // MARK: - FileState
@@ -102,28 +103,28 @@ public struct ChangeDetectionResult: Sendable {
     public let changes: [FileChange]
 
     /// Files that were added.
-    public var addedFiles: [String] {
-        changes.filter { $0.changeType == .added }.map(\.path)
+    public var addedFiles: some Collection<String> {
+        changes.lazy.filter { $0.changeType == .added }.map(\.path)
     }
 
     /// Files that were modified.
-    public var modifiedFiles: [String] {
-        changes.filter { $0.changeType == .modified }.map(\.path)
+    public var modifiedFiles: some Collection<String> {
+        changes.lazy.filter { $0.changeType == .modified }.map(\.path)
     }
 
     /// Files that were deleted.
-    public var deletedFiles: [String] {
-        changes.filter { $0.changeType == .deleted }.map(\.path)
+    public var deletedFiles: some Collection<String> {
+        changes.lazy.filter { $0.changeType == .deleted }.map(\.path)
     }
 
     /// Files that are unchanged.
-    public var unchangedFiles: [String] {
-        changes.filter { $0.changeType == .unchanged }.map(\.path)
+    public var unchangedFiles: some Collection<String> {
+        changes.lazy.filter { $0.changeType == .unchanged }.map(\.path)
     }
 
     /// Files that need re-analysis (added + modified).
-    public var filesToAnalyze: [String] {
-        addedFiles + modifiedFiles
+    public var filesToAnalyze: some Collection<String> {
+        chain(addedFiles, modifiedFiles)
     }
 
     /// Whether any changes were detected.
@@ -287,10 +288,7 @@ public struct ChangeDetector: Sendable {
             // Process in batches to limit concurrency
             let batchSize = configuration.maxConcurrency
 
-            for batchStart in stride(from: 0, to: files.count, by: batchSize) {
-                let batchEnd = min(batchStart + batchSize, files.count)
-                let batch = files[batchStart..<batchEnd]
-
+            for batch in files.chunks(ofCount: batchSize) {
                 for file in batch {
                     group.addTask {
                         // Optimization: if not always verifying hash, check mod time first
@@ -303,9 +301,6 @@ public struct ChangeDetector: Sendable {
                         return (file, computeState(for: file))
                     }
                 }
-
-                // Collect batch results before starting next batch
-                // This limits true concurrency
             }
 
             var results: [String: FileState] = [:]

@@ -5,6 +5,7 @@
 //  Detects semantic clones (Type 3 clones) using AST structural comparison.
 //
 
+import Algorithms
 import Foundation
 import SwiftStaticAnalysisCore
 import SwiftSyntax
@@ -177,12 +178,10 @@ public struct SemanticCloneDetector: Sendable {
         var totalSimilarity = 0.0
         var comparisons = 0
 
-        for i in 0..<group.count {
-            for j in (i + 1)..<group.count {
-                let sim = fingerprintSimilarity(group[i].fingerprint, group[j].fingerprint)
-                totalSimilarity += sim
-                comparisons += 1
-            }
+        for pair in group.combinations(ofCount: 2) {
+            let sim = fingerprintSimilarity(pair[0].fingerprint, pair[1].fingerprint)
+            totalSimilarity += sim
+            comparisons += 1
         }
 
         return comparisons > 0 ? totalSimilarity / Double(comparisons) : 0

@@ -9,6 +9,7 @@
 //  complexity by using LSH to avoid O(n²) pairwise comparisons.
 //
 
+import Algorithms
 import Collections
 import Foundation
 import SwiftStaticAnalysisCore
@@ -162,7 +163,7 @@ public struct MinHashCloneDetector: Sendable {
         let candidatePairs = lshIndex.findCandidatePairs()
 
         // Build document lookup
-        let documentMap = Dictionary(uniqueKeysWithValues: allDocuments.map { ($0.id, $0) })
+        let documentMap = allDocuments.keyed(by: \.id)
 
         // Verify candidates and build clone groups
         let clonePairs = verifyCandidatePairs(candidatePairs, documentMap: documentMap)
@@ -250,7 +251,7 @@ public struct MinHashCloneDetector: Sendable {
         }
 
         // Build document lookup
-        let documentMap = Dictionary(uniqueKeysWithValues: allDocuments.map { ($0.id, $0) })
+        let documentMap = allDocuments.keyed(by: \.id)
 
         // Verify candidates (parallel or sequential)
         let clonePairs: [ClonePairInfo]
