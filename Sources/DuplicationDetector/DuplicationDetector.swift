@@ -6,6 +6,7 @@
 //
 
 import Algorithms
+import AsyncAlgorithms
 import Foundation
 import SwiftStaticAnalysisCore
 
@@ -363,6 +364,63 @@ extension [CloneGroup] {
                 .sorted()
                 .joined(separator: "|")
         }))
+    }
+}
+
+// MARK: - Streaming Clone Group Deduplication
+
+/// Streaming utilities for clone group deduplication.
+///
+/// These utilities enable memory-bounded processing for large result sets
+/// by deduplicating clone groups as they stream through the pipeline.
+public enum StreamingCloneDeduplication {
+    /// Deduplicate clone groups from an async stream.
+    ///
+    /// Uses an in-memory set to track seen fingerprints, yielding only
+    /// unique groups. Suitable for ParallelMode.maximum.
+    ///
+    /// - Parameters:
+    ///   - stream: AsyncStream of clone groups.
+    ///   - bufferSize: Size of the output buffer.
+    /// - Returns: AsyncStream of deduplicated clone groups.
+    public static func deduplicated(
+        _ stream: AsyncStream<CloneGroup>,
+        bufferSize: Int = 100
+    ) -> AsyncStream<CloneGroup> {
+        AsyncStream(bufferingPolicy: .bufferingNewest(bufferSize)) { continuation in
+            Task {
+                var seen = Set<String>()
+
+                for await group in stream {
+                    let fingerprint = group.clones
+                        .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
+                        .sorted()
+                        .joined(separator: "|")
+
+                    if seen.insert(fingerprint).inserted {
+                        continuation.yield(group)
+                    }
+                }
+
+                continuation.finish()
+            }
+        }
+    }
+
+    /// Collect deduplicated results from a stream.
+    ///
+    /// Convenience method that collects all deduplicated groups into an array.
+    ///
+    /// - Parameter stream: AsyncStream of clone groups.
+    /// - Returns: Array of deduplicated clone groups.
+    public static func collectDeduplicated(
+        _ stream: AsyncStream<CloneGroup>
+    ) async -> [CloneGroup] {
+        var results: [CloneGroup] = []
+        for await group in deduplicated(stream) {
+            results.append(group)
+        }
+        return results
     }
 }
 

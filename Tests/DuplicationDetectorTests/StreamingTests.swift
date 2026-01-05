@@ -217,3 +217,95 @@ struct VerificationProgressTests {
         #expect(progress.progress == 1.0)  // Edge case: 0/0 = 100%
     }
 }
+
+// MARK: - Streaming Clone Deduplication Tests
+
+@Suite("Streaming Clone Deduplication Tests")
+struct StreamingCloneDeduplicationTests {
+    // MARK: - Helpers
+
+    private func createClone(file: String, startLine: Int, endLine: Int) -> Clone {
+        Clone(
+            file: file,
+            startLine: startLine,
+            endLine: endLine,
+            tokenCount: 50,
+            codeSnippet: "test code"
+        )
+    }
+
+    private func createGroup(clones: [Clone], similarity: Double) -> CloneGroup {
+        let fingerprint = clones
+            .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
+            .sorted()
+            .joined(separator: "|")
+        return CloneGroup(
+            type: .exact,
+            clones: clones,
+            similarity: similarity,
+            fingerprint: fingerprint
+        )
+    }
+
+    @Test("Deduplicates clone groups from stream")
+    func streamDeduplication() async {
+        // Create test clone groups with some duplicates
+        let clone1 = createClone(file: "a.swift", startLine: 1, endLine: 5)
+        let clone2 = createClone(file: "b.swift", startLine: 1, endLine: 5)
+        let clone3 = createClone(file: "c.swift", startLine: 10, endLine: 15)
+
+        let group1 = createGroup(clones: [clone1, clone2], similarity: 1.0)
+        let group2 = createGroup(clones: [clone1, clone2], similarity: 1.0)  // Duplicate
+        let group3 = createGroup(clones: [clone1, clone3], similarity: 1.0)  // Different
+
+        let inputStream = AsyncStream<CloneGroup> { continuation in
+            continuation.yield(group1)
+            continuation.yield(group2)
+            continuation.yield(group3)
+            continuation.finish()
+        }
+
+        let results = await StreamingCloneDeduplication.collectDeduplicated(inputStream)
+
+        // Should have 2 unique groups (group1 and group3)
+        #expect(results.count == 2)
+    }
+
+    @Test("Handles empty stream")
+    func emptyStreamDeduplication() async {
+        let inputStream = AsyncStream<CloneGroup> { continuation in
+            continuation.finish()
+        }
+
+        let results = await StreamingCloneDeduplication.collectDeduplicated(inputStream)
+
+        #expect(results.isEmpty)
+    }
+
+    @Test("Preserves order of first occurrence")
+    func preservesOrder() async {
+        let clone1 = createClone(file: "a.swift", startLine: 1, endLine: 5)
+        let clone2 = createClone(file: "b.swift", startLine: 1, endLine: 5)
+        let clone3 = createClone(file: "c.swift", startLine: 1, endLine: 5)
+
+        let group1 = createGroup(clones: [clone1, clone2], similarity: 1.0)
+        let group2 = createGroup(clones: [clone2, clone3], similarity: 0.9)
+        let group3 = createGroup(clones: [clone1, clone3], similarity: 0.8)
+
+        let inputStream = AsyncStream<CloneGroup> { continuation in
+            continuation.yield(group1)
+            continuation.yield(group2)
+            continuation.yield(group3)
+            continuation.finish()
+        }
+
+        let results = await StreamingCloneDeduplication.collectDeduplicated(inputStream)
+
+        // All three are unique (different file combinations)
+        #expect(results.count == 3)
+        // Order should be preserved
+        #expect(results[0].similarity == 1.0)
+        #expect(results[1].similarity == 0.9)
+        #expect(results[2].similarity == 0.8)
+    }
+}

@@ -5,6 +5,7 @@
 //  Extracts dependencies between declarations to build the reachability graph.
 //
 
+import AsyncAlgorithms
 import Foundation
 import SwiftStaticAnalysisCore
 
@@ -115,6 +116,92 @@ public struct DependencyExtractor: Sendable {
                 result: result,
                 declByName: declByName
             )
+        }
+    }
+
+    /// Stream edges as they're computed (for ParallelMode.maximum).
+    ///
+    /// This method yields edges incrementally, reducing peak memory for large codebases.
+    /// Each declaration's edges are computed and yielded immediately.
+    ///
+    /// - Parameters:
+    ///   - result: The analysis result containing declarations and references.
+    ///   - bufferSize: Size of the streaming buffer for backpressure.
+    /// - Returns: AsyncStream of dependency edges.
+    public func streamEdges(
+        from result: AnalysisResult,
+        bufferSize: Int = 1000
+    ) -> AsyncStream<DependencyEdge> {
+        let declarations = result.declarations
+        let references = result.references
+
+        // Create a lookup from name to declarations
+        var declByNameMutable: [String: [Declaration]] = [:]
+        for decl in declarations.declarations {
+            declByNameMutable[decl.name, default: []].append(decl)
+        }
+        let declByName = declByNameMutable
+
+        return AsyncStream(bufferingPolicy: .bufferingNewest(bufferSize)) { continuation in
+            Task {
+                for declaration in declarations.declarations {
+                    let edges = self.computeEdgesForDeclaration(
+                        declaration,
+                        references: references,
+                        declByName: declByName
+                    )
+                    for edge in edges {
+                        continuation.yield(edge)
+                    }
+                }
+
+                // Also stream protocol witness edges
+                if self.configuration.trackProtocolWitnesses {
+                    for await edge in self.streamProtocolWitnessEdges(
+                        result: result,
+                        declByName: declByName
+                    ) {
+                        continuation.yield(edge)
+                    }
+                }
+
+                continuation.finish()
+            }
+        }
+    }
+
+    /// Stream protocol witness edges.
+    private func streamProtocolWitnessEdges(
+        result: AnalysisResult,
+        declByName: [String: [Declaration]]
+    ) -> AsyncStream<DependencyEdge> {
+        let protocols = result.declarations.find(kind: .protocol)
+        let types = result.declarations.declarations.filter {
+            $0.kind == .class || $0.kind == .struct || $0.kind == .enum
+        }
+
+        return AsyncStream { continuation in
+            Task {
+                // Stream protocol witness edges
+                for proto in protocols {
+                    for edge in self.computeProtocolWitnessEdges(
+                        for: proto,
+                        result: result,
+                        declByName: declByName
+                    ) {
+                        continuation.yield(edge)
+                    }
+                }
+
+                // Stream type method edges
+                for type in types {
+                    for edge in self.computeTypeMethodEdges(for: type, result: result) {
+                        continuation.yield(edge)
+                    }
+                }
+
+                continuation.finish()
+            }
         }
     }
 
