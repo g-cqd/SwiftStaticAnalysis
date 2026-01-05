@@ -1,9 +1,6 @@
-//
 //  DiagnosticTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for diagnostics and Xcode formatting.
-//
+//  MIT License
 
 import Foundation
 import Testing

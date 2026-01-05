@@ -1,14 +1,6 @@
-//
 //  DetectionModeTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify detection mode presets and configuration
-//
-//  ## Coverage
-//  - Simple mode is default
-//  - Reachability, IndexStore, Strict presets
-//
+//  MIT License
 
 import Foundation
 import Testing

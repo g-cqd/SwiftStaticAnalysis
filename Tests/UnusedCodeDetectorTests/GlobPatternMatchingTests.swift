@@ -1,18 +1,6 @@
-//
 //  GlobPatternMatchingTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify glob pattern matching for path exclusions
-//
-//  ## Coverage
-//  - Single star wildcard (*)
-//  - Double star wildcard (**)
-//  - Tests and Fixtures directory patterns
-//  - File suffix patterns
-//  - Escaped dots
-//  - Question mark wildcard (?)
-//
+//  MIT License
 
 import Foundation
 import Testing

@@ -1,11 +1,6 @@
-//
 //  ParallelMode.swift
 //  SwiftStaticAnalysis
-//
-//  Parallel execution mode for analysis operations.
-//  Provides backward compatibility with boolean --parallel flag while enabling
-//  future streaming/async-algorithms patterns.
-//
+//  MIT License
 
 import Foundation
 

@@ -1,9 +1,6 @@
-//
 //  ConfidenceCalculator.swift
 //  SwiftStaticAnalysis
-//
-//  Shared utilities for calculating confidence levels.
-//
+//  MIT License
 
 import SwiftStaticAnalysisCore
 

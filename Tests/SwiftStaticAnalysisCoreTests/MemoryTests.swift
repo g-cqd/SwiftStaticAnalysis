@@ -1,9 +1,6 @@
-//
 //  MemoryTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for arena allocation, memory-mapped files, and SoA token storage.
-//
+//  MIT License
 
 import Foundation
 import Testing

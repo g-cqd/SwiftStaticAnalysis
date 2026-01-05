@@ -1,12 +1,6 @@
-//
 //  CFGBuilder.swift
 //  SwiftStaticAnalysis
-//
-//  Control Flow Graph construction for data flow analysis.
-//  Builds a CFG from Swift function bodies for use in
-//  live variable analysis, reaching definitions, and SCCP.
-//
-// swiftlint:disable file_length
+//  MIT License
 
 import Foundation
 import SwiftStaticAnalysisCore

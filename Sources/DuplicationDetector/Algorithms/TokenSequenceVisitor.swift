@@ -1,9 +1,6 @@
-//
 //  TokenSequenceVisitor.swift
 //  SwiftStaticAnalysis
-//
-//  Extracts token sequences from Swift source code for clone detection.
-//
+//  MIT License
 
 import Foundation
 import SwiftStaticAnalysisCore

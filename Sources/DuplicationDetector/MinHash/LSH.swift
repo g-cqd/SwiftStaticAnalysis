@@ -1,17 +1,6 @@
-//
 //  LSH.swift
 //  SwiftStaticAnalysis
-//
-//  Locality Sensitive Hashing (LSH) for efficient similarity search.
-//
-//  LSH uses the banding technique to bucket MinHash signatures so that
-//  similar documents hash to the same bucket with high probability.
-//  This reduces similarity search from O(n^2) to approximately O(n).
-//
-//  The probability that two documents with Jaccard similarity s become
-//  candidates is: 1 - (1 - s^r)^b
-//  where b = number of bands, r = rows per band.
-//
+//  MIT License
 
 import Algorithms
 import AsyncAlgorithms

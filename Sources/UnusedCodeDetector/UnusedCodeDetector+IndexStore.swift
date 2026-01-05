@@ -1,9 +1,6 @@
-//
 //  UnusedCodeDetector+IndexStore.swift
 //  SwiftStaticAnalysis
-//
-//  IndexStore-based unused code detection.
-//
+//  MIT License
 
 import Foundation
 import IndexStoreDB

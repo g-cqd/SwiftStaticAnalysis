@@ -1,9 +1,6 @@
-//
-//  DuplicationEngine.swift
+//  _DuplicationEngine.swift
 //  SwiftStaticAnalysis
-//
-//  Shared engine for code duplication detection algorithms.
-//
+//  MIT License
 
 import Foundation
 import SwiftStaticAnalysisCore

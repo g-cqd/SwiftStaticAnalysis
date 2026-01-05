@@ -1,9 +1,6 @@
-//
 //  SwiftStaticAnalysisCore.swift
 //  SwiftStaticAnalysis
-//
-//  Core infrastructure for Swift static analysis.
-//
+//  MIT License
 
 import Foundation
 @_exported import SwiftParser

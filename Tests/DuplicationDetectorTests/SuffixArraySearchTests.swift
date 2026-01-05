@@ -1,14 +1,6 @@
-//
 //  SuffixArraySearchTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify suffix array pattern search functionality
-//  - Test various occurrence scenarios
-//
-//  ## Coverage
-//  - findOccurrences: exact pattern, non-existent, single, overlapping
-//
+//  MIT License
 
 import Foundation
 import Testing

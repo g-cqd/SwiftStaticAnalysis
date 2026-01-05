@@ -1,19 +1,6 @@
-//
 //  ExactCloneDetectorTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify ExactCloneDetector initialization
-//  - Test empty sequence handling
-//
-//  ## Coverage
-//  - ExactCloneDetector: initialization with minimumTokens
-//  - detect(): empty input returns empty result
-//
-//  ## Gaps
-//  - Missing: actual clone detection with duplicate sequences
-//  - Missing: threshold behavior testing
-//
+//  MIT License
 
 import Testing
 

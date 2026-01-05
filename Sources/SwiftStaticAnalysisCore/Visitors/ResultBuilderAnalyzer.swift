@@ -1,11 +1,6 @@
-//
 //  ResultBuilderAnalyzer.swift
 //  SwiftStaticAnalysis
-//
-//  Detects and analyzes result builder usage in Swift code.
-//  Result builders like @ViewBuilder transform closure contents
-//  into builder method calls, which affects clone detection.
-//
+//  MIT License
 
 import Foundation
 import SwiftSyntax

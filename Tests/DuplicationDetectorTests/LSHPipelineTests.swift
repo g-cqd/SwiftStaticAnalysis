@@ -1,13 +1,6 @@
-//
 //  LSHPipelineTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify LSH pipeline end-to-end functionality
-//
-//  ## Coverage
-//  - findSimilarPairs with verification
-//
+//  MIT License
 
 import Foundation
 import Testing

@@ -1,9 +1,6 @@
-//
 //  CLITests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for the `swa` CLI tool commands.
-//
+//  MIT License
 
 import Foundation
 import Testing

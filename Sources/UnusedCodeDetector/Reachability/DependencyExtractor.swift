@@ -1,9 +1,6 @@
-//
 //  DependencyExtractor.swift
 //  SwiftStaticAnalysis
-//
-//  Extracts dependencies between declarations to build the reachability graph.
-//
+//  MIT License
 
 import AsyncAlgorithms
 import Foundation

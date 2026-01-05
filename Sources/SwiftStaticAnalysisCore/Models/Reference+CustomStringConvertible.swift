@@ -1,9 +1,6 @@
-//
 //  Reference+CustomStringConvertible.swift
 //  SwiftStaticAnalysis
-//
-
-// MARK: - Reference + CustomStringConvertible
+//  MIT License
 
 extension Reference: CustomStringConvertible {
     public var description: String {

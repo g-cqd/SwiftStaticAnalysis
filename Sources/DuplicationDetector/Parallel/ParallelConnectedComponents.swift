@@ -1,14 +1,6 @@
-//
 //  ParallelConnectedComponents.swift
 //  SwiftStaticAnalysis
-//
-//  Parallel connected component finding for clone graphs.
-//  Directly applies patterns from ParallelBFS:
-//  - AtomicBitmap for lock-free visited tracking
-//  - Top-down chunked expansion
-//  - Direction-optimizing for dense graphs
-//  - Atomic root claiming for global parallelism
-//
+//  MIT License
 
 import Algorithms
 import Collections

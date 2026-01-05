@@ -1,11 +1,6 @@
-//
 //  ClosureNormalizer.swift
 //  SwiftStaticAnalysis
-//
-//  Normalizes closure expressions for clone detection.
-//  Handles trailing closures, shorthand argument names,
-//  and other syntactic variations.
-//
+//  MIT License
 
 import RegexBuilder
 import SwiftSyntax

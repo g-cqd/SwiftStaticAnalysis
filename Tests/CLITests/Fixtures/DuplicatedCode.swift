@@ -1,9 +1,6 @@
-//
 //  DuplicatedCode.swift
-//  CLI Test Fixture
-//
-//  A Swift file with intentional code duplication for testing clone detection.
-//
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Foundation
 

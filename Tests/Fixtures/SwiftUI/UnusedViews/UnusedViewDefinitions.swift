@@ -1,10 +1,6 @@
-//
 //  UnusedViewDefinitions.swift
-//  SwiftStaticAnalysis - Test Fixtures
-//
-//  Views that are defined but never used anywhere.
-//  These SHOULD be flagged as unused.
-//
+//  SwiftStaticAnalysis
+//  MIT License
 
 import SwiftUI
 

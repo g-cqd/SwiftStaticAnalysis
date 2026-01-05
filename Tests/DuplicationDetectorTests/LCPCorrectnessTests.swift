@@ -1,16 +1,6 @@
-//
 //  LCPCorrectnessTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify LCP array values are computed correctly
-//  - Test specific edge cases
-//
-//  ## Coverage
-//  - LCP values match direct computation
-//  - No common prefixes case (descending input)
-//  - Long common prefix detection
-//
+//  MIT License
 
 import Foundation
 import Testing

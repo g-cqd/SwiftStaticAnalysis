@@ -1,14 +1,6 @@
-//
 //  MinHash.swift
 //  SwiftStaticAnalysis
-//
-//  MinHash implementation for estimating Jaccard similarity between sets.
-//  Uses SIMD operations where possible for high-throughput signature computation.
-//
-//  MinHash generates k hash values (signature) for each document, where k is
-//  the number of hash functions. The probability that two documents have the
-//  same MinHash value equals their Jaccard similarity.
-//
+//  MIT License
 
 import Algorithms
 import Foundation

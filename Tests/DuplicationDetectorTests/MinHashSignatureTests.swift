@@ -1,19 +1,6 @@
-//
 //  MinHashSignatureTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify MinHash signature computation
-//  - Test similarity estimation accuracy
-//
-//  ## Coverage
-//  - Identical sets produce similarity 1.0
-//  - Disjoint sets produce low similarity
-//  - Partial overlap similarity estimation
-//  - Empty set signature behavior
-//  - Deterministic signatures with same seed
-//  - Different seeds produce different signatures
-//
+//  MIT License
 
 import Foundation
 import Testing

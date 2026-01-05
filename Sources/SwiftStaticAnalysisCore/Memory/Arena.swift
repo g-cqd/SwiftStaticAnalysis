@@ -1,19 +1,6 @@
-//
 //  Arena.swift
 //  SwiftStaticAnalysis
-//
-//  Arena allocator for region-based memory management.
-//
-//  Arena allocation provides extremely fast allocation through bump-pointer
-//  semantics. Memory is allocated contiguously and all allocations are freed
-//  at once when the arena is destroyed or reset.
-//
-//  Benefits:
-//  - O(1) allocation (just increment a pointer)
-//  - Cache-friendly contiguous memory layout
-//  - No individual deallocation overhead
-//  - Ideal for batch processing workloads
-//
+//  MIT License
 
 import Foundation
 

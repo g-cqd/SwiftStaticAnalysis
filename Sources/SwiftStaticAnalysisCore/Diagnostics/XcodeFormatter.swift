@@ -1,9 +1,6 @@
-//
 //  XcodeFormatter.swift
 //  SwiftStaticAnalysis
-//
-//  Format diagnostics for Xcode integration.
-//
+//  MIT License
 
 import Foundation
 

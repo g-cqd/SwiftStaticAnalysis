@@ -1,18 +1,6 @@
-//
 //  SemanticCloneDetectorTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify SemanticCloneDetector initialization
-//
-//  ## Coverage
-//  - SemanticCloneDetector: initialization with minimumNodes, minimumSimilarity
-//
-//  ## Gaps
-//  - Missing: actual semantic clone detection testing
-//  - Missing: AST structure comparison testing
-//  - Missing: similarity calculation verification
-//
+//  MIT License
 
 import Testing
 

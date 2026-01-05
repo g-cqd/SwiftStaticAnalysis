@@ -1,9 +1,6 @@
-//
 //  StreamingTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for streaming components using swift-async-algorithms.
-//
+//  MIT License
 
 import Testing
 

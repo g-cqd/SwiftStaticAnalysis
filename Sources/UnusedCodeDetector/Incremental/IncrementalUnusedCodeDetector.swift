@@ -1,9 +1,6 @@
-//
 //  IncrementalUnusedCodeDetector.swift
 //  SwiftStaticAnalysis
-//
-//  Incremental unused code detector with caching support.
-//
+//  MIT License
 
 import RegexBuilder
 import SwiftStaticAnalysisCore
@@ -45,6 +42,8 @@ public actor IncrementalUnusedCodeDetector {
     ) {
         self.configuration = configuration
         self.concurrency = concurrency
+        // Pre-compile ignore patterns for efficient matching
+        compiledIgnorePatterns = CompiledPatterns(configuration.ignoredPatterns)
 
         let incrementalConfig = IncrementalConfiguration(
             cacheDirectory: configuration.cacheDirectory,
@@ -118,6 +117,9 @@ public actor IncrementalUnusedCodeDetector {
 
     /// Incremental analyzer.
     private let incrementalAnalyzer: IncrementalAnalyzer
+
+    /// Pre-compiled ignore patterns for efficient matching.
+    private let compiledIgnorePatterns: CompiledPatterns
 
     /// Whether initialized.
     private var isInitialized: Bool = false
@@ -217,13 +219,9 @@ public actor IncrementalUnusedCodeDetector {
             return false
         }
 
-        // Check ignored patterns
-        for pattern in configuration.ignoredPatterns {
-            if let regex = try? Regex(pattern),
-                declaration.name.contains(regex)
-            {
-                return false
-            }
+        // Check ignored patterns using pre-compiled patterns
+        if compiledIgnorePatterns.anyMatches(declaration.name) {
+            return false
         }
 
         // SwiftUI filters

@@ -1,15 +1,6 @@
-//
 //  LiveVariableAnalysis.swift
 //  SwiftStaticAnalysis
-//
-//  Backward data flow analysis for live variable detection.
-//  Computes which variables are "live" (may be read before being written)
-//  at each program point. Used for detecting dead stores and unused variables.
-//
-//  Equations:
-//    LIVE_in[B] = USE[B] ∪ (LIVE_out[B] - DEF[B])
-//    LIVE_out[B] = ∪ LIVE_in[S] for all successors S of B
-//
+//  MIT License
 
 import Foundation
 import SwiftStaticAnalysisCore

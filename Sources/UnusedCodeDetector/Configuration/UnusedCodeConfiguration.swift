@@ -1,9 +1,6 @@
-//
 //  UnusedCodeConfiguration.swift
 //  SwiftStaticAnalysis
-//
-//  Configuration for unused code detection.
-//
+//  MIT License
 
 import Foundation
 

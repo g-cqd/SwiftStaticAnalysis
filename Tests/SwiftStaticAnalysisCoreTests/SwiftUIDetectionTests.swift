@@ -1,9 +1,6 @@
-//
 //  SwiftUIDetectionTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for SwiftUI property wrapper and View detection.
-//
+//  MIT License
 
 import Foundation
 import Testing

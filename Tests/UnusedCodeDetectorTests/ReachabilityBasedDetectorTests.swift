@@ -1,14 +1,6 @@
-//
 //  ReachabilityBasedDetectorTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify ReachabilityBasedDetector initialization and mode configuration
-//
-//  ## Coverage
-//  - Default initialization
-//  - Reachability mode configuration
-//
+//  MIT License
 
 import Foundation
 import Testing

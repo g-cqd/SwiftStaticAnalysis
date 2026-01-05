@@ -1,10 +1,6 @@
-//
 //  ViewModelDuplication.swift
-//  SwiftStaticAnalysis - Test Fixtures
-//
-//  This file contains intentional near-clone duplication (Type-2).
-//  ViewModels have identical structure but different variable names.
-//
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Foundation
 

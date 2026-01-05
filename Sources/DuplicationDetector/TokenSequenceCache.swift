@@ -1,9 +1,6 @@
-//
 //  TokenSequenceCache.swift
 //  SwiftStaticAnalysis
-//
-//  Cache for token sequences to enable incremental duplication detection.
-//
+//  MIT License
 
 import Foundation
 import SwiftStaticAnalysisCore

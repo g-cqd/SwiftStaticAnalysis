@@ -1,9 +1,6 @@
-//
 //  PropertyWrapper.swift
 //  SwiftStaticAnalysis
-//
-//  Property wrapper detection for SwiftUI and other frameworks.
-//
+//  MIT License
 
 import Foundation
 

@@ -1,13 +1,6 @@
-//
 //  MinHashCloneDetector.swift
 //  SwiftStaticAnalysis
-//
-//  Clone detection using MinHash and LSH for Type-3 (gapped/near-miss) clones.
-//
-//  This detector uses probabilistic similarity estimation to find code clones
-//  that may have insertions, deletions, or modifications. It achieves O(n)
-//  complexity by using LSH to avoid O(n²) pairwise comparisons.
-//
+//  MIT License
 
 import Algorithms
 import Collections

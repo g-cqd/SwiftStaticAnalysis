@@ -1,10 +1,6 @@
-// swiftlint:disable file_length
-//
 //  main.swift
 //  SwiftStaticAnalysis
-//
-//  CLI entry point for the `swa` tool.
-//
+//  MIT License
 
 import ArgumentParser
 import DuplicationDetector

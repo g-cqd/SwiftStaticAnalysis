@@ -1,9 +1,6 @@
-//
 //  SwiftSyntaxModeTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for unused code detection using SwiftSyntax-only mode.
-//
+//  MIT License
 
 import Foundation
 import Testing

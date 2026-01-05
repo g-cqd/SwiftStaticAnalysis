@@ -1,9 +1,6 @@
-//
 //  Models.swift
-//  NetworkingApp - Test Fixtures
-//
-//  Shared models for the networking app.
-//
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Foundation
 

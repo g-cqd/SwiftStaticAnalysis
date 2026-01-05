@@ -1,21 +1,6 @@
-//
 //  IntegrationTests.swift
 //  SwiftStaticAnalysis
-//
-//  End-to-end integration tests for the duplication detector.
-//
-//  ## Test Goals
-//  - Verify full detection pipeline works with real Swift files
-//  - Test exact, near, and semantic clone detection on fixture files
-//  - Validate cross-file clone detection across multiple sources
-//  - Ensure report generation produces correct metrics
-//  - Test edge cases: non-existent files, empty file lists
-//
-//  ## Coverage
-//  - DuplicationDetector.detectClones() with various configurations
-//  - Multi-file analysis with cross-file clone detection
-//  - DuplicationReport metric calculations
-//
+//  MIT License
 
 import Foundation
 import Testing

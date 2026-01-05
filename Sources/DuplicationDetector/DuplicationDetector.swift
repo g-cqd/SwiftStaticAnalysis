@@ -1,9 +1,6 @@
-//
 //  DuplicationDetector.swift
 //  SwiftStaticAnalysis
-//
-//  Code duplication detection module.
-//
+//  MIT License
 
 import Algorithms
 import AsyncAlgorithms

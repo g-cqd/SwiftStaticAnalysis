@@ -1,9 +1,6 @@
-//
 //  RepeatedModifiers.swift
-//  SwiftStaticAnalysis - Test Fixtures
-//
-//  Repeated modifier chains that should be detected as duplicates.
-//
+//  SwiftStaticAnalysis
+//  MIT License
 
 import SwiftUI
 

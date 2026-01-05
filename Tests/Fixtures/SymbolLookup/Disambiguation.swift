@@ -1,6 +1,6 @@
-// Test fixture for symbol disambiguation - same names in different contexts
-
-// swift-format-ignore: AlwaysUseLowerCamelCase
+//  Disambiguation.swift
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Foundation
 

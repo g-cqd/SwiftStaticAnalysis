@@ -1,9 +1,6 @@
-//
 //  ExactCloneDetector.swift
 //  SwiftStaticAnalysis
-//
-//  Detects exact code clones using Rabin-Karp rolling hash algorithm.
-//
+//  MIT License
 
 import Foundation
 import SwiftStaticAnalysisCore

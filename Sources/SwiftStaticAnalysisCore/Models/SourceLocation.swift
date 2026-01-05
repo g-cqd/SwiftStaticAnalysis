@@ -1,7 +1,6 @@
-//
 //  SourceLocation.swift
 //  SwiftStaticAnalysis
-//
+//  MIT License
 
 import Foundation
 

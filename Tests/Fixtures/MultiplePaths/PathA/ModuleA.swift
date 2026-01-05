@@ -1,9 +1,6 @@
-//
 //  ModuleA.swift
 //  SwiftStaticAnalysis
-//
-//  Test fixture for multiple paths support - Module A.
-//
+//  MIT License
 
 import Foundation
 

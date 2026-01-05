@@ -1,9 +1,6 @@
-//
 //  SemanticCloneTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for semantic clone (Type-3/Type-4) detection.
-//
+//  MIT License
 
 import Foundation
 import SwiftParser

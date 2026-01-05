@@ -1,4 +1,6 @@
-// Test fixture for symbol lookup with variety of symbol types
+//  SymbolVariety.swift
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Foundation
 

@@ -1,9 +1,6 @@
-//
 //  UnusedCodeDetector.swift
 //  SwiftStaticAnalysis
-//
-//  Unused code detection module.
-//
+//  MIT License
 
 import Foundation
 import IndexStoreDB
@@ -18,12 +15,19 @@ public struct UnusedCodeDetector: Sendable {
     public init(configuration: UnusedCodeConfiguration = .default) {
         self.configuration = configuration
         analyzer = StaticAnalyzer()
+        // Pre-compile ignore patterns for efficient matching
+        compiledIgnorePatterns = CompiledPatterns(configuration.ignoredPatterns)
     }
 
     // MARK: Public
 
     /// Configuration for detection.
     public let configuration: UnusedCodeConfiguration
+
+    // MARK: Private
+
+    /// Pre-compiled ignore patterns for efficient matching.
+    private let compiledIgnorePatterns: CompiledPatterns
 
     /// Detect unused code in the given files.
     ///
@@ -285,14 +289,7 @@ extension UnusedCodeDetector {
 
     /// Check if the declaration matches an ignored pattern.
     private func matchesIgnoredPattern(_ declaration: Declaration) -> Bool {
-        for pattern in configuration.ignoredPatterns {
-            if let regex = try? Regex(pattern),
-                declaration.name.contains(regex)
-            {
-                return true
-            }
-        }
-        return false
+        compiledIgnorePatterns.anyMatches(declaration.name)
     }
 }
 

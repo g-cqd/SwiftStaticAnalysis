@@ -1,15 +1,6 @@
-//
 //  LCPArrayTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify LCP (Longest Common Prefix) array construction
-//  - Test repeat detection using LCP values
-//
-//  ## Coverage
-//  - LCPArray: empty, single element, repeated sequence
-//  - findRepeatsAboveThreshold, findMaximalRepeats, findRepeatGroups
-//
+//  MIT License
 
 import Foundation
 import Testing

@@ -1,15 +1,6 @@
-//
 //  TestSuiteNameTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify test suite name detection
-//
-//  ## Coverage
-//  - Names ending with Tests
-//  - Names ending with Test
-//  - Non-test names rejection
-//
+//  MIT License
 
 import Foundation
 import Testing

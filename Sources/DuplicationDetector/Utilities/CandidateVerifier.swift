@@ -1,10 +1,6 @@
-//
 //  CandidateVerifier.swift
 //  SwiftStaticAnalysis
-//
-//  Shared verification logic for LSH candidate pairs.
-//  Extracted from LSH and ParallelLSH to eliminate code duplication.
-//
+//  MIT License
 
 import Algorithms
 import Foundation

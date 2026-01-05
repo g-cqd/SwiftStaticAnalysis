@@ -1,9 +1,6 @@
-//
 //  ExactCloneTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for exact clone (Type-1) detection.
-//
+//  MIT License
 
 import Foundation
 import SwiftParser

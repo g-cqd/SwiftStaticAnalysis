@@ -1,24 +1,6 @@
-//
 //  SoATokenStorage.swift
 //  SwiftStaticAnalysis
-//
-//  Struct-of-Arrays (SoA) token storage for cache-efficient processing.
-//
-//  Traditional Array-of-Structs (AoS):
-//    tokens: [{kind, offset, length, line}, {kind, offset, length, line}, ...]
-//
-//  Struct-of-Arrays (SoA):
-//    kinds:   [kind, kind, kind, ...]
-//    offsets: [offset, offset, offset, ...]
-//    lengths: [length, length, length, ...]
-//    lines:   [line, line, line, ...]
-//
-//  Benefits:
-//  - Better cache utilization when iterating over a single field
-//  - SIMD-friendly contiguous memory layout
-//  - Reduced memory for sparse access patterns
-//  - Enables vectorized operations on numeric fields
-//
+//  MIT License
 
 import Foundation
 

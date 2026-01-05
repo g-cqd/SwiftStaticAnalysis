@@ -1,9 +1,6 @@
-//
 //  IgnoreDirectiveScannerTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for IgnoreDirectiveScanner - scanning for swa:ignore-duplicates directives.
-//
+//  MIT License
 
 import Foundation
 import Testing

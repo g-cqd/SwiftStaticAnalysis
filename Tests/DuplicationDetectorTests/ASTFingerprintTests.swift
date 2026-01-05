@@ -1,19 +1,6 @@
-//
 //  ASTFingerprintTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify ASTFingerprint initialization and properties
-//  - Test FingerprintedNode initialization
-//
-//  ## Coverage
-//  - ASTFingerprint: hash, depth, nodeCount, rootKind
-//  - FingerprintedNode: file, fingerprint, line range, tokenCount
-//
-//  ## Gaps
-//  - Missing: fingerprint computation from actual AST nodes
-//  - Missing: fingerprint comparison/matching tests
-//
+//  MIT License
 
 import Testing
 

@@ -1,18 +1,6 @@
-//
 //  ShingleGeneratorTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify shingle generation for token sequences
-//  - Test shingle positions and normalization
-//
-//  ## Coverage
-//  - Basic shingle generation with correct count
-//  - Position tracking for each shingle
-//  - Identifier and literal normalization
-//  - Character shingle generation
-//  - Edge cases: empty input, input smaller than shingle size
-//
+//  MIT License
 
 import Foundation
 import Testing

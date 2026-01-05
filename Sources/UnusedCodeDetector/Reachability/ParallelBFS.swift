@@ -1,10 +1,6 @@
-//
 //  ParallelBFS.swift
 //  SwiftStaticAnalysis
-//
-//  Direction-optimizing parallel BFS implementation.
-//  Based on Beamer et al. "Direction-Optimizing Breadth-First Search" (SC 2012).
-//
+//  MIT License
 
 import Algorithms
 import Foundation

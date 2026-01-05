@@ -1,15 +1,6 @@
-//
 //  BatchProcessingTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify batch signature computation
-//  - Test pairwise similarity computation
-//
-//  ## Coverage
-//  - computeSignatures for multiple documents
-//  - computePairwiseSimilarities with threshold
-//
+//  MIT License
 
 import Foundation
 import Testing

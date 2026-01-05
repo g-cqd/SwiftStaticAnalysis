@@ -1,9 +1,6 @@
-//
 //  IgnoreDirectiveScanner.swift
 //  SwiftStaticAnalysis
-//
-//  Scans source files for ignore directives to exclude regions from duplication detection.
-//
+//  MIT License
 
 import Foundation
 

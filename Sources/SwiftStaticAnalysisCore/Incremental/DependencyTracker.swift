@@ -1,10 +1,6 @@
-//
 //  DependencyTracker.swift
 //  SwiftStaticAnalysis
-//
-//  Tracks dependencies between files for proper cache invalidation.
-//  When a file changes, dependent files may need re-analysis.
-//
+//  MIT License
 
 import Collections
 import Foundation

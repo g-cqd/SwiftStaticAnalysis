@@ -1,10 +1,6 @@
-//
 //  SuffixArray.swift
 //  SwiftStaticAnalysis
-//
-//  Suffix Array implementation using the SA-IS (Suffix Array Induced Sorting) algorithm.
-//  Achieves O(n) time complexity for construction with excellent cache locality.
-//
+//  MIT License
 
 import Foundation
 

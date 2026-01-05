@@ -1,10 +1,6 @@
-//
 //  NearCloneDetector.swift
 //  SwiftStaticAnalysis
-//
-//  Detects near-clones (Type 2 clones) where identifiers and literals
-//  may be renamed but structure is identical.
-//
+//  MIT License
 
 import Algorithms
 import Foundation

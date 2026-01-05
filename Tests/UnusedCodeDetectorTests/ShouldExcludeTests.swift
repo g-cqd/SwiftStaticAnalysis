@@ -1,19 +1,6 @@
-//
 //  ShouldExcludeTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify shouldExclude() method for individual rules
-//
-//  ## Coverage
-//  - Excludes imports when configured
-//  - Excludes deinit when configured
-//  - Excludes backticked enum cases when configured
-//  - Excludes test suites when configured
-//  - Excludes by path pattern
-//  - Excludes by name pattern (regex)
-//  - Applies multiple exclusion rules
-//
+//  MIT License
 
 import Foundation
 import Testing

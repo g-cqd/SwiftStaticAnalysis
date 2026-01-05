@@ -1,17 +1,6 @@
-//
 //  FilterMethodTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify filter() method correctly applies all configured rules
-//  - Test Array extension methods
-//  - Test integration scenarios
-//
-//  ## Coverage
-//  - filter(): excluded items, empty input, no exclusions, all matching
-//  - Array extension: filtered(with:), filteredWithSensibleDefaults()
-//  - Integration: production filtering, complex scenarios, invalid regex
-//
+//  MIT License
 
 import Foundation
 import Testing

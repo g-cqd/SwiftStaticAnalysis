@@ -1,17 +1,6 @@
-//
 //  TokenNormalizerTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify TokenNormalizer replaces identifiers with placeholder
-//  - Test literal normalization
-//  - Validate preserved identifiers (standard library types) are not normalized
-//
-//  ## Coverage
-//  - TokenNormalizer.normalize(): identifier replacement
-//  - TokenNormalizer: literal normalization with number placeholder
-//  - Preserved identifiers (String, Int, etc.) remain unchanged
-//
+//  MIT License
 
 import SwiftParser
 import Testing

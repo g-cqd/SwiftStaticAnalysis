@@ -1,15 +1,6 @@
-// swiftlint:disable vertical_whitespace_between_cases
-//
 //  ZeroCopyParser.swift
 //  SwiftStaticAnalysis
-//
-//  Zero-copy Swift file parsing using memory-mapped I/O and SoA token storage.
-//
-//  This module integrates:
-//  - MemoryMappedFile for zero-copy file access
-//  - SoATokenStorage for cache-efficient token storage
-//  - Arena allocation for temporary data
-//
+//  MIT License
 
 import Foundation
 import SwiftParser

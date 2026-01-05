@@ -1,16 +1,6 @@
-//
 //  ExactJaccardTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify exact Jaccard similarity computation
-//  - Test edge cases
-//
-//  ## Coverage
-//  - Empty sets, one empty set
-//  - Identical sets, disjoint sets
-//  - Partial overlap calculation
-//
+//  MIT License
 
 import Foundation
 import Testing

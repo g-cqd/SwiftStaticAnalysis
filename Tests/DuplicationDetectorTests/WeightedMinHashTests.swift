@@ -1,15 +1,6 @@
-//
 //  WeightedMinHashTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify weighted MinHash signature computation
-//  - Test that weights affect similarity
-//
-//  ## Coverage
-//  - Identical counts produce similarity 1.0
-//  - Different weights affect similarity
-//
+//  MIT License
 
 import Foundation
 import Testing

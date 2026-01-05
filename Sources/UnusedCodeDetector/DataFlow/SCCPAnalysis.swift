@@ -1,12 +1,6 @@
-//
 //  SCCPAnalysis.swift
 //  SwiftStaticAnalysis
-//
-//  Sparse Conditional Constant Propagation (SCCP) analysis.
-//  Combines constant propagation with reachability analysis:
-//  if a branch condition is constant, only the taken edge is marked executable.
-//  Used for detecting dead branches and unreachable code.
-//
+//  MIT License
 
 import Foundation
 import SwiftStaticAnalysisCore

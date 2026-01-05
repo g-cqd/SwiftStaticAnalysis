@@ -1,9 +1,6 @@
-//
 //  IndexStoreAnalyzer.swift
 //  SwiftStaticAnalysis
-//
-//  Analyzes symbol usage using IndexStoreDB for accurate unused code detection.
-//
+//  MIT License
 
 import Foundation
 import SwiftStaticAnalysisCore

@@ -1,13 +1,6 @@
-//
 //  DataFlowTests.swift
 //  SwiftStaticAnalysis
-//
-//  Comprehensive tests for data flow analysis components:
-//  - CFGBuilder: Control Flow Graph construction
-//  - LiveVariableAnalysis: Backward data flow for liveness
-//  - SCCPAnalysis: Sparse Conditional Constant Propagation
-//  - ReachingDefinitionsAnalysis: Forward data flow for definitions
-//
+//  MIT License
 
 import Foundation
 import SwiftParser

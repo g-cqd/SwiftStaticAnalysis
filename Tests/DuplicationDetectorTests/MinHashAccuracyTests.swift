@@ -1,15 +1,6 @@
-//
 //  MinHashAccuracyTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify MinHash similarity estimation accuracy
-//  - Test accuracy at various thresholds and set sizes
-//
-//  ## Coverage
-//  - Accuracy at 0.2, 0.5, 0.8 similarity thresholds
-//  - Large set similarity estimation
-//
+//  MIT License
 
 import Foundation
 import Testing

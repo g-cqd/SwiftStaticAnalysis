@@ -1,16 +1,6 @@
-//
 //  ReachabilityReportTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify report generation with correct statistics
-//  - Test percentage calculation and grouping
-//
-//  ## Coverage
-//  - Report contains correct counts (total, root, reachable, unreachable)
-//  - Reachability percentage calculation
-//  - Grouping unreachable by kind
-//
+//  MIT License
 
 import Foundation
 import Testing

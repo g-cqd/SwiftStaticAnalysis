@@ -1,10 +1,6 @@
-//
 //  ParallelVerification.swift
 //  SwiftStaticAnalysis
-//
-//  Parallel verification of LSH candidate pairs.
-//  Computes exact Jaccard similarity for candidates concurrently.
-//
+//  MIT License
 
 import Algorithms
 import AsyncAlgorithms

@@ -1,16 +1,6 @@
-//
 //  DuplicationAlgorithmTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify algorithm selection in DuplicationConfiguration
-//  - Test preset configurations
-//
-//  ## Coverage
-//  - Default algorithm is rollingHash
-//  - High performance preset uses suffixArray
-//  - Custom algorithm configuration
-//
+//  MIT License
 
 import Testing
 

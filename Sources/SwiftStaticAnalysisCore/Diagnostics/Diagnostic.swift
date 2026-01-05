@@ -1,9 +1,6 @@
-//
 //  Diagnostic.swift
 //  SwiftStaticAnalysis
-//
-//  Xcode-compatible diagnostic representation.
-//
+//  MIT License
 
 import Foundation
 

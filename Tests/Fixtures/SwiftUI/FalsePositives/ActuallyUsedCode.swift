@@ -1,10 +1,6 @@
-//
 //  ActuallyUsedCode.swift
-//  SwiftStaticAnalysis - Test Fixtures
-//
-//  Code that might appear unused but actually IS used.
-//  These should NOT be flagged as unused.
-//
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Combine
 import SwiftUI

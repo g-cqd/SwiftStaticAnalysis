@@ -1,10 +1,6 @@
-//
 //  DenseGraph.swift
 //  SwiftStaticAnalysis
-//
-//  Dense graph representation optimized for parallel BFS.
-//  Converts string-based node IDs to integers for O(1) array access.
-//
+//  MIT License
 
 import Foundation
 

@@ -1,19 +1,6 @@
-//
 //  MemoryMappedFile.swift
 //  SwiftStaticAnalysis
-//
-//  Memory-mapped file I/O for zero-copy file access.
-//
-//  Memory mapping allows reading files directly from the kernel's page cache
-//  without copying data to userspace buffers. This is especially efficient
-//  for large files that are read sequentially or with random access.
-//
-//  Benefits:
-//  - Zero-copy access (no memcpy from kernel to userspace)
-//  - Lazy loading (pages loaded on-demand)
-//  - Automatic memory management (kernel handles paging)
-//  - Efficient for read-only access patterns
-//
+//  MIT License
 
 import Foundation
 

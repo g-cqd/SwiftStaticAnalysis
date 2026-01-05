@@ -1,9 +1,6 @@
-//
 //  ASTFingerprintVisitor.swift
 //  SwiftStaticAnalysis
-//
-//  Creates structural fingerprints of AST subtrees for semantic clone detection.
-//
+//  MIT License
 
 import Foundation
 import SwiftStaticAnalysisCore

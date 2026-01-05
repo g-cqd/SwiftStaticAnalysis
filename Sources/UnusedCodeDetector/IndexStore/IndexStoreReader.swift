@@ -1,10 +1,6 @@
-// swiftlint:disable vertical_whitespace_between_cases
-//
 //  IndexStoreReader.swift
 //  SwiftStaticAnalysis
-//
-//  Wrapper around IndexStoreDB for reading Swift index data.
-//
+//  MIT License
 
 import Foundation
 import IndexStoreDB

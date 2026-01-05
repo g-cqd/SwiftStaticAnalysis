@@ -1,11 +1,6 @@
-//
 //  OrderAPI.swift
-//  NetworkingApp - Test Fixtures
-//
-//  Order-related API calls. Contains boilerplate duplicated across API files.
-//
-
-// swift-format-ignore: NeverForceUnwrap
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Foundation
 

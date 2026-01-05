@@ -1,10 +1,6 @@
-//
 //  IgnoredDuplicates.swift
 //  SwiftStaticAnalysis
-//
-//  Test fixture for ignore directive handling in duplication detection.
-//  Contains intentionally duplicated code that should be ignored.
-//
+//  MIT License
 
 import Foundation
 

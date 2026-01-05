@@ -1,15 +1,30 @@
-//===----------------------------------------------------------------------===//
-//
-// This source file is part of the SwiftStaticAnalysis open source project
-//
-// Copyright (c) 2024 the SwiftStaticAnalysis project authors
-// Licensed under Apache License v2.0
-//
-// See LICENSE for license information
-//
-// SPDX-License-Identifier: Apache-2.0
-//
-//===----------------------------------------------------------------------===//
+//  USRDecoder.swift
+//  SwiftStaticAnalysis
+//  MIT License
+
+import RegexBuilder
+
+// MARK: - USR Type Context Pattern
+
+/// Matches Swift USR type context pattern: `s:<length><name><kind-marker>`
+///
+/// Examples:
+/// - `s:14NetworkMonitorC` - Class
+/// - `s:7MyModelV` - Struct
+/// - `s:6StatusO` - Enum
+/// - `s:10MyProtocolP` - Protocol
+///
+/// Captures the kind marker character (C/V/O/P).
+private nonisolated(unsafe) let usrTypeContextRegex = Regex {
+    "s:"
+    OneOrMore(.digit)
+    OneOrMore(.word)
+    Capture {
+        One(CharacterClass.anyOf("CVOP"))
+    }
+}
+
+// MARK: - USRDecoder
 
 /// Decodes USR (Unified Symbol Resolution) strings.
 ///
@@ -247,9 +262,9 @@ public struct USRDecoder: Sendable {
         if usr.contains("FC") {
             return .function
         }
-        // Type markers at context position
-        if let range = usr.range(of: #"s:\d+\w+C"#, options: .regularExpression) {
-            let marker = usr[range].last
+        // Type markers at context position using RegexBuilder
+        if let match = usr.firstMatch(of: usrTypeContextRegex) {
+            let marker = match.output.1
             switch marker {
             case "C": return .type  // Class/Actor
             case "V": return .struct

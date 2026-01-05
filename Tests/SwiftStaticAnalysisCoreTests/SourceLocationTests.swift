@@ -1,11 +1,6 @@
-//
 //  SourceLocationTests.swift
 //  SwiftStaticAnalysis
-//
-//  Regression tests for source location reporting.
-//  Ensures declarations report the line of the actual keyword,
-//  not preceding comments or trivia.
-//
+//  MIT License
 
 import Foundation
 import SwiftParser

@@ -1,10 +1,6 @@
-//
 //  TokenNormalizer.swift
 //  SwiftStaticAnalysis
-//
-//  Normalizes tokens for near-clone detection by replacing identifiers
-//  and literals with placeholders.
-//
+//  MIT License
 
 import Foundation
 

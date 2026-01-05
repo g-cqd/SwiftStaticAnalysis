@@ -1,9 +1,6 @@
-//
 //  ParallelBFSTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for ParallelBFS direction-optimizing algorithm.
-//
+//  MIT License
 
 import Foundation
 import Testing

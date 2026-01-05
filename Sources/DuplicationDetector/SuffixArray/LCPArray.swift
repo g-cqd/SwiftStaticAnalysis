@@ -1,12 +1,6 @@
-//
 //  LCPArray.swift
 //  SwiftStaticAnalysis
-//
-//  Longest Common Prefix (LCP) array implementation.
-//  The LCP array stores the length of the longest common prefix between
-//  consecutive suffixes in the sorted suffix array, enabling O(n) detection
-//  of all maximal repeats.
-//
+//  MIT License
 
 import Foundation
 

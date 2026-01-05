@@ -1,9 +1,6 @@
-//
 //  SourceLocation+CustomStringConvertible.swift
 //  SwiftStaticAnalysis
-//
-
-// MARK: - SourceLocation + CustomStringConvertible
+//  MIT License
 
 extension SourceLocation: CustomStringConvertible {
     public var description: String {

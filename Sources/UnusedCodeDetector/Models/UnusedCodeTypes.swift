@@ -1,9 +1,6 @@
-//
 //  UnusedCodeTypes.swift
 //  SwiftStaticAnalysis
-//
-//  Model types for unused code detection.
-//
+//  MIT License
 
 import Foundation
 import SwiftStaticAnalysisCore

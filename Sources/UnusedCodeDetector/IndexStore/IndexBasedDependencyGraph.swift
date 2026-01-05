@@ -1,13 +1,6 @@
-//
 //  IndexBasedDependencyGraph.swift
 //  SwiftStaticAnalysis
-//
-//  Dependency graph construction from IndexStoreDB data.
-//
-//  This module builds a comprehensive dependency graph by reading
-//  the compiler's pre-built index, enabling accurate cross-module
-//  reference tracking and protocol witness resolution.
-//
+//  MIT License
 
 import Collections
 import Foundation

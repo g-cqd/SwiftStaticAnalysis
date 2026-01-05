@@ -1,15 +1,6 @@
-//
 //  DependencyExtractionTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify DependencyExtractor initialization and configuration
-//
-//  ## Coverage
-//  - Default configuration
-//  - Custom configuration
-//  - Strict configuration preset
-//
+//  MIT License
 
 import Foundation
 import Testing

@@ -1,7 +1,6 @@
-//
 //  AnalysisError+LocalizedError.swift
 //  SwiftStaticAnalysis
-//
+//  MIT License
 
 import Foundation
 

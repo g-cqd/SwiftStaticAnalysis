@@ -1,9 +1,6 @@
-//
 //  ParallelModeTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for ParallelMode enum and equivalence across modes.
-//
+//  MIT License
 
 import Foundation
 import Testing

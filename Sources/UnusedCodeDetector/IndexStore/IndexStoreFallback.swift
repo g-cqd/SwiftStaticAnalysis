@@ -1,16 +1,6 @@
-//
 //  IndexStoreFallback.swift
 //  SwiftStaticAnalysis
-//
-//  Graceful degradation and fallback mechanisms for IndexStore-based analysis.
-//
-//  This module provides:
-//  - Index store availability detection
-//  - Freshness checking (comparing index with source files)
-//  - Auto-build option to ensure fresh index
-//  - Fallback to syntax-based analysis when index unavailable
-//  - Hybrid mode combining index and syntax analysis
-//
+//  MIT License
 
 import Foundation
 @preconcurrency import IndexStoreDB

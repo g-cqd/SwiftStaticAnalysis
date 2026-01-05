@@ -1,10 +1,6 @@
-//
 //  Bitmap.swift
 //  SwiftStaticAnalysis
-//
-//  Thread-safe bitmap for parallel BFS visited tracking.
-//  Uses swift-atomics for lock-free concurrent access.
-//
+//  MIT License
 
 import Atomics
 import Foundation

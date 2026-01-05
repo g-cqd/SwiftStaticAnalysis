@@ -1,10 +1,6 @@
-// swiftlint:disable vertical_whitespace_between_cases
-//
 //  DeclarationKindConverter.swift
 //  SwiftStaticAnalysis
-//
-//  Shared utilities for converting between different declaration kind representations.
-//
+//  MIT License
 
 import Foundation
 

@@ -1,9 +1,6 @@
-//
 //  DenseGraphTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for DenseGraph representation.
-//
+//  MIT License
 
 import Foundation
 import Testing

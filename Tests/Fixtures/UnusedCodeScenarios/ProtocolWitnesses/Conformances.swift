@@ -1,10 +1,6 @@
-//
 //  Conformances.swift
-//  SwiftStaticAnalysis - Test Fixtures
-//
-//  This file tests protocol witness handling.
-//  Methods that satisfy protocol requirements should NOT be flagged as unused.
-//
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Foundation
 

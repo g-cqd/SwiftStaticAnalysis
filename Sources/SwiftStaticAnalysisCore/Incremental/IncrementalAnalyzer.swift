@@ -1,10 +1,6 @@
-//
 //  IncrementalAnalyzer.swift
 //  SwiftStaticAnalysis
-//
-//  Coordinator for incremental analysis using change detection,
-//  caching, and dependency tracking.
-//
+//  MIT License
 
 import Foundation
 

@@ -1,10 +1,6 @@
-//
 //  SuffixArrayCloneDetector.swift
 //  SwiftStaticAnalysis
-//
-//  Clone detection using suffix arrays for deterministic, exhaustive matching.
-//  Detects Type-1 (exact) and Type-2 (parameterized) clones with O(n) complexity.
-//
+//  MIT License
 
 import Algorithms
 import Foundation

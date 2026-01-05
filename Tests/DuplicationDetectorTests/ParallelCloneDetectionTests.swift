@@ -1,19 +1,6 @@
-//
 //  ParallelCloneDetectionTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify parallel clone detection produces identical results to sequential
-//  - Test ParallelMinHashGenerator correctness
-//  - Test CloneSimilarityGraph construction
-//  - Test ParallelConnectedComponents correctness
-//  - Test ParallelVerifier correctness
-//
-//  ## Coverage
-//  - Parallel vs sequential equivalence
-//  - Edge cases (empty input, single document)
-//  - Large inputs for parallelism triggers
-//
+//  MIT License
 
 import Foundation
 import Testing

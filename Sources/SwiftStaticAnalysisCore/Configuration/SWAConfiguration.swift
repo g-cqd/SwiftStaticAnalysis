@@ -1,14 +1,6 @@
-// swiftlint:disable discouraged_optional_boolean
-//
 //  SWAConfiguration.swift
 //  SwiftStaticAnalysis
-//
-//  Configuration file model for SwiftStaticAnalysis.
-//  Supports JSON configuration files (.swa.json) for project-level settings.
-//
-//  Note: Optional booleans are intentional for partial configuration support.
-//  Config files may omit values that should use defaults.
-//
+//  MIT License
 
 import Foundation
 

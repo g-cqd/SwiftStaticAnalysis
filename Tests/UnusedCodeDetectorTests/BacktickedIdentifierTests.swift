@@ -1,15 +1,6 @@
-//
 //  BacktickedIdentifierTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify backticked identifier detection
-//
-//  ## Coverage
-//  - Detects backticked identifiers
-//  - Rejects non-backticked identifiers
-//  - Rejects partial backticks
-//
+//  MIT License
 
 import Foundation
 import Testing

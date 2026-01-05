@@ -1,9 +1,6 @@
-//
 //  MultiProbeLSH.swift
 //  SwiftStaticAnalysis
-//
-//  Multi-probe LSH for improved recall without increasing index size.
-//
+//  MIT License
 
 import Algorithms
 import Foundation

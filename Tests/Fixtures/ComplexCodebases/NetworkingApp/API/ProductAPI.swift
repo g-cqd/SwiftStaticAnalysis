@@ -1,11 +1,6 @@
-//
 //  ProductAPI.swift
-//  NetworkingApp - Test Fixtures
-//
-//  Product-related API calls. Contains boilerplate duplicated across API files.
-//
-
-// swift-format-ignore: NeverForceUnwrap
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Foundation
 

@@ -1,17 +1,6 @@
-//
 //  FastSimilarityCheckerTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify FastSimilarityChecker functionality
-//  - Test similarity computation for various code patterns
-//
-//  ## Coverage
-//  - Identical sequences have similarity 1.0
-//  - Different code structures have low similarity
-//  - Similar structures with different names have high similarity (normalization)
-//  - Estimated vs exact similarity comparison
-//
+//  MIT License
 
 import Foundation
 import Testing

@@ -1,15 +1,6 @@
-//===----------------------------------------------------------------------===//
-//
-// This source file is part of the SwiftStaticAnalysis open source project
-//
-// Copyright (c) 2024 the SwiftStaticAnalysis project authors
-// Licensed under Apache License v2.0
-//
-// See LICENSE for license information
-//
-// SPDX-License-Identifier: Apache-2.0
-//
-//===----------------------------------------------------------------------===//
+//  USRDecoderTests.swift
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Testing
 

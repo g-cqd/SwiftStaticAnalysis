@@ -1,9 +1,6 @@
-//
 //  ConfigurationTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for SWAConfiguration and ConfigurationLoader.
-//
+//  MIT License
 
 import Foundation
 import Testing

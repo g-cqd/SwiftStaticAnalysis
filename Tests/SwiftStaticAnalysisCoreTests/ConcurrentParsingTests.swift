@@ -1,13 +1,6 @@
-//
 //  ConcurrentParsingTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify concurrent parsing works correctly
-//
-//  ## Coverage
-//  - Parsing multiple sources concurrently with TaskGroup
-//
+//  MIT License
 
 import Foundation
 import SwiftParser

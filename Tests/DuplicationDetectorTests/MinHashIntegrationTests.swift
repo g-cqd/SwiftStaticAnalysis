@@ -1,15 +1,6 @@
-//
 //  MinHashIntegrationTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify end-to-end MinHash-based clone detection
-//  - Test LSH finds near duplicates
-//
-//  ## Coverage
-//  - End-to-end clone detection with realistic code patterns
-//  - LSH index finding near-duplicate documents
-//
+//  MIT License
 
 import Foundation
 import Testing

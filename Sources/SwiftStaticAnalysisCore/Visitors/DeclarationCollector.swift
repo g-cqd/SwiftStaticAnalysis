@@ -1,7 +1,6 @@
-//
 //  DeclarationCollector.swift
 //  SwiftStaticAnalysis
-//
+//  MIT License
 
 import Foundation
 import SwiftSyntax

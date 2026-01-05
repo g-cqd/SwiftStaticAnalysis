@@ -1,10 +1,6 @@
-//
 //  StateBindingUsage.swift
-//  SwiftStaticAnalysis - Test Fixtures
-//
-//  Tests for SwiftUI property wrapper detection.
-//  These properties should NOT be flagged as unused.
-//
+//  SwiftStaticAnalysis
+//  MIT License
 
 import SwiftUI
 

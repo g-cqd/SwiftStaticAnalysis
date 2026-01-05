@@ -1,9 +1,6 @@
-//
 //  VisitorTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for DeclarationCollector and ReferenceCollector visitors.
-//
+//  MIT License
 
 import Foundation
 import SwiftParser

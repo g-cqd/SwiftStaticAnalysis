@@ -1,9 +1,6 @@
-//
 //  IndexStoreTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for Phase E: IndexStoreDB Deep Integration
-//
+//  MIT License
 
 import Foundation
 import SwiftStaticAnalysisCore

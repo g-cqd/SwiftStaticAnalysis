@@ -1,9 +1,6 @@
-//
 //  SimpleClass.swift
-//  CLI Test Fixture
-//
-//  A simple Swift file for testing CLI commands.
-//
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Foundation
 

@@ -1,15 +1,6 @@
-//
 //  SuffixArrayIntegrationTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Test end-to-end clone detection using suffix arrays
-//  - Verify performance with large-scale inputs
-//
-//  ## Coverage
-//  - End-to-end detection with shared patterns across files
-//  - Large scale performance with multiple sequences
-//
+//  MIT License
 
 import Foundation
 import Testing

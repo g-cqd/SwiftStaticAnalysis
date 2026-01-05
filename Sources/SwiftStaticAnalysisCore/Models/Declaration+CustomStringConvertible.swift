@@ -1,9 +1,6 @@
-//
 //  Declaration+CustomStringConvertible.swift
 //  SwiftStaticAnalysis
-//
-
-// MARK: - Declaration + CustomStringConvertible
+//  MIT License
 
 extension Declaration: CustomStringConvertible {
     public var description: String {

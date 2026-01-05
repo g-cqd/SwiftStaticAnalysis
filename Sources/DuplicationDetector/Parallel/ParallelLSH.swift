@@ -1,10 +1,6 @@
-//
 //  ParallelLSH.swift
 //  SwiftStaticAnalysis
-//
-//  Parallel LSH configuration and utilities.
-//  Core parallel methods are in LSH.swift (findCandidatePairsParallel).
-//
+//  MIT License
 
 import Foundation
 

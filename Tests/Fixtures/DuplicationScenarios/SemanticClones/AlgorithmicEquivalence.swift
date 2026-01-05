@@ -1,10 +1,6 @@
-//
 //  AlgorithmicEquivalence.swift
-//  SwiftStaticAnalysis - Test Fixtures
-//
-//  This file contains semantic clones (Type-3/Type-4).
-//  Same algorithms implemented with different syntax.
-//
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Foundation
 

@@ -1,13 +1,6 @@
-//
 //  CloneSimilarityGraph.swift
 //  SwiftStaticAnalysis
-//
-//  Dense graph representation for clone similarity.
-//  Optimized for parallel connected component finding.
-//
-//  This mirrors the DenseGraph design from ParallelBFS, leveraging
-//  the fact that ShingledDocument IDs are contiguous integers.
-//
+//  MIT License
 
 import Foundation
 

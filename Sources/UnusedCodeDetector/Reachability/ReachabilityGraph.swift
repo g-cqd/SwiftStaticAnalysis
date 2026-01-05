@@ -1,10 +1,6 @@
-//
 //  ReachabilityGraph.swift
 //  SwiftStaticAnalysis
-//
-//  Graph-based reachability analysis for unused code detection.
-//  Uses BFS traversal from root sets (entry points) to find reachable code.
-//
+//  MIT License
 
 import Collections
 import SwiftStaticAnalysisCore

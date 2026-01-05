@@ -1,9 +1,6 @@
-//
 //  IncrementalDuplicationDetector.swift
 //  SwiftStaticAnalysis
-//
-//  Incremental duplication detector with token sequence caching.
-//
+//  MIT License
 
 import Foundation
 import SwiftStaticAnalysisCore

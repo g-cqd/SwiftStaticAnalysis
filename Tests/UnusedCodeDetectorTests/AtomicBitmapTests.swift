@@ -1,9 +1,6 @@
-//
 //  AtomicBitmapTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for AtomicBitmap and Bitmap data structures.
-//
+//  MIT License
 
 import Foundation
 import Testing

@@ -1,16 +1,6 @@
-//
 //  MinHashCloneDetectorTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify MinHashCloneDetector initialization
-//  - Test detection with token sequences
-//
-//  ## Coverage
-//  - Initialization with parameters
-//  - Empty input handling
-//  - Detection with similar token sequences
-//
+//  MIT License
 
 import Foundation
 import Testing

@@ -1,10 +1,6 @@
-//
 //  CommonPatterns.swift
-//  SwiftStaticAnalysis - Test Fixtures
-//
-//  Common SwiftUI boilerplate patterns that appear across many views.
-//  These should be detected as semantic clones.
-//
+//  SwiftStaticAnalysis
+//  MIT License
 
 import SwiftUI
 

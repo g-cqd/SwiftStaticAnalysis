@@ -1,9 +1,6 @@
-//
 //  SemanticCloneDetector.swift
 //  SwiftStaticAnalysis
-//
-//  Detects semantic clones (Type 3 clones) using AST structural comparison.
-//
+//  MIT License
 
 import Algorithms
 import Foundation

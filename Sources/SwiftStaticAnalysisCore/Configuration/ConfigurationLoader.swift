@@ -1,9 +1,6 @@
-//
 //  ConfigurationLoader.swift
 //  SwiftStaticAnalysis
-//
-//  Handles loading and parsing of .swa.json configuration files.
-//
+//  MIT License
 
 import Foundation
 

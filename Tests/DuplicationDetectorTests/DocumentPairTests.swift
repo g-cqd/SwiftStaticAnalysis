@@ -1,15 +1,6 @@
-//
 //  DocumentPairTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify DocumentPair normalization and equality
-//
-//  ## Coverage
-//  - Pair normalization (id1, id2) == (id2, id1)
-//  - Hash value consistency
-//  - Equality comparison
-//
+//  MIT License
 
 import Foundation
 import Testing

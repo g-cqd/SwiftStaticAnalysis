@@ -1,9 +1,6 @@
-//
 //  ConcurrencyConfiguration.swift
 //  SwiftStaticAnalysis
-//
-//  Configuration for parallel processing limits and concurrency control.
-//
+//  MIT License
 
 import Algorithms
 import Foundation

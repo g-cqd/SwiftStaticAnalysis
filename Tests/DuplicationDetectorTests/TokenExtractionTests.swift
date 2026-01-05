@@ -1,15 +1,6 @@
-//
 //  TokenExtractionTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify TokenSequenceExtractor extracts tokens from Swift source
-//  - Test TokenKind classification for keywords, identifiers, literals, operators
-//
-//  ## Coverage
-//  - TokenSequenceExtractor.extract(): file assignment, token extraction
-//  - TokenKind: keyword, identifier, literal, operator classification
-//
+//  MIT License
 
 import SwiftParser
 import Testing

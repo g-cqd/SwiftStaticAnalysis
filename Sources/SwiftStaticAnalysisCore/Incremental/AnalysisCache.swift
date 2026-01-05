@@ -1,10 +1,6 @@
-//
 //  AnalysisCache.swift
 //  SwiftStaticAnalysis
-//
-//  Persistent cache for analysis results enabling incremental analysis.
-//  Uses actor isolation for thread-safe access.
-//
+//  MIT License
 
 import Algorithms
 import Foundation

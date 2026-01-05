@@ -1,10 +1,6 @@
-//
 //  ShingleGenerator.swift
 //  SwiftStaticAnalysis
-//
-//  Generates shingles (n-grams) from token sequences for MinHash computation.
-//  Shingles capture local structure while being robust to insertions/deletions.
-//
+//  MIT License
 
 import Algorithms
 import Foundation

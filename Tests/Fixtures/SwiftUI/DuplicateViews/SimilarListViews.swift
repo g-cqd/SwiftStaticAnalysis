@@ -1,9 +1,6 @@
-//
 //  SimilarListViews.swift
-//  SwiftStaticAnalysis - Test Fixtures
-//
-//  Views with nearly identical structure that should be detected as clones.
-//
+//  SwiftStaticAnalysis
+//  MIT License
 
 import SwiftUI
 

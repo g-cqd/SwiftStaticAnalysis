@@ -1,10 +1,6 @@
-//
 //  HigherOrderFunctions.swift
-//  SwiftStaticAnalysis - Test Fixtures
-//
-//  This file tests indirect references through higher-order functions.
-//  Some functions appear unused but are passed as closures.
-//
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Foundation
 

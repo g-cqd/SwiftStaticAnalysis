@@ -1,19 +1,6 @@
-//
 //  SwiftFileParserTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify SwiftFileParser correctly parses valid Swift source code
-//  - Test graceful handling of syntax errors
-//  - Validate line counting accuracy
-//  - Test parsing of modern Swift features
-//
-//  ## Coverage
-//  - parse(source:): valid source, syntax errors, empty, only comments
-//  - parse(file:): parsing from disk
-//  - lineCount(source:): with and without empty lines
-//  - Complex structures: nested types, async/await, generics, property wrappers
-//
+//  MIT License
 
 import Foundation
 import SwiftParser

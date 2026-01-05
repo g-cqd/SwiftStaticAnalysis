@@ -1,9 +1,6 @@
-//
 //  IncrementalAnalysisTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for incremental analysis framework.
-//
+//  MIT License
 
 import Foundation
 import Testing

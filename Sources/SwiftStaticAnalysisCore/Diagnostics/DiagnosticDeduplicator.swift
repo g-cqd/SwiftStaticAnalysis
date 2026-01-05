@@ -1,9 +1,6 @@
-//
 //  DiagnosticDeduplicator.swift
 //  SwiftStaticAnalysis
-//
-//  Deduplication and merging of diagnostics.
-//
+//  MIT License
 
 import Algorithms
 import Foundation

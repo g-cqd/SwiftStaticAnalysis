@@ -1,16 +1,6 @@
-//
 //  FilterConfigurationTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify filter configuration defaults and presets
-//
-//  ## Coverage
-//  - Default configuration has no exclusions
-//  - None preset matches default
-//  - Sensible defaults preset
-//  - Production preset with/without test path exclusion
-//
+//  MIT License
 
 import Foundation
 import Testing

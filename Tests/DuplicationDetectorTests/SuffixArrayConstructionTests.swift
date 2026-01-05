@@ -1,17 +1,6 @@
-//
 //  SuffixArrayConstructionTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify suffix array construction for various input patterns
-//  - Test SA-IS algorithm implementation
-//
-//  ## Coverage
-//  - Empty input, single element, two elements
-//  - Repeated elements, banana-like pattern
-//  - String-based construction with alphabet mapping
-//  - Large array construction (performance)
-//
+//  MIT License
 
 import Foundation
 import Testing

@@ -1,16 +1,6 @@
-//
 //  SAISCorrectnessTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify SA-IS algorithm produces correct suffix arrays
-//  - Test edge cases and specific input patterns
-//
-//  ## Coverage
-//  - Permutation property: SA contains each index exactly once
-//  - Lexicographic ordering: adjacent suffixes are correctly ordered
-//  - Special cases: all ones, descending, ascending inputs
-//
+//  MIT License
 
 import Foundation
 import Testing

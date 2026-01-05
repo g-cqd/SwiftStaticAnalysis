@@ -1,9 +1,6 @@
-//
 //  NearCloneTests.swift
 //  SwiftStaticAnalysis
-//
-//  Tests for near-clone (Type-2) detection with variable renaming.
-//
+//  MIT License
 
 import Foundation
 import SwiftParser

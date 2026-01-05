@@ -1,10 +1,6 @@
-//
 //  TestTags.swift
 //  SwiftStaticAnalysis
-//
-//  Shared test tags for categorizing tests across the codebase.
-//  Tags enable targeted test runs: `swift test --filter .slow` or `swift test --skip .slow`
-//
+//  MIT License
 
 import Testing
 

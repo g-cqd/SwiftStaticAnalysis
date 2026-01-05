@@ -1,17 +1,6 @@
-//
 //  RootDetectionTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify automatic root detection for various declaration types
-//  - Test strict mode behavior
-//
-//  ## Coverage
-//  - Public declarations are roots by default
-//  - Test methods are roots
-//  - Main function is root
-//  - Strict mode excludes public API
-//
+//  MIT License
 
 import Foundation
 import Testing

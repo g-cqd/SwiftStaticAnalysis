@@ -1,7 +1,6 @@
-//
 //  Scope.swift
 //  SwiftStaticAnalysis
-//
+//  MIT License
 
 import Foundation
 

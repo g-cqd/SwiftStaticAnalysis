@@ -1,18 +1,6 @@
-//
 //  NearCloneDetectorTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify NearCloneDetector initialization
-//
-//  ## Coverage
-//  - NearCloneDetector: initialization with minimumTokens, minimumSimilarity
-//
-//  ## Gaps
-//  - Missing: actual near-clone detection testing
-//  - Missing: similarity threshold behavior
-//  - Missing: identifier normalization impact testing
-//
+//  MIT License
 
 import Testing
 

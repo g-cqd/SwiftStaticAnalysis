@@ -1,17 +1,6 @@
-//
 //  LSHIndexTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify LSH index operations
-//  - Test optimal bands/rows calculation
-//
-//  ## Coverage
-//  - optimalBandsAndRows for various thresholds
-//  - insert and query operations
-//  - findCandidatePairs for similar documents
-//  - queryWithSimilarity with threshold filtering
-//
+//  MIT License
 
 import Foundation
 import Testing

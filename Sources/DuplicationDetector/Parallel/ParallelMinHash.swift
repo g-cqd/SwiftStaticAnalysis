@@ -1,10 +1,6 @@
-//
 //  ParallelMinHash.swift
 //  SwiftStaticAnalysis
-//
-//  Parallel MinHash signature computation using Swift Concurrency.
-//  Computes signatures for multiple documents concurrently.
-//
+//  MIT License
 
 import Algorithms
 import Foundation

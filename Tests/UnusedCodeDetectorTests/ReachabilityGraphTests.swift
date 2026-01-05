@@ -1,19 +1,6 @@
-//
 //  ReachabilityGraphTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify ReachabilityGraph construction and traversal
-//  - Test node addition, edge addition, reachability computation
-//
-//  ## Coverage
-//  - Empty graph has no reachable nodes
-//  - Root nodes are reachable
-//  - Edges make targets reachable
-//  - Unreachable nodes are detected
-//  - Transitive reachability through edge chains
-//  - Path finding from root to target
-//
+//  MIT License
 
 import Foundation
 import Testing

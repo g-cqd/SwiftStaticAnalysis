@@ -1,7 +1,6 @@
-//
 //  Declaration.swift
 //  SwiftStaticAnalysis
-//
+//  MIT License
 
 import Foundation
 

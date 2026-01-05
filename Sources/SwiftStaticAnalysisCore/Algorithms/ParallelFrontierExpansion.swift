@@ -1,10 +1,6 @@
-//
 //  ParallelFrontierExpansion.swift
 //  SwiftStaticAnalysis
-//
-//  Generic parallel frontier expansion for BFS-like graph traversals.
-//  Extracted from ParallelBFS and ParallelConnectedComponents to eliminate duplication.
-//
+//  MIT License
 
 import Algorithms
 import Foundation

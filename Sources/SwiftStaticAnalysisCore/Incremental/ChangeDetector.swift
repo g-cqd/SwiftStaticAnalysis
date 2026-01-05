@@ -1,10 +1,6 @@
-//
 //  ChangeDetector.swift
 //  SwiftStaticAnalysis
-//
-//  Change detection for incremental analysis.
-//  Uses content hashing and modification time tracking for efficient detection.
-//
+//  MIT License
 
 import Algorithms
 import Foundation

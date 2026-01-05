@@ -1,22 +1,6 @@
-//
 //  CloneModelTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify CloneType, Clone, CloneGroup model initialization
-//  - Test CloneGroup metrics calculation
-//  - Validate DuplicationConfiguration defaults
-//  - Test DuplicationDetector initialization
-//  - Verify DuplicationReport metrics
-//
-//  ## Coverage
-//  - CloneType: raw values
-//  - Clone: initialization, properties
-//  - CloneGroup: occurrences, duplicatedLines
-//  - DuplicationConfiguration: default values
-//  - DuplicationDetector: initialization with configuration
-//  - DuplicationReport: duplicatedLines, duplicationPercentage
-//
+//  MIT License
 
 import Testing
 

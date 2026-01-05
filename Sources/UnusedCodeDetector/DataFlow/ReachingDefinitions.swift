@@ -1,15 +1,6 @@
-//
 //  ReachingDefinitions.swift
 //  SwiftStaticAnalysis
-//
-//  Forward data flow analysis for reaching definitions.
-//  Determines which variable definitions may reach a given program point.
-//  Used for detecting uninitialized variable use and supporting constant propagation.
-//
-//  Equations:
-//    REACH_out[B] = GEN[B] ∪ (REACH_in[B] - KILL[B])
-//    REACH_in[B] = ∪ REACH_out[P] for all predecessors P of B
-//
+//  MIT License
 
 import Foundation
 import SwiftStaticAnalysisCore

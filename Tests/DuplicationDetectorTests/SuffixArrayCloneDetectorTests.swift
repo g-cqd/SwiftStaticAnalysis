@@ -1,18 +1,6 @@
-//
 //  SuffixArrayCloneDetectorTests.swift
 //  SwiftStaticAnalysis
-//
-//  ## Test Goals
-//  - Verify SuffixArrayCloneDetector initialization
-//  - Test detection with various input scenarios
-//  - Verify cross-file boundary handling
-//  - Test Type-2 normalization detection
-//
-//  ## Coverage
-//  - SuffixArrayCloneDetector: initialization, minimumTokens, normalizeForType2
-//  - detect(): empty input, below threshold, exact duplicates, cross-file
-//  - detectWithNormalization(): Type-2 detection
-//
+//  MIT License
 
 import Foundation
 import Testing

@@ -1,12 +1,6 @@
-//
 //  NetworkingDuplication.swift
-//  SwiftStaticAnalysis - Test Fixtures
-//
-//  This file contains intentional code duplication for testing exact clone detection.
-//  The two fetch functions are nearly identical, differing only in URL and type.
-//
-
-// swift-format-ignore: NeverForceUnwrap
+//  SwiftStaticAnalysis
+//  MIT License
 
 import Foundation
 
