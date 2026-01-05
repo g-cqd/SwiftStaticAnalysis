@@ -85,9 +85,12 @@ swa duplicates [OPTIONS] <PATHS>...
 | `--min-similarity <RATIO>` | Minimum similarity (0.0-1.0) | `0.8` |
 | `--algorithm <ALG>` | Algorithm: `rollingHash`, `suffixArray`, `minHashLSH` | `rollingHash` |
 | `--exclude-paths <GLOB>` | Paths to exclude (repeatable) | - |
-| `--parallel` | Use parallel MinHash/LSH clone detection (experimental) | `false` |
+| `--parallel-mode <MODE>` | Parallel mode: `none`, `safe`, `maximum` | `none` |
+| `--parallel` | Deprecated: use `--parallel-mode` | `false` |
 | `--config <PATH>` | Path to configuration file (.swa.json) | - |
 | `-f, --format <FORMAT>` | Output format: `text`, `json`, `xcode` | `xcode` |
+
+Parallel modes: `none` (sequential), `safe` (TaskGroup parallelism), `maximum` (streaming/backpressure for large pipelines). `--parallel` maps to `safe`.
 
 #### Examples
 
@@ -102,7 +105,7 @@ swa duplicates --types exact --types near --min-similarity 0.7 Sources/
 swa duplicates --algorithm suffixArray --min-tokens 30 Sources/
 
 # Parallel MinHash/LSH (large codebases)
-swa duplicates --types near --algorithm minHashLSH --parallel Sources/
+swa duplicates --types near --algorithm minHashLSH --parallel-mode safe Sources/
 ```
 
 ### unused
@@ -126,7 +129,8 @@ swa unused [OPTIONS] <PATHS>...
 | `--ignore-public` | Ignore public declarations | `false` |
 | `--index-store-path <PATH>` | Path to IndexStore database | - |
 | `--report` | Generate reachability report | `false` |
-| `--parallel` | Use parallel reachability BFS (experimental) | `false` |
+| `--parallel-mode <MODE>` | Parallel mode: `none`, `safe`, `maximum` | `none` |
+| `--parallel` | Deprecated: use `--parallel-mode` | `false` |
 | `--exclude-paths <GLOB>` | Paths to exclude (repeatable) | - |
 | `--exclude-imports` | Exclude import statements | `false` |
 | `--exclude-test-suites` | Exclude test suite declarations | `false` |
@@ -143,6 +147,8 @@ swa unused [OPTIONS] <PATHS>...
 | `--config <PATH>` | Path to configuration file (.swa.json) | - |
 | `-f, --format <FORMAT>` | Output format: `text`, `json`, `xcode` | `xcode` |
 
+Parallel modes: `none` (sequential), `safe` (TaskGroup parallelism), `maximum` (streaming/backpressure for large pipelines). `--parallel` maps to `safe`.
+
 #### Examples
 
 ```bash
@@ -153,7 +159,7 @@ swa unused Sources/
 swa unused --mode reachability --format json Sources/
 
 # Parallel reachability on large graphs
-swa unused --mode reachability --parallel Sources/
+swa unused --mode reachability --parallel-mode safe Sources/
 
 # IndexStore-based analysis (requires prior build)
 swa unused --mode indexStore --index-store-path .build/debug/index/store Sources/
@@ -263,7 +269,7 @@ Create a `.swa.json` file in your project root for persistent configuration.
     "ignoreSwiftUIPropertyWrappers": false,
     "ignorePreviewProviders": false,
     "ignoreViewBody": false,
-    "parallel": false
+    "parallelMode": "none"
   },
   "duplicates": {
     "enabled": true,
@@ -272,10 +278,12 @@ Create a `.swa.json` file in your project root for persistent configuration.
     "types": ["exact", "near"],
     "algorithm": "rollingHash",
     "excludePaths": ["**/Generated/**"],
-    "parallel": false
+    "parallelMode": "none"
   }
 }
 ```
+
+`parallelMode` accepts `none`, `safe`, or `maximum`. The legacy `parallel` boolean is still supported but deprecated.
 
 ### Example Configurations
 

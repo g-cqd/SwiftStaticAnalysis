@@ -55,7 +55,7 @@ let results = await withTaskGroup(of: ParseResult.self) { group in
 
 **Benefit**: Near-linear scaling with CPU cores.
 
-Parallel processing also powers reachability edge building and optional parallel BFS/clone detection via `--parallel`.
+Parallel processing also powers reachability edge building and optional parallel BFS/clone detection via `--parallel-mode safe`. For large pipelines, `ParallelMode.maximum` exposes streaming/backpressure APIs.
 
 ### SIMD-Accelerated Hashing
 
@@ -121,11 +121,13 @@ swa duplicates . --types exact --types near
 
 ```bash
 # Parallel reachability traversal (large graphs)
-swa unused . --mode reachability --parallel
+swa unused . --mode reachability --parallel-mode safe
 
 # Parallel MinHash/LSH pipeline (large codebases)
-swa duplicates . --algorithm minHashLSH --parallel
+swa duplicates . --algorithm minHashLSH --parallel-mode safe
 ```
+
+`--parallel` is deprecated and maps to `--parallel-mode safe`.
 
 ## Benchmarks
 
@@ -175,6 +177,24 @@ for try await item in detector.detectUnusedStream(in: files) {
     if item.confidence == .high {
         print(item.suggestion)
     }
+}
+```
+
+Stream clone verification batches for memory-bounded pipelines:
+
+```swift
+let verifier = StreamingVerifier.forMaximumMode()
+for await progress in verifier.verifyStreaming(candidatePairs, documentMap: docs) {
+    handle(progress.batchResults)
+}
+```
+
+Stream reachability edges as they are computed:
+
+```swift
+let extractor = DependencyExtractor()
+for await edge in extractor.streamEdges(from: analysisResult) {
+    handle(edge)
 }
 ```
 

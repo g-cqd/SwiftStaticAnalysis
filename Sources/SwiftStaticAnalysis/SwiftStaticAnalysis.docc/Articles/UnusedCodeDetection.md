@@ -40,7 +40,7 @@ swa unused . --mode reachability
 - Entry point analysis
 - Better handling of indirect usage
 - Parallel edge computation and batch insertion for large graphs
-- Optional direction-optimizing parallel BFS (experimental, use `--parallel`)
+- Optional direction-optimizing parallel BFS (experimental, use `--parallel-mode safe`)
 
 Generate a reachability report:
 
@@ -73,10 +73,11 @@ Unreachable by kind:
 Enable direction-optimizing parallel BFS for large reachability graphs:
 
 ```bash
-swa unused . --mode reachability --parallel
+swa unused . --mode reachability --parallel-mode safe
 ```
 
 This uses a top-down/bottom-up hybrid BFS with automatic fallback to sequential traversal on small graphs.
+`--parallel` is deprecated and maps to `--parallel-mode safe`.
 
 ### IndexStore Mode
 
@@ -172,6 +173,17 @@ config.useParallelBFS = true
 
 let detector = UnusedCodeDetector(configuration: config)
 let unused = try await detector.detectUnused(in: swiftFiles)
+```
+
+### Streaming Edge Extraction (Advanced)
+
+Stream dependency edges as they are computed to reduce peak memory:
+
+```swift
+let extractor = DependencyExtractor()
+for await edge in extractor.streamEdges(from: analysisResult) {
+    handle(edge)
+}
 ```
 
 ### IndexStore Mode

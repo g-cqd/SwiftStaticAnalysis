@@ -25,6 +25,7 @@ Clone detection with multiple algorithms:
 - **Near Clones (Type-2)**: Renamed variables via MinHash + LSH
 - **Semantic Clones (Type-3/4)**: Functionally equivalent via AST fingerprinting
 - **Parallel MinHash/LSH (Experimental)**: Parallel signature, candidate, and verification pipeline
+- **Streaming Pipelines**: Candidate pair and verification streaming for memory-bounded analysis (`ParallelMode.maximum`)
 
 ### UnusedCodeDetector
 
@@ -33,6 +34,7 @@ Unused code detection with configurable modes:
 - **Reachability Mode**: Graph-based dead code analysis
 - **IndexStore Mode**: Cross-module accuracy using compiler index
 - **Parallel Reachability (Experimental)**: Direction-optimizing BFS on large graphs
+- **Streaming Edge Extraction**: Incremental graph edge emission for large codebases (`ParallelMode.maximum`)
 
 ### SymbolLookup
 

@@ -151,10 +151,30 @@ MinHash generates compact signatures that preserve Jaccard similarity. LSH enabl
 Enable parallel clone detection for large codebases:
 
 ```bash
-swa duplicates . --types near --algorithm minHashLSH --parallel
+swa duplicates . --types near --algorithm minHashLSH --parallel-mode safe
 ```
 
 This parallelizes signature generation, candidate finding, verification, and connected-components grouping.
+`--parallel` is deprecated and maps to `--parallel-mode safe`.
+
+### Streaming Verification (Advanced)
+
+For very large candidate sets, stream verification results to keep memory bounded:
+
+```swift
+import SwiftStaticAnalysis
+
+let verifier = StreamingVerifier.forMaximumMode()
+for await progress in verifier.verifyStreaming(candidatePairs, documentMap: documentMap) {
+    handle(progress.batchResults)
+}
+```
+
+To deduplicate clone groups in a streaming pipeline:
+
+```swift
+let uniqueGroups = await StreamingCloneDeduplication.collectDeduplicated(stream)
+```
 
 ### AST Fingerprinting (Semantic Clones)
 

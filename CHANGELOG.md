@@ -5,6 +5,19 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `ParallelMode` (`none`, `safe`, `maximum`) with `--parallel-mode` CLI support and `parallelMode` configuration for unused/duplicates
+- Streaming verification APIs (`StreamingVerifier`, `VerificationProgress`) backed by swift-async-algorithms
+- Streaming candidate pair generation (LSH) and streaming clone-group deduplication utilities
+- Streaming reachability edge extraction via `DependencyExtractor.streamEdges`
+
+### Changed
+- Deprecated legacy `--parallel` CLI flag and `parallel` config option in favor of `parallelMode`
+- Added ignore patterns for generated analysis artifacts to `.gitignore`
+- Applied consistent formatting to streaming/parallel components
+
 ## [0.0.24] - 2026-01-05
 
 ### Added

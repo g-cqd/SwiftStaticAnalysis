@@ -104,8 +104,8 @@ swa duplicates /path/to/project --types exact --types near --types semantic
 # Detect unused code with reachability analysis
 swa unused /path/to/project --mode reachability
 
-# Enable experimental parallel reachability (large graphs)
-swa unused /path/to/project --mode reachability --parallel
+# Enable parallel reachability (large graphs)
+swa unused /path/to/project --mode reachability --parallel-mode safe
 
 # Apply sensible filters to reduce false positives
 swa unused . --sensible-defaults --exclude-paths "**/Tests/**"
@@ -120,7 +120,7 @@ swa symbol "fetch" --kind method --access public /path/to/project
 swa symbol "SharedCache.instance" --usages /path/to/project
 
 # Parallel MinHash/LSH clone detection (large codebases)
-swa duplicates /path/to/project --types near --algorithm minHashLSH --parallel
+swa duplicates /path/to/project --types near --algorithm minHashLSH --parallel-mode safe
 
 # Output as JSON for CI integration
 swa analyze . --format json > report.json
@@ -137,7 +137,7 @@ Create a `.swa.json` file in your project root for persistent configuration:
 {
   "unused": {
     "mode": "reachability",
-    "parallel": true,
+    "parallelMode": "safe",
     "minConfidence": "medium",
     "excludePaths": ["**/Tests/**", "**/Fixtures/**"],
     "excludeImports": true,
@@ -149,12 +149,13 @@ Create a `.swa.json` file in your project root for persistent configuration:
     "types": ["exact", "near"],
     "minTokens": 50,
     "minSimilarity": 0.8,
-    "algorithm": "minHashLSH"
+    "algorithm": "minHashLSH",
+    "parallelMode": "safe"
   }
 }
 ```
 
-`parallel` enables experimental parallel reachability (unused) for large codebases.
+`parallelMode` controls parallel execution: `none`, `safe`, `maximum`. `safe` matches legacy `--parallel`, while `maximum` enables streaming/backpressure in programmatic pipelines. Legacy `parallel` is still supported but deprecated.
 
 Then run with:
 
@@ -311,7 +312,7 @@ public extension SIMDStorage {
 | `reachability` | Medium | ~85% | Entry-point based dead code detection |
 | `indexStore` | Slow | ~95% | Cross-module, protocol witnesses |
 
-Use `--parallel` with `reachability` for experimental direction-optimizing BFS on large graphs.
+Use `--parallel-mode safe` with `reachability` for direction-optimizing BFS on large graphs.
 
 ## Clone Types
 
@@ -321,7 +322,7 @@ Use `--parallel` with `reachability` for experimental direction-optimizing BFS o
 | **Near** (Type-2) | Renamed variables/literals | MinHash + LSH |
 | **Semantic** (Type-3/4) | Functionally equivalent | AST Fingerprinting |
 
-Use `--parallel` with `minHashLSH` to enable experimental parallel clone detection.
+Use `--parallel-mode safe` with `minHashLSH` to enable parallel clone detection.
 
 ## Filtering Options
 
@@ -379,7 +380,8 @@ swa unused [<path>] [options]
 | `--min-confidence <level>` | Minimum confidence: `low`, `medium`, `high` |
 | `--index-store-path <path>` | Path to index store (for indexStore mode) |
 | `--report` | Generate reachability report |
-| `--parallel` | Use parallel reachability BFS (experimental, reachability mode) |
+| `--parallel-mode <mode>` | Parallel mode: `none`, `safe`, `maximum` |
+| `--parallel` | Deprecated: use `--parallel-mode` |
 | `-f, --format <format>` | Output format: `text`, `json`, `xcode` |
 | `--exclude-paths <glob>` | Paths to exclude (repeatable) |
 | `--exclude-imports` | Exclude import statements |
@@ -412,7 +414,8 @@ swa duplicates [<path>] [options]
 | `--min-similarity <n>` | Minimum similarity (0.0-1.0) |
 | `--algorithm <algo>` | Algorithm: `rollingHash`, `suffixArray`, `minHashLSH` |
 | `--exclude-paths <glob>` | Paths to exclude (repeatable) |
-| `--parallel` | Use parallel MinHash/LSH clone detection (experimental) |
+| `--parallel-mode <mode>` | Parallel mode: `none`, `safe`, `maximum` |
+| `--parallel` | Deprecated: use `--parallel-mode` |
 | `-f, --format <format>` | Output format: `text`, `json`, `xcode` |
 
 ### `swa symbol`
@@ -501,6 +504,8 @@ swift package --allow-writing-to-directory ./docs \
 
 - Parallel reachability BFS: `Sources/UnusedCodeDetector/Reachability/ParallelBFS.swift`, `PARALLEL_BFS_STUDY.md`, `PARALLEL_BFS_IMPLEMENTATION_STUDY.md`
 - Parallel clone detection: `Sources/DuplicationDetector/Parallel/ParallelMinHash.swift`, `Sources/DuplicationDetector/Parallel/ParallelLSH.swift`
+- Streaming verification and deduplication: `Sources/DuplicationDetector/Parallel/ParallelVerification.swift`, `Sources/DuplicationDetector/DuplicationDetector.swift`
+- Streaming reachability edges: `Sources/UnusedCodeDetector/Reachability/DependencyExtractor.swift`
 - Scope-aware dataflow analysis: `Sources/UnusedCodeDetector/DataFlow/CFGBuilder.swift`, `Sources/UnusedCodeDetector/DataFlow/LiveVariableAnalysis.swift`
 
 ## Performance
@@ -510,7 +515,7 @@ The framework includes several performance optimizations:
 - **Memory-Mapped I/O**: Zero-copy file reading for large codebases
 - **SoA Token Storage**: Cache-efficient struct-of-arrays layout
 - **Arena Allocation**: Reduced allocation overhead for temporary data
-- **Parallel Processing**: Concurrent parsing, reachability edge building, and optional parallel BFS/clone detection
+- **Parallel Processing**: Concurrent parsing, reachability edge building, and optional parallel BFS/clone detection via `ParallelMode`
 - **SIMD-Accelerated Hashing**: Fast MinHash signature computation
 
 ## Testing
