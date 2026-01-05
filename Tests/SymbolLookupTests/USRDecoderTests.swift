@@ -71,6 +71,7 @@ struct USRDecoderTests {
         let result = decoder.decode(clangUSR)
 
         #expect(result?.schema == .clang)
+        #expect(result?.kind == .unknown)
     }
 
     @Test("Property kind detection")
@@ -133,5 +134,20 @@ struct USRDecoderTests {
         let result = decoder.decode(usr)
 
         #expect(result?.rawUSR == usr)
+    }
+
+    @Test("Type kind detection from context markers")
+    func typeKindDetectionFromContextMarkers() {
+        let cases: [(String, USRDecoder.Kind)] = [
+            ("s:14NetworkMonitorC", .type),
+            ("s:7MyModelV", .struct),
+            ("s:6StatusO", .enum),
+            ("s:10MyProtocolP", .protocol),
+        ]
+
+        for (usr, expected) in cases {
+            let result = decoder.decode(usr)
+            #expect(result?.kind == expected)
+        }
     }
 }
