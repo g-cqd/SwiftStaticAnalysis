@@ -152,8 +152,8 @@ struct Duplicates: AsyncParsableCommand {
     @Option(name: .long, parsing: .upToNextOption, help: "Paths to exclude (glob patterns)")
     var excludePaths: [String] = []
 
-    @Flag(name: .long, help: "Use experimental parallel clone detection (beta)")
-    var xparallelClones: Bool = false
+    @Flag(name: .long, help: "Use parallel processing (faster for large codebases)")
+    var parallel: Bool = false
 
     @Option(name: .shortAndLong, help: "Output format")
     var format: OutputFormat = .xcode
@@ -172,7 +172,7 @@ struct Duplicates: AsyncParsableCommand {
         let effectiveAlgorithm = algorithm?.toAlgorithm ?? parseAlgorithm(dupConfig?.algorithm)
         let effectiveTypes = types.isEmpty ? parseCloneTypes(dupConfig?.types) : Set(types.map(\.toCloneType))
         let effectiveExcludePaths = excludePaths.isEmpty ? (dupConfig?.excludePaths ?? []) : excludePaths
-        let effectiveXparallelClones = xparallelClones || (dupConfig?.xparallelClones ?? false)
+        let effectiveParallel = parallel || (dupConfig?.parallel ?? false)
 
         // Merge with global excludePaths
         let allExcludePaths = effectiveExcludePaths + (swaConfig?.excludePaths ?? [])
@@ -184,7 +184,7 @@ struct Duplicates: AsyncParsableCommand {
             cloneTypes: effectiveTypes,
             minimumSimilarity: effectiveMinSimilarity,
             algorithm: effectiveAlgorithm,
-            useParallelClones: effectiveXparallelClones
+            useParallelClones: effectiveParallel
         )
 
         let detector = DuplicationDetector(configuration: detectorConfig)
@@ -277,9 +277,8 @@ struct Unused: AsyncParsableCommand {
     @Flag(name: .long, help: "Ignore View body properties")
     var ignoreViewBody: Bool = false
 
-    // Experimental features
-    @Flag(name: .long, help: "Use experimental parallel BFS (beta, faster for large codebases)")
-    var xparallelBfs: Bool = false
+    @Flag(name: .long, help: "Use parallel processing (faster for large codebases)")
+    var parallel: Bool = false
 
     // swiftlint:disable:next function_body_length
     func run() async throws {
@@ -319,8 +318,7 @@ struct Unused: AsyncParsableCommand {
         let effectiveIgnorePreviewProviders = ignorePreviewProviders || (unusedConfig?.ignorePreviewProviders ?? false)
         let effectiveIgnoreViewBody = ignoreViewBody || (unusedConfig?.ignoreViewBody ?? false)
 
-        // Merge experimental settings
-        let effectiveXparallelBfs = xparallelBfs || (unusedConfig?.xparallelBfs ?? false)
+        let effectiveParallel = parallel || (unusedConfig?.parallel ?? false)
 
         // Merge path exclusions
         let effectiveExcludePaths = excludePaths.isEmpty ? (unusedConfig?.excludePaths ?? []) : excludePaths
@@ -348,7 +346,7 @@ struct Unused: AsyncParsableCommand {
             ignoreSwiftUIPropertyWrappers: effectiveIgnoreSwiftUIPropertyWrappers,
             ignorePreviewProviders: effectiveIgnorePreviewProviders,
             ignoreViewBody: effectiveIgnoreViewBody,
-            useParallelBFS: effectiveXparallelBfs,
+            useParallelBFS: effectiveParallel,
         )
 
         let detector = UnusedCodeDetector(configuration: detectorConfig)
@@ -670,7 +668,7 @@ func buildUnusedConfig(from config: UnusedConfiguration?) -> UnusedCodeConfigura
         ignoreSwiftUIPropertyWrappers: config?.ignoreSwiftUIPropertyWrappers ?? false,
         ignorePreviewProviders: config?.ignorePreviewProviders ?? false,
         ignoreViewBody: config?.ignoreViewBody ?? false,
-        useParallelBFS: config?.xparallelBfs ?? false,
+        useParallelBFS: config?.parallel ?? false,
     )
 }
 

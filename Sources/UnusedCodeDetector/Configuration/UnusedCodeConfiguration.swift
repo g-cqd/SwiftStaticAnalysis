@@ -164,17 +164,15 @@ public struct UnusedCodeConfiguration: Sendable {
     /// Ignore View body properties.
     public var ignoreViewBody: Bool
 
-    // MARK: - Experimental Features
-
-    /// Use experimental parallel BFS for reachability analysis (beta).
+    /// Use parallel BFS for reachability analysis.
     ///
     /// This feature uses direction-optimizing parallel BFS (Beamer et al., 2012)
-    /// for potentially faster reachability computation on large graphs.
+    /// for faster reachability computation on large graphs.
     ///
     /// - Performance: 2-4x speedup on graphs with > 10,000 nodes
     /// - Small graphs: Minimal benefit due to parallelization overhead
     ///
-    /// Enable via `--xparallel-bfs` CLI flag.
+    /// Enable via `--parallel` CLI flag.
     public var useParallelBFS: Bool
 
     /// Use IndexStoreDB for accurate detection (deprecated, use mode instead).

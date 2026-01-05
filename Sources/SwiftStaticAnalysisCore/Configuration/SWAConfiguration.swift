@@ -107,7 +107,7 @@ public struct UnusedConfiguration: Codable, Sendable, Equatable {
         excludeTestSuites: Bool? = nil,
         excludeNamePatterns: [String]? = nil,
         excludePaths: [String]? = nil,
-        xparallelBfs: Bool? = nil,
+        parallel: Bool? = nil,
     ) {
         self.enabled = enabled
         self.mode = mode
@@ -128,7 +128,7 @@ public struct UnusedConfiguration: Codable, Sendable, Equatable {
         self.excludeTestSuites = excludeTestSuites
         self.excludeNamePatterns = excludeNamePatterns
         self.excludePaths = excludePaths
-        self.xparallelBfs = xparallelBfs
+        self.parallel = parallel
     }
 
     // MARK: Public
@@ -193,10 +193,8 @@ public struct UnusedConfiguration: Codable, Sendable, Equatable {
     /// Additional path exclusion patterns (glob syntax).
     public var excludePaths: [String]?
 
-    // MARK: - Experimental Features
-
-    /// Use experimental parallel BFS for reachability analysis (beta).
-    public var xparallelBfs: Bool?
+    /// Use parallel processing (faster for large codebases).
+    public var parallel: Bool?
 }
 
 // MARK: - DuplicatesConfiguration
@@ -213,7 +211,7 @@ public struct DuplicatesConfiguration: Codable, Sendable, Equatable {
         algorithm: String? = nil,
         ignoredPatterns: [String]? = nil,
         excludePaths: [String]? = nil,
-        xparallelClones: Bool? = nil
+        parallel: Bool? = nil
     ) {
         self.enabled = enabled
         self.minTokens = minTokens
@@ -222,7 +220,7 @@ public struct DuplicatesConfiguration: Codable, Sendable, Equatable {
         self.algorithm = algorithm
         self.ignoredPatterns = ignoredPatterns
         self.excludePaths = excludePaths
-        self.xparallelClones = xparallelClones
+        self.parallel = parallel
     }
 
     // MARK: Public
@@ -251,6 +249,6 @@ public struct DuplicatesConfiguration: Codable, Sendable, Equatable {
     /// Additional path exclusion patterns (glob syntax).
     public var excludePaths: [String]?
 
-    /// Use experimental parallel clone detection (beta).
-    public var xparallelClones: Bool?
+    /// Use parallel processing (faster for large codebases).
+    public var parallel: Bool?
 }

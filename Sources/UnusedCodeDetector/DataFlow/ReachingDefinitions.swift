@@ -273,18 +273,18 @@ public struct ReachingDefinitionsAnalysis: Sendable {
 
             for (index, statement) in block.statements.enumerated() {
                 for variable in statement.defs {
-                    // Skip ignored variables
-                    if configuration.ignoredVariables.contains(variable) {
+                    // Skip ignored variables (by name)
+                    if configuration.ignoredVariables.contains(variable.name) {
                         continue
                     }
 
                     let def = DefinitionSite(
-                        variable: variable,
+                        variable: variable.name,
                         block: id,
                         statementIndex: index,
                         location: statement.location,
                         value: extractValue(from: statement),
-                        isInitial: id == .entry && index == 0,
+                        isInitial: id == .entry && index == 0
                     )
                     definitions.append(def)
                 }
@@ -316,13 +316,14 @@ public struct ReachingDefinitionsAnalysis: Sendable {
         // Process statements in order
         for (index, statement) in block.statements.enumerated() {
             for variable in statement.defs {
-                if configuration.ignoredVariables.contains(variable) {
+                // Skip ignored variables (by name)
+                if configuration.ignoredVariables.contains(variable.name) {
                     continue
                 }
 
                 // GEN: definitions created in this block
                 let newDef = definitions.first {
-                    $0.block == block.id && $0.statementIndex == index && $0.variable == variable
+                    $0.block == block.id && $0.statementIndex == index && $0.variable == variable.name
                 }
                 if let newDef {
                     gen.insert(newDef)
@@ -330,12 +331,12 @@ public struct ReachingDefinitionsAnalysis: Sendable {
 
                 // KILL: all other definitions of this variable
                 let killed = definitions.filter {
-                    $0.variable == variable && ($0.block != block.id || $0.statementIndex != index)
+                    $0.variable == variable.name && ($0.block != block.id || $0.statementIndex != index)
                 }
                 kill.formUnion(killed)
 
                 // Remove killed definitions from GEN (if redefined)
-                gen = gen.filter { $0.variable != variable || $0.statementIndex == index }
+                gen = gen.filter { $0.variable != variable.name || $0.statementIndex == index }
             }
         }
 
@@ -422,21 +423,22 @@ public struct ReachingDefinitionsAnalysis: Sendable {
             for statement in block.statements {
                 // Check each used variable
                 for usedVar in statement.uses {
-                    if configuration.ignoredVariables.contains(usedVar) {
+                    // Skip ignored variables (by name)
+                    if configuration.ignoredVariables.contains(usedVar.name) {
                         continue
                     }
 
                     // Find definitions of this variable that reach here
-                    let varDefs = reachingDefs.filter { $0.variable == usedVar }
+                    let varDefs = reachingDefs.filter { $0.variable == usedVar.name }
 
                     if varDefs.isEmpty {
                         // No definition reaches this use
                         uninitializedUses.append(
                             UninitializedUse(
-                                variable: usedVar,
+                                variable: usedVar.name,
                                 location: statement.location,
                                 reachingDefinitionCount: 0,
-                                definitelyUninitialized: true,
+                                definitelyUninitialized: true
                             ))
                     }
                 }
@@ -444,7 +446,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
                 // Update reaching definitions for definitions in this statement
                 for definedVar in statement.defs {
                     reachingDefs.updateDefinition(
-                        for: definedVar,
+                        for: definedVar.name,
                         block: id,
                         location: statement.location,
                     )
@@ -472,7 +474,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
             for statement in block.statements {
                 // For each use, link to reaching definitions
                 for usedVar in statement.uses {
-                    let varDefs = reachingDefs.filter { $0.variable == usedVar }
+                    let varDefs = reachingDefs.filter { $0.variable == usedVar.name }
                     for def in varDefs {
                         chains[def, default: []].insert(statement.location)
                     }
@@ -481,9 +483,9 @@ public struct ReachingDefinitionsAnalysis: Sendable {
                 // Update reaching definitions
                 for definedVar in statement.defs {
                     reachingDefs.updateDefinition(
-                        for: definedVar,
+                        for: definedVar.name,
                         block: id,
-                        location: statement.location,
+                        location: statement.location
                     )
                 }
             }
@@ -602,7 +604,7 @@ public struct CombinedDataFlowAnalysis: Sendable {
             let uses = reachingResult.defUseChains[def] ?? []
             if uses.isEmpty, !def.isInitial {
                 let store = DeadStore(
-                    variable: def.variable,
+                    variable: VariableID(name: def.variable),
                     location: def.location,
                     assignedValue: def.value,
                     suggestion: "Definition of '\(def.variable)' is never used",

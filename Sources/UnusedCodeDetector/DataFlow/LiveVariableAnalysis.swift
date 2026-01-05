@@ -22,10 +22,10 @@ public struct DeadStore: Sendable {
     // MARK: Lifecycle
 
     public init(
-        variable: String,
+        variable: VariableID,
         location: SwiftStaticAnalysisCore.SourceLocation,
         assignedValue: String? = nil,
-        suggestion: String = "Consider removing this assignment",
+        suggestion: String = "Consider removing this assignment"
     ) {
         self.variable = variable
         self.location = location
@@ -35,8 +35,8 @@ public struct DeadStore: Sendable {
 
     // MARK: Public
 
-    /// The variable being assigned.
-    public let variable: String
+    /// The variable being assigned (with scope context).
+    public let variable: VariableID
 
     /// Location of the dead store.
     public let location: SwiftStaticAnalysisCore.SourceLocation
@@ -57,9 +57,9 @@ public struct LiveVariableResult: Sendable {
     public init(
         cfg: ControlFlowGraph,
         deadStores: [DeadStore],
-        unusedVariables: Set<String>,
-        liveIn: [BlockID: Set<String>],
-        liveOut: [BlockID: Set<String>],
+        unusedVariables: Set<VariableID>,
+        liveIn: [BlockID: Set<VariableID>],
+        liveOut: [BlockID: Set<VariableID>]
     ) {
         self.cfg = cfg
         self.deadStores = deadStores
@@ -76,14 +76,14 @@ public struct LiveVariableResult: Sendable {
     /// Dead stores found.
     public let deadStores: [DeadStore]
 
-    /// Variables that are defined but never used.
-    public let unusedVariables: Set<String>
+    /// Variables that are defined but never used (with scope context).
+    public let unusedVariables: Set<VariableID>
 
-    /// Live-in sets for each block.
-    public let liveIn: [BlockID: Set<String>]
+    /// Live-in sets for each block (with scope context).
+    public let liveIn: [BlockID: Set<VariableID>]
 
-    /// Live-out sets for each block.
-    public let liveOut: [BlockID: Set<String>]
+    /// Live-out sets for each block (with scope context).
+    public let liveOut: [BlockID: Set<VariableID>]
 }
 
 // MARK: - LiveVariableAnalysis
@@ -189,10 +189,10 @@ public struct LiveVariableAnalysis: Sendable {
 
     /// Compute live variables using iterative worklist algorithm.
     private func computeLiveVariables(
-        _ cfg: inout ControlFlowGraph,
-    ) -> (liveIn: [BlockID: Set<String>], liveOut: [BlockID: Set<String>]) {
-        var liveIn: [BlockID: Set<String>] = [:]
-        var liveOut: [BlockID: Set<String>] = [:]
+        _ cfg: inout ControlFlowGraph
+    ) -> (liveIn: [BlockID: Set<VariableID>], liveOut: [BlockID: Set<VariableID>]) {
+        var liveIn: [BlockID: Set<VariableID>] = [:]
+        var liveOut: [BlockID: Set<VariableID>] = [:]
 
         // Initialize all blocks
         for id in cfg.blockOrder {
@@ -211,7 +211,7 @@ public struct LiveVariableAnalysis: Sendable {
             guard let block = cfg.blocks[blockID] else { continue }
 
             // Compute LIVE_out = ∪ LIVE_in[S] for all successors S
-            var newLiveOut = Set<String>()
+            var newLiveOut = Set<VariableID>()
             for succID in block.successors {
                 if let succLiveIn = liveIn[succID] {
                     newLiveOut.formUnion(succLiveIn)
@@ -219,12 +219,15 @@ public struct LiveVariableAnalysis: Sendable {
             }
 
             // Compute LIVE_in = USE ∪ (LIVE_out - DEF)
+            // For subtraction, we need to match by name since the same variable
+            // might have different VariableIDs at different points
+            let defNames = Set(block.def.map(\.name))
             var newLiveIn = block.use
-            newLiveIn.formUnion(newLiveOut.subtracting(block.def))
+            newLiveIn.formUnion(newLiveOut.filter { !defNames.contains($0.name) })
 
-            // Remove ignored variables
-            newLiveIn.subtract(configuration.ignoredVariables)
-            newLiveOut.subtract(configuration.ignoredVariables)
+            // Remove ignored variables (by name)
+            newLiveIn = newLiveIn.filter { !configuration.ignoredVariables.contains($0.name) }
+            newLiveOut = newLiveOut.filter { !configuration.ignoredVariables.contains($0.name) }
 
             // Check for changes
             if newLiveIn != liveIn[blockID] || newLiveOut != liveOut[blockID] {
@@ -248,7 +251,7 @@ public struct LiveVariableAnalysis: Sendable {
     /// Find assignments to variables that are not live after the assignment.
     private func findDeadStores(
         cfg: ControlFlowGraph,
-        liveOut: [BlockID: Set<String>],
+        liveOut: [BlockID: Set<VariableID>]
     ) -> [DeadStore] {
         var deadStores: [DeadStore] = []
 
@@ -257,20 +260,22 @@ public struct LiveVariableAnalysis: Sendable {
 
             // Compute liveness at each statement point (backward within block)
             var liveAtPoint = liveOut[id] ?? []
+            var liveNamesAtPoint = Set(liveAtPoint.map(\.name))
 
             // Process statements in reverse order
             for statement in block.statements.reversed() {
                 // Check each defined variable
                 for definedVar in statement.defs {
-                    // Skip ignored variables
-                    if configuration.ignoredVariables.contains(definedVar) {
+                    // Skip ignored variables (by name)
+                    if configuration.ignoredVariables.contains(definedVar.name) {
                         continue
                     }
 
                     // If defined variable is not live after this point, it's a dead store
-                    if !liveAtPoint.contains(definedVar) {
+                    // Compare by name for liveness check
+                    if !liveNamesAtPoint.contains(definedVar.name) {
                         // Check if variable is used in the same statement (like x = x + 1)
-                        let usedInSameStatement = statement.uses.contains(definedVar)
+                        let usedInSameStatement = statement.uses.contains { $0.name == definedVar.name }
 
                         if !usedInSameStatement {
                             deadStores.append(
@@ -278,7 +283,7 @@ public struct LiveVariableAnalysis: Sendable {
                                     variable: definedVar,
                                     location: statement.location,
                                     assignedValue: extractAssignedValue(statement),
-                                    suggestion: "Variable '\(definedVar)' is assigned but never read",
+                                    suggestion: "Variable '\(definedVar.name)' is assigned but never read"
                                 ))
                         }
                     }
@@ -286,8 +291,10 @@ public struct LiveVariableAnalysis: Sendable {
 
                 // Update liveness for this point
                 // LIVE_before = USE ∪ (LIVE_after - DEF)
-                liveAtPoint.subtract(statement.defs)
+                let defNames = Set(statement.defs.map(\.name))
+                liveAtPoint = liveAtPoint.filter { !defNames.contains($0.name) }
                 liveAtPoint.formUnion(statement.uses)
+                liveNamesAtPoint = Set(liveAtPoint.map(\.name))
             }
         }
 
@@ -308,23 +315,23 @@ public struct LiveVariableAnalysis: Sendable {
     /// Find variables that are defined but never used anywhere.
     private func findUnusedVariables(
         cfg: ControlFlowGraph,
-        liveIn: [BlockID: Set<String>],
-    ) -> Set<String> {
+        liveIn: [BlockID: Set<VariableID>]
+    ) -> Set<VariableID> {
         // Collect all defined variables
-        var allDefined = Set<String>()
-        var allUsed = Set<String>()
+        var allDefined = Set<VariableID>()
+        var allUsedNames = Set<String>()
 
         for id in cfg.blockOrder {
             guard let block = cfg.blocks[id] else { continue }
             allDefined.formUnion(block.def)
-            allUsed.formUnion(block.use)
+            allUsedNames.formUnion(block.use.map(\.name))
         }
 
-        // Remove ignored variables
-        allDefined.subtract(configuration.ignoredVariables)
+        // Remove ignored variables (by name)
+        allDefined = allDefined.filter { !configuration.ignoredVariables.contains($0.name) }
 
-        // Find variables defined but never used
-        return allDefined.subtracting(allUsed)
+        // Find variables defined but never used (by name)
+        return allDefined.filter { !allUsedNames.contains($0.name) }
     }
 }
 
@@ -340,16 +347,16 @@ extension LiveVariableAnalysis {
     /// - Returns: Array of (statement, liveBeforeStatement) pairs.
     public func computeStatementLiveness(
         block: BasicBlock,
-        liveAtExit: Set<String>,
-    ) -> [(statement: CFGStatement, liveBefore: Set<String>)] {
-        var result: [(CFGStatement, Set<String>)] = []
+        liveAtExit: Set<VariableID>
+    ) -> [(statement: CFGStatement, liveBefore: Set<VariableID>)] {
+        var result: [(CFGStatement, Set<VariableID>)] = []
         var live = liveAtExit
 
         // Process statements in reverse order
         for statement in block.statements.reversed() {
             // LIVE_before = USE ∪ (LIVE_after - DEF)
-            var liveBefore = live
-            liveBefore.subtract(statement.defs)
+            let defNames = Set(statement.defs.map(\.name))
+            var liveBefore = live.filter { !defNames.contains($0.name) }
             liveBefore.formUnion(statement.uses)
 
             result.append((statement, liveBefore))
@@ -438,16 +445,19 @@ extension LiveVariableResult {
         for id in cfg.blockOrder {
             guard let block = cfg.blocks[id] else { continue }
             output += "Block \(id.value):\n"
-            output += "  LIVE_in:  {\(liveIn[id]?.sorted().joined(separator: ", ") ?? "")}\n"
-            output += "  LIVE_out: {\(liveOut[id]?.sorted().joined(separator: ", ") ?? "")}\n"
-            output += "  USE: {\(block.use.sorted().joined(separator: ", "))}\n"
-            output += "  DEF: {\(block.def.sorted().joined(separator: ", "))}\n\n"
+            output +=
+                "  LIVE_in:  {\(liveIn[id]?.sorted().map(\.description).joined(separator: ", ") ?? "")}\n"
+            output +=
+                "  LIVE_out: {\(liveOut[id]?.sorted().map(\.description).joined(separator: ", ") ?? "")}\n"
+            output += "  USE: {\(block.use.sorted().map(\.description).joined(separator: ", "))}\n"
+            output += "  DEF: {\(block.def.sorted().map(\.description).joined(separator: ", "))}\n\n"
         }
 
         if !deadStores.isEmpty {
             output += "Dead Stores Found:\n"
             for store in deadStores {
-                output += "  - \(store.variable) at \(store.location.file):\(store.location.line)\n"
+                output +=
+                    "  - \(store.variable.description) at \(store.location.file):\(store.location.line)\n"
                 if let value = store.assignedValue {
                     output += "    Value: \(value)\n"
                 }

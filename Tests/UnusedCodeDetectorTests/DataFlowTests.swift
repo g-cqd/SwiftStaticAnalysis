@@ -287,8 +287,8 @@ struct CFGBuilderTests {
 
         // Entry block should have DEF for x and y
         let entryBlock = cfg.blocks[.entry]
-        #expect(entryBlock?.def.contains("x") == true)
-        #expect(entryBlock?.def.contains("y") == true)
+        #expect(entryBlock?.def.contains { $0.name == "x" } == true)
+        #expect(entryBlock?.def.contains { $0.name == "y" } == true)
     }
 
     @Test("Reverse postorder is computed")
@@ -369,7 +369,7 @@ struct LiveVariableAnalysisTests {
         let result = analysis.analyze(cfg)
 
         // x is never used
-        #expect(result.unusedVariables.contains("x") || !result.deadStores.isEmpty)
+        #expect(result.unusedVariables.contains { $0.name == "x" } || !result.deadStores.isEmpty)
     }
 
     @Test("Dead store is detected")
@@ -432,7 +432,7 @@ struct LiveVariableAnalysisTests {
         let result = analysis.analyze(cfg)
 
         // _ should not be reported as unused
-        #expect(!result.unusedVariables.contains("_"))
+        #expect(!result.unusedVariables.contains { $0.name == "_" })
     }
 
     @Test("Statement-level liveness")
@@ -1046,13 +1046,13 @@ struct DeadStoreTests {
     func deadStoreCreation() {
         let location = SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0)
         let store = DeadStore(
-            variable: "x",
+            variable: VariableID(name: "x"),
             location: location,
             assignedValue: "1",
             suggestion: "Remove this",
         )
 
-        #expect(store.variable == "x")
+        #expect(store.variable.name == "x")
         #expect(store.assignedValue == "1")
         #expect(store.suggestion == "Remove this")
     }
@@ -1060,9 +1060,9 @@ struct DeadStoreTests {
     @Test("Dead store equality")
     func deadStoreEquality() {
         let location = SourceLocation(file: "test.swift", line: 1, column: 1, offset: 0)
-        let store1 = DeadStore(variable: "x", location: location)
-        let store2 = DeadStore(variable: "x", location: location)
-        let store3 = DeadStore(variable: "y", location: location)
+        let store1 = DeadStore(variable: VariableID(name: "x"), location: location)
+        let store2 = DeadStore(variable: VariableID(name: "x"), location: location)
+        let store3 = DeadStore(variable: VariableID(name: "y"), location: location)
 
         #expect(store1 == store2)
         #expect(store1 != store3)

@@ -343,12 +343,13 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
     private func evaluateStatement(_ statement: CFGStatement) {
         // Try to evaluate assignments
         for variable in statement.defs {
-            if configuration.ignoredVariables.contains(variable) {
+            // Check by name for ignored variables
+            if configuration.ignoredVariables.contains(variable.name) {
                 continue
             }
 
             let value = evaluateExpression(statement.syntax)
-            updateValue(variable: variable, value: value)
+            updateValue(variable: variable.name, value: value)
         }
     }
 
@@ -672,10 +673,10 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
 
             for statement in block.statements {
                 for variable in statement.defs {
-                    if let latticeValue = values[variable],
+                    if let latticeValue = values[variable.name],
                         case .constant(let constValue) = latticeValue
                     {
-                        constants.append((variable, constValue, statement.location))
+                        constants.append((variable.name, constValue, statement.location))
                     }
                 }
             }

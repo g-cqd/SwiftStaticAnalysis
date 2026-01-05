@@ -688,7 +688,7 @@ extension ReachabilityGraph {
         )
     }
 
-    /// Compute reachable nodes using experimental parallel BFS.
+    /// Compute reachable nodes using parallel BFS.
     ///
     /// This method uses direction-optimizing parallel BFS for potentially
     /// faster reachability computation on large graphs.
@@ -696,7 +696,7 @@ extension ReachabilityGraph {
     /// - Parameter configuration: Parallel BFS configuration
     /// - Returns: Set of reachable node IDs
     ///
-    /// - Note: This is an experimental feature. Use `--xparallel-bfs` flag to enable.
+    /// - Note: Use `--parallel` flag to enable.
     public func computeReachableParallel(
         configuration: ParallelBFS.Configuration = .default
     ) async -> Set<String> {
