@@ -107,6 +107,7 @@ public struct UnusedConfiguration: Codable, Sendable, Equatable {
         excludeTestSuites: Bool? = nil,
         excludeNamePatterns: [String]? = nil,
         excludePaths: [String]? = nil,
+        xparallelBfs: Bool? = nil,
     ) {
         self.enabled = enabled
         self.mode = mode
@@ -127,6 +128,7 @@ public struct UnusedConfiguration: Codable, Sendable, Equatable {
         self.excludeTestSuites = excludeTestSuites
         self.excludeNamePatterns = excludeNamePatterns
         self.excludePaths = excludePaths
+        self.xparallelBfs = xparallelBfs
     }
 
     // MARK: Public
@@ -190,6 +192,11 @@ public struct UnusedConfiguration: Codable, Sendable, Equatable {
 
     /// Additional path exclusion patterns (glob syntax).
     public var excludePaths: [String]?
+
+    // MARK: - Experimental Features
+
+    /// Use experimental parallel BFS for reachability analysis (beta).
+    public var xparallelBfs: Bool?
 }
 
 // MARK: - DuplicatesConfiguration

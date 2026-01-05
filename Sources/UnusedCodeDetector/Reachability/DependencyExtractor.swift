@@ -467,8 +467,13 @@ public struct ReachabilityBasedDetector: Sendable {
         let extractor = DependencyExtractor(configuration: extractionConfiguration)
         let graph = await extractor.buildGraph(from: result)
 
-        // Get unreachable declarations
-        let unreachable = await graph.computeUnreachable()
+        // Get unreachable declarations using sequential or parallel BFS
+        let unreachable: [DeclarationNode]
+        if configuration.useParallelBFS {
+            unreachable = await graph.computeUnreachableParallel()
+        } else {
+            unreachable = await graph.computeUnreachable()
+        }
 
         // Convert to UnusedCode
         return unreachable.compactMap { node -> UnusedCode? in

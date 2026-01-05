@@ -9,6 +9,7 @@
 //  reference tracking and protocol witness resolution.
 //
 
+import Collections
 import Foundation
 import IndexStoreDB
 import SwiftStaticAnalysisCore
@@ -226,12 +227,10 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
         }
 
         var reachable = Set<String>()
-        var queue = Array(roots)
+        var queue = Deque(roots)  // O(1) pop from front
         var visited = Set<String>()
 
-        while !queue.isEmpty {
-            let current = queue.removeFirst()
-
+        while let current = queue.popFirst() {  // O(1) instead of O(n)
             if visited.contains(current) {
                 continue
             }

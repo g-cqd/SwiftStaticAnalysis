@@ -272,6 +272,10 @@ struct Unused: AsyncParsableCommand {
     @Flag(name: .long, help: "Ignore View body properties")
     var ignoreViewBody: Bool = false
 
+    // Experimental features
+    @Flag(name: .long, help: "Use experimental parallel BFS (beta, faster for large codebases)")
+    var xparallelBfs: Bool = false
+
     // swiftlint:disable:next function_body_length
     func run() async throws {
         // Use first path for configuration discovery
@@ -310,6 +314,9 @@ struct Unused: AsyncParsableCommand {
         let effectiveIgnorePreviewProviders = ignorePreviewProviders || (unusedConfig?.ignorePreviewProviders ?? false)
         let effectiveIgnoreViewBody = ignoreViewBody || (unusedConfig?.ignoreViewBody ?? false)
 
+        // Merge experimental settings
+        let effectiveXparallelBfs = xparallelBfs || (unusedConfig?.xparallelBfs ?? false)
+
         // Merge path exclusions
         let effectiveExcludePaths = excludePaths.isEmpty ? (unusedConfig?.excludePaths ?? []) : excludePaths
         let allExcludePaths = effectiveExcludePaths + (swaConfig?.excludePaths ?? [])
@@ -336,6 +343,7 @@ struct Unused: AsyncParsableCommand {
             ignoreSwiftUIPropertyWrappers: effectiveIgnoreSwiftUIPropertyWrappers,
             ignorePreviewProviders: effectiveIgnorePreviewProviders,
             ignoreViewBody: effectiveIgnoreViewBody,
+            useParallelBFS: effectiveXparallelBfs,
         )
 
         let detector = UnusedCodeDetector(configuration: detectorConfig)
@@ -657,6 +665,7 @@ func buildUnusedConfig(from config: UnusedConfiguration?) -> UnusedCodeConfigura
         ignoreSwiftUIPropertyWrappers: config?.ignoreSwiftUIPropertyWrappers ?? false,
         ignorePreviewProviders: config?.ignorePreviewProviders ?? false,
         ignoreViewBody: config?.ignoreViewBody ?? false,
+        useParallelBFS: config?.xparallelBfs ?? false,
     )
 }
 

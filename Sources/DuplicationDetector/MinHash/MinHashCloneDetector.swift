@@ -9,6 +9,7 @@
 //  complexity by using LSH to avoid O(n²) pairwise comparisons.
 //
 
+import Collections
 import Foundation
 import SwiftStaticAnalysisCore
 
@@ -230,11 +231,10 @@ public struct MinHashCloneDetector: Sendable {
 
         for docId in adjacency.keys where !visited.contains(docId) {
             var component: [Int] = []
-            var queue = [docId]
+            var queue: Deque<Int> = [docId]  // O(1) pop from front
             visited.insert(docId)
 
-            while !queue.isEmpty {
-                let current = queue.removeFirst()
+            while let current = queue.popFirst() {  // O(1) instead of O(n)
                 component.append(current)
 
                 if let neighbors = adjacency[current] {

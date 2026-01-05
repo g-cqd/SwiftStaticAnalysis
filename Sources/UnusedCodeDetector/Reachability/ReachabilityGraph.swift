@@ -6,6 +6,7 @@
 //  Uses BFS traversal from root sets (entry points) to find reachable code.
 //
 
+import Collections
 import SwiftStaticAnalysisCore
 
 // MARK: - DeclarationNode
@@ -299,12 +300,10 @@ public actor ReachabilityGraph {
         }
 
         var reachable = Set<String>()
-        var queue = Array(roots)
+        var queue = Deque(roots)  // O(1) pop from front
         var visited = Set<String>()
 
-        while !queue.isEmpty {
-            let current = queue.removeFirst()
-
+        while let current = queue.popFirst() {  // O(1) instead of O(n)
             if visited.contains(current) {
                 continue
             }
@@ -360,12 +359,10 @@ public actor ReachabilityGraph {
     /// Find the shortest path from any root to a given node.
     /// Returns nil if the node is unreachable.
     public func findPathFromRoot(to targetId: String) -> [String]? {
-        var queue: [(String, [String])] = roots.map { ($0, [$0]) }
+        var queue: Deque<(String, [String])> = Deque(roots.map { ($0, [$0]) })
         var visited = Set<String>()
 
-        while !queue.isEmpty {
-            let (current, path) = queue.removeFirst()
-
+        while let (current, path) = queue.popFirst() {  // O(1) instead of O(n)
             if current == targetId {
                 return path
             }
@@ -663,5 +660,61 @@ extension ReachabilityGraph {
             unreachableByKind: unreachableByKind,
             rootsByReason: rootsByReason,
         )
+    }
+}
+
+// MARK: - ReachabilityGraph + Parallel BFS
+
+extension ReachabilityGraph {
+    /// Export graph as dense representation for parallel BFS processing.
+    ///
+    /// Converts string-based node IDs to contiguous integers for
+    /// cache-efficient parallel traversal.
+    public func exportDenseGraph() -> DenseGraph {
+        let nodeIds = Array(nodes.keys)
+
+        // Collect edges as (from, to) pairs
+        var edgePairs: [(from: String, to: String)] = []
+        for (fromId, outgoing) in edges {
+            for edge in outgoing {
+                edgePairs.append((from: fromId, to: edge.to))
+            }
+        }
+
+        return DenseGraph(
+            nodeIds: nodeIds,
+            edges: edgePairs,
+            rootIds: roots
+        )
+    }
+
+    /// Compute reachable nodes using experimental parallel BFS.
+    ///
+    /// This method uses direction-optimizing parallel BFS for potentially
+    /// faster reachability computation on large graphs.
+    ///
+    /// - Parameter configuration: Parallel BFS configuration
+    /// - Returns: Set of reachable node IDs
+    ///
+    /// - Note: This is an experimental feature. Use `--xparallel-bfs` flag to enable.
+    public func computeReachableParallel(
+        configuration: ParallelBFS.Configuration = .default
+    ) async -> Set<String> {
+        let denseGraph = exportDenseGraph()
+        let reachableIndices = await ParallelBFS.computeReachable(
+            graph: denseGraph,
+            configuration: configuration
+        )
+
+        // Convert back to string IDs
+        return denseGraph.toNodeIds(reachableIndices)
+    }
+
+    /// Get all unreachable nodes using parallel BFS.
+    public func computeUnreachableParallel(
+        configuration: ParallelBFS.Configuration = .default
+    ) async -> [DeclarationNode] {
+        let reachable = await computeReachableParallel(configuration: configuration)
+        return nodes.values.filter { !reachable.contains($0.id) }
     }
 }

@@ -6,6 +6,7 @@
 //  When a file changes, dependent files may need re-analysis.
 //
 
+import Collections
 import Foundation
 
 // MARK: - DependencyType
@@ -137,11 +138,10 @@ public struct DependencyGraph: Codable, Sendable {
     /// Uses BFS to find all transitive dependents.
     public func getAffectedFiles(changedFiles: Set<String>) -> Set<String> {
         var affected = Set<String>()
-        var queue = Array(changedFiles)
+        var queue = Deque(changedFiles)  // O(1) pop from front
         var visited = changedFiles
 
-        while !queue.isEmpty {
-            let file = queue.removeFirst()
+        while let file = queue.popFirst() {  // O(1) instead of O(n)
             affected.insert(file)
 
             for dependent in getDirectDependents(of: file) where !visited.contains(dependent) {

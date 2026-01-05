@@ -60,6 +60,9 @@ let package = Package(
         .package(url: "https://github.com/swiftlang/swift-format.git", from: "602.0.0"),
         .package(url: "https://github.com/g-cqd/SwiftProjectKit.git", from: "0.0.21"),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.3"),
+        .package(url: "https://github.com/apple/swift-async-algorithms.git", .upToNextMajor(from: "1.1.1")),
+        .package(url: "https://github.com/apple/swift-atomics.git", .upToNextMajor(from: "1.3.0")),
+        .package(url: "https://github.com/apple/swift-collections.git", .upToNextMajor(from: "1.3.0")),
     ],
     targets: [
         // MARK: - Core Infrastructure
@@ -68,6 +71,7 @@ let package = Package(
             dependencies: [
                 .product(name: "SwiftSyntax", package: "swift-syntax"),
                 .product(name: "SwiftParser", package: "swift-syntax"),
+                .product(name: "Collections", package: "swift-collections"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
@@ -79,7 +83,8 @@ let package = Package(
         .target(
             name: "DuplicationDetector",
             dependencies: [
-                "SwiftStaticAnalysisCore"
+                "SwiftStaticAnalysisCore",
+                .product(name: "Collections", package: "swift-collections"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
@@ -93,6 +98,8 @@ let package = Package(
             dependencies: [
                 "SwiftStaticAnalysisCore",
                 .product(name: "IndexStoreDB", package: "indexstore-db"),
+                .product(name: "Atomics", package: "swift-atomics"),
+                .product(name: "Collections", package: "swift-collections"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
