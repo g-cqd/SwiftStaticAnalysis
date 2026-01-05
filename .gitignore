@@ -54,3 +54,9 @@ AGENTS/
 
 # Generated documentation
 docs/
+
+# Generated analysis and planning files
+*_REPORT.md
+*_PLAN.md
+SWIFT_ALGORITHMS.md
+SWIFT_ASYNC_ALGORITHMS.md
