@@ -177,8 +177,9 @@ struct ParallelVerifierTests {
 
         let doc1 = makeDocument(
             id: 0, file: "a.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 5])
+        // 3/7 = 0.43 similarity
         let doc2 = makeDocument(
-            id: 1, file: "b.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 6, 7])  // 3/7 = 0.43 similarity
+            id: 1, file: "b.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 6, 7])
 
         let documentMap = [0: doc1, 1: doc2]
         let candidates: Set<DocumentPair> = [DocumentPair(id1: 0, id2: 1)]
@@ -195,8 +196,9 @@ struct ParallelVerifierTests {
 
         let doc1 = makeDocument(
             id: 0, file: "a.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 5])
+        // 4/6 = 0.67 similarity
         let doc2 = makeDocument(
-            id: 1, file: "b.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 6])  // 4/6 = 0.67 similarity
+            id: 1, file: "b.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 6])
 
         let documentMap = [0: doc1, 1: doc2]
         let candidates: Set<DocumentPair> = [DocumentPair(id1: 0, id2: 1)]
@@ -214,8 +216,9 @@ struct ParallelVerifierTests {
         // Same file, overlapping lines
         let doc1 = makeDocument(
             id: 0, file: "a.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 5])
+        // Overlaps with doc1
         let doc2 = makeDocument(
-            id: 1, file: "a.swift", startLine: 5, endLine: 15, tokenCount: 50, hashes: [1, 2, 3, 4, 5])  // Overlaps with doc1
+            id: 1, file: "a.swift", startLine: 5, endLine: 15, tokenCount: 50, hashes: [1, 2, 3, 4, 5])
 
         let documentMap = [0: doc1, 1: doc2]
         let candidates: Set<DocumentPair> = [DocumentPair(id1: 0, id2: 1)]

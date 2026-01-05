@@ -60,8 +60,12 @@ class CallbackManager {
 // MARK: - Higher-Order Function Calls
 
 func executeAll() {
-    functions.forEach { $0() }
-    processors.values.forEach { $0() }
+    for function in functions {
+        function()
+    }
+    for processor in processors.values {
+        processor()
+    }
 }
 
 // MARK: - Partially Referenced Closures

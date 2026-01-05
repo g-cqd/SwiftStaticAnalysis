@@ -80,7 +80,9 @@ struct Order: Processable {
 // MARK: - Generic Protocol Usage
 
 func showAll(_ items: [any Displayable]) {
-    items.forEach { $0.display() }
+    for item in items {
+        item.display()
+    }
 }
 
 func getAllIds(_ items: [some Identifiable]) -> [String] {

@@ -5,6 +5,8 @@
 //  User-related API calls. Contains boilerplate duplicated across API files.
 //
 
+// swift-format-ignore: NeverForceUnwrap
+
 import Foundation
 
 // MARK: - User API

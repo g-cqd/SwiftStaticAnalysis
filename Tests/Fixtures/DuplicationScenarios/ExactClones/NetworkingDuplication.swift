@@ -6,6 +6,8 @@
 //  The two fetch functions are nearly identical, differing only in URL and type.
 //
 
+// swift-format-ignore: NeverForceUnwrap
+
 import Foundation
 
 // MARK: - User

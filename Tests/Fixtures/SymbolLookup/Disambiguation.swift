@@ -1,5 +1,7 @@
 // Test fixture for symbol disambiguation - same names in different contexts
 
+// swift-format-ignore: AlwaysUseLowerCamelCase
+
 import Foundation
 
 // MARK: - Same Property Name in Different Types
