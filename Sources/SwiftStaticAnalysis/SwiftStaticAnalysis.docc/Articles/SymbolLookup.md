@@ -166,6 +166,8 @@ let finder = try SymbolFinder(
 )
 ```
 
+If you initialize with `SymbolFinder(projectPath:)`, SwiftStaticAnalysis attempts to auto-discover the IndexStore path in `.build/.../index/store` or Xcode DerivedData (including versioned DataStore folders). See `Sources/UnusedCodeDetector/IndexStore/IndexStoreReader.swift` for discovery logic.
+
 ### Syntax Resolution
 
 Parses source files directly using SwiftSyntax:

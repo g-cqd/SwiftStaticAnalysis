@@ -99,6 +99,20 @@ For faster `indexStore` mode analysis:
         run: swa unused . --mode indexStore --index-store-path .build/debug/index/store
 ```
 
+## DocC Documentation
+
+Generate DocC documentation in CI (same command used for GitHub Pages):
+
+```bash
+swift package --allow-writing-to-directory ./docs \
+  generate-documentation \
+  --target SwiftStaticAnalysis \
+  --disable-indexing \
+  --transform-for-static-hosting \
+  --hosting-base-path SwiftStaticAnalysis \
+  --output-path ./docs
+```
+
 ## GitLab CI
 
 Create `.gitlab-ci.yml`:

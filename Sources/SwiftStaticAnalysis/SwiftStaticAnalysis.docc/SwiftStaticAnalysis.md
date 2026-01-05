@@ -24,6 +24,7 @@ Clone detection with multiple algorithms:
 - **Exact Clones (Type-1)**: Identical code via Suffix Array (SA-IS)
 - **Near Clones (Type-2)**: Renamed variables via MinHash + LSH
 - **Semantic Clones (Type-3/4)**: Functionally equivalent via AST fingerprinting
+- **Parallel MinHash/LSH (Experimental)**: Parallel signature, candidate, and verification pipeline
 
 ### UnusedCodeDetector
 
@@ -31,6 +32,7 @@ Unused code detection with configurable modes:
 - **Simple Mode**: Fast syntax-based detection
 - **Reachability Mode**: Graph-based dead code analysis
 - **IndexStore Mode**: Cross-module accuracy using compiler index
+- **Parallel Reachability (Experimental)**: Direction-optimizing BFS on large graphs
 
 ### SymbolLookup
 

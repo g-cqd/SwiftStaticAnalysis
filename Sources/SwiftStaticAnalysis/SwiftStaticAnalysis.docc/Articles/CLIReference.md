@@ -4,7 +4,7 @@ Complete reference for the `swa` command-line tool.
 
 ## Overview
 
-The `swa` (Swift Static Analysis) CLI provides commands for detecting unused code and code duplication in Swift projects.
+The `swa` (Swift Static Analysis) CLI provides commands for detecting unused code and code duplication in Swift projects, plus symbol lookup.
 
 ## Installation
 
@@ -35,71 +35,74 @@ swift package plugin analyze
 
 ## Commands
 
-### symbol
+### analyze
 
-Look up symbols in Swift source files.
+Run full analysis (duplicates + unused code).
 
 ```bash
-swa symbol [OPTIONS] <QUERY> <PATHS>...
+swa analyze [OPTIONS] <PATHS>...
 ```
 
 #### Arguments
 
-- `<QUERY>`: Symbol name, qualified name (Type.member), selector (method(param:)), or USR.
 - `<PATHS>`: One or more paths to Swift files or directories to analyze.
 
 #### Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--usr` | Treat query as USR directly | `false` |
-| `--kind <KIND>` | Filter by kind: `function`, `method`, `variable`, `class`, `struct`, `enum`, `protocol`, `initializer` | - |
-| `--access <LEVEL>` | Filter by access: `private`, `fileprivate`, `internal`, `public`, `open` | - |
-| `--in-type <TYPE>` | Search within type scope | - |
-| `--definition` | Show only definitions | `false` |
-| `--usages` | Show usages/references | `false` |
-| `--index-store-path <PATH>` | Path to IndexStore database | - |
-| `--limit <N>` | Maximum results to return | - |
-| `--format <FORMAT>` | Output format: `text`, `json`, `xcode` | `text` |
-
-#### Query Patterns
-
-| Pattern | Example | Description |
-|---------|---------|-------------|
-| Simple name | `NetworkManager` | Find by symbol name |
-| Qualified name | `APIClient.shared` | Find member in type |
-| Selector | `fetch(id:completion:)` | Find method by signature |
-| USR | `s:14NetworkMonitor6sharedACvpZ` | Find by compiler USR (with `--usr`) |
+| `--config <PATH>` | Path to configuration file (.swa.json) | - |
+| `-f, --format <FORMAT>` | Output format: `text`, `json`, `xcode` | `xcode` |
 
 #### Examples
 
 ```bash
-# Find class by name
-swa symbol NetworkManager Sources/
+# Full analysis
+swa analyze Sources/
 
-# Find qualified member
-swa symbol "APIClient.shared" Sources/
+# JSON output
+swa analyze . --format json > report.json
+```
 
-# Find method by selector
-swa symbol "fetch(id:completion:)" Sources/
+### duplicates
 
-# Filter by kind
-swa symbol shared --kind variable --kind property Sources/
+Detect code duplication in Swift files.
 
-# Filter by access level
-swa symbol Manager --access public Sources/
+```bash
+swa duplicates [OPTIONS] <PATHS>...
+```
 
-# Show only definitions
-swa symbol NetworkManager --definition Sources/
+#### Arguments
 
-# Show all usages of a symbol
-swa symbol "Cache.shared" --usages Sources/
+- `<PATHS>`: One or more paths to Swift files or directories to analyze.
 
-# Use IndexStore for faster lookup
-swa symbol NetworkManager --index-store-path .build/debug/index/store Sources/
+#### Options
 
-# JSON output for tooling
-swa symbol "APIClient" --format json Sources/
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--types <TYPE>` | Clone types: `exact`, `near`, `semantic` (repeatable) | `exact` |
+| `--min-tokens <N>` | Minimum tokens for a clone | `50` |
+| `--min-similarity <RATIO>` | Minimum similarity (0.0-1.0) | `0.8` |
+| `--algorithm <ALG>` | Algorithm: `rollingHash`, `suffixArray`, `minHashLSH` | `rollingHash` |
+| `--exclude-paths <GLOB>` | Paths to exclude (repeatable) | - |
+| `--parallel` | Use parallel MinHash/LSH clone detection (experimental) | `false` |
+| `--config <PATH>` | Path to configuration file (.swa.json) | - |
+| `-f, --format <FORMAT>` | Output format: `text`, `json`, `xcode` | `xcode` |
+
+#### Examples
+
+```bash
+# Basic duplication detection
+swa duplicates Sources/
+
+# Detect near-clones with lower threshold
+swa duplicates --types exact --types near --min-similarity 0.7 Sources/
+
+# High-performance exact detection
+swa duplicates --algorithm suffixArray --min-tokens 30 Sources/
+
+# Parallel MinHash/LSH (large codebases)
+swa duplicates --types near --algorithm minHashLSH --parallel Sources/
 ```
 
 ### unused
@@ -120,19 +123,25 @@ swa unused [OPTIONS] <PATHS>...
 |--------|-------------|---------|
 | `--mode <MODE>` | Detection mode: `simple`, `reachability`, `indexStore` | `simple` |
 | `--min-confidence <LEVEL>` | Minimum confidence: `low`, `medium`, `high` | `medium` |
-| `--ignore-public-api` | Ignore public declarations | `false` |
-| `--treat-public-as-root` | Treat public API as reachability roots | `true` |
-| `--treat-objc-as-root` | Treat @objc declarations as roots | `true` |
-| `--treat-tests-as-root` | Treat test methods as roots | `true` |
-| `--treat-swift-ui-views-as-root` | Treat SwiftUI views as roots | `true` |
-| `--ignore-swift-ui-property-wrappers` | Ignore @State, @Binding, etc. | `true` |
-| `--ignore-preview-providers` | Ignore PreviewProvider types | `true` |
-| `--ignore-view-body` | Ignore SwiftUI body properties | `true` |
+| `--ignore-public` | Ignore public declarations | `false` |
 | `--index-store-path <PATH>` | Path to IndexStore database | - |
-| `--format <FORMAT>` | Output format: `text`, `json`, `xcode` | `text` |
-| `--output <FILE>` | Write output to file | stdout |
-| `--config <PATH>` | Path to configuration file | `.swa.json` |
-| `-v, --verbose` | Enable verbose output | `false` |
+| `--report` | Generate reachability report | `false` |
+| `--parallel` | Use parallel reachability BFS (experimental) | `false` |
+| `--exclude-paths <GLOB>` | Paths to exclude (repeatable) | - |
+| `--exclude-imports` | Exclude import statements | `false` |
+| `--exclude-test-suites` | Exclude test suite declarations | `false` |
+| `--exclude-enum-cases` | Exclude backticked enum cases | `false` |
+| `--exclude-deinit` | Exclude deinit methods | `false` |
+| `--sensible-defaults` | Apply common exclusions | `false` |
+| `--treat-public-as-root` | Treat public API as entry points | `false` |
+| `--treat-objc-as-root` | Treat @objc declarations as entry points | `false` |
+| `--treat-tests-as-root` | Treat test methods as entry points | `false` |
+| `--treat-swift-ui-views-as-root` | Treat SwiftUI Views as entry points | `false` |
+| `--ignore-swift-ui-property-wrappers` | Ignore SwiftUI property wrappers | `false` |
+| `--ignore-preview-providers` | Ignore PreviewProvider implementations | `false` |
+| `--ignore-view-body` | Ignore View body properties | `false` |
+| `--config <PATH>` | Path to configuration file (.swa.json) | - |
+| `-f, --format <FORMAT>` | Output format: `text`, `json`, `xcode` | `xcode` |
 
 #### Examples
 
@@ -143,70 +152,85 @@ swa unused Sources/
 # Reachability-based analysis with JSON output
 swa unused --mode reachability --format json Sources/
 
+# Parallel reachability on large graphs
+swa unused --mode reachability --parallel Sources/
+
 # IndexStore-based analysis (requires prior build)
 swa unused --mode indexStore --index-store-path .build/debug/index/store Sources/
 
 # Ignore public API for library development
-swa unused --ignore-public-api Sources/
+swa unused --ignore-public Sources/
 
-# High confidence only
-swa unused --min-confidence high Sources/
-
-# Xcode-compatible output for CI integration
-swa unused --format xcode Sources/
+# Apply sensible defaults
+swa unused --sensible-defaults Sources/
 ```
 
-### duplicates
+### symbol
 
-Detect code duplication in Swift files.
+Look up symbols in Swift source files.
 
 ```bash
-swa duplicates [OPTIONS] <PATHS>...
+swa symbol [OPTIONS] <QUERY> <PATHS>...
 ```
 
 #### Arguments
 
+- `<QUERY>`: Symbol name, qualified name (Type.member), selector (method(param:)), regex, or USR.
 - `<PATHS>`: One or more paths to Swift files or directories to analyze.
 
 #### Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--min-tokens <N>` | Minimum tokens for a clone | `50` |
-| `--min-similarity <RATIO>` | Minimum similarity (0.0-1.0) | `0.8` |
-| `--clone-types <TYPES>` | Clone types: `exact`, `near`, `semantic` | `exact,near` |
-| `--algorithm <ALG>` | Algorithm: `rollingHash`, `suffixArray`, `minHashLSH` | `rollingHash` |
-| `--format <FORMAT>` | Output format: `text`, `json`, `xcode` | `text` |
-| `--output <FILE>` | Write output to file | stdout |
-| `--config <PATH>` | Path to configuration file | `.swa.json` |
-| `-v, --verbose` | Enable verbose output | `false` |
+| `--usr` | Treat query as USR directly | `false` |
+| `--kind <KIND>` | Filter by kind: `function`, `method`, `variable`, `constant`, `class`, `struct`, `enum`, `protocol`, `initializer` | - |
+| `--access <LEVEL>` | Filter by access: `private`, `fileprivate`, `internal`, `public`, `open` | - |
+| `--in-type <TYPE>` | Search within type scope | - |
+| `--definition` | Show only definitions | `false` |
+| `--usages` | Show usages/references | `false` |
+| `--index-store-path <PATH>` | Path to IndexStore database | - |
+| `--limit <N>` | Maximum results to return | - |
+| `-f, --format <FORMAT>` | Output format: `text`, `json`, `xcode` | `text` |
 
-#### Clone Types
+#### Query Patterns
 
-- **exact**: Identical code blocks (Type-1 clones)
-- **near**: Similar code with renamed identifiers/literals (Type-2 clones)
-- **semantic**: Structurally equivalent code (Type-3 clones)
-
-#### Algorithms
-
-- **rollingHash**: Fast rolling hash algorithm, good for most cases
-- **suffixArray**: O(n log n) suffix array for high-performance exact detection
-- **minHashLSH**: LSH-based probabilistic detection for large codebases
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| Simple name | `NetworkManager` | Find by symbol name |
+| Qualified name | `APIClient.shared` | Find member in type |
+| Selector | `fetch(id:completion:)` | Find method by signature |
+| Regex | `/^handle.*Event$/` | Find by pattern match |
+| USR | `s:14NetworkMonitor6sharedACvpZ` | Find by compiler USR (with `--usr`) |
 
 #### Examples
 
 ```bash
-# Basic duplication detection
-swa duplicates Sources/
+# Find class by name
+swa symbol NetworkManager Sources/
 
-# Detect near-clones with lower threshold
-swa duplicates --clone-types exact,near --min-similarity 0.7 Sources/
+# Find qualified member
+swa symbol "APIClient.shared" Sources/
 
-# High-performance mode for large codebases
-swa duplicates --algorithm suffixArray --min-tokens 30 Sources/
+# Find method by selector
+swa symbol "fetch(id:completion:)" Sources/
 
-# JSON output for tooling integration
-swa duplicates --format json --output duplicates.json Sources/
+# Filter by kind
+swa symbol shared --kind variable --kind constant Sources/
+
+# Filter by access level
+swa symbol Manager --access public Sources/
+
+# Show only definitions
+swa symbol NetworkManager --definition Sources/
+
+# Show all usages of a symbol
+swa symbol "Cache.shared" --usages Sources/
+
+# Use IndexStore for faster lookup
+swa symbol NetworkManager --index-store-path .build/debug/index/store Sources/
+
+# JSON output for tooling
+swa symbol "APIClient" --format json Sources/
 ```
 
 ## Configuration File
@@ -217,36 +241,39 @@ Create a `.swa.json` file in your project root for persistent configuration.
 
 ```json
 {
+  "version": 1,
+  "format": "xcode",
+  "excludePaths": ["**/Tests/**", "**/Fixtures/**"],
   "unused": {
+    "enabled": true,
     "mode": "reachability",
+    "indexStorePath": ".build/debug/index/store",
     "minConfidence": "medium",
     "ignorePublicAPI": false,
-    "treatPublicAsRoot": true,
-    "treatObjcAsRoot": true,
-    "treatTestsAsRoot": true,
-    "treatSwiftUIViewsAsRoot": true,
-    "ignoreSwiftUIPropertyWrappers": true,
-    "ignorePreviewProviders": true,
-    "ignoreViewBody": true,
-    "excludePaths": [
-      "**/Tests/**",
-      "**/Fixtures/**"
-    ],
-    "excludeNames": [
-      "^_.*"
-    ]
+    "sensibleDefaults": true,
+    "excludeImports": true,
+    "excludeDeinit": true,
+    "excludeEnumCases": true,
+    "excludeTestSuites": true,
+    "excludePaths": ["**/Tests/**"],
+    "treatPublicAsRoot": false,
+    "treatObjcAsRoot": false,
+    "treatTestsAsRoot": false,
+    "treatSwiftUIViewsAsRoot": false,
+    "ignoreSwiftUIPropertyWrappers": false,
+    "ignorePreviewProviders": false,
+    "ignoreViewBody": false,
+    "parallel": false
   },
   "duplicates": {
+    "enabled": true,
     "minTokens": 50,
     "minSimilarity": 0.8,
-    "cloneTypes": ["exact", "near"],
+    "types": ["exact", "near"],
     "algorithm": "rollingHash",
-    "excludePaths": [
-      "**/Generated/**"
-    ]
-  },
-  "format": "text",
-  "verbose": false
+    "excludePaths": ["**/Generated/**"],
+    "parallel": false
+  }
 }
 ```
 
@@ -299,19 +326,8 @@ Create a `.swa.json` file in your project root for persistent configuration.
 Human-readable output with file paths and line numbers.
 
 ```
-Unused Code Report
-==================
-Found 3 unused declarations
-
-src/Models/User.swift:15:5
-  warning: Unused function 'legacyValidate'
-  Confidence: high
-  Reason: Never referenced
-
-src/Utils/Helpers.swift:42:1
-  warning: Unused struct 'DeprecatedCache'
-  Confidence: medium
-  Reason: Only referenced by other unused code
+[high] Sources/Models/User.swift:15:5: Consider removing unused function 'legacyValidate'
+[medium] Sources/Utils/Helpers.swift:42:1: Consider removing unused struct 'DeprecatedCache'
 ```
 
 ### json
@@ -320,25 +336,34 @@ Machine-readable JSON output for tooling integration.
 
 ```json
 {
-  "unusedCode": [
+  "clones": [
     {
-      "file": "src/Models/User.swift",
-      "line": 15,
-      "column": 5,
-      "name": "legacyValidate",
-      "kind": "function",
-      "confidence": "high",
-      "reason": "neverReferenced"
+      "clones": [
+        {
+          "codeSnippet": "func foo() { ... }",
+          "endLine": 20,
+          "file": "Sources/A.swift",
+          "startLine": 10,
+          "tokenCount": 42
+        }
+      ],
+      "fingerprint": "f1a2b3c4",
+      "similarity": 1,
+      "type": "exact"
     }
   ],
-  "summary": {
-    "totalDeclarations": 150,
-    "unusedCount": 3,
-    "byKind": {
-      "function": 2,
-      "struct": 1
+  "unused": [
+    {
+      "confidence": "high",
+      "declaration": {
+        "kind": "function",
+        "location": {"column": 5, "file": "Sources/Models/User.swift", "line": 15},
+        "name": "legacyValidate"
+      },
+      "reason": "noReferences",
+      "suggestion": "Consider removing unused function 'legacyValidate'"
     }
-  }
+  ]
 }
 ```
 
@@ -347,19 +372,12 @@ Machine-readable JSON output for tooling integration.
 Xcode-compatible output for build phase integration.
 
 ```
-src/Models/User.swift:15:5: warning: Unused function 'legacyValidate' [swa-unused]
-src/Utils/Helpers.swift:42:1: warning: Unused struct 'DeprecatedCache' [swa-unused]
+Sources/Models/User.swift:15:5: warning: Consider removing unused function 'legacyValidate'
 ```
 
-## Exit Codes
+## Exit Status
 
-| Code | Description |
-|------|-------------|
-| 0 | Success (no issues found or analysis completed) |
-| 1 | Analysis found issues |
-| 2 | Invalid arguments or configuration |
-| 3 | File not found or unreadable |
-| 4 | Internal error |
+`swa` returns a non-zero status only for errors (invalid arguments, missing files, or runtime failures). It does not currently fail the build when issues are found.
 
 ## Ignore Directives
 
@@ -406,12 +424,12 @@ struct GeneratedModel2 { }
 
 ## SwiftUI Support
 
-The tool includes special handling for SwiftUI patterns:
+The tool includes SwiftUI-aware heuristics you can toggle via flags:
 
-- **Property Wrappers**: `@State`, `@Binding`, `@ObservedObject`, `@EnvironmentObject`, `@Published`, `@Environment` are recognized as used
-- **Preview Providers**: `PreviewProvider` conforming types are treated as roots
-- **View Body**: The `body` property in `View` conforming types is treated as used
-- **View Protocol**: Types conforming to `View` can be treated as roots
+- **Property Wrappers**: `@State`, `@Binding`, `@ObservedObject`, `@EnvironmentObject`, `@Published`, `@Environment`
+- **Preview Providers**: `PreviewProvider` conforming types
+- **View Body**: `body` property in `View` conforming types
+- **View Protocol**: Types conforming to `View`
 
 ## Build Plugin Integration
 

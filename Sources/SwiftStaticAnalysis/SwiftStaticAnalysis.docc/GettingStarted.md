@@ -48,6 +48,7 @@ This gives you access to all components. Alternatively, import individual module
         .product(name: "SwiftStaticAnalysisCore", package: "SwiftStaticAnalysis"),  // Core only
         .product(name: "DuplicationDetector", package: "SwiftStaticAnalysis"),      // Clone detection
         .product(name: "UnusedCodeDetector", package: "SwiftStaticAnalysis"),       // Unused code
+        .product(name: "SymbolLookup", package: "SwiftStaticAnalysis"),             // Symbol lookup
     ]
 )
 ```

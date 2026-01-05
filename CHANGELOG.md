@@ -5,6 +5,24 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.24] - 2026-01-05
+
+### Added
+- Direction-optimizing parallel BFS for reachability analysis (experimental `--parallel`)
+- Parallel MinHash/LSH clone detection pipeline with parallel verification and connected components (experimental `--parallel`)
+- Scope-aware variable tracking for dataflow analysis, including tuple pattern extraction and closure capture handling
+- Parallel edge computation and batch insertion for reachability graph construction
+
+### Changed
+- Renamed experimental flags `--xparallel-bfs` and `--xparallel-clones` to unified `--parallel` (config: `parallel`)
+- CI pipeline streamlined with code coverage artifacts and simplified build steps
+
+### Fixed
+- Improved IndexStore path auto-detection for Xcode DerivedData (normalized names, versioned stores)
+- Skip `_` declarations and parameters as explicitly unused
+- Format check exclusion handling (glob conversion and path filtering)
+- Linter warnings in test files
+
 ## [0.0.20] - 2025-12-31
 
 ### Changed

@@ -117,7 +117,9 @@ import SwiftStaticAnalysis
 let config = DuplicationConfiguration(
     minimumTokens: 50,
     cloneTypes: [.exact, .near, .semantic],
-    minimumSimilarity: 0.8  // For near/semantic clones
+    minimumSimilarity: 0.8,  // For near/semantic clones
+    algorithm: .minHashLSH,
+    useParallelClones: true
 )
 
 let detector = DuplicationDetector(configuration: config)
@@ -144,6 +146,16 @@ MinHash generates compact signatures that preserve Jaccard similarity. LSH enabl
 - Scales to millions of code fragments
 - Configurable similarity threshold
 
+### Parallel MinHash/LSH (Experimental)
+
+Enable parallel clone detection for large codebases:
+
+```bash
+swa duplicates . --types near --algorithm minHashLSH --parallel
+```
+
+This parallelizes signature generation, candidate finding, verification, and connected-components grouping.
+
 ### AST Fingerprinting (Semantic Clones)
 
 Creates structural fingerprints from the Abstract Syntax Tree, ignoring surface-level syntax differences.
@@ -159,6 +171,14 @@ Creates structural fingerprints from the Abstract Syntax Tree, ignoring surface-
 2. **Adjust `--min-tokens`** - Lower for thorough analysis, higher to reduce noise
 3. **Review near clones carefully** - Some may be intentionally similar (e.g., test fixtures)
 4. **Use semantic detection sparingly** - Higher false positive rate but catches deep issues
+
+## Implementation Sources
+
+- `Sources/DuplicationDetector/MinHash/MinHashCloneDetector.swift`
+- `Sources/DuplicationDetector/Parallel/ParallelMinHash.swift`
+- `Sources/DuplicationDetector/Parallel/ParallelLSH.swift`
+- `Sources/DuplicationDetector/Parallel/ParallelVerification.swift`
+- `Sources/DuplicationDetector/Parallel/ParallelConnectedComponents.swift`
 
 ## See Also
 

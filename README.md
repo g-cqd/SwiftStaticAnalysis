@@ -10,14 +10,15 @@ A high-performance Swift static analysis framework for **code duplication detect
 
 ## Features
 
-- **Multi-Algorithm Clone Detection**: Exact (Type-1), near (Type-2), and semantic (Type-3/4) clone detection
-- **IndexStoreDB Integration**: Accurate cross-module unused code detection using compiler index data
-- **Reachability Analysis**: Graph-based dead code detection with entry point tracking
+- **Multi-Algorithm Clone Detection**: Exact (Type-1), near (Type-2), and semantic (Type-3/4) clone detection with optional parallel MinHash/LSH
+- **IndexStoreDB Integration**: Accurate cross-module unused code detection using compiler index data with improved auto-discovery
+- **Reachability Analysis**: Graph-based dead code detection with entry point tracking, parallel edge building, and optional direction-optimizing BFS
 - **Symbol Lookup**: Find symbols by name, qualified name, selector, USR, or regex pattern
 - **Ignore Directives**: Suppress false positives with `// swa:ignore` comments
 - **High-Performance Parsing**: Memory-mapped I/O, SoA token storage, and arena allocation
 - **Zero-Boilerplate CLI**: Full-featured `swa` command with JSON/text/Xcode output formats
 - **Swift 6 Concurrency**: Thread-safe design with `Sendable` conformance throughout
+- **Scope-Aware Dataflow Analysis**: Tuple pattern extraction, closure capture handling, and `_`-skip rules
 - **Configurable Filtering**: Exclude imports, test suites, deinit methods, and custom patterns
 
 ## Requirements
@@ -103,6 +104,9 @@ swa duplicates /path/to/project --types exact --types near --types semantic
 # Detect unused code with reachability analysis
 swa unused /path/to/project --mode reachability
 
+# Enable experimental parallel reachability (large graphs)
+swa unused /path/to/project --mode reachability --parallel
+
 # Apply sensible filters to reduce false positives
 swa unused . --sensible-defaults --exclude-paths "**/Tests/**"
 
@@ -114,6 +118,9 @@ swa symbol "fetch" --kind method --access public /path/to/project
 
 # Find symbol usages
 swa symbol "SharedCache.instance" --usages /path/to/project
+
+# Parallel MinHash/LSH clone detection (large codebases)
+swa duplicates /path/to/project --types near --algorithm minHashLSH --parallel
 
 # Output as JSON for CI integration
 swa analyze . --format json > report.json
@@ -130,6 +137,7 @@ Create a `.swa.json` file in your project root for persistent configuration:
 {
   "unused": {
     "mode": "reachability",
+    "parallel": true,
     "minConfidence": "medium",
     "excludePaths": ["**/Tests/**", "**/Fixtures/**"],
     "excludeImports": true,
@@ -141,10 +149,12 @@ Create a `.swa.json` file in your project root for persistent configuration:
     "types": ["exact", "near"],
     "minTokens": 50,
     "minSimilarity": 0.8,
-    "algorithm": "suffixArray"
+    "algorithm": "minHashLSH"
   }
 }
 ```
+
+`parallel` enables experimental parallel reachability (unused) for large codebases.
 
 Then run with:
 
@@ -206,6 +216,8 @@ config.autoBuild = true  // Build if index is stale
 let detector = UnusedCodeDetector(configuration: config)
 let unused = try await detector.detectUnused(in: swiftFiles)
 ```
+
+If you omit `indexStorePath`, the detector attempts to auto-discover it in `.build/.../index/store` or Xcode DerivedData.
 
 #### Symbol Lookup
 
@@ -299,6 +311,8 @@ public extension SIMDStorage {
 | `reachability` | Medium | ~85% | Entry-point based dead code detection |
 | `indexStore` | Slow | ~95% | Cross-module, protocol witnesses |
 
+Use `--parallel` with `reachability` for experimental direction-optimizing BFS on large graphs.
+
 ## Clone Types
 
 | Type | Description | Algorithm |
@@ -306,6 +320,8 @@ public extension SIMDStorage {
 | **Exact** (Type-1) | Identical code, whitespace-normalized | Suffix Array (SA-IS) |
 | **Near** (Type-2) | Renamed variables/literals | MinHash + LSH |
 | **Semantic** (Type-3/4) | Functionally equivalent | AST Fingerprinting |
+
+Use `--parallel` with `minHashLSH` to enable experimental parallel clone detection.
 
 ## Filtering Options
 
@@ -330,6 +346,8 @@ swa unused . --exclude-paths "**/Tests/**" --exclude-paths "**/Fixtures/**"
 # Apply all sensible defaults at once
 swa unused . --sensible-defaults
 ```
+
+Declarations or parameters named `_` are always skipped as explicitly unused.
 
 ## CLI Reference
 
@@ -361,6 +379,7 @@ swa unused [<path>] [options]
 | `--min-confidence <level>` | Minimum confidence: `low`, `medium`, `high` |
 | `--index-store-path <path>` | Path to index store (for indexStore mode) |
 | `--report` | Generate reachability report |
+| `--parallel` | Use parallel reachability BFS (experimental, reachability mode) |
 | `-f, --format <format>` | Output format: `text`, `json`, `xcode` |
 | `--exclude-paths <glob>` | Paths to exclude (repeatable) |
 | `--exclude-imports` | Exclude import statements |
@@ -393,6 +412,7 @@ swa duplicates [<path>] [options]
 | `--min-similarity <n>` | Minimum similarity (0.0-1.0) |
 | `--algorithm <algo>` | Algorithm: `rollingHash`, `suffixArray`, `minHashLSH` |
 | `--exclude-paths <glob>` | Paths to exclude (repeatable) |
+| `--parallel` | Use parallel MinHash/LSH clone detection (experimental) |
 | `-f, --format <format>` | Output format: `text`, `json`, `xcode` |
 
 ### `swa symbol`
@@ -406,8 +426,8 @@ swa symbol <query> [<path>] [options]
 | Option | Description |
 |--------|-------------|
 | `--usr` | Treat query as USR (Unified Symbol Resolution) directly |
-| `--kind <kind>` | Filter by kind: `function`, `method`, `variable`, `class`, `struct`, `enum`, `protocol` (repeatable) |
-| `--access <level>` | Filter by access: `private`, `internal`, `public`, `open` (repeatable) |
+| `--kind <kind>` | Filter by kind: `function`, `method`, `variable`, `constant`, `class`, `struct`, `enum`, `protocol`, `initializer` (repeatable) |
+| `--access <level>` | Filter by access: `private`, `fileprivate`, `internal`, `public`, `open` (repeatable) |
 | `--in-type <type>` | Search within type scope |
 | `--definition` | Show only definitions |
 | `--usages` | Show usages/references |
@@ -465,6 +485,24 @@ The documentation includes:
 - **CI Integration**: Setting up automated analysis
 - **API Reference**: Complete API documentation for all modules
 
+Generate DocC locally (same as CI):
+
+```bash
+swift package --allow-writing-to-directory ./docs \
+  generate-documentation \
+  --target SwiftStaticAnalysis \
+  --disable-indexing \
+  --transform-for-static-hosting \
+  --hosting-base-path SwiftStaticAnalysis \
+  --output-path ./docs
+```
+
+## Implementation References
+
+- Parallel reachability BFS: `Sources/UnusedCodeDetector/Reachability/ParallelBFS.swift`, `PARALLEL_BFS_STUDY.md`, `PARALLEL_BFS_IMPLEMENTATION_STUDY.md`
+- Parallel clone detection: `Sources/DuplicationDetector/Parallel/ParallelMinHash.swift`, `Sources/DuplicationDetector/Parallel/ParallelLSH.swift`
+- Scope-aware dataflow analysis: `Sources/UnusedCodeDetector/DataFlow/CFGBuilder.swift`, `Sources/UnusedCodeDetector/DataFlow/LiveVariableAnalysis.swift`
+
 ## Performance
 
 The framework includes several performance optimizations:
@@ -472,7 +510,7 @@ The framework includes several performance optimizations:
 - **Memory-Mapped I/O**: Zero-copy file reading for large codebases
 - **SoA Token Storage**: Cache-efficient struct-of-arrays layout
 - **Arena Allocation**: Reduced allocation overhead for temporary data
-- **Parallel Processing**: Concurrent file parsing with configurable limits
+- **Parallel Processing**: Concurrent parsing, reachability edge building, and optional parallel BFS/clone detection
 - **SIMD-Accelerated Hashing**: Fast MinHash signature computation
 
 ## Testing

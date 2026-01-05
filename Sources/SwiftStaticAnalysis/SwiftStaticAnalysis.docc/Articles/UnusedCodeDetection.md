@@ -39,6 +39,8 @@ swa unused . --mode reachability
 - Graph-based dead code detection
 - Entry point analysis
 - Better handling of indirect usage
+- Parallel edge computation and batch insertion for large graphs
+- Optional direction-optimizing parallel BFS (experimental, use `--parallel`)
 
 Generate a reachability report:
 
@@ -66,6 +68,16 @@ Unreachable by kind:
   - struct: 10
 ```
 
+#### Parallel Reachability (Experimental)
+
+Enable direction-optimizing parallel BFS for large reachability graphs:
+
+```bash
+swa unused . --mode reachability --parallel
+```
+
+This uses a top-down/bottom-up hybrid BFS with automatic fallback to sequential traversal on small graphs.
+
 ### IndexStore Mode
 
 Uses the compiler's index store for cross-module accuracy and protocol witness detection.
@@ -81,7 +93,7 @@ swa unused . --mode indexStore --index-store-path .build/debug/index/store
 
 **Requirements**:
 - Build your project first to generate the index store
-- Specify the index store path
+- Specify the index store path (or let SwiftStaticAnalysis auto-discover it in `.build/.../index/store` or Xcode DerivedData)
 
 ## Filtering Options
 
@@ -103,6 +115,8 @@ swa unused . --exclude-test-suites
 # Apply all sensible defaults at once
 swa unused . --sensible-defaults
 ```
+
+Declarations or parameters named `_` are always skipped as explicitly unused.
 
 ### Path Exclusions
 
@@ -150,6 +164,16 @@ let detector = UnusedCodeDetector(configuration: config)
 let unused = try await detector.detectUnused(in: swiftFiles)
 ```
 
+### Parallel Reachability (Programmatic)
+
+```swift
+var config = UnusedCodeConfiguration.reachability
+config.useParallelBFS = true
+
+let detector = UnusedCodeDetector(configuration: config)
+let unused = try await detector.detectUnused(in: swiftFiles)
+```
+
 ### IndexStore Mode
 
 ```swift
@@ -177,6 +201,16 @@ let customFiltered = unused.filter { item in
 }
 ```
 
+## Dataflow Analysis Notes
+
+Unused variable detection uses scope-aware identifiers (scope depth + declaration line) to avoid false matches across nested scopes. Tuple pattern bindings and destructuring are expanded into individual variables, and captured variables in closures are conservatively marked as used.
+
+Implementation sources:
+- `Sources/UnusedCodeDetector/DataFlow/CFGBuilder.swift`
+- `Sources/UnusedCodeDetector/DataFlow/LiveVariableAnalysis.swift`
+- `Sources/UnusedCodeDetector/DataFlow/ReachingDefinitions.swift`
+- `Sources/UnusedCodeDetector/DataFlow/SCCPAnalysis.swift`
+
 ## Confidence Levels
 
 Each result includes a confidence level:
@@ -201,6 +235,14 @@ The confidence is calculated based on:
 5. **SwiftUI previews** - Preview providers
 
 Use <doc:IgnoreDirectives> to suppress known false positives.
+
+## Implementation Sources
+
+- `Sources/UnusedCodeDetector/Reachability/ParallelBFS.swift` (direction-optimizing BFS)
+- `Sources/UnusedCodeDetector/Reachability/DenseGraph.swift` and `Sources/UnusedCodeDetector/Reachability/Bitmap.swift`
+- `Sources/UnusedCodeDetector/Reachability/DependencyExtractor.swift` (parallel edge building)
+- `Sources/UnusedCodeDetector/IndexStore/IndexStoreReader.swift` (index store discovery)
+- `PARALLEL_BFS_STUDY.md` and `PARALLEL_BFS_IMPLEMENTATION_STUDY.md`
 
 ## See Also
 

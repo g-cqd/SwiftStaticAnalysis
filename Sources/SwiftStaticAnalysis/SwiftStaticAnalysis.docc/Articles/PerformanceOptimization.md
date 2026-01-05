@@ -55,6 +55,8 @@ let results = await withTaskGroup(of: ParseResult.self) { group in
 
 **Benefit**: Near-linear scaling with CPU cores.
 
+Parallel processing also powers reachability edge building and optional parallel BFS/clone detection via `--parallel`.
+
 ### SIMD-Accelerated Hashing
 
 MinHash signature computation uses SIMD instructions when available:
@@ -113,6 +115,16 @@ swa duplicates . --types exact
 
 # Balanced: exact and near
 swa duplicates . --types exact --types near
+```
+
+### Enable Parallel Graph Algorithms
+
+```bash
+# Parallel reachability traversal (large graphs)
+swa unused . --mode reachability --parallel
+
+# Parallel MinHash/LSH pipeline (large codebases)
+swa duplicates . --algorithm minHashLSH --parallel
 ```
 
 ## Benchmarks
