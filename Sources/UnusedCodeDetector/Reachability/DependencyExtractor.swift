@@ -56,7 +56,10 @@ public struct DependencyExtractor: Sendable {
             treatPublicAsRoot: configuration.treatPublicAsRoot,
             treatObjcAsRoot: configuration.treatObjcAsRoot,
             treatTestsAsRoot: configuration.treatTestsAsRoot,
-            treatProtocolRequirementsAsRoot: configuration.treatProtocolRequirementsAsRoot
+            treatProtocolRequirementsAsRoot: configuration.treatProtocolRequirementsAsRoot,
+            treatSwiftUIViewsAsRoot: configuration.treatSwiftUIViewsAsRoot,
+            treatSwiftUIPropertyWrappersAsRoot: configuration.treatSwiftUIPropertyWrappersAsRoot,
+            treatPreviewProvidersAsRoot: configuration.treatPreviewProvidersAsRoot
         )
 
         await graph.detectRoots(
@@ -478,6 +481,9 @@ public struct DependencyExtractionConfiguration: Sendable {
         treatObjcAsRoot: Bool = true,
         treatTestsAsRoot: Bool = true,
         treatProtocolRequirementsAsRoot: Bool = true,
+        treatSwiftUIViewsAsRoot: Bool = true,
+        treatSwiftUIPropertyWrappersAsRoot: Bool = true,
+        treatPreviewProvidersAsRoot: Bool = true,
         trackProtocolWitnesses: Bool = true,
         trackClosureCaptures: Bool = true,
     ) {
@@ -485,6 +491,9 @@ public struct DependencyExtractionConfiguration: Sendable {
         self.treatObjcAsRoot = treatObjcAsRoot
         self.treatTestsAsRoot = treatTestsAsRoot
         self.treatProtocolRequirementsAsRoot = treatProtocolRequirementsAsRoot
+        self.treatSwiftUIViewsAsRoot = treatSwiftUIViewsAsRoot
+        self.treatSwiftUIPropertyWrappersAsRoot = treatSwiftUIPropertyWrappersAsRoot
+        self.treatPreviewProvidersAsRoot = treatPreviewProvidersAsRoot
         self.trackProtocolWitnesses = trackProtocolWitnesses
         self.trackClosureCaptures = trackClosureCaptures
     }
@@ -500,6 +509,9 @@ public struct DependencyExtractionConfiguration: Sendable {
         treatObjcAsRoot: true,
         treatTestsAsRoot: true,
         treatProtocolRequirementsAsRoot: true,
+        treatSwiftUIViewsAsRoot: true,
+        treatSwiftUIPropertyWrappersAsRoot: true,
+        treatPreviewProvidersAsRoot: false,
         trackProtocolWitnesses: true,
         trackClosureCaptures: true,
     )
@@ -515,6 +527,15 @@ public struct DependencyExtractionConfiguration: Sendable {
 
     /// Treat protocol requirements as roots.
     public var treatProtocolRequirementsAsRoot: Bool
+
+    /// Treat SwiftUI Views as roots.
+    public var treatSwiftUIViewsAsRoot: Bool
+
+    /// Treat SwiftUI property wrappers as roots.
+    public var treatSwiftUIPropertyWrappersAsRoot: Bool
+
+    /// Treat PreviewProviders as roots.
+    public var treatPreviewProvidersAsRoot: Bool
 
     /// Track protocol witness relationships.
     public var trackProtocolWitnesses: Bool

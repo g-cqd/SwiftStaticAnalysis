@@ -263,18 +263,18 @@ struct Unused: AsyncParsableCommand {
     @Flag(name: .long, help: "Apply sensible defaults (exclude imports, deinit, enum cases)")
     var sensibleDefaults: Bool = false
 
-    // Root treatment flags
-    @Flag(name: .long, help: "Treat public API as entry points")
-    var treatPublicAsRoot: Bool = false
+    // Root treatment flags (use --no-treat-*-as-root to disable)
+    @Flag(inversion: .prefixedNo, help: "Treat public API as entry points")
+    var treatPublicAsRoot: Bool?
 
-    @Flag(name: .long, help: "Treat @objc declarations as entry points")
-    var treatObjcAsRoot: Bool = false
+    @Flag(inversion: .prefixedNo, help: "Treat @objc declarations as entry points")
+    var treatObjcAsRoot: Bool?
 
-    @Flag(name: .long, help: "Treat test methods as entry points")
-    var treatTestsAsRoot: Bool = false
+    @Flag(inversion: .prefixedNo, help: "Treat test methods as entry points")
+    var treatTestsAsRoot: Bool?
 
-    @Flag(name: .long, help: "Treat SwiftUI Views as entry points")
-    var treatSwiftUIViewsAsRoot: Bool = false
+    @Flag(inversion: .prefixedNo, help: "Treat SwiftUI Views as entry points")
+    var treatSwiftUIViewsAsRoot: Bool?
 
     // SwiftUI flags
     @Flag(name: .long, help: "Ignore SwiftUI property wrappers")
@@ -317,12 +317,11 @@ struct Unused: AsyncParsableCommand {
         let effectiveExcludeTestSuites =
             excludeTestSuites || (unusedConfig?.excludeTestSuites ?? false) || effectiveSensibleDefaults
 
-        // Merge root treatment settings
-        let effectiveTreatPublicAsRoot = treatPublicAsRoot || (unusedConfig?.treatPublicAsRoot ?? false)
-        let effectiveTreatObjcAsRoot = treatObjcAsRoot || (unusedConfig?.treatObjcAsRoot ?? false)
-        let effectiveTreatTestsAsRoot = treatTestsAsRoot || (unusedConfig?.treatTestsAsRoot ?? false)
-        let effectiveTreatSwiftUIViewsAsRoot =
-            treatSwiftUIViewsAsRoot || (unusedConfig?.treatSwiftUIViewsAsRoot ?? false)
+        // Merge root treatment settings (CLI > config > default true)
+        let effectiveTreatPublicAsRoot = treatPublicAsRoot ?? unusedConfig?.treatPublicAsRoot ?? true
+        let effectiveTreatObjcAsRoot = treatObjcAsRoot ?? unusedConfig?.treatObjcAsRoot ?? true
+        let effectiveTreatTestsAsRoot = treatTestsAsRoot ?? unusedConfig?.treatTestsAsRoot ?? true
+        let effectiveTreatSwiftUIViewsAsRoot = treatSwiftUIViewsAsRoot ?? unusedConfig?.treatSwiftUIViewsAsRoot ?? true
 
         // Merge SwiftUI settings
         let effectiveIgnoreSwiftUIPropertyWrappers =

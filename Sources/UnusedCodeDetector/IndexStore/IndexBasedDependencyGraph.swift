@@ -520,13 +520,19 @@ public struct IndexGraphConfiguration: Sendable {
     // MARK: Lifecycle
 
     public init(
+        treatPublicAsRoot: Bool = true,
+        treatObjcAsRoot: Bool = true,
         treatTestsAsRoot: Bool = true,
         treatProtocolRequirementsAsRoot: Bool = true,
+        treatSwiftUIViewsAsRoot: Bool = true,
         includeCrossModuleEdges: Bool = true,
         trackProtocolWitnesses: Bool = true,
     ) {
+        self.treatPublicAsRoot = treatPublicAsRoot
+        self.treatObjcAsRoot = treatObjcAsRoot
         self.treatTestsAsRoot = treatTestsAsRoot
         self.treatProtocolRequirementsAsRoot = treatProtocolRequirementsAsRoot
+        self.treatSwiftUIViewsAsRoot = treatSwiftUIViewsAsRoot
         self.includeCrossModuleEdges = includeCrossModuleEdges
         self.trackProtocolWitnesses = trackProtocolWitnesses
     }
@@ -535,11 +541,20 @@ public struct IndexGraphConfiguration: Sendable {
 
     public static let `default` = Self()
 
+    /// Treat public/open declarations as roots.
+    public var treatPublicAsRoot: Bool
+
+    /// Treat @objc declarations as roots.
+    public var treatObjcAsRoot: Bool
+
     /// Treat test methods as roots.
     public var treatTestsAsRoot: Bool
 
     /// Treat protocol requirements as roots.
     public var treatProtocolRequirementsAsRoot: Bool
+
+    /// Treat SwiftUI Views as roots.
+    public var treatSwiftUIViewsAsRoot: Bool
 
     /// Include cross-module edges.
     public var includeCrossModuleEdges: Bool

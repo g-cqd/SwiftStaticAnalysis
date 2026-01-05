@@ -64,7 +64,8 @@ public struct UnusedCodeDetector: Sendable {
             let extractionConfig = DependencyExtractionConfiguration(
                 treatPublicAsRoot: configuration.treatPublicAsRoot,
                 treatObjcAsRoot: configuration.treatObjcAsRoot,
-                treatTestsAsRoot: configuration.treatTestsAsRoot
+                treatTestsAsRoot: configuration.treatTestsAsRoot,
+                treatSwiftUIViewsAsRoot: configuration.treatSwiftUIViewsAsRoot
             )
             let reachabilityDetector = ReachabilityBasedDetector(
                 configuration: configuration,
@@ -89,6 +90,7 @@ public struct UnusedCodeDetector: Sendable {
             treatPublicAsRoot: configuration.treatPublicAsRoot,
             treatObjcAsRoot: configuration.treatObjcAsRoot,
             treatTestsAsRoot: configuration.treatTestsAsRoot,
+            treatSwiftUIViewsAsRoot: configuration.treatSwiftUIViewsAsRoot
         )
 
         let reachabilityDetector = ReachabilityBasedDetector(
@@ -119,6 +121,7 @@ extension UnusedCodeDetector {
             treatObjcAsRoot: configuration.treatObjcAsRoot,
             treatTestsAsRoot: configuration.treatTestsAsRoot,
             treatProtocolRequirementsAsRoot: true,
+            treatSwiftUIViewsAsRoot: configuration.treatSwiftUIViewsAsRoot,
             trackProtocolWitnesses: true,
             trackClosureCaptures: true,
         )

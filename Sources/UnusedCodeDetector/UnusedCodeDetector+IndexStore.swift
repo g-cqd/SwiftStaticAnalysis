@@ -56,8 +56,11 @@ extension UnusedCodeDetector {
     func detectWithIndexGraph(db: IndexStoreDB, files: [String]) -> [UnusedCode] {
         // Configure the graph
         let graphConfig = IndexGraphConfiguration(
+            treatPublicAsRoot: configuration.treatPublicAsRoot,
+            treatObjcAsRoot: configuration.treatObjcAsRoot,
             treatTestsAsRoot: configuration.treatTestsAsRoot,
             treatProtocolRequirementsAsRoot: true,
+            treatSwiftUIViewsAsRoot: configuration.treatSwiftUIViewsAsRoot,
             includeCrossModuleEdges: true,
             trackProtocolWitnesses: true
         )
