@@ -503,7 +503,8 @@ public struct IndexStorePathFinder: Sendable {
             let projectName = URL(fileURLWithPath: projectRoot).lastPathComponent
             // Xcode normalizes project names in DerivedData: spaces become underscores
             let normalizedProjectName = normalizeProjectName(projectName)
-            for dir in contents where dirMatchesProject(dir, projectName: projectName, normalizedName: normalizedProjectName) {
+            for dir in contents
+            where dirMatchesProject(dir, projectName: projectName, normalizedName: normalizedProjectName) {
                 let dataStore =
                     derivedData
                     .appendingPathComponent(dir)
@@ -533,7 +534,8 @@ public struct IndexStorePathFinder: Sendable {
         }
 
         // Find versioned directories (v5, v6, etc.) that contain records and units
-        let versionedDirs = contents
+        let versionedDirs =
+            contents
             .filter { $0.hasPrefix("v") && $0.dropFirst().allSatisfy(\.isNumber) }
             .sorted { lhs, rhs in
                 // Sort by version number descending to get the highest version first
@@ -548,8 +550,8 @@ public struct IndexStorePathFinder: Sendable {
             let unitsPath = versionedPath.appendingPathComponent("units")
 
             // Verify this versioned directory contains the expected structure
-            if FileManager.default.fileExists(atPath: recordsPath.path) ||
-                FileManager.default.fileExists(atPath: unitsPath.path)
+            if FileManager.default.fileExists(atPath: recordsPath.path)
+                || FileManager.default.fileExists(atPath: unitsPath.path)
             {
                 return versionedPath.path
             }
