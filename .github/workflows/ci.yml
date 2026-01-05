@@ -20,12 +20,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-permissions:
-  contents: write
-  pages: write
-  id-token: write
-  security-events: write
-
 env:
   XCODE_VERSION: '26.1.1'
 
@@ -227,6 +221,9 @@ jobs:
     name: CodeQL Analysis
     runs-on: macos-15
     needs: test
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -275,11 +272,17 @@ jobs:
 
       - name: Determine Version
         id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           if [[ -f ".spk.json" ]]; then
             VERSION=$(jq -r '.project.version // empty' .spk.json)
-          elif [[ -n "${{ inputs.version }}" ]]; then
-            VERSION="${{ inputs.version }}"
+          elif [[ -n "$INPUT_VERSION" ]]; then
+            if [[ ! "$INPUT_VERSION" =~ ^[0-9]+(\.[0-9]+){1,3}([.-][0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+              echo "Invalid version format: $INPUT_VERSION"
+              exit 1
+            fi
+            VERSION="$INPUT_VERSION"
           elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF#refs/tags/v}"
           else
@@ -383,6 +386,8 @@ jobs:
     runs-on: macos-15
     needs: prepare-release
     if: needs.prepare-release.outputs.should_release == 'true'
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -493,6 +498,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: docs
     if: github.ref == 'refs/heads/main'
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
