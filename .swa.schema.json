@@ -134,8 +134,13 @@
         },
         "parallel": {
           "type": "boolean",
-          "description": "Use parallel processing for faster analysis",
+          "description": "Use parallel processing for faster analysis (deprecated: use parallelMode)",
           "default": false
+        },
+        "parallelMode": {
+          "type": "string",
+          "description": "Parallel execution mode (none, safe, maximum). Takes precedence over legacy parallel.",
+          "enum": ["none", "safe", "maximum"]
         }
       },
       "additionalProperties": false
@@ -193,8 +198,13 @@
         },
         "parallel": {
           "type": "boolean",
-          "description": "Use parallel processing for faster analysis",
+          "description": "Use parallel processing for faster analysis (deprecated: use parallelMode)",
           "default": false
+        },
+        "parallelMode": {
+          "type": "string",
+          "description": "Parallel execution mode (none, safe, maximum). Takes precedence over legacy parallel.",
+          "enum": ["none", "safe", "maximum"]
         }
       },
       "additionalProperties": false
@@ -218,7 +228,7 @@
         "enabled": true,
         "minTokens": 50,
         "types": ["exact", "near"],
-        "parallel": true
+        "parallelMode": "safe"
       }
     }
   ]
