@@ -239,6 +239,19 @@ public actor ReachabilityGraph {
         addEdge(from: fromNode.id, to: toNode.id, kind: kind)
     }
 
+    /// Add multiple edges in a single batch (reduces actor hop overhead for parallel processing).
+    public func addEdges(_ newEdges: [DependencyEdge]) {
+        guard !newEdges.isEmpty else { return }
+
+        for edge in newEdges {
+            edges[edge.from, default: []].insert(edge)
+            reverseEdges[edge.to, default: []].insert(edge)
+        }
+
+        // Invalidate cache once after all insertions
+        reachableCache = nil
+    }
+
     // MARK: - Root Detection
 
     /// Detect and mark root nodes based on declarations and references.
@@ -260,6 +273,25 @@ public actor ReachabilityGraph {
 
     // swa:ignore-duplicates - Standard BFS reachability algorithm used in multiple graph implementations
     /// Compute all reachable nodes from the root set using BFS.
+    ///
+    /// ## Why BFS is Sequential
+    ///
+    /// This implementation uses standard sequential BFS rather than parallel BFS because:
+    ///
+    /// 1. **Algorithmic Dependency**: BFS visits nodes level-by-level from roots. Each level
+    ///    depends on discovering all nodes at the previous level first. This creates an
+    ///    inherent sequential dependency chain.
+    ///
+    /// 2. **Graph Characteristics**: For typical codebases (hundreds to low thousands of nodes),
+    ///    the BFS traversal is already fast (O(V+E)). Parallelization overhead would likely
+    ///    exceed any potential speedup.
+    ///
+    /// 3. **Correctness Guarantee**: Sequential BFS is proven correct and deterministic.
+    ///    Parallel BFS algorithms require careful synchronization to avoid race conditions
+    ///    and may produce non-deterministic traversal orders.
+    ///
+    /// The parallelization benefit in reachability analysis comes from the *edge computation*
+    /// phase in `DependencyExtractor`, not the BFS traversal itself.
     public func computeReachable() -> Set<String> {
         // Return cached result if available
         if let cached = reachableCache {

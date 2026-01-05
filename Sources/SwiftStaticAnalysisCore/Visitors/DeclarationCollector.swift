@@ -109,6 +109,12 @@ public final class DeclarationCollector: ScopeTrackingVisitor {  // swiftlint:di
 
     override public func visit(_ node: FunctionParameterSyntax) -> SyntaxVisitorContinueKind {
         let name = node.secondName?.text ?? node.firstName.text
+
+        // Skip underscore parameters - they're explicitly unused by design
+        guard name != "_" else {
+            return .visitChildren
+        }
+
         let typeAnnotation = node.type.description.trimmingCharacters(in: .whitespaces)
 
         let declaration = Declaration(

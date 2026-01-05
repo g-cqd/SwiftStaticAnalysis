@@ -501,19 +501,116 @@ public struct IndexStorePathFinder: Sendable {
         // Try to find matching project
         if let contents = try? FileManager.default.contentsOfDirectory(atPath: derivedData.path) {
             let projectName = URL(fileURLWithPath: projectRoot).lastPathComponent
-            for dir in contents where dir.contains(projectName) {
-                let indexStore =
+            // Xcode normalizes project names in DerivedData: spaces become underscores
+            let normalizedProjectName = normalizeProjectName(projectName)
+            for dir in contents where dirMatchesProject(dir, projectName: projectName, normalizedName: normalizedProjectName) {
+                let dataStore =
                     derivedData
                     .appendingPathComponent(dir)
                     .appendingPathComponent("Index.noindex")
                     .appendingPathComponent("DataStore")
 
-                if FileManager.default.fileExists(atPath: indexStore.path) {
-                    return indexStore.path
+                // Modern Xcode stores index data in versioned subdirectories (v5, v6, etc.)
+                // Look for the highest versioned subdirectory containing records/units
+                if let versionedPath = findVersionedIndexStore(in: dataStore) {
+                    return versionedPath
+                }
+
+                // Fallback to DataStore if no versioned subdirectory
+                if FileManager.default.fileExists(atPath: dataStore.path) {
+                    return dataStore.path
                 }
             }
         }
 
         return nil
+    }
+
+    /// Find the versioned index store subdirectory (e.g., v5, v6)
+    private static func findVersionedIndexStore(in dataStore: URL) -> String? {
+        guard let contents = try? FileManager.default.contentsOfDirectory(atPath: dataStore.path) else {
+            return nil
+        }
+
+        // Find versioned directories (v5, v6, etc.) that contain records and units
+        let versionedDirs = contents
+            .filter { $0.hasPrefix("v") && $0.dropFirst().allSatisfy(\.isNumber) }
+            .sorted { lhs, rhs in
+                // Sort by version number descending to get the highest version first
+                let lhsNum = Int(lhs.dropFirst()) ?? 0
+                let rhsNum = Int(rhs.dropFirst()) ?? 0
+                return lhsNum > rhsNum
+            }
+
+        for versionedDir in versionedDirs {
+            let versionedPath = dataStore.appendingPathComponent(versionedDir)
+            let recordsPath = versionedPath.appendingPathComponent("records")
+            let unitsPath = versionedPath.appendingPathComponent("units")
+
+            // Verify this versioned directory contains the expected structure
+            if FileManager.default.fileExists(atPath: recordsPath.path) ||
+                FileManager.default.fileExists(atPath: unitsPath.path)
+            {
+                return versionedPath.path
+            }
+        }
+
+        return nil
+    }
+
+    /// Normalize project name to match Xcode's DerivedData naming convention.
+    /// Xcode replaces spaces and other special characters with underscores.
+    private static func normalizeProjectName(_ name: String) -> String {
+        // Xcode replaces these characters with underscores in DerivedData folder names
+        let charactersToReplace = CharacterSet(charactersIn: " -.")
+        var normalized = name
+        for scalar in name.unicodeScalars where charactersToReplace.contains(scalar) {
+            normalized = normalized.replacingOccurrences(of: String(scalar), with: "_")
+        }
+        return normalized
+    }
+
+    /// URL-encode project name as a fallback matching strategy.
+    /// Some tools may use percent-encoding for special characters.
+    private static func urlEncodeProjectName(_ name: String) -> String? {
+        // Only encode if there are characters that need encoding
+        name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
+    }
+
+    /// Check if a DerivedData directory name matches a project name.
+    /// Handles exact matches, normalized matches (spaces -> underscores), and URL-encoded matches.
+    private static func dirMatchesProject(_ dir: String, projectName: String, normalizedName: String) -> Bool {
+        // DerivedData folders are named: ProjectName-hash
+        // Extract the project name portion (before the hash)
+        let components = dir.split(separator: "-", maxSplits: 1)
+        guard let dirProjectName = components.first else {
+            return false
+        }
+
+        let dirNameStr = String(dirProjectName)
+
+        // Check exact match first
+        if dirNameStr == projectName {
+            return true
+        }
+
+        // Check normalized match (handles spaces -> underscores, etc.)
+        if dirNameStr == normalizedName {
+            return true
+        }
+
+        // Check URL-encoded match (handles spaces -> %20, etc.)
+        if let urlEncoded = urlEncodeProjectName(projectName), dirNameStr == urlEncoded {
+            return true
+        }
+
+        // Check if directory name is URL-encoded and matches when decoded
+        if let decoded = dirNameStr.removingPercentEncoding, decoded == projectName {
+            return true
+        }
+
+        // Also check if the directory contains the project name (legacy behavior)
+        // This handles edge cases like additional suffixes
+        return dir.contains(projectName) || dir.contains(normalizedName)
     }
 }

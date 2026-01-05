@@ -293,6 +293,66 @@ struct DeclarationCollectorTests {
         let imports = collector.imports
         #expect(imports.count == 4)
     }
+
+    // MARK: - Underscore Parameters
+
+    @Test("Skip underscore parameters")
+    func skipUnderscoreParameters() {
+        let source = """
+            func test1(_: Int) {
+                print("test1")
+            }
+
+            func test2(_ _: Int) {
+                print("test2")
+            }
+
+            func test3(_ value: Int) {
+                print(value)
+            }
+
+            func withClosure(_ handler: (Int) -> Void) {
+                handler(1)
+            }
+            """
+
+        let tree = Parser.parse(source: source)
+        let collector = DeclarationCollector(file: "test.swift", tree: tree)
+        collector.walk(tree)
+
+        let parameters = collector.declarations.filter { $0.kind == .parameter }
+        let paramNames = parameters.map(\.name)
+
+        // Should NOT contain underscore parameters
+        #expect(!paramNames.contains("_"))
+
+        // Should contain named parameter
+        #expect(paramNames.contains("value"))
+        #expect(paramNames.contains("handler"))
+    }
+
+    @Test("Skip underscore in closure parameters")
+    func skipUnderscoreInClosures() {
+        let source = """
+            let closure: (Int) -> Void = { _ in
+                print("closure")
+            }
+
+            let handler = { (_, second: String) in
+                print(second)
+            }
+            """
+
+        let tree = Parser.parse(source: source)
+        let collector = DeclarationCollector(file: "test.swift", tree: tree)
+        collector.walk(tree)
+
+        let parameters = collector.declarations.filter { $0.kind == .parameter }
+        let paramNames = parameters.map(\.name)
+
+        // Should NOT contain underscore parameters
+        #expect(!paramNames.contains("_"))
+    }
 }
 
 // MARK: - ReferenceCollectorTests

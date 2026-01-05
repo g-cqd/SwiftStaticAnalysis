@@ -54,3 +54,9 @@ unused-code-report*.json
 FINDINGS_ANALYSIS.md
 compass_artifact*.md
 performance_report.md
+
+# Temporary files and test projects
+.tmp/
+
+# Generated documentation
+docs/

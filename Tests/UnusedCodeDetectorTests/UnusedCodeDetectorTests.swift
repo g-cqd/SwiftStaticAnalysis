@@ -135,4 +135,29 @@ struct UnusedCodeDetectorTests {
         #expect(report.summaryByConfidence["high"] == 1)
         #expect(report.summaryByConfidence["medium"] == 1)
     }
+
+    @Test("Underscore declarations are not flagged as unused")
+    func underscoreDeclarationsNotFlagged() async throws {
+        let source = """
+            func test(_: Int) {
+                print("test")
+            }
+
+            func demo() {
+                let _ = someValue()
+                for _ in 0..<10 {
+                    print("loop")
+                }
+            }
+
+            func someValue() -> Int { 42 }
+            """
+
+        let detector = UnusedCodeDetector(configuration: .default)
+        let unusedItems = try await detector.detectFromSource(source, file: "test.swift")
+
+        // No underscore declarations should be reported
+        let underscoreItems = unusedItems.filter { $0.declaration.name == "_" }
+        #expect(underscoreItems.isEmpty)
+    }
 }

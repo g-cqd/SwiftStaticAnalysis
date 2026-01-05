@@ -192,6 +192,9 @@ extension UnusedCodeDetector {
 extension UnusedCodeDetector {
     /// Check if a declaration should be analyzed for unused code.
     func shouldCheck(_ declaration: Declaration) -> Bool {
+        // Skip underscore declarations - they're explicitly unused by design
+        guard declaration.name != "_" else { return false }
+
         // Check kind filter
         guard shouldCheckKind(declaration) else { return false }
 
