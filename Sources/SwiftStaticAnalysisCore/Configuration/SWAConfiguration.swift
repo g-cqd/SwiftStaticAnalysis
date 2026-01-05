@@ -213,6 +213,7 @@ public struct DuplicatesConfiguration: Codable, Sendable, Equatable {
         algorithm: String? = nil,
         ignoredPatterns: [String]? = nil,
         excludePaths: [String]? = nil,
+        xparallelClones: Bool? = nil
     ) {
         self.enabled = enabled
         self.minTokens = minTokens
@@ -221,6 +222,7 @@ public struct DuplicatesConfiguration: Codable, Sendable, Equatable {
         self.algorithm = algorithm
         self.ignoredPatterns = ignoredPatterns
         self.excludePaths = excludePaths
+        self.xparallelClones = xparallelClones
     }
 
     // MARK: Public
@@ -248,4 +250,7 @@ public struct DuplicatesConfiguration: Codable, Sendable, Equatable {
 
     /// Additional path exclusion patterns (glob syntax).
     public var excludePaths: [String]?
+
+    /// Use experimental parallel clone detection (beta).
+    public var xparallelClones: Bool?
 }

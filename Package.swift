@@ -84,7 +84,9 @@ let package = Package(
             name: "DuplicationDetector",
             dependencies: [
                 "SwiftStaticAnalysisCore",
+                "UnusedCodeDetector",  // For AtomicBitmap, Bitmap
                 .product(name: "Collections", package: "swift-collections"),
+                .product(name: "Atomics", package: "swift-atomics"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

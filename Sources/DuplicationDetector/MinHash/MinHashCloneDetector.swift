@@ -12,11 +12,12 @@
 import Collections
 import Foundation
 import SwiftStaticAnalysisCore
+import UnusedCodeDetector  // For AtomicBitmap, Bitmap
 
 // MARK: - ClonePairInfo
 
 /// Information about a pair of similar documents.
-struct ClonePairInfo: Sendable {
+public struct ClonePairInfo: Sendable {
     let doc1: ShingledDocument
     let doc2: ShingledDocument
     let similarity: Double
@@ -32,6 +33,52 @@ struct DocumentLocationInfo: Sendable {
     let tokenCount: Int
 }
 
+// MARK: - ParallelCloneConfiguration
+
+/// Configuration for parallel clone detection.
+public struct ParallelCloneConfiguration: Sendable {
+    // MARK: Lifecycle
+
+    /// Create parallel clone configuration.
+    ///
+    /// - Parameters:
+    ///   - enabled: Whether to enable parallel processing.
+    ///   - minParallelDocuments: Minimum documents to trigger parallelism.
+    ///   - minParallelPairs: Minimum pairs to trigger parallel verification.
+    ///   - maxConcurrency: Maximum concurrent tasks.
+    public init(
+        enabled: Bool = true,
+        minParallelDocuments: Int = 50,
+        minParallelPairs: Int = 100,
+        maxConcurrency: Int = ProcessInfo.processInfo.activeProcessorCount
+    ) {
+        self.enabled = enabled
+        self.minParallelDocuments = max(1, minParallelDocuments)
+        self.minParallelPairs = max(1, minParallelPairs)
+        self.maxConcurrency = max(1, maxConcurrency)
+    }
+
+    // MARK: Public
+
+    /// Default configuration (parallel enabled).
+    public static let `default` = ParallelCloneConfiguration()
+
+    /// Sequential-only configuration.
+    public static let sequential = ParallelCloneConfiguration(enabled: false)
+
+    /// Whether to enable parallel processing.
+    public let enabled: Bool
+
+    /// Minimum documents to trigger parallel MinHash.
+    public let minParallelDocuments: Int
+
+    /// Minimum pairs to trigger parallel verification.
+    public let minParallelPairs: Int
+
+    /// Maximum concurrent tasks.
+    public let maxConcurrency: Int
+}
+
 // MARK: - MinHashCloneDetector
 
 /// Detects Type-3 clones using MinHash and LSH.
@@ -43,11 +90,13 @@ public struct MinHashCloneDetector: Sendable {
         shingleSize: Int = 5,
         numHashes: Int = 128,
         minimumSimilarity: Double = 0.5,
+        parallelConfig: ParallelCloneConfiguration = .default
     ) {
         self.minimumTokens = minimumTokens
         self.shingleSize = shingleSize
         self.numHashes = numHashes
         self.minimumSimilarity = minimumSimilarity
+        self.parallelConfig = parallelConfig
 
         shingleGenerator = ShingleGenerator(shingleSize: shingleSize, normalize: true)
         minHashGenerator = MinHashGenerator(numHashes: numHashes)
@@ -74,6 +123,9 @@ public struct MinHashCloneDetector: Sendable {
 
     /// Minimum similarity threshold for clones.
     public let minimumSimilarity: Double
+
+    /// Parallel processing configuration.
+    public let parallelConfig: ParallelCloneConfiguration
 
     /// Detect Type-3 clones in the given token sequences.
     ///
@@ -135,7 +187,86 @@ public struct MinHashCloneDetector: Sendable {
             sequences.append(sequence)
         }
 
+        // Use parallel detection if enabled and enough documents
+        if parallelConfig.enabled {
+            return await detectParallel(in: sequences)
+        }
         return detect(in: sequences)
+    }
+
+    /// Detect Type-3 clones using parallel processing.
+    ///
+    /// Uses parallel MinHash, parallel LSH candidate finding, parallel verification,
+    /// and parallel connected components for optimal performance on large codebases.
+    ///
+    /// - Parameter sequences: Array of token sequences from files.
+    /// - Returns: Array of clone groups found.
+    public func detectParallel(in sequences: [TokenSequence]) async -> [CloneGroup] {
+        guard !sequences.isEmpty, minimumTokens > 0 else { return [] }
+
+        // Generate shingled documents for all code blocks
+        var allDocuments: [ShingledDocument] = []
+        var documentId = 0
+
+        for sequence in sequences {
+            let documents = shingleGenerator.generateBlockDocuments(
+                from: sequence,
+                blockSize: minimumTokens,
+                startId: documentId
+            )
+            allDocuments.append(contentsOf: documents)
+            documentId += documents.count
+        }
+
+        guard !allDocuments.isEmpty else { return [] }
+
+        // Decide between parallel and sequential based on document count
+        let useParallelMinHash = allDocuments.count >= parallelConfig.minParallelDocuments
+
+        // Compute MinHash signatures (parallel or sequential)
+        let signatures: [MinHashSignature]
+        if useParallelMinHash {
+            let parallelMinHash = ParallelMinHashGenerator(
+                numHashes: numHashes,
+                maxConcurrency: parallelConfig.maxConcurrency
+            )
+            signatures = await parallelMinHash.computeSignatures(for: allDocuments)
+        } else {
+            signatures = minHashGenerator.computeSignatures(for: allDocuments)
+        }
+
+        // Build LSH index
+        var lshIndex = LSHIndex(bands: lshBands, rows: lshRows)
+        lshIndex.insert(signatures)
+
+        // Find candidate pairs (parallel if enough bands)
+        let candidatePairs: Set<DocumentPair>
+        if lshBands >= 4 {
+            candidatePairs = await lshIndex.findCandidatePairsParallel(
+                maxConcurrency: parallelConfig.maxConcurrency
+            )
+        } else {
+            candidatePairs = lshIndex.findCandidatePairs()
+        }
+
+        // Build document lookup
+        let documentMap = Dictionary(uniqueKeysWithValues: allDocuments.map { ($0.id, $0) })
+
+        // Verify candidates (parallel or sequential)
+        let clonePairs: [ClonePairInfo]
+        if candidatePairs.count >= parallelConfig.minParallelPairs {
+            let verifier = ParallelVerifier(
+                minimumSimilarity: minimumSimilarity,
+                minParallelPairs: parallelConfig.minParallelPairs,
+                maxConcurrency: parallelConfig.maxConcurrency
+            )
+            clonePairs = await verifier.verifyCandidatePairs(candidatePairs, documentMap: documentMap)
+        } else {
+            clonePairs = verifyCandidatePairs(candidatePairs, documentMap: documentMap)
+        }
+
+        // Group related clones using parallel connected components
+        return await groupClonesParallel(clonePairs, maxDocId: documentId - 1)
     }
 
     // MARK: Private
@@ -192,6 +323,52 @@ public struct MinHashCloneDetector: Sendable {
 
         // Find connected components using BFS
         let groups = findConnectedComponents(adjacency: adjacency)
+
+        // Convert to CloneGroups
+        return convertToCloneGroups(groups, documentInfo: documentInfo, pairs: pairs)
+    }
+
+    /// Group clone pairs into clone groups using parallel connected components.
+    ///
+    /// - Parameters:
+    ///   - pairs: Verified clone pairs.
+    ///   - maxDocId: Maximum document ID for graph sizing.
+    /// - Returns: Array of clone groups.
+    private func groupClonesParallel(
+        _ pairs: [ClonePairInfo],
+        maxDocId: Int
+    ) async -> [CloneGroup] {
+        guard !pairs.isEmpty else { return [] }
+
+        // Build document info for conversion
+        var documentInfo: [Int: DocumentLocationInfo] = [:]
+        for pair in pairs {
+            documentInfo[pair.doc1.id] = DocumentLocationInfo(
+                file: pair.doc1.file,
+                startLine: pair.doc1.startLine,
+                endLine: pair.doc1.endLine,
+                tokenCount: pair.doc1.tokenCount
+            )
+            documentInfo[pair.doc2.id] = DocumentLocationInfo(
+                file: pair.doc2.file,
+                startLine: pair.doc2.startLine,
+                endLine: pair.doc2.endLine,
+                tokenCount: pair.doc2.tokenCount
+            )
+        }
+
+        // Build dense graph from pairs
+        let graph = CloneSimilarityGraph(pairs: pairs, maxDocId: maxDocId)
+
+        // Find connected components using parallel BFS
+        let config = ParallelConnectedComponents.Configuration(
+            minParallelSize: parallelConfig.minParallelDocuments,
+            maxConcurrency: parallelConfig.maxConcurrency
+        )
+        let groups = await ParallelConnectedComponents.findComponents(
+            graph: graph,
+            configuration: config
+        )
 
         // Convert to CloneGroups
         return convertToCloneGroups(groups, documentInfo: documentInfo, pairs: pairs)

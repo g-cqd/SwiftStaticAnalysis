@@ -129,6 +129,7 @@ public struct DuplicationConfiguration: Sendable {
         algorithm: DetectionAlgorithm = .rollingHash,
         useIncremental: Bool = false,
         cacheDirectory: URL? = nil,
+        useParallelClones: Bool = false
     ) {
         // Validate and clamp minimumTokens to safe range [1, 10000]
         self.minimumTokens = min(max(minimumTokens, 1), 10000)
@@ -138,6 +139,7 @@ public struct DuplicationConfiguration: Sendable {
         self.algorithm = algorithm
         self.useIncremental = useIncremental
         self.cacheDirectory = cacheDirectory
+        self.useParallelClones = useParallelClones
     }
 
     // MARK: Public
@@ -180,6 +182,9 @@ public struct DuplicationConfiguration: Sendable {
 
     /// Cache directory for incremental detection.
     public var cacheDirectory: URL?
+
+    /// Whether to use experimental parallel clone detection.
+    public var useParallelClones: Bool
 
     /// Incremental configuration with caching enabled.
     public static func incremental(cacheDirectory: URL? = nil) -> Self {
@@ -261,11 +266,15 @@ public struct DuplicationDetector: Sendable {
         switch configuration.algorithm {
         case .minHashLSH:
             // Use MinHash + LSH for Type-3 clone detection
+            let parallelConfig: ParallelCloneConfiguration = configuration.useParallelClones
+                ? .default
+                : .sequential
             let detector = MinHashCloneDetector(
                 minimumTokens: configuration.minimumTokens,
                 shingleSize: 5,
                 numHashes: 128,
                 minimumSimilarity: configuration.minimumSimilarity,
+                parallelConfig: parallelConfig
             )
             return try await detector.detect(in: files)
 
@@ -274,7 +283,7 @@ public struct DuplicationDetector: Sendable {
             // Use AST fingerprinting for semantic clone detection
             let detector = SemanticCloneDetector(
                 minimumNodes: configuration.minimumTokens / 5,  // Roughly 5 tokens per node
-                minimumSimilarity: configuration.minimumSimilarity,
+                minimumSimilarity: configuration.minimumSimilarity
             )
             return try await detector.detect(in: files)
         }

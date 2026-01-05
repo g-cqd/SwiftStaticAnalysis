@@ -152,6 +152,9 @@ struct Duplicates: AsyncParsableCommand {
     @Option(name: .long, parsing: .upToNextOption, help: "Paths to exclude (glob patterns)")
     var excludePaths: [String] = []
 
+    @Flag(name: .long, help: "Use experimental parallel clone detection (beta)")
+    var xparallelClones: Bool = false
+
     @Option(name: .shortAndLong, help: "Output format")
     var format: OutputFormat = .xcode
 
@@ -169,6 +172,7 @@ struct Duplicates: AsyncParsableCommand {
         let effectiveAlgorithm = algorithm?.toAlgorithm ?? parseAlgorithm(dupConfig?.algorithm)
         let effectiveTypes = types.isEmpty ? parseCloneTypes(dupConfig?.types) : Set(types.map(\.toCloneType))
         let effectiveExcludePaths = excludePaths.isEmpty ? (dupConfig?.excludePaths ?? []) : excludePaths
+        let effectiveXparallelClones = xparallelClones || (dupConfig?.xparallelClones ?? false)
 
         // Merge with global excludePaths
         let allExcludePaths = effectiveExcludePaths + (swaConfig?.excludePaths ?? [])
@@ -180,6 +184,7 @@ struct Duplicates: AsyncParsableCommand {
             cloneTypes: effectiveTypes,
             minimumSimilarity: effectiveMinSimilarity,
             algorithm: effectiveAlgorithm,
+            useParallelClones: effectiveXparallelClones
         )
 
         let detector = DuplicationDetector(configuration: detectorConfig)

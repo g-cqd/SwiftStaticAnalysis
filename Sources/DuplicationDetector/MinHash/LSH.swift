@@ -202,6 +202,64 @@ public struct LSHIndex: Sendable, LSHQueryable {
         signatures[documentId]
     }
 
+    /// Find candidate pairs in a specific range of bands.
+    ///
+    /// This method enables parallel candidate finding by processing
+    /// different band ranges concurrently.
+    ///
+    /// - Parameters:
+    ///   - startBand: Starting band index (inclusive).
+    ///   - endBand: Ending band index (exclusive).
+    /// - Returns: Candidate pairs found in the specified bands.
+    public func findCandidatePairsInBands(from startBand: Int, to endBand: Int) -> Set<DocumentPair> {
+        var candidates = Set<DocumentPair>()
+
+        for band in startBand..<min(endBand, bands) {
+            for (_, docIds) in buckets[band] {
+                for i in 0..<docIds.count {
+                    for j in (i + 1)..<docIds.count {
+                        candidates.insert(DocumentPair(id1: docIds[i], id2: docIds[j]))
+                    }
+                }
+            }
+        }
+
+        return candidates
+    }
+
+    /// Find candidate pairs using parallel band processing.
+    ///
+    /// Each band range is processed concurrently, then results are merged.
+    ///
+    /// - Parameter maxConcurrency: Maximum concurrent tasks.
+    /// - Returns: Set of candidate document pairs.
+    public func findCandidatePairsParallel(
+        maxConcurrency: Int = ProcessInfo.processInfo.activeProcessorCount
+    ) async -> Set<DocumentPair> {
+        // Use sequential for small band counts
+        if bands < 4 {
+            return findCandidatePairs()
+        }
+
+        let bandsPerChunk = max(1, bands / maxConcurrency)
+
+        return await withTaskGroup(of: Set<DocumentPair>.self) { group in
+            for chunkStart in stride(from: 0, to: bands, by: bandsPerChunk) {
+                let chunkEnd = min(chunkStart + bandsPerChunk, bands)
+
+                group.addTask {
+                    self.findCandidatePairsInBands(from: chunkStart, to: chunkEnd)
+                }
+            }
+
+            var allCandidates = Set<DocumentPair>()
+            for await partialCandidates in group {
+                allCandidates.formUnion(partialCandidates)
+            }
+            return allCandidates
+        }
+    }
+
     // MARK: Private
 
     /// Hash buckets for each band. buckets[band][hash] = [documentIds].
