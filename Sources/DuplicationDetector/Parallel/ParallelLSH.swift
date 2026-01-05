@@ -117,13 +117,13 @@ public struct ParallelLSHPipeline: Sendable {
         var results: [SimilarPair] = []
         for pair in candidatePairs {
             guard let sig1 = index.signature(for: pair.id1),
-                  let sig2 = index.signature(for: pair.id2)
+                let sig2 = index.signature(for: pair.id2)
             else { continue }
 
             let similarity: Double =
                 if verifyWithExact,
-                   let doc1 = documentMap[pair.id1],
-                   let doc2 = documentMap[pair.id2]
+                    let doc1 = documentMap[pair.id1],
+                    let doc2 = documentMap[pair.id2]
                 {
                     MinHashGenerator.exactJaccardSimilarity(doc1, doc2)
                 } else {

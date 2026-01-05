@@ -22,7 +22,9 @@ import Testing
 
 // MARK: - Helper to create ShingledDocument
 
-private func makeDocument(id: Int, file: String, startLine: Int, endLine: Int, tokenCount: Int, hashes: Set<UInt64>) -> ShingledDocument {
+private func makeDocument(id: Int, file: String, startLine: Int, endLine: Int, tokenCount: Int, hashes: Set<UInt64>)
+    -> ShingledDocument
+{
     ShingledDocument(
         file: file,
         startLine: startLine,
@@ -104,7 +106,8 @@ struct ParallelMinHashGeneratorTests {
     @Test("Single document")
     func singleDocument() async {
         let generator = ParallelMinHashGenerator(numHashes: 64)
-        let doc = makeDocument(id: 0, file: "test.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 5])
+        let doc = makeDocument(
+            id: 0, file: "test.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 5])
 
         let signatures = await generator.computeSignatures(for: [doc])
 
@@ -118,7 +121,9 @@ struct ParallelMinHashGeneratorTests {
         let generator = ParallelMinHashGenerator(numHashes: 64, maxConcurrency: 4)
 
         let documents = (0..<20).map { i in
-            makeDocument(id: i, file: "file\(i).swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: Set((0..<10).map { UInt64($0 + i * 10) }))
+            makeDocument(
+                id: i, file: "file\(i).swift", startLine: 1, endLine: 10, tokenCount: 50,
+                hashes: Set((0..<10).map { UInt64($0 + i * 10) }))
         }
 
         let signatures = await generator.computeSignatures(for: documents)
@@ -137,7 +142,9 @@ struct ParallelMinHashGeneratorTests {
         let sequentialGen = MinHashGenerator(numHashes: 64, seed: 42)
 
         let documents = (0..<10).map { i in
-            makeDocument(id: i, file: "file\(i).swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: Set((0..<5).map { UInt64($0 + i) }))
+            makeDocument(
+                id: i, file: "file\(i).swift", startLine: 1, endLine: 10, tokenCount: 50,
+                hashes: Set((0..<5).map { UInt64($0 + i) }))
         }
 
         let parallelSigs = await parallelGen.computeSignatures(for: documents)
@@ -168,8 +175,10 @@ struct ParallelVerifierTests {
     func singlePairVerification() async {
         let verifier = ParallelVerifier(minimumSimilarity: 0.5)
 
-        let doc1 = makeDocument(id: 0, file: "a.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 5])
-        let doc2 = makeDocument(id: 1, file: "b.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 6, 7])  // 3/7 = 0.43 similarity
+        let doc1 = makeDocument(
+            id: 0, file: "a.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 5])
+        let doc2 = makeDocument(
+            id: 1, file: "b.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 6, 7])  // 3/7 = 0.43 similarity
 
         let documentMap = [0: doc1, 1: doc2]
         let candidates: Set<DocumentPair> = [DocumentPair(id1: 0, id2: 1)]
@@ -184,8 +193,10 @@ struct ParallelVerifierTests {
     func pairAboveThreshold() async {
         let verifier = ParallelVerifier(minimumSimilarity: 0.5)
 
-        let doc1 = makeDocument(id: 0, file: "a.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 5])
-        let doc2 = makeDocument(id: 1, file: "b.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 6])  // 4/6 = 0.67 similarity
+        let doc1 = makeDocument(
+            id: 0, file: "a.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 5])
+        let doc2 = makeDocument(
+            id: 1, file: "b.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 6])  // 4/6 = 0.67 similarity
 
         let documentMap = [0: doc1, 1: doc2]
         let candidates: Set<DocumentPair> = [DocumentPair(id1: 0, id2: 1)]
@@ -201,8 +212,10 @@ struct ParallelVerifierTests {
         let verifier = ParallelVerifier(minimumSimilarity: 0.5)
 
         // Same file, overlapping lines
-        let doc1 = makeDocument(id: 0, file: "a.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 5])
-        let doc2 = makeDocument(id: 1, file: "a.swift", startLine: 5, endLine: 15, tokenCount: 50, hashes: [1, 2, 3, 4, 5])  // Overlaps with doc1
+        let doc1 = makeDocument(
+            id: 0, file: "a.swift", startLine: 1, endLine: 10, tokenCount: 50, hashes: [1, 2, 3, 4, 5])
+        let doc2 = makeDocument(
+            id: 1, file: "a.swift", startLine: 5, endLine: 15, tokenCount: 50, hashes: [1, 2, 3, 4, 5])  // Overlaps with doc1
 
         let documentMap = [0: doc1, 1: doc2]
         let candidates: Set<DocumentPair> = [DocumentPair(id1: 0, id2: 1)]

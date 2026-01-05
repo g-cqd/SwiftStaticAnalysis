@@ -100,7 +100,7 @@ public struct ParallelMinHashGenerator: Sendable {
         }
 
         let effectiveChunkSize = chunkSize ?? maxConcurrency * 2
-        var allSignatures = [MinHashSignature]()
+        var allSignatures: [MinHashSignature] = []
         allSignatures.reserveCapacity(documents.count)
 
         for chunkStart in stride(from: 0, to: documents.count, by: effectiveChunkSize) {
@@ -200,7 +200,7 @@ public struct ParallelShingleGenerator: Sendable {
         }
 
         // Compute starting IDs for each sequence
-        var startIds = [Int]()
+        var startIds: [Int] = []
         startIds.reserveCapacity(sequences.count)
         var currentId = 0
         for count in documentCounts {
@@ -223,7 +223,7 @@ public struct ParallelShingleGenerator: Sendable {
             }
 
             // Collect and flatten results in order
-            var allDocsByIndex = [(Int, [ShingledDocument])]()
+            var allDocsByIndex: [(Int, [ShingledDocument])] = []
             allDocsByIndex.reserveCapacity(sequences.count)
             for await result in group {
                 allDocsByIndex.append(result)

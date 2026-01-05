@@ -266,7 +266,8 @@ public struct DuplicationDetector: Sendable {
         switch configuration.algorithm {
         case .minHashLSH:
             // Use MinHash + LSH for Type-3 clone detection
-            let parallelConfig: ParallelCloneConfiguration = configuration.useParallelClones
+            let parallelConfig: ParallelCloneConfiguration =
+                configuration.useParallelClones
                 ? .default
                 : .sequential
             let detector = MinHashCloneDetector(

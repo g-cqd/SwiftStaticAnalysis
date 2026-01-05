@@ -59,7 +59,7 @@ public struct DenseGraph: Sendable {
 
         for (from, to) in edges {
             guard let fromIndex = nodeToIndex[from],
-                  let toIndex = nodeToIndex[to]
+                let toIndex = nodeToIndex[to]
             else {
                 continue  // Skip edges with unknown nodes
             }

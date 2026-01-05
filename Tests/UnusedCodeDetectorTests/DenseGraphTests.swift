@@ -152,10 +152,10 @@ struct DenseGraphTests {
     func invalidEdgesSkipped() {
         let nodeIds = ["A", "B"]
         let edges: [(from: String, to: String)] = [
-            ("A", "B"),      // Valid
-            ("A", "X"),      // Invalid - X not in nodeIds
-            ("Y", "B"),      // Invalid - Y not in nodeIds
-            ("X", "Y"),      // Invalid - neither in nodeIds
+            ("A", "B"),  // Valid
+            ("A", "X"),  // Invalid - X not in nodeIds
+            ("Y", "B"),  // Invalid - Y not in nodeIds
+            ("X", "Y"),  // Invalid - neither in nodeIds
         ]
 
         let graph = DenseGraph(
@@ -338,6 +338,6 @@ struct DenseGraphTests {
         #expect(stats.edgeCount == 3)
         #expect(stats.rootCount == 1)
         #expect(stats.maxOutDegree == 2)  // A has 2 outgoing
-        #expect(stats.maxInDegree == 2)   // C has 2 incoming
+        #expect(stats.maxInDegree == 2)  // C has 2 incoming
     }
 }

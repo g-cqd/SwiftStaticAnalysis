@@ -266,7 +266,7 @@ struct ParallelBFSTests {
             maxConcurrency: 10000
         )
         #expect(largeConfig.alpha <= 100)  // Clamped to reasonable max
-        #expect(largeConfig.beta <= 100)   // Clamped to reasonable max
+        #expect(largeConfig.beta <= 100)  // Clamped to reasonable max
         #expect(largeConfig.maxConcurrency <= ProcessInfo.processInfo.activeProcessorCount)
     }
 
@@ -386,7 +386,9 @@ struct ParallelBFSTests {
 
         // Assert that bottom-up was actually triggered (per review finding)
         // This ensures the direction-switching heuristic is working correctly
-        #expect(stats.bottomUpIterations > 0, "Expected bottom-up phase to trigger on dense graph (α=\(config.alpha), stats=\(stats))")
+        #expect(
+            stats.bottomUpIterations > 0,
+            "Expected bottom-up phase to trigger on dense graph (α=\(config.alpha), stats=\(stats))")
         #expect(stats.totalIterations > 0)
 
         // Verify stats consistency
@@ -511,11 +513,11 @@ struct ParallelBFSTests {
 
         // Test various alpha/beta combinations produce correct results
         let configs: [(alpha: Int, beta: Int)] = [
-            (2, 24),    // Low alpha
-            (14, 24),   // Default
+            (2, 24),  // Low alpha
+            (14, 24),  // Default
             (100, 24),  // High alpha
             (14, 100),  // High beta
-            (100, 100), // Both high
+            (100, 100),  // Both high
         ]
 
         for (alpha, beta) in configs {

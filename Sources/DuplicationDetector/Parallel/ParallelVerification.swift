@@ -104,13 +104,12 @@ public struct ParallelVerifier: Sendable {
         documentMap: [Int: ShingledDocument]
     ) -> ClonePairInfo? {
         guard let doc1 = documentMap[pair.id1],
-              let doc2 = documentMap[pair.id2]
+            let doc2 = documentMap[pair.id2]
         else { return nil }
 
         // Skip overlapping in same file
         if doc1.file == doc2.file {
-            let overlaps = !(doc1.endLine < doc2.startLine ||
-                           doc2.endLine < doc1.startLine)
+            let overlaps = !(doc1.endLine < doc2.startLine || doc2.endLine < doc1.startLine)
             if overlaps { return nil }
         }
 

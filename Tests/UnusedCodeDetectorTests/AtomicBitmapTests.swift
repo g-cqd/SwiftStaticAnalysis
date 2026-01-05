@@ -128,10 +128,10 @@ struct AtomicBitmapTests {
         let bitmap = AtomicBitmap(size: 128)
 
         // Test word boundaries (64-bit words)
-        bitmap.set(0)      // First bit
-        bitmap.set(63)     // Last bit of first word
-        bitmap.set(64)     // First bit of second word
-        bitmap.set(127)    // Last bit
+        bitmap.set(0)  // First bit
+        bitmap.set(63)  // Last bit of first word
+        bitmap.set(64)  // First bit of second word
+        bitmap.set(127)  // Last bit
 
         #expect(bitmap.test(0))
         #expect(bitmap.test(63))
@@ -190,7 +190,7 @@ struct BitmapTests {
     func testAndSet() {
         var bitmap = Bitmap(size: 100)
 
-        #expect(bitmap.testAndSet(42) == true)   // Was unset
+        #expect(bitmap.testAndSet(42) == true)  // Was unset
         #expect(bitmap.testAndSet(42) == false)  // Was already set
     }
 
