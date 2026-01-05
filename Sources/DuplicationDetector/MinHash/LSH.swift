@@ -14,7 +14,9 @@
 //
 
 import Algorithms
+import AsyncAlgorithms
 import Foundation
+import SwiftStaticAnalysisCore
 
 // MARK: - LSHQueryable
 
@@ -254,6 +256,65 @@ public struct LSHIndex: Sendable, LSHQueryable {
                 allCandidates.formUnion(partialCandidates)
             }
             return allCandidates
+        }
+    }
+
+    /// Stream candidate pairs as they're discovered (band by band).
+    ///
+    /// This method yields candidate pairs incrementally, enabling:
+    /// - Early results for progressive UI updates
+    /// - Memory-bounded processing via backpressure
+    /// - Suitable for ParallelMode.maximum
+    ///
+    /// - Parameter bufferSize: Size of the streaming buffer.
+    /// - Returns: AsyncStream of candidate document pairs.
+    public func findCandidatePairsStreaming(
+        bufferSize: Int = 1000
+    ) -> AsyncStream<DocumentPair> {
+        let bands = self.bands
+        let buckets = self.buckets
+
+        return AsyncStream(bufferingPolicy: .bufferingNewest(bufferSize)) { continuation in
+            Task {
+                var seen = Set<DocumentPair>()
+
+                for band in 0..<bands {
+                    for (_, docIds) in buckets[band] {
+                        for pair in docIds.combinations(ofCount: 2) {
+                            let documentPair = DocumentPair(id1: pair[0], id2: pair[1])
+
+                            // Deduplicate on the fly
+                            if seen.insert(documentPair).inserted {
+                                continuation.yield(documentPair)
+                            }
+                        }
+                    }
+                }
+
+                continuation.finish()
+            }
+        }
+    }
+
+    /// Find candidate pairs based on parallel mode.
+    ///
+    /// - Parameter mode: The parallel execution mode.
+    /// - Returns: Set of candidate document pairs.
+    public func findCandidatePairs(mode: ParallelMode) async -> Set<DocumentPair> {
+        switch mode {
+        case .none:
+            return findCandidatePairs()
+
+        case .safe:
+            return await findCandidatePairsParallel()
+
+        case .maximum:
+            // Streaming collects into Set for compatibility
+            var candidates = Set<DocumentPair>()
+            for await pair in findCandidatePairsStreaming() {
+                candidates.insert(pair)
+            }
+            return candidates
         }
     }
 
