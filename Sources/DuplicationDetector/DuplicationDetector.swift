@@ -358,12 +358,13 @@ extension [CloneGroup] {
     /// Two clone groups are considered duplicates if they contain clones
     /// at the exact same file locations.
     public func deduplicated() -> [CloneGroup] {
-        Array(self.uniqued(on: { group in
-            group.clones
-                .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
-                .sorted()
-                .joined(separator: "|")
-        }))
+        Array(
+            self.uniqued(on: { group in
+                group.clones
+                    .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
+                    .sorted()
+                    .joined(separator: "|")
+            }))
     }
 }
 

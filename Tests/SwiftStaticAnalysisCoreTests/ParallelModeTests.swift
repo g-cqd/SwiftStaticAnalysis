@@ -153,15 +153,15 @@ struct ParallelModeConfigurationTests {
     @Test("Configuration loads parallelMode from JSON")
     func loadsParallelModeFromJSON() throws {
         let json = """
-        {
-            "unused": {
-                "parallelMode": "safe"
-            },
-            "duplicates": {
-                "parallelMode": "maximum"
+            {
+                "unused": {
+                    "parallelMode": "safe"
+                },
+                "duplicates": {
+                    "parallelMode": "maximum"
+                }
             }
-        }
-        """
+            """
 
         let decoder = JSONDecoder()
         let config = try decoder.decode(SWAConfiguration.self, from: json.data(using: .utf8)!)
@@ -173,13 +173,13 @@ struct ParallelModeConfigurationTests {
     @Test("Configuration handles both parallel and parallelMode in JSON")
     func loadsLegacyAndNewFromJSON() throws {
         let json = """
-        {
-            "unused": {
-                "parallel": true,
-                "parallelMode": "maximum"
+            {
+                "unused": {
+                    "parallel": true,
+                    "parallelMode": "maximum"
+                }
             }
-        }
-        """
+            """
 
         let decoder = JSONDecoder()
         let config = try decoder.decode(SWAConfiguration.self, from: json.data(using: .utf8)!)

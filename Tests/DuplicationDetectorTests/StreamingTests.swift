@@ -235,7 +235,8 @@ struct StreamingCloneDeduplicationTests {
     }
 
     private func createGroup(clones: [Clone], similarity: Double) -> CloneGroup {
-        let fingerprint = clones
+        let fingerprint =
+            clones
             .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
             .sorted()
             .joined(separator: "|")

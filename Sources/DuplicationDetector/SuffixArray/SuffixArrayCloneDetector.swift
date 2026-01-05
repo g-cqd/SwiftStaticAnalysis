@@ -378,12 +378,13 @@ public struct SuffixArrayCloneDetector: Sendable {
 
     /// Deduplicate clone groups with same locations.
     private func deduplicateGroups(_ groups: [CloneGroup]) -> [CloneGroup] {
-        Array(groups.uniqued(on: { group in
-            group.clones
-                .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
-                .sorted()
-                .joined(separator: "|")
-        }))
+        Array(
+            groups.uniqued(on: { group in
+                group.clones
+                    .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
+                    .sorted()
+                    .joined(separator: "|")
+            }))
     }
 }
 
