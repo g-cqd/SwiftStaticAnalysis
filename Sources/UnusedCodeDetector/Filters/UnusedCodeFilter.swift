@@ -199,13 +199,48 @@ public struct UnusedCodeFilter: Sendable {
     private let namePatterns: [String]
 
     /// Convert a glob pattern to a regex pattern string.
+    ///
+    /// Properly escapes all regex metacharacters to prevent regex injection,
+    /// then converts glob wildcards to their regex equivalents.
     private static func globToRegexPattern(_ pattern: String) -> String {
-        pattern
-            .replacingOccurrences(of: ".", with: "\\.")
-            .replacingOccurrences(of: "**", with: "<<<DOUBLESTAR>>>")
-            .replacingOccurrences(of: "*", with: "[^/]*")
-            .replacingOccurrences(of: "<<<DOUBLESTAR>>>", with: ".*")
-            .replacingOccurrences(of: "?", with: ".")
+        // Placeholder for glob wildcards to preserve them during escaping
+        let doubleStarPlaceholder = "\u{0000}DOUBLESTAR\u{0000}"
+        let singleStarPlaceholder = "\u{0000}SINGLESTAR\u{0000}"
+        let questionPlaceholder = "\u{0000}QUESTION\u{0000}"
+
+        var result =
+            pattern
+            // First, replace glob wildcards with placeholders
+            .replacingOccurrences(of: "**", with: doubleStarPlaceholder)
+            .replacingOccurrences(of: "*", with: singleStarPlaceholder)
+            .replacingOccurrences(of: "?", with: questionPlaceholder)
+
+        // Escape all regex metacharacters (order matters - backslash first)
+        let metacharacters: [(String, String)] = [
+            ("\\", "\\\\"),  // Backslash must be escaped first
+            (".", "\\."),
+            ("^", "\\^"),
+            ("$", "\\$"),
+            ("+", "\\+"),
+            ("[", "\\["),
+            ("]", "\\]"),
+            ("(", "\\("),
+            (")", "\\)"),
+            ("{", "\\{"),
+            ("}", "\\}"),
+            ("|", "\\|"),
+        ]
+
+        for (char, escaped) in metacharacters {
+            result = result.replacingOccurrences(of: char, with: escaped)
+        }
+
+        // Convert glob placeholders to regex equivalents
+        return
+            result
+            .replacingOccurrences(of: doubleStarPlaceholder, with: ".*")
+            .replacingOccurrences(of: singleStarPlaceholder, with: "[^/]*")
+            .replacingOccurrences(of: questionPlaceholder, with: ".")
     }
 }
 

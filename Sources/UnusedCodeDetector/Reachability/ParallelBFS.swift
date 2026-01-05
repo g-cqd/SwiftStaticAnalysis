@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import SwiftStaticAnalysisCore  // For ParallelFrontierExpansion
 
 // MARK: - ParallelBFS
 
@@ -256,33 +257,13 @@ public enum ParallelBFS {
             )
         }
 
-        // Parallel processing with chunking
-        let chunkSize = max(1, frontier.count / maxConcurrency)
-
-        return await withTaskGroup(of: [Int].self) { group in
-            for chunkStart in stride(from: 0, to: frontier.count, by: chunkSize) {
-                let chunkEnd = min(chunkStart + chunkSize, frontier.count)
-                let chunk = Array(frontier[chunkStart..<chunkEnd])
-
-                group.addTask {
-                    var localNext: [Int] = []
-                    for node in chunk {
-                        for neighbor in graph.adjacency[node] {
-                            if visited.testAndSet(neighbor) {
-                                localNext.append(neighbor)
-                            }
-                        }
-                    }
-                    return localNext
-                }
-            }
-
-            var nextFrontier: [Int] = []
-            for await partial in group {
-                nextFrontier.append(contentsOf: partial)
-            }
-            return nextFrontier
-        }
+        // Parallel processing using shared utility
+        return await ParallelFrontierExpansion.expandParallel(
+            frontier: frontier,
+            maxConcurrency: maxConcurrency,
+            getNeighbors: { graph.adjacency[$0] },
+            testAndSetVisited: { visited.testAndSet($0) }
+        )
     }
 
     /// Sequential top-down step for small frontiers.

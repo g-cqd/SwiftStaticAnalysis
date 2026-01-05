@@ -44,16 +44,10 @@ codecov/
 # Index store (generated during builds)
 index-store/
 
-# Analysis outputs
-analysis-report*.json
-unused-code-report*.json
-
-# Development artifacts (plans, reports, compass files)
-*PLAN*.md
-*_PLAN.md
-FINDINGS_ANALYSIS.md
-compass_artifact*.md
-performance_report.md
+# AI Development
+AGENTS.md
+CLAUDE.md
+AGENTS/
 
 # Temporary files and test projects
 .tmp/

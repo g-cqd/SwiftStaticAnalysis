@@ -226,11 +226,11 @@ public struct SuffixArrayCloneDetector: Sendable {
             tokenInfos: tokenInfos,
             cloneType: .near,
         ) { pos, length in
-            createCloneLocationFromNormalized(
+            createCloneLocation(
                 position: pos,
                 length: length,
                 tokenInfos: tokenInfos,
-                sequences: sequences,
+                sequences: sequences
             )
         }
     }
@@ -301,11 +301,14 @@ public struct SuffixArrayCloneDetector: Sendable {
     }
 
     /// Create a clone location from a position.
-    private func createCloneLocation(
+    ///
+    /// Generic over any sequence type conforming to TokenSequenceProtocol,
+    /// eliminating duplication between regular and normalized sequence handling.
+    private func createCloneLocation<S: TokenSequenceProtocol>(
         position: Int,
         length: Int,
         tokenInfos: [TokenStreamInfo],
-        sequences: [TokenSequence],
+        sequences: [S]
     ) -> CloneLocation? {
         guard isValidPosition(position, length: length, tokenInfos: tokenInfos) else { return nil }
 
@@ -319,30 +322,7 @@ public struct SuffixArrayCloneDetector: Sendable {
             startLine: startInfo.line,
             endLine: endInfo.line,
             startPosition: position,
-            endPosition: position + length - 1,
-        )
-    }
-
-    /// Create a clone location from normalized sequences.
-    private func createCloneLocationFromNormalized(
-        position: Int,
-        length: Int,
-        tokenInfos: [TokenStreamInfo],
-        sequences: [NormalizedSequence],
-    ) -> CloneLocation? {
-        guard isValidPosition(position, length: length, tokenInfos: tokenInfos) else { return nil }
-
-        let startInfo = tokenInfos[position]
-        let endInfo = tokenInfos[position + length - 1]
-        let file = sequences[startInfo.fileIndex].file
-
-        return CloneLocation(
-            file: file,
-            fileIndex: startInfo.fileIndex,
-            startLine: startInfo.line,
-            endLine: endInfo.line,
-            startPosition: position,
-            endPosition: position + length - 1,
+            endPosition: position + length - 1
         )
     }
 

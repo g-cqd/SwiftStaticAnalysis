@@ -12,6 +12,7 @@
 
 import Collections
 import Foundation
+import SwiftStaticAnalysisCore  // For ParallelFrontierExpansion
 import UnusedCodeDetector  // For AtomicBitmap, Bitmap
 
 // MARK: - ParallelConnectedComponents
@@ -206,39 +207,19 @@ public enum ParallelConnectedComponents {
         return next
     }
 
-    /// Top-down parallel expansion (mirrors ParallelBFS.topDownStep).
+    /// Top-down parallel expansion (uses shared ParallelFrontierExpansion).
     private static func topDownExpand(
         _ frontier: [Int],
         graph: CloneSimilarityGraph,
         visited: AtomicBitmap,
         maxConcurrency: Int
     ) async -> [Int] {
-        let chunkSize = max(1, frontier.count / maxConcurrency)
-
-        return await withTaskGroup(of: [Int].self) { group in
-            for chunkStart in stride(from: 0, to: frontier.count, by: chunkSize) {
-                let chunkEnd = min(chunkStart + chunkSize, frontier.count)
-                let chunk = Array(frontier[chunkStart..<chunkEnd])
-
-                group.addTask {
-                    var localNext: [Int] = []
-                    for node in chunk {
-                        for neighbor in graph.adjacency[node] {
-                            if visited.testAndSet(neighbor) {
-                                localNext.append(neighbor)
-                            }
-                        }
-                    }
-                    return localNext
-                }
-            }
-
-            var result: [Int] = []
-            for await partial in group {
-                result.append(contentsOf: partial)
-            }
-            return result
-        }
+        await ParallelFrontierExpansion.expandParallel(
+            frontier: frontier,
+            maxConcurrency: maxConcurrency,
+            getNeighbors: { graph.adjacency[$0] },
+            testAndSetVisited: { visited.testAndSet($0) }
+        )
     }
 
     /// Bottom-up parallel expansion (mirrors ParallelBFS.bottomUpStep).

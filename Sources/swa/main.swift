@@ -931,33 +931,77 @@ private let defaultExcludedDirectories: Set<String> = [
     ".git",  // Git metadata
 ]
 
+// MARK: - Path Canonicalization
+
+/// Canonicalizes a file path to prevent path traversal attacks.
+///
+/// This function:
+/// - Resolves symlinks to their real paths
+/// - Resolves `.` and `..` components
+/// - Returns the standardized absolute path
+///
+/// - Parameter path: The raw path to canonicalize.
+/// - Returns: The canonicalized path.
+/// - Throws: `AnalysisError.invalidPath` if the path cannot be resolved.
+func canonicalizePath(_ path: String) throws -> String {
+    let url = URL(fileURLWithPath: path).standardized
+
+    // Resolve symlinks to prevent symlink attacks
+    let resolvedURL: URL
+    do {
+        resolvedURL = try URL(resolvingAliasFileAt: url, options: [.withoutMounting])
+    } catch {
+        // If resolution fails, use the standardized path
+        resolvedURL = url
+    }
+
+    return resolvedURL.path
+}
+
+/// Validates that a path doesn't traverse outside expected boundaries.
+///
+/// - Parameters:
+///   - path: The path to validate.
+///   - basePath: The expected base directory (if any).
+/// - Returns: `true` if the path is within expected boundaries.
+func isPathWithinBoundaries(_ path: String, basePath: String?) -> Bool {
+    guard let basePath else { return true }
+
+    let normalizedPath = (path as NSString).standardizingPath
+    let normalizedBase = (basePath as NSString).standardizingPath
+
+    return normalizedPath.hasPrefix(normalizedBase)
+}
+
 func findSwiftFiles(in paths: [String], excludePaths: [String]? = nil) throws -> [String] {
     let fileManager = FileManager.default
     var swiftFiles: [String] = []
 
     for path in paths {
-        let url = URL(fileURLWithPath: path)
+        // Canonicalize path to prevent path traversal attacks
+        let canonicalPath = try canonicalizePath(path)
+        let url = URL(fileURLWithPath: canonicalPath)
 
         var isDirectory: ObjCBool = false
-        guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory) else {
-            throw AnalysisError.fileNotFound(path)
+        guard fileManager.fileExists(atPath: canonicalPath, isDirectory: &isDirectory) else {
+            throw AnalysisError.fileNotFound(canonicalPath)
         }
 
         if !isDirectory.boolValue {
             // Single file
-            guard path.hasSuffix(".swift") else {
-                throw AnalysisError.invalidPath("Not a Swift file: \(path)")
+            guard canonicalPath.hasSuffix(".swift") else {
+                throw AnalysisError.invalidPath("Not a Swift file: \(canonicalPath)")
             }
             // Apply exclusion patterns to single files too
             if let excludePaths, !excludePaths.isEmpty {
                 let shouldExclude = excludePaths.contains { pattern in
-                    UnusedCodeFilter.matchesGlobPattern(path, pattern: pattern)
+                    UnusedCodeFilter.matchesGlobPattern(canonicalPath, pattern: pattern)
                 }
                 if shouldExclude {
                     continue
                 }
             }
-            swiftFiles.append(path)
+            swiftFiles.append(canonicalPath)
             continue
         }
 

@@ -110,37 +110,13 @@ public struct ParallelLSHPipeline: Sendable {
             maxConcurrency: maxConcurrency
         )
 
-        // Build document lookup
-        let documentMap = Dictionary(uniqueKeysWithValues: documents.map { ($0.id, $0) })
-
-        // Verify and filter (can be parallelized separately)
-        var results: [SimilarPair] = []
-        for pair in candidatePairs {
-            guard let sig1 = index.signature(for: pair.id1),
-                let sig2 = index.signature(for: pair.id2)
-            else { continue }
-
-            let similarity: Double =
-                if verifyWithExact,
-                    let doc1 = documentMap[pair.id1],
-                    let doc2 = documentMap[pair.id2]
-                {
-                    MinHashGenerator.exactJaccardSimilarity(doc1, doc2)
-                } else {
-                    sig1.estimateSimilarity(with: sig2)
-                }
-
-            if similarity >= threshold {
-                results.append(
-                    SimilarPair(
-                        documentId1: pair.id1,
-                        documentId2: pair.id2,
-                        similarity: similarity
-                    )
-                )
-            }
-        }
-
-        return results.sorted { $0.similarity > $1.similarity }
+        // Verify and filter using shared logic
+        return CandidateVerifier.verify(
+            candidatePairs: candidatePairs,
+            index: index,
+            documents: documents,
+            threshold: threshold,
+            verifyWithExact: verifyWithExact
+        )
     }
 }

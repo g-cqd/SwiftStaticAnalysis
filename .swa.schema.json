@@ -1,0 +1,225 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/swiftlang/swift-static-analysis/.swa.schema.json",
+  "title": "SWA Configuration",
+  "description": "Configuration file schema for Swift Static Analysis (swa) tool",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema reference for IDE autocomplete support"
+    },
+    "version": {
+      "type": "integer",
+      "description": "Configuration file format version",
+      "default": 1,
+      "minimum": 1
+    },
+    "format": {
+      "type": "string",
+      "description": "Global output format for results",
+      "enum": ["text", "json", "xcode"],
+      "default": "xcode"
+    },
+    "excludePaths": {
+      "type": "array",
+      "description": "Global path exclusion patterns using glob syntax",
+      "items": {
+        "type": "string"
+      },
+      "examples": [["**/Tests/**", "**/Fixtures/**", "**/Generated/**"]]
+    },
+    "unused": {
+      "type": "object",
+      "description": "Configuration for unused code detection",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether unused code detection is enabled",
+          "default": true
+        },
+        "mode": {
+          "type": "string",
+          "description": "Detection mode algorithm",
+          "enum": ["simple", "reachability", "indexStore"],
+          "default": "simple"
+        },
+        "indexStorePath": {
+          "type": "string",
+          "description": "Path to IndexStore database for indexStore mode"
+        },
+        "minConfidence": {
+          "type": "string",
+          "description": "Minimum confidence level to report",
+          "enum": ["low", "medium", "high"]
+        },
+        "treatPublicAsRoot": {
+          "type": "boolean",
+          "description": "Treat public API as entry points (reachable by definition)",
+          "default": false
+        },
+        "treatObjcAsRoot": {
+          "type": "boolean",
+          "description": "Treat @objc declarations as entry points",
+          "default": false
+        },
+        "treatTestsAsRoot": {
+          "type": "boolean",
+          "description": "Treat test methods as entry points",
+          "default": false
+        },
+        "treatSwiftUIViewsAsRoot": {
+          "type": "boolean",
+          "description": "Treat SwiftUI Views as entry points",
+          "default": false
+        },
+        "ignoreSwiftUIPropertyWrappers": {
+          "type": "boolean",
+          "description": "Ignore SwiftUI property wrappers (@State, @Binding, etc.)",
+          "default": false
+        },
+        "ignorePreviewProviders": {
+          "type": "boolean",
+          "description": "Ignore PreviewProvider implementations",
+          "default": false
+        },
+        "ignoreViewBody": {
+          "type": "boolean",
+          "description": "Ignore View body properties",
+          "default": false
+        },
+        "ignorePublicAPI": {
+          "type": "boolean",
+          "description": "Ignore public API declarations (may be used externally)",
+          "default": false
+        },
+        "sensibleDefaults": {
+          "type": "boolean",
+          "description": "Apply sensible defaults for common exclusions (imports, deinit, enum cases)",
+          "default": false
+        },
+        "excludeImports": {
+          "type": "boolean",
+          "description": "Exclude import statements from analysis",
+          "default": false
+        },
+        "excludeDeinit": {
+          "type": "boolean",
+          "description": "Exclude deinit methods from analysis",
+          "default": false
+        },
+        "excludeEnumCases": {
+          "type": "boolean",
+          "description": "Exclude backticked enum cases from analysis",
+          "default": false
+        },
+        "excludeTestSuites": {
+          "type": "boolean",
+          "description": "Exclude test suite declarations from analysis",
+          "default": false
+        },
+        "excludeNamePatterns": {
+          "type": "array",
+          "description": "Regex patterns for declaration names to exclude",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludePaths": {
+          "type": "array",
+          "description": "Additional path exclusion patterns (glob syntax)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "parallel": {
+          "type": "boolean",
+          "description": "Use parallel processing for faster analysis",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "duplicates": {
+      "type": "object",
+      "description": "Configuration for code duplication detection",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether duplication detection is enabled",
+          "default": true
+        },
+        "minTokens": {
+          "type": "integer",
+          "description": "Minimum number of tokens for a code region to be considered a clone",
+          "default": 50,
+          "minimum": 1
+        },
+        "minSimilarity": {
+          "type": "number",
+          "description": "Minimum similarity threshold for near/semantic clones (0.0-1.0)",
+          "default": 0.8,
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "types": {
+          "type": "array",
+          "description": "Clone types to detect",
+          "items": {
+            "type": "string",
+            "enum": ["exact", "near", "semantic"]
+          },
+          "default": ["exact"]
+        },
+        "algorithm": {
+          "type": "string",
+          "description": "Detection algorithm to use",
+          "enum": ["rollingHash", "suffixArray", "minHashLSH"],
+          "default": "rollingHash"
+        },
+        "ignoredPatterns": {
+          "type": "array",
+          "description": "Regex patterns for code to ignore in duplication detection",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excludePaths": {
+          "type": "array",
+          "description": "Additional path exclusion patterns (glob syntax)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "parallel": {
+          "type": "boolean",
+          "description": "Use parallel processing for faster analysis",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "$schema": "./.swa.schema.json",
+      "version": 1,
+      "format": "xcode",
+      "excludePaths": ["**/Tests/**", "**/Fixtures/**"],
+      "unused": {
+        "enabled": true,
+        "mode": "reachability",
+        "sensibleDefaults": true,
+        "treatPublicAsRoot": true,
+        "treatTestsAsRoot": true
+      },
+      "duplicates": {
+        "enabled": true,
+        "minTokens": 50,
+        "types": ["exact", "near"],
+        "parallel": true
+      }
+    }
+  ]
+}

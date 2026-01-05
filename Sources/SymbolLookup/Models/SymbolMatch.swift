@@ -146,6 +146,29 @@ extension SymbolMatch {
     public var isInstanceMember: Bool {
         isMember && !isStatic
     }
+
+    /// Creates a copy of this match with a different containing type.
+    ///
+    /// - Parameter newContainingType: The new containing type name.
+    /// - Returns: A new SymbolMatch with the updated containing type.
+    public func withContainingType(_ newContainingType: String?) -> SymbolMatch {
+        SymbolMatch(
+            usr: usr,
+            name: name,
+            kind: kind,
+            accessLevel: accessLevel,
+            file: file,
+            line: line,
+            column: column,
+            isStatic: isStatic,
+            containingType: newContainingType,
+            moduleName: moduleName,
+            typeSignature: typeSignature,
+            signature: signature,
+            genericParameters: genericParameters,
+            source: source
+        )
+    }
 }
 
 // MARK: - Factory Methods

@@ -11,7 +11,17 @@ import Testing
 @testable import SwiftStaticAnalysisCore
 @testable import UnusedCodeDetector
 
-@Suite("Parallel BFS Tests")
+// MARK: - Test Tags
+
+extension Tag {
+    @Tag static var reachability: Self
+    @Tag static var concurrency: Self
+    @Tag static var boundary: Self
+    @Tag static var algorithm: Self
+    @Tag static var slow: Self
+}
+
+@Suite("Parallel BFS Tests", .tags(.reachability, .concurrency, .algorithm))
 struct ParallelBFSTests {
     // MARK: - Correctness Tests
 
@@ -539,6 +549,226 @@ struct ParallelBFSTests {
 }
 
 // MARK: - Integration with ReachabilityGraph
+
+// MARK: - Edge Case Tests
+
+@Suite("Parallel BFS Edge Case Tests", .tags(.reachability, .boundary))
+struct ParallelBFSEdgeCaseTests {
+    @Test("Self-loops are handled correctly")
+    func selfLoopsHandled() async {
+        let nodeIds = ["A", "B", "C"]
+        let edges: [(from: String, to: String)] = [
+            ("A", "A"),  // Self-loop
+            ("A", "B"),
+            ("B", "B"),  // Another self-loop
+            ("B", "C"),
+        ]
+
+        let graph = DenseGraph(
+            nodeIds: nodeIds,
+            edges: edges,
+            rootIds: ["A"]
+        )
+
+        let reachable = await ParallelBFS.computeReachable(graph: graph)
+
+        // All nodes should still be reachable despite self-loops
+        #expect(reachable.count == 3)
+
+        // Verify sequential matches
+        let sequentialResult = graph.computeReachableSequential()
+        #expect(reachable == sequentialResult)
+    }
+
+    @Test("Zero remaining edges case handled")
+    func zeroRemainingEdges() async {
+        // After first iteration, no edges remain (star graph)
+        let nodeIds = ["root", "leaf1", "leaf2", "leaf3"]
+        let edges: [(from: String, to: String)] = [
+            ("root", "leaf1"),
+            ("root", "leaf2"),
+            ("root", "leaf3"),
+        ]
+
+        let graph = DenseGraph(
+            nodeIds: nodeIds,
+            edges: edges,
+            rootIds: ["root"]
+        )
+
+        let config = ParallelBFS.Configuration(minParallelSize: 1)
+        let (reachable, stats) = await ParallelBFS.computeReachableWithStats(
+            graph: graph,
+            configuration: config
+        )
+
+        // All nodes reachable
+        #expect(reachable.count == 4)
+
+        // Should complete quickly (2 iterations: root, then all leaves)
+        #expect(stats.totalIterations <= 2)
+    }
+
+    @Test("Duplicate roots are handled correctly")
+    func duplicateRoots() async {
+        let nodeIds = ["A", "B", "C"]
+        let edges: [(from: String, to: String)] = [
+            ("A", "B"),
+            ("B", "C"),
+        ]
+
+        // Duplicate A as root
+        let graph = DenseGraph(
+            nodeIds: nodeIds,
+            edges: edges,
+            rootIds: ["A", "A", "A"]  // Same root multiple times
+        )
+
+        let reachable = await ParallelBFS.computeReachable(graph: graph)
+
+        // Should still work correctly
+        #expect(reachable.count == 3)
+    }
+
+    @Test("Large fan-out node handled")
+    func largeFanOut() async {
+        // One node connects to many others
+        let nodeCount = 500
+        let nodeIds = (0..<nodeCount).map { "Node\($0)" }
+        var edges: [(from: String, to: String)] = []
+
+        // Node 0 connects to all others
+        for i in 1..<nodeCount {
+            edges.append((from: "Node0", to: "Node\(i)"))
+        }
+
+        let graph = DenseGraph(
+            nodeIds: nodeIds,
+            edges: edges,
+            rootIds: ["Node0"]
+        )
+
+        let config = ParallelBFS.Configuration(minParallelSize: 100)
+        let reachable = await ParallelBFS.computeReachable(graph: graph, configuration: config)
+
+        #expect(reachable.count == nodeCount)
+
+        // Verify correctness against sequential
+        let sequentialResult = graph.computeReachableSequential()
+        #expect(reachable == sequentialResult)
+    }
+
+    @Test("Large fan-in node handled")
+    func largeFanIn() async {
+        // Many nodes connect to one target
+        let nodeCount = 500
+        let nodeIds = (0..<nodeCount).map { "Node\($0)" }
+        var edges: [(from: String, to: String)] = []
+
+        // All nodes connect to the last one
+        for i in 0..<nodeCount - 1 {
+            edges.append((from: "Node\(i)", to: "Node\(nodeCount - 1)"))
+        }
+
+        // Chain the first few to ensure connectivity
+        for i in 0..<10 {
+            if i + 1 < nodeCount - 1 {
+                edges.append((from: "Node\(i)", to: "Node\(i + 1)"))
+            }
+        }
+
+        let graph = DenseGraph(
+            nodeIds: nodeIds,
+            edges: edges,
+            rootIds: ["Node0"]
+        )
+
+        let config = ParallelBFS.Configuration(minParallelSize: 100)
+        let reachable = await ParallelBFS.computeReachable(graph: graph, configuration: config)
+
+        // Verify correctness against sequential
+        let sequentialResult = graph.computeReachableSequential()
+        #expect(reachable == sequentialResult)
+    }
+
+    @Test("Isolated node not reachable")
+    func isolatedNodeNotReachable() async {
+        let nodeIds = ["A", "B", "C", "isolated"]
+        let edges: [(from: String, to: String)] = [
+            ("A", "B"),
+            ("B", "C"),
+            // "isolated" has no edges
+        ]
+
+        let graph = DenseGraph(
+            nodeIds: nodeIds,
+            edges: edges,
+            rootIds: ["A"]
+        )
+
+        let reachable = await ParallelBFS.computeReachable(graph: graph)
+
+        // isolated should NOT be reachable
+        let isolatedIndex = graph.nodeToIndex["isolated"]!
+        #expect(!reachable.contains(isolatedIndex))
+
+        // Others should be reachable
+        #expect(reachable.count == 3)
+    }
+
+    @Test("Bidirectional edges work correctly")
+    func bidirectionalEdges() async {
+        let nodeIds = ["A", "B", "C"]
+        let edges: [(from: String, to: String)] = [
+            ("A", "B"),
+            ("B", "A"),  // Bidirectional
+            ("B", "C"),
+            ("C", "B"),  // Bidirectional
+        ]
+
+        let graph = DenseGraph(
+            nodeIds: nodeIds,
+            edges: edges,
+            rootIds: ["A"]
+        )
+
+        let reachable = await ParallelBFS.computeReachable(graph: graph)
+
+        // All nodes reachable
+        #expect(reachable.count == 3)
+
+        // Verify matches sequential
+        let sequentialResult = graph.computeReachableSequential()
+        #expect(reachable == sequentialResult)
+    }
+
+    @Test("Diamond dependency pattern")
+    func diamondPattern() async {
+        // A → B, A → C, B → D, C → D (diamond)
+        let nodeIds = ["A", "B", "C", "D"]
+        let edges: [(from: String, to: String)] = [
+            ("A", "B"),
+            ("A", "C"),
+            ("B", "D"),
+            ("C", "D"),
+        ]
+
+        let graph = DenseGraph(
+            nodeIds: nodeIds,
+            edges: edges,
+            rootIds: ["A"]
+        )
+
+        let reachable = await ParallelBFS.computeReachable(graph: graph)
+
+        // All nodes reachable
+        #expect(reachable.count == 4)
+
+        // D should only be counted once despite two paths
+        let dIndex = graph.nodeToIndex["D"]!
+        #expect(reachable.contains(dIndex))
+    }
+}
 
 @Suite("Parallel BFS Integration Tests")
 struct ParallelBFSIntegrationTests {

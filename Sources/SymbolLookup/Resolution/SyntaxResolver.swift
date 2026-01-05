@@ -157,23 +157,7 @@ extension SyntaxResolver {
             }
 
             let match = convertToSymbolMatch(decl, scopeTree: result.scopes)
-            // Update containing type
-            return SymbolMatch(
-                usr: match.usr,
-                name: match.name,
-                kind: match.kind,
-                accessLevel: match.accessLevel,
-                file: match.file,
-                line: match.line,
-                column: match.column,
-                isStatic: match.isStatic,
-                containingType: containerName,
-                moduleName: match.moduleName,
-                typeSignature: match.typeSignature,
-                signature: match.signature,
-                genericParameters: match.genericParameters,
-                source: match.source
-            )
+            return match.withContainingType(containerName)
         }
     }
 
@@ -230,23 +214,7 @@ extension SyntaxResolver {
                 return nil
             }
 
-            // Update containing type
-            return SymbolMatch(
-                usr: match.usr,
-                name: match.name,
-                kind: match.kind,
-                accessLevel: match.accessLevel,
-                file: match.file,
-                line: match.line,
-                column: match.column,
-                isStatic: match.isStatic,
-                containingType: containerName,
-                moduleName: match.moduleName,
-                typeSignature: match.typeSignature,
-                signature: match.signature,
-                genericParameters: match.genericParameters,
-                source: match.source
-            )
+            return match.withContainingType(containerName)
         }
     }
 
