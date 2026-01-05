@@ -108,6 +108,7 @@ public struct UnusedConfiguration: Codable, Sendable, Equatable {
         excludeNamePatterns: [String]? = nil,
         excludePaths: [String]? = nil,
         parallel: Bool? = nil,
+        parallelMode: ParallelMode? = nil,
     ) {
         self.enabled = enabled
         self.mode = mode
@@ -129,6 +130,7 @@ public struct UnusedConfiguration: Codable, Sendable, Equatable {
         self.excludeNamePatterns = excludeNamePatterns
         self.excludePaths = excludePaths
         self.parallel = parallel
+        self.parallelMode = parallelMode
     }
 
     // MARK: Public
@@ -194,7 +196,23 @@ public struct UnusedConfiguration: Codable, Sendable, Equatable {
     public var excludePaths: [String]?
 
     /// Use parallel processing (faster for large codebases).
+    /// Deprecated: Use `parallelMode` instead.
     public var parallel: Bool?
+
+    /// Parallel execution mode: "none", "safe", or "maximum".
+    /// Takes precedence over `parallel` if both are specified.
+    public var parallelMode: ParallelMode?
+
+    /// Resolved parallel mode, considering both `parallelMode` and legacy `parallel`.
+    public var resolvedParallelMode: ParallelMode {
+        if let mode = parallelMode {
+            return mode
+        }
+        if let legacy = parallel {
+            return ParallelMode.from(legacyParallel: legacy)
+        }
+        return .none
+    }
 }
 
 // MARK: - DuplicatesConfiguration
@@ -211,7 +229,8 @@ public struct DuplicatesConfiguration: Codable, Sendable, Equatable {
         algorithm: String? = nil,
         ignoredPatterns: [String]? = nil,
         excludePaths: [String]? = nil,
-        parallel: Bool? = nil
+        parallel: Bool? = nil,
+        parallelMode: ParallelMode? = nil,
     ) {
         self.enabled = enabled
         self.minTokens = minTokens
@@ -221,6 +240,7 @@ public struct DuplicatesConfiguration: Codable, Sendable, Equatable {
         self.ignoredPatterns = ignoredPatterns
         self.excludePaths = excludePaths
         self.parallel = parallel
+        self.parallelMode = parallelMode
     }
 
     // MARK: Public
@@ -250,5 +270,21 @@ public struct DuplicatesConfiguration: Codable, Sendable, Equatable {
     public var excludePaths: [String]?
 
     /// Use parallel processing (faster for large codebases).
+    /// Deprecated: Use `parallelMode` instead.
     public var parallel: Bool?
+
+    /// Parallel execution mode: "none", "safe", or "maximum".
+    /// Takes precedence over `parallel` if both are specified.
+    public var parallelMode: ParallelMode?
+
+    /// Resolved parallel mode, considering both `parallelMode` and legacy `parallel`.
+    public var resolvedParallelMode: ParallelMode {
+        if let mode = parallelMode {
+            return mode
+        }
+        if let legacy = parallel {
+            return ParallelMode.from(legacyParallel: legacy)
+        }
+        return .none
+    }
 }

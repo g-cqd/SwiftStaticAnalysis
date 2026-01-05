@@ -152,8 +152,11 @@ struct Duplicates: AsyncParsableCommand {
     @Option(name: .long, parsing: .upToNextOption, help: "Paths to exclude (glob patterns)")
     var excludePaths: [String] = []
 
-    @Flag(name: .long, help: "Use parallel processing (faster for large codebases)")
+    @Flag(name: .long, help: "Use parallel processing (deprecated: use --parallel-mode)")
     var parallel: Bool = false
+
+    @Option(name: .long, help: "Parallel mode (none, safe, maximum)")
+    var parallelMode: ParallelModeArg?
 
     @Option(name: .shortAndLong, help: "Output format")
     var format: OutputFormat = .xcode
@@ -172,7 +175,17 @@ struct Duplicates: AsyncParsableCommand {
         let effectiveAlgorithm = algorithm?.toAlgorithm ?? parseAlgorithm(dupConfig?.algorithm)
         let effectiveTypes = types.isEmpty ? parseCloneTypes(dupConfig?.types) : Set(types.map(\.toCloneType))
         let effectiveExcludePaths = excludePaths.isEmpty ? (dupConfig?.excludePaths ?? []) : excludePaths
-        let effectiveParallel = parallel || (dupConfig?.parallel ?? false)
+
+        // Resolve parallel mode: CLI --parallel-mode > CLI --parallel > config
+        let effectiveParallelMode: ParallelMode =
+            if let mode = parallelMode {
+                mode.toParallelMode
+            } else if parallel {
+                .safe
+            } else {
+                dupConfig?.resolvedParallelMode ?? .none
+            }
+        let effectiveParallel = effectiveParallelMode.isParallel
 
         // Merge with global excludePaths
         let allExcludePaths = effectiveExcludePaths + (swaConfig?.excludePaths ?? [])
@@ -277,8 +290,11 @@ struct Unused: AsyncParsableCommand {
     @Flag(name: .long, help: "Ignore View body properties")
     var ignoreViewBody: Bool = false
 
-    @Flag(name: .long, help: "Use parallel processing (faster for large codebases)")
+    @Flag(name: .long, help: "Use parallel processing (deprecated: use --parallel-mode)")
     var parallel: Bool = false
+
+    @Option(name: .long, help: "Parallel mode (none, safe, maximum)")
+    var parallelMode: ParallelModeArg?
 
     // swiftlint:disable:next function_body_length
     func run() async throws {
@@ -318,7 +334,16 @@ struct Unused: AsyncParsableCommand {
         let effectiveIgnorePreviewProviders = ignorePreviewProviders || (unusedConfig?.ignorePreviewProviders ?? false)
         let effectiveIgnoreViewBody = ignoreViewBody || (unusedConfig?.ignoreViewBody ?? false)
 
-        let effectiveParallel = parallel || (unusedConfig?.parallel ?? false)
+        // Resolve parallel mode: CLI --parallel-mode > CLI --parallel > config
+        let effectiveParallelMode: ParallelMode =
+            if let mode = parallelMode {
+                mode.toParallelMode
+            } else if parallel {
+                .safe
+            } else {
+                unusedConfig?.resolvedParallelMode ?? .none
+            }
+        let effectiveParallel = effectiveParallelMode.isParallel
 
         // Merge path exclusions
         let effectiveExcludePaths = excludePaths.isEmpty ? (unusedConfig?.excludePaths ?? []) : excludePaths
@@ -853,6 +878,25 @@ enum ConfidenceArg: String, ExpressibleByArgument, CaseIterable {
         case .low: .low
         case .medium: .medium
         case .high: .high
+        }
+    }
+}
+
+// MARK: - ParallelModeArg
+
+/// Validated parallel mode argument for CLI.
+enum ParallelModeArg: String, ExpressibleByArgument, CaseIterable {
+    case none
+    case safe
+    case maximum
+
+    // MARK: Internal
+
+    var toParallelMode: ParallelMode {
+        switch self {
+        case .none: .none
+        case .safe: .safe
+        case .maximum: .maximum
         }
     }
 }
