@@ -48,6 +48,10 @@
               "pattern": "version: \"(\\d+\\.\\d+\\.\\d+)\""
             },
             {
+              "file": "Sources/swa-mcp/main.swift",
+              "pattern": "swa-mcp (\\d+\\.\\d+\\.\\d+)"
+            },
+            {
               "file": "README.md",
               "pattern": "from: \"(\\d+\\.\\d+\\.\\d+)\""
             },
