@@ -10,10 +10,12 @@ A high-performance Swift static analysis framework for **code duplication detect
 
 ## Features
 
-- **Multi-Algorithm Clone Detection**: Exact (Type-1), near (Type-2), and semantic (Type-3/4) clone detection with optional parallel MinHash/LSH
+- **Multi-Algorithm Clone Detection**: Exact (Type-1), near (Type-2), and semantic (Type-3/4) clone detection with parallel MinHash/LSH (enabled by default)
 - **IndexStoreDB Integration**: Accurate cross-module unused code detection using compiler index data with improved auto-discovery
-- **Reachability Analysis**: Graph-based dead code detection with entry point tracking, parallel edge building, and optional direction-optimizing BFS
-- **Symbol Lookup**: Find symbols by name, qualified name, selector, USR, or regex pattern
+- **Reachability Analysis**: Graph-based dead code detection with entry point tracking, parallel edge building, and direction-optimizing BFS
+- **Symbol Lookup**: Find symbols by name, qualified name, selector, USR, or regex pattern with rich context extraction
+- **Symbol Context**: Extract surrounding code, documentation, signatures, and scope information for matched symbols
+- **MCP Server Integration**: Model Context Protocol server (`swa-mcp`) for AI assistant integration
 - **Ignore Directives**: Suppress false positives with `// swa:ignore` comments
 - **High-Performance Parsing**: Memory-mapped I/O, SoA token storage, and arena allocation
 - **Zero-Boilerplate CLI**: Full-featured `swa` command with JSON/text/Xcode output formats
@@ -50,7 +52,7 @@ Then add the dependency to your target:
 )
 ```
 
-This gives you access to all components. Alternatively, import individual modules:
+This gives you access to all components including the MCP server. Alternatively, import individual modules:
 
 ```swift
 .target(
@@ -60,6 +62,7 @@ This gives you access to all components. Alternatively, import individual module
         .product(name: "DuplicationDetector", package: "SwiftStaticAnalysis"),      // Clone detection
         .product(name: "UnusedCodeDetector", package: "SwiftStaticAnalysis"),       // Unused code
         .product(name: "SymbolLookup", package: "SwiftStaticAnalysis"),             // Symbol lookup
+        .product(name: "SwiftStaticAnalysisMCP", package: "SwiftStaticAnalysis"),   // MCP server
     ]
 )
 ```
@@ -118,6 +121,15 @@ swa symbol "fetch" --kind method --access public /path/to/project
 
 # Find symbol usages
 swa symbol "SharedCache.instance" --usages /path/to/project
+
+# Symbol lookup with context (surrounding code)
+swa symbol "NetworkManager" --context-lines 3 /path/to/project
+
+# Include documentation and signature
+swa symbol "fetchData" --context-documentation --context-signature /path/to/project
+
+# Include all context information
+swa symbol "CacheManager" --context-all /path/to/project
 
 # Parallel MinHash/LSH clone detection (large codebases)
 swa duplicates /path/to/project --types near --algorithm minHashLSH --parallel-mode safe
@@ -437,6 +449,14 @@ swa symbol <query> [<path>] [options]
 | `--index-store-path <path>` | Path to index store |
 | `--limit <n>` | Maximum results to return |
 | `-f, --format <format>` | Output format: `text`, `json`, `xcode` |
+| `--context-lines <n>` | Lines of context before and after symbol |
+| `--context-before <n>` | Lines of context before symbol |
+| `--context-after <n>` | Lines of context after symbol |
+| `--context-scope` | Include containing scope information |
+| `--context-signature` | Include complete signature |
+| `--context-body` | Include declaration body |
+| `--context-documentation` | Include documentation comments |
+| `--context-all` | Include all context information |
 
 #### Query Patterns
 
@@ -447,6 +467,25 @@ swa symbol <query> [<path>] [options]
 | Selector | `fetch(id:completion:)` | Find method by signature |
 | Regex | `/^handle.*Event$/` | Find by pattern match |
 | USR | `s:14NetworkMonitor6sharedACvpZ` | Find by compiler USR |
+
+#### Context Flag Examples
+
+```bash
+# Show 3 lines before and after each match
+swa symbol "NetworkManager" --context-lines 3 Sources/
+
+# Show documentation and signature
+swa symbol "fetchData" --context-documentation --context-signature Sources/
+
+# Show containing scope (class/struct/function)
+swa symbol "processItem" --context-scope Sources/
+
+# Include function body
+swa symbol "validate" --context-body Sources/
+
+# All context information in JSON format
+swa symbol "CacheManager" --context-all --format json Sources/
+```
 
 ## Architecture
 
@@ -469,10 +508,68 @@ Sources/
 ├── SymbolLookup/                 # Symbol resolution
 │   ├── Models/                   # SymbolQuery, SymbolMatch
 │   ├── Query/                    # QueryParser, USRDecoder
+│   ├── Context/                  # SymbolContextExtractor, FileContentCache
 │   └── Resolution/               # SymbolFinder, IndexStore/Syntax resolvers
+├── SwiftStaticAnalysisMCP/       # MCP server library
+│   ├── SWAMCPServer.swift        # MCP server implementation
+│   └── CodebaseContext.swift     # Sandboxed codebase access
 ├── swa/                          # CLI tool
+├── swa-mcp/                      # MCP server executable
 ├── StaticAnalysisBuildPlugin/    # Build-time analysis plugin
 └── StaticAnalysisCommandPlugin/  # On-demand analysis plugin
+```
+
+## MCP Server
+
+SwiftStaticAnalysis includes a Model Context Protocol (MCP) server that allows AI assistants like Claude to analyze Swift codebases.
+
+### Running the MCP Server
+
+```bash
+# Build and run with a default codebase
+swift build -c release
+.build/release/swa-mcp /path/to/your/project
+
+# Or run without a default (clients must specify codebase_path)
+.build/release/swa-mcp
+```
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_codebase_info` | Get codebase statistics (file count, LOC, size) |
+| `list_swift_files` | List Swift files with optional exclusion patterns |
+| `detect_unused_code` | Detect unused functions, types, and variables |
+| `detect_duplicates` | Find duplicate code patterns |
+| `read_file` | Read file contents with line range support |
+| `search_symbols` | Search symbols with filters and context extraction |
+| `analyze_file` | Full static analysis of a single file |
+
+### Programmatic Usage
+
+```swift
+import SwiftStaticAnalysisMCP
+import MCP
+
+let server = try SWAMCPServer(codebasePath: "/path/to/codebase")
+let transport = StdioTransport()
+try await server.start(transport: transport)
+```
+
+### Claude Desktop Configuration
+
+Add to your Claude Desktop `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "swa": {
+      "command": "/path/to/swa-mcp",
+      "args": ["/path/to/your/project"]
+    }
+  }
+}
 ```
 
 ## Documentation
@@ -484,6 +581,8 @@ The documentation includes:
 - **CLI Reference**: Complete command-line options for the `swa` tool
 - **Clone Detection**: Algorithm details and configuration
 - **Unused Code Detection**: Detection modes and filtering
+- **Symbol Lookup**: Query patterns and context extraction
+- **MCP Server**: AI assistant integration guide
 - **Ignore Directives**: Reference for suppressing false positives
 - **CI Integration**: Setting up automated analysis
 - **API Reference**: Complete API documentation for all modules

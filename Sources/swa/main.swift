@@ -177,9 +177,9 @@ struct Duplicates: AsyncParsableCommand {
             if let mode = parallelMode {
                 mode.toParallelMode
             } else if parallel {
-                .safe
+                .maximum
             } else {
-                dupConfig?.resolvedParallelMode ?? .none
+                dupConfig?.resolvedParallelMode ?? .maximum
             }
         let effectiveParallel = effectiveParallelMode.isParallel
 
@@ -334,9 +334,9 @@ struct Unused: AsyncParsableCommand {
             if let mode = parallelMode {
                 mode.toParallelMode
             } else if parallel {
-                .safe
+                .maximum
             } else {
-                unusedConfig?.resolvedParallelMode ?? .none
+                unusedConfig?.resolvedParallelMode ?? .maximum
             }
         let effectiveParallel = effectiveParallelMode.isParallel
 
@@ -463,6 +463,31 @@ struct Symbol: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Output format")
     var format: OutputFormat = .text
 
+    // Context flags
+    @Option(name: .customLong("context-lines"), help: "Lines of context before and after symbol")
+    var contextLines: Int?
+
+    @Option(name: .customLong("context-before"), help: "Lines of context before symbol")
+    var contextBefore: Int?
+
+    @Option(name: .customLong("context-after"), help: "Lines of context after symbol")
+    var contextAfter: Int?
+
+    @Flag(name: .customLong("context-scope"), help: "Include containing scope")
+    var contextScope: Bool = false
+
+    @Flag(name: .customLong("context-signature"), help: "Include complete signature")
+    var contextSignature: Bool = false
+
+    @Flag(name: .customLong("context-body"), help: "Include declaration body")
+    var contextBody: Bool = false
+
+    @Flag(name: .customLong("context-documentation"), help: "Include documentation comments")
+    var contextDocumentation: Bool = false
+
+    @Flag(name: .customLong("context-all"), help: "Include all context")
+    var contextAll: Bool = false
+
     func run() async throws {
         let files = try findSwiftFiles(in: paths, excludePaths: nil)
 
@@ -521,11 +546,39 @@ struct Symbol: AsyncParsableCommand {
             return
         }
 
+        // Extract context if requested
+        let contextConfig = buildContextConfiguration()
+        var contexts: [SymbolMatch: SymbolContext] = [:]
+        if contextConfig.wantsContext {
+            let extractor = SymbolContextExtractor()
+            contexts = try await extractor.extractContext(for: matches, configuration: contextConfig)
+        }
+
         // Output results
-        outputMatches(matches)
+        outputMatches(matches, contexts: contexts)
     }
 
-    private func outputMatches(_ matches: [SymbolMatch]) {
+    /// Builds context configuration from CLI flags.
+    private func buildContextConfiguration() -> SymbolContextConfiguration {
+        if contextAll {
+            return .all
+        }
+
+        // Calculate lines before/after
+        let linesBefore = contextBefore ?? contextLines ?? 0
+        let linesAfter = contextAfter ?? contextLines ?? 0
+
+        return SymbolContextConfiguration(
+            linesBefore: linesBefore,
+            linesAfter: linesAfter,
+            includeScope: contextScope,
+            includeSignature: contextSignature,
+            includeBody: contextBody,
+            includeDocumentation: contextDocumentation
+        )
+    }
+
+    private func outputMatches(_ matches: [SymbolMatch], contexts: [SymbolMatch: SymbolContext] = [:]) {
         if matches.isEmpty {
             print("No symbols found matching '\(query)'")
             return
@@ -535,33 +588,11 @@ struct Symbol: AsyncParsableCommand {
         case .text:
             print("Found \(matches.count) symbol(s):\n")
             for match in matches {
-                // Build symbol name with optional signature
-                var symbolName = match.name
-                if !match.genericParameters.isEmpty {
-                    symbolName += "<\(match.genericParameters.joined(separator: ", "))>"
-                }
-                if let sig = match.signature {
-                    symbolName += sig.selectorString
-                }
-
-                var line = "\(match.kind.rawValue) \(symbolName)"
-                if let containingType = match.containingType {
-                    line = "\(containingType).\(line)"
-                }
-                print("  \(line)")
-                print("    Location: \(match.file):\(match.line):\(match.column)")
-                print("    Access: \(match.accessLevel.rawValue)")
-                if let sig = match.signature {
-                    print("    Signature: \(sig.displayString)")
-                }
-                if let usr = match.usr {
-                    print("    USR: \(usr)")
-                }
-                print()
+                outputMatchText(match, context: contexts[match])
             }
 
         case .json:
-            OutputFormatter.printJSON(matches)
+            outputMatchesJSON(matches, contexts: contexts)
 
         case .xcode:
             for match in matches {
@@ -569,6 +600,111 @@ struct Symbol: AsyncParsableCommand {
                 print("\(match.file):\(match.line):\(match.column): note: \(desc)")
             }
         }
+    }
+
+    private func outputMatchText(_ match: SymbolMatch, context: SymbolContext?) {
+        // Build symbol name with optional signature
+        var symbolName = match.name
+        if !match.genericParameters.isEmpty {
+            symbolName += "<\(match.genericParameters.joined(separator: ", "))>"
+        }
+        if let sig = match.signature {
+            symbolName += sig.selectorString
+        }
+
+        var line = "\(match.kind.rawValue) \(symbolName)"
+        if let containingType = match.containingType {
+            line = "\(containingType).\(line)"
+        }
+        print("  \(line)")
+        print("    Location: \(match.file):\(match.line):\(match.column)")
+        print("    Access: \(match.accessLevel.rawValue)")
+        if let sig = match.signature {
+            print("    Signature: \(sig.displayString)")
+        }
+        if let usr = match.usr {
+            print("    USR: \(usr)")
+        }
+
+        // Output context if available
+        if let ctx = context, !ctx.isEmpty {
+            print()
+            outputContextText(ctx)
+        }
+        print()
+    }
+
+    private func outputContextText(_ context: SymbolContext) {
+        // Documentation
+        if let doc = context.documentation, doc.hasContent {
+            print("    Documentation:")
+            if let summary = doc.summary {
+                print("      \(summary)")
+            }
+            for param in doc.parameters {
+                print("      - Parameter \(param.name): \(param.description)")
+            }
+            if let returns = doc.returns {
+                print("      - Returns: \(returns)")
+            }
+            if let throwsDoc = doc.throws {
+                print("      - Throws: \(throwsDoc)")
+            }
+        }
+
+        // Complete signature
+        if let sig = context.completeSignature {
+            print("    Complete Signature:")
+            print("      \(sig)")
+        }
+
+        // Line context
+        if !context.linesBefore.isEmpty || !context.linesAfter.isEmpty {
+            print("    Source Context:")
+            let allLines = context.linesBefore + context.linesAfter
+            let maxLineNum = allLines.map(\.lineNumber).max() ?? 0
+            let lineNumWidth = String(maxLineNum).count
+
+            for line in context.linesBefore {
+                print("      \(line.formatted(lineNumberWidth: lineNumWidth))")
+            }
+            for line in context.linesAfter {
+                print("      \(line.formatted(lineNumberWidth: lineNumWidth))")
+            }
+        }
+
+        // Body
+        if let body = context.body {
+            print("    Body:")
+            let bodyLines = body.split(separator: "\n", omittingEmptySubsequences: false)
+            let preview = bodyLines.prefix(10)
+            for bodyLine in preview {
+                print("      \(bodyLine)")
+            }
+            if bodyLines.count > 10 {
+                print("      ... (\(bodyLines.count - 10) more lines)")
+            }
+        }
+
+        // Scope
+        if let scope = context.scopeContent {
+            print("    Containing Scope: \(scope.kind.rawValue)\(scope.name.map { " '\($0)'" } ?? "")")
+            print("      Lines \(scope.startLine)-\(scope.endLine)")
+        }
+    }
+
+    private func outputMatchesJSON(_ matches: [SymbolMatch], contexts: [SymbolMatch: SymbolContext]) {
+        // Build combined output
+        struct MatchWithContext: Codable {
+            let match: SymbolMatch
+            let context: SymbolContext?
+        }
+
+        let combined = matches.map { match in
+            MatchWithContext(match: match, context: contexts[match])
+        }
+
+        OutputFormatter.printJSON(combined)
     }
 
     private func outputUsages(_ usages: [SymbolOccurrence], matches: [SymbolMatch]) {

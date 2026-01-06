@@ -112,10 +112,10 @@ struct ParallelModeConfigurationTests {
         #expect(config2.resolvedParallelMode == .none)
     }
 
-    @Test("UnusedConfiguration.resolvedParallelMode defaults to none")
+    @Test("UnusedConfiguration.resolvedParallelMode defaults to maximum")
     func unusedConfigDefault() {
         let config = UnusedConfiguration()
-        #expect(config.resolvedParallelMode == .none)
+        #expect(config.resolvedParallelMode == .maximum)
     }
 
     // MARK: - DuplicatesConfiguration
@@ -139,10 +139,10 @@ struct ParallelModeConfigurationTests {
         #expect(config2.resolvedParallelMode == .none)
     }
 
-    @Test("DuplicatesConfiguration.resolvedParallelMode defaults to none")
+    @Test("DuplicatesConfiguration.resolvedParallelMode defaults to maximum")
     func duplicatesConfigDefault() {
         let config = DuplicatesConfiguration()
-        #expect(config.resolvedParallelMode == .none)
+        #expect(config.resolvedParallelMode == .maximum)
     }
 
     // MARK: - JSON Configuration

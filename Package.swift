@@ -191,6 +191,7 @@ let package = Package(
                 "DuplicationDetector",
                 "UnusedCodeDetector",
                 "SymbolLookup",
+                "SwiftStaticAnalysisMCP",
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
@@ -201,7 +202,10 @@ let package = Package(
         .target(
             name: "SwiftStaticAnalysisMCP",
             dependencies: [
-                "SwiftStaticAnalysis",
+                "SwiftStaticAnalysisCore",
+                "DuplicationDetector",
+                "UnusedCodeDetector",
+                "SymbolLookup",
                 .product(name: "MCP", package: "swift-sdk"),
             ],
             swiftSettings: [

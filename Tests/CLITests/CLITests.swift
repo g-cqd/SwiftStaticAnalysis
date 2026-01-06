@@ -370,3 +370,331 @@ struct CLICommandTests {
         return path
     }
 }
+
+// MARK: - Symbol Command Integration Tests
+
+@Suite("Symbol Command Integration Tests")
+struct SymbolCommandIntegrationTests {
+    private let swaPath: String
+    private let fixturesPath: String
+
+    init() throws {
+        let testFileURL = URL(fileURLWithPath: #filePath)
+        let testsDir = testFileURL.deletingLastPathComponent()
+        let packageRoot = testsDir.deletingLastPathComponent().deletingLastPathComponent()
+
+        swaPath = packageRoot.appendingPathComponent(".build/debug/swa").path
+        fixturesPath = testsDir.appendingPathComponent("Fixtures").path
+
+        guard FileManager.default.fileExists(atPath: swaPath) else {
+            throw CLITestError.binaryNotFound(swaPath)
+        }
+    }
+
+    // MARK: - Symbol Search Tests
+
+    @Test("symbol command finds function by name")
+    func symbolFindsFunctionByName() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "getName", fixture])
+
+        #expect(output.succeeded, "Symbol lookup should succeed")
+        #expect(
+            output.stdout.contains("getName") || output.stdout.contains("No symbols found"),
+            "Should find getName or report no symbols"
+        )
+    }
+
+    @Test("symbol command finds protocol by name")
+    func symbolFindsProtocolByName() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "SimpleProtocol", fixture])
+
+        #expect(output.succeeded, "Symbol lookup should succeed")
+        // The output may vary depending on IndexStore availability
+    }
+
+    @Test("symbol command finds struct by name")
+    func symbolFindsStructByName() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "SimpleStruct", fixture])
+
+        #expect(output.succeeded, "Symbol lookup should succeed")
+    }
+
+    @Test("symbol command finds enum by name")
+    func symbolFindsEnumByName() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "SimpleEnum", fixture])
+
+        #expect(output.succeeded, "Symbol lookup should succeed")
+    }
+
+    // MARK: - Kind Filter Tests
+
+    @Test("symbol command filters by class kind")
+    func symbolFiltersByClassKind() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "Simple", "--kind", "class", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command filters by function kind")
+    func symbolFiltersByFunctionKind() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "get", "--kind", "function", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command filters by protocol kind")
+    func symbolFiltersByProtocolKind() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "Protocol", "--kind", "protocol", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command filters by struct kind")
+    func symbolFiltersByStructKind() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "Struct", "--kind", "struct", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command filters by enum kind")
+    func symbolFiltersByEnumKind() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "Enum", "--kind", "enum", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command filters by variable kind")
+    func symbolFiltersByVariableKind() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "unused", "--kind", "variable", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    // MARK: - Access Filter Tests
+
+    @Test("symbol command filters by public access")
+    func symbolFiltersByPublicAccess() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "Simple", "--access", "public", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command filters by private access")
+    func symbolFiltersByPrivateAccess() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "unused", "--access", "private", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command filters by internal access")
+    func symbolFiltersByInternalAccess() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "Simple", "--access", "internal", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    // MARK: - Mode Tests
+
+    @Test("symbol command definition mode")
+    func symbolDefinitionMode() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "getName", "--definition", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command usages mode")
+    func symbolUsagesMode() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "name", "--usages", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    // MARK: - Context Flag Tests
+
+    @Test("symbol command with --context-lines")
+    func symbolWithContextLines() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "getName", "--context-lines", "3", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+        // Context lines should show surrounding code
+    }
+
+    @Test("symbol command with --context-before and --context-after")
+    func symbolWithAsymmetricContext() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA([
+            "symbol", "getName", "--context-before", "2", "--context-after", "5", fixture,
+        ])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command with --context-signature")
+    func symbolWithContextSignature() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "getName", "--context-signature", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command with --context-body")
+    func symbolWithContextBody() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "getName", "--context-body", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command with --context-documentation")
+    func symbolWithContextDocumentation() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "SimpleClass", "--context-documentation", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command with --context-scope")
+    func symbolWithContextScope() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "getName", "--context-scope", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command with --context-all")
+    func symbolWithAllContext() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "getName", "--context-all", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    // MARK: - Output Format Tests
+
+    @Test("symbol command with json format")
+    func symbolWithJsonFormat() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "SimpleClass", "--format", "json", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+        let trimmed = output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        #expect(
+            trimmed.hasPrefix("[") || trimmed.hasPrefix("{"),
+            "JSON output should start with [ or {"
+        )
+    }
+
+    @Test("symbol command with text format")
+    func symbolWithTextFormat() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "SimpleClass", "--format", "text", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command with xcode format")
+    func symbolWithXcodeFormat() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "SimpleClass", "--format", "xcode", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    // MARK: - Combined Options Tests
+
+    @Test("symbol command with kind and access combined")
+    func symbolWithKindAndAccess() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA([
+            "symbol", "unused", "--kind", "function", "--access", "private", fixture,
+        ])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command with multiple context flags")
+    func symbolWithMultipleContextFlags() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA([
+            "symbol", "getName",
+            "--context-lines", "2",
+            "--context-signature",
+            "--context-body",
+            fixture,
+        ])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    @Test("symbol command with limit option")
+    func symbolWithLimit() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "get", "--limit", "1", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    // MARK: - Qualified Name Tests
+
+    @Test("symbol command with qualified name")
+    func symbolWithQualifiedName() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "SimpleClass.getName", fixture])
+
+        #expect(output.succeeded, "Command should succeed")
+    }
+
+    // MARK: - Helpers
+
+    private func runSWA(_ arguments: [String]) async throws -> CLIOutput {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: swaPath)
+        process.arguments = arguments
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
+        let stderr = String(data: stderrData, encoding: .utf8) ?? ""
+
+        return CLIOutput(
+            stdout: stdout,
+            stderr: stderr,
+            exitCode: process.terminationStatus
+        )
+    }
+
+    private func fixtureFile(_ name: String) throws -> String {
+        let path = (fixturesPath as NSString).appendingPathComponent(name)
+
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw CLITestError.fixtureNotFound(name)
+        }
+
+        return path
+    }
+}

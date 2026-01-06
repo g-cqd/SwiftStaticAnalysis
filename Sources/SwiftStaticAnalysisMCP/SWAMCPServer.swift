@@ -2,9 +2,12 @@
 /// SwiftStaticAnalysisMCP
 /// MIT License
 
+import DuplicationDetector
 import Foundation
 import MCP
-import SwiftStaticAnalysis
+import SwiftStaticAnalysisCore
+import SymbolLookup
+import UnusedCodeDetector
 
 /// An MCP server that exposes Swift Static Analysis tools for any codebase.
 ///
@@ -185,6 +188,48 @@ extension SWAMCPServer {
                             "type": .string("boolean"),
                             "description": .string("Whether to include public API in analysis (default: false)"),
                         ]),
+                        "treat_public_as_root": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Treat public API as entry points (default: false)"),
+                        ]),
+                        "treat_objc_as_root": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Treat @objc declarations as entry points (default: false)"),
+                        ]),
+                        "treat_tests_as_root": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Treat test methods as entry points (default: false)"),
+                        ]),
+                        "treat_swiftui_views_as_root": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Treat SwiftUI Views as entry points (default: true)"),
+                        ]),
+                        "exclude_imports": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Exclude import statements from analysis (default: false)"),
+                        ]),
+                        "ignore_swiftui_property_wrappers": .object([
+                            "type": .string("boolean"),
+                            "description": .string(
+                                "Ignore SwiftUI property wrappers (@State, @Binding, etc.) (default: false)"),
+                        ]),
+                        "ignore_preview_providers": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Ignore PreviewProvider implementations (default: false)"),
+                        ]),
+                        "ignore_view_body": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Ignore View body properties (default: false)"),
+                        ]),
+                        "index_store_path": .object([
+                            "type": .string("string"),
+                            "description": .string("Path to IndexStore for enhanced accuracy"),
+                        ]),
+                        "exclude_paths": .object([
+                            "type": .string("array"),
+                            "items": .object(["type": .string("string")]),
+                            "description": .string("Glob patterns to exclude from analysis"),
+                        ]),
                         "paths": .object([
                             "type": .string("array"),
                             "items": .object(["type": .string("string")]),
@@ -223,6 +268,11 @@ extension SWAMCPServer {
                             "type": .string("string"),
                             "enum": .array([.string("rollingHash"), .string("suffixArray"), .string("minHashLSH")]),
                             "description": .string("Detection algorithm to use"),
+                        ]),
+                        "exclude_paths": .object([
+                            "type": .string("array"),
+                            "items": .object(["type": .string("string")]),
+                            "description": .string("Glob patterns to exclude from analysis"),
                         ]),
                         "paths": .object([
                             "type": .string("array"),
@@ -286,6 +336,50 @@ extension SWAMCPServer {
                             ]),
                             "description": .string("Filter by minimum access level"),
                         ]),
+                        "definition_only": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Only return definitions, not references (default: true)"),
+                        ]),
+                        "use_regex": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Treat query as a regex pattern (default: false)"),
+                        ]),
+                        "limit": .object([
+                            "type": .string("integer"),
+                            "description": .string("Maximum number of results to return"),
+                        ]),
+                        "context_lines": .object([
+                            "type": .string("integer"),
+                            "description": .string("Lines of context before and after symbol"),
+                        ]),
+                        "context_before": .object([
+                            "type": .string("integer"),
+                            "description": .string("Lines of context before symbol"),
+                        ]),
+                        "context_after": .object([
+                            "type": .string("integer"),
+                            "description": .string("Lines of context after symbol"),
+                        ]),
+                        "context_scope": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Include containing scope information"),
+                        ]),
+                        "context_signature": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Include complete signature"),
+                        ]),
+                        "context_body": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Include declaration body"),
+                        ]),
+                        "context_documentation": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Include documentation comments"),
+                        ]),
+                        "context_all": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Include all context information"),
+                        ]),
                     ]),
                     "required": .array([.string("query")]),
                 ])
@@ -300,6 +394,38 @@ extension SWAMCPServer {
                         "path": .object([
                             "type": .string("string"),
                             "description": .string("Path to the Swift file to analyze"),
+                        ]),
+                        "include_declarations": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Include declaration listing (default: true)"),
+                        ]),
+                        "include_references": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Include reference listing (default: true)"),
+                        ]),
+                        "max_references": .object([
+                            "type": .string("integer"),
+                            "description": .string("Maximum references to return (default: 100)"),
+                        ]),
+                        "declaration_kinds": .object([
+                            "type": .string("array"),
+                            "items": .object([
+                                "type": .string("string"),
+                                "enum": .array([
+                                    .string("function"), .string("method"), .string("class"),
+                                    .string("struct"), .string("enum"), .string("protocol"),
+                                    .string("variable"), .string("constant"), .string("typealias"),
+                                ]),
+                            ]),
+                            "description": .string("Filter declarations by kinds"),
+                        ]),
+                        "include_imports": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Include import statements (default: true)"),
+                        ]),
+                        "include_scopes": .object([
+                            "type": .string("boolean"),
+                            "description": .string("Include scope hierarchy information (default: false)"),
                         ]),
                     ]),
                     "required": .array([.string("path")]),
@@ -408,23 +534,74 @@ extension SWAMCPServer {
         var config = UnusedCodeConfiguration.default
 
         if let args = arguments {
+            // Detection mode
             if let modeStr = args["mode"]?.stringValue {
                 config.mode = DetectionMode(rawValue: modeStr) ?? .simple
             }
+
+            // Confidence level
             if let confStr = args["min_confidence"]?.stringValue {
                 config.minimumConfidence = Confidence(rawValue: confStr) ?? .medium
             }
+
+            // Public API handling
             if let includePublic = args["include_public"]?.boolValue {
                 config.ignorePublicAPI = !includePublic
             }
+
+            // Entry point configuration
+            if let treatPublicAsRoot = args["treat_public_as_root"]?.boolValue {
+                config.treatPublicAsRoot = treatPublicAsRoot
+            }
+            if let treatObjcAsRoot = args["treat_objc_as_root"]?.boolValue {
+                config.treatObjcAsRoot = treatObjcAsRoot
+            }
+            if let treatTestsAsRoot = args["treat_tests_as_root"]?.boolValue {
+                config.treatTestsAsRoot = treatTestsAsRoot
+            }
+            if let treatSwiftUIViewsAsRoot = args["treat_swiftui_views_as_root"]?.boolValue {
+                config.treatSwiftUIViewsAsRoot = treatSwiftUIViewsAsRoot
+            }
+
+            // Detection options - exclude_imports means we should NOT detect imports
+            if let excludeImports = args["exclude_imports"]?.boolValue {
+                config.detectImports = !excludeImports
+            }
+
+            // SwiftUI options
+            if let ignoreSwiftUIPropertyWrappers = args["ignore_swiftui_property_wrappers"]?.boolValue {
+                config.ignoreSwiftUIPropertyWrappers = ignoreSwiftUIPropertyWrappers
+            }
+            if let ignorePreviewProviders = args["ignore_preview_providers"]?.boolValue {
+                config.ignorePreviewProviders = ignorePreviewProviders
+            }
+            if let ignoreViewBody = args["ignore_view_body"]?.boolValue {
+                config.ignoreViewBody = ignoreViewBody
+            }
+
+            // Index store path
+            if let indexStorePath = args["index_store_path"]?.stringValue {
+                config.indexStorePath = indexStorePath
+            }
         }
 
-        let files: [String]
+        // Get files to analyze
+        var files: [String]
         if let args = arguments, let paths = args["paths"]?.arrayValue {
             let relativePaths = paths.compactMap { $0.stringValue }
             files = try context.validatePaths(relativePaths)
         } else {
             files = try context.findSwiftFiles()
+        }
+
+        // Apply path exclusions
+        if let args = arguments, let excludePaths = args["exclude_paths"]?.arrayValue {
+            let patterns = excludePaths.compactMap { $0.stringValue }
+            files = files.filter { file in
+                !patterns.contains { pattern in
+                    UnusedCodeFilter.matchesGlobPattern(file, pattern: pattern)
+                }
+            }
         }
 
         let detector = UnusedCodeDetector(configuration: config)
@@ -470,12 +647,23 @@ extension SWAMCPServer {
             }
         }
 
-        let files: [String]
+        // Get files to analyze
+        var files: [String]
         if let args = arguments, let paths = args["paths"]?.arrayValue {
             let relativePaths = paths.compactMap { $0.stringValue }
             files = try context.validatePaths(relativePaths)
         } else {
             files = try context.findSwiftFiles()
+        }
+
+        // Apply path exclusions
+        if let args = arguments, let excludePaths = args["exclude_paths"]?.arrayValue {
+            let patterns = excludePaths.compactMap { $0.stringValue }
+            files = files.filter { file in
+                !patterns.contains { pattern in
+                    UnusedCodeFilter.matchesGlobPattern(file, pattern: pattern)
+                }
+            }
         }
 
         let detector = DuplicationDetector(configuration: config)
@@ -540,11 +728,22 @@ extension SWAMCPServer {
         let context = try getContext(for: codebasePath)
 
         let files = try context.findSwiftFiles()
+
+        // Build context configuration if requested
+        let contextConfig = buildContextConfiguration(from: args)
+
+        // Check if we should use regex matching
+        let useRegex = args["use_regex"]?.boolValue ?? false
+
         let analyzer = StaticAnalyzer()
         let result = try await analyzer.analyze(files)
 
         var matches = result.declarations.declarations.filter { decl in
-            decl.name.localizedCaseInsensitiveContains(query)
+            if useRegex {
+                return (try? Regex(query).firstMatch(in: decl.name)) != nil
+            } else {
+                return decl.name.localizedCaseInsensitiveContains(query)
+            }
         }
 
         // Filter by kind if specified
@@ -561,8 +760,20 @@ extension SWAMCPServer {
             matches = matches.filter { $0.accessLevel >= access }
         }
 
-        let output = matches.map { decl -> [String: Any] in
-            [
+        // Apply limit if specified
+        if let limit = args["limit"]?.intValue {
+            matches = Array(matches.prefix(limit))
+        }
+
+        // Extract context for each match if requested
+        var contextExtractor: SymbolContextExtractor?
+        if contextConfig.wantsContext {
+            contextExtractor = SymbolContextExtractor()
+        }
+
+        var output: [[String: Any]] = []
+        for decl in matches {
+            var matchOutput: [String: Any] = [
                 "name": decl.name,
                 "kind": decl.kind.rawValue,
                 "access_level": decl.accessLevel.rawValue,
@@ -570,10 +781,103 @@ extension SWAMCPServer {
                 "line": decl.location.line,
                 "column": decl.location.column,
             ]
+
+            // Add context if requested and extractor is available
+            if let extractor = contextExtractor, contextConfig.wantsContext {
+                // Create a SymbolMatch from the Declaration for context extraction
+                let symbolMatch = SymbolMatch.from(
+                    declaration: decl,
+                    source: .syntaxTree
+                )
+
+                if let symbolContext = try? await extractor.extractContext(
+                    for: symbolMatch,
+                    configuration: contextConfig
+                ) {
+                    matchOutput["context"] = buildContextOutput(symbolContext)
+                }
+            }
+
+            output.append(matchOutput)
         }
 
         let jsonData = try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys])
         return .init(content: [.text(String(data: jsonData, encoding: .utf8) ?? "[]")], isError: false)
+    }
+
+    /// Build a SymbolContextConfiguration from MCP arguments.
+    private func buildContextConfiguration(from args: [String: Value]) -> SymbolContextConfiguration {
+        if args["context_all"]?.boolValue == true {
+            return .all
+        }
+
+        let contextLines = args["context_lines"]?.intValue ?? 0
+        let contextBefore = args["context_before"]?.intValue ?? contextLines
+        let contextAfter = args["context_after"]?.intValue ?? contextLines
+
+        return SymbolContextConfiguration(
+            linesBefore: contextBefore,
+            linesAfter: contextAfter,
+            includeScope: args["context_scope"]?.boolValue ?? false,
+            includeSignature: args["context_signature"]?.boolValue ?? false,
+            includeBody: args["context_body"]?.boolValue ?? false,
+            includeDocumentation: args["context_documentation"]?.boolValue ?? false
+        )
+    }
+
+    /// Build context output dictionary for JSON serialization.
+    private func buildContextOutput(_ context: SymbolContext) -> [String: Any] {
+        var output: [String: Any] = [:]
+
+        if !context.linesBefore.isEmpty {
+            output["lines_before"] = context.linesBefore.map { line in
+                ["line_number": line.lineNumber, "content": line.content]
+            }
+        }
+
+        if !context.linesAfter.isEmpty {
+            output["lines_after"] = context.linesAfter.map { line in
+                ["line_number": line.lineNumber, "content": line.content]
+            }
+        }
+
+        if let scope = context.scopeContent {
+            output["scope"] = [
+                "kind": scope.kind.rawValue,
+                "name": scope.name as Any,
+                "start_line": scope.startLine,
+                "end_line": scope.endLine,
+            ]
+        }
+
+        if let signature = context.completeSignature {
+            output["signature"] = signature
+        }
+
+        if let body = context.body {
+            output["body"] = body
+        }
+
+        if let doc = context.documentation, doc.hasContent {
+            var docOutput: [String: Any] = [:]
+            if let summary = doc.summary {
+                docOutput["summary"] = summary
+            }
+            if !doc.parameters.isEmpty {
+                docOutput["parameters"] = doc.parameters.map { param in
+                    ["name": param.name, "description": param.description]
+                }
+            }
+            if let returns = doc.returns {
+                docOutput["returns"] = returns
+            }
+            if let throwsDoc = doc.throws {
+                docOutput["throws"] = throwsDoc
+            }
+            output["documentation"] = docOutput
+        }
+
+        return output
     }
 
     private func handleAnalyzeFile(_ arguments: [String: Value]?) async throws -> CallTool.Result {
@@ -584,34 +888,95 @@ extension SWAMCPServer {
         let codebasePath = args["codebase_path"]?.stringValue
         let context = try getContext(for: codebasePath)
 
+        // Parse options
+        let includeDeclarations = args["include_declarations"]?.boolValue ?? true
+        let includeReferences = args["include_references"]?.boolValue ?? true
+        let maxReferences = args["max_references"]?.intValue ?? 100
+        let includeImports = args["include_imports"]?.boolValue ?? true
+        let includeScopes = args["include_scopes"]?.boolValue ?? false
+
+        // Parse declaration kind filters
+        var kindFilters: Set<DeclarationKind>?
+        if let kindsArray = args["declaration_kinds"]?.arrayValue {
+            let kinds = kindsArray.compactMap { $0.stringValue }.compactMap { DeclarationKind(rawValue: $0) }
+            if !kinds.isEmpty {
+                kindFilters = Set(kinds)
+            }
+        }
+
         let validatedPath = try context.validatePath(path)
         let analyzer = StaticAnalyzer()
         let result = try await analyzer.analyze([validatedPath])
 
-        let declarations = result.declarations.declarations.map { decl -> [String: Any] in
-            [
-                "name": decl.name,
-                "kind": decl.kind.rawValue,
-                "access_level": decl.accessLevel.rawValue,
-                "line": decl.location.line,
-            ]
-        }
-
-        let references = result.references.references.prefix(100).map { ref -> [String: Any] in
-            [
-                "identifier": ref.identifier,
-                "context": ref.context.rawValue,
-                "line": ref.location.line,
-            ]
-        }
-
-        let output: [String: Any] = [
+        var output: [String: Any] = [
             "file": String(validatedPath.dropFirst(context.rootPath.count + 1)),
             "declaration_count": result.declarations.declarations.count,
             "reference_count": result.references.references.count,
-            "declarations": declarations,
-            "references": Array(references),
         ]
+
+        if includeDeclarations {
+            var declarations = result.declarations.declarations
+
+            // Filter by kind if specified
+            if let filters = kindFilters {
+                declarations = declarations.filter { filters.contains($0.kind) }
+            }
+
+            // Filter out imports if requested
+            if !includeImports {
+                declarations = declarations.filter { $0.kind != .import }
+            }
+
+            let declarationsOutput = declarations.map { decl -> [String: Any] in
+                var declOutput: [String: Any] = [
+                    "name": decl.name,
+                    "kind": decl.kind.rawValue,
+                    "access_level": decl.accessLevel.rawValue,
+                    "line": decl.location.line,
+                ]
+
+                // Include scope info if requested
+                if includeScopes {
+                    declOutput["scope_id"] = decl.scope.id
+                }
+
+                // Include additional metadata for better context
+                if !decl.genericParameters.isEmpty {
+                    declOutput["generic_parameters"] = decl.genericParameters
+                }
+                if let sig = decl.signature {
+                    declOutput["signature"] = sig.displayString
+                }
+
+                return declOutput
+            }
+            output["declarations"] = declarationsOutput
+        }
+
+        if includeReferences {
+            let references = result.references.references.prefix(maxReferences).map { ref -> [String: Any] in
+                [
+                    "identifier": ref.identifier,
+                    "context": ref.context.rawValue,
+                    "line": ref.location.line,
+                ]
+            }
+            output["references"] = Array(references)
+        }
+
+        // Include scope hierarchy if requested
+        if includeScopes {
+            let scopes = result.scopes.scopes.values.map { scope -> [String: Any] in
+                [
+                    "id": scope.id.id,
+                    "kind": scope.kind.rawValue,
+                    "name": scope.name ?? "",
+                    "line": scope.location.line,
+                    "parent_id": scope.parent?.id as Any,
+                ]
+            }
+            output["scopes"] = scopes
+        }
 
         let jsonData = try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys])
         return .init(content: [.text(String(data: jsonData, encoding: .utf8) ?? "{}")], isError: false)

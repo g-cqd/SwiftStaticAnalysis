@@ -39,7 +39,7 @@ Then add the dependency to your target:
 )
 ```
 
-This gives you access to all components. Alternatively, import individual modules:
+This gives you access to all components including the MCP server. Alternatively, import individual modules:
 
 ```swift
 .target(
@@ -49,6 +49,7 @@ This gives you access to all components. Alternatively, import individual module
         .product(name: "DuplicationDetector", package: "SwiftStaticAnalysis"),      // Clone detection
         .product(name: "UnusedCodeDetector", package: "SwiftStaticAnalysis"),       // Unused code
         .product(name: "SymbolLookup", package: "SwiftStaticAnalysis"),             // Symbol lookup
+        .product(name: "SwiftStaticAnalysisMCP", package: "SwiftStaticAnalysis"),   // MCP server
     ]
 )
 ```
@@ -77,6 +78,12 @@ swa duplicates /path/to/your/project
 
 # Just detect unused code
 swa unused /path/to/your/project
+
+# Look up symbols
+swa symbol "NetworkManager" /path/to/your/project
+
+# Look up symbols with context
+swa symbol "fetchData" --context-all /path/to/your/project
 ```
 
 ### Understanding the Output
@@ -182,5 +189,7 @@ The `version` field is optional and defaults to `1` when not specified. See <doc
 
 - <doc:CloneDetection> - Learn about clone detection algorithms and configuration
 - <doc:UnusedCodeDetection> - Understand detection modes and accuracy trade-offs
+- <doc:SymbolLookup> - Find and explore symbols with context extraction
+- <doc:MCPServer> - Integrate with AI assistants using the MCP server
 - <doc:IgnoreDirectives> - Suppress false positives directly in your source code
 - <doc:CIIntegration> - Set up automated analysis in your CI pipeline

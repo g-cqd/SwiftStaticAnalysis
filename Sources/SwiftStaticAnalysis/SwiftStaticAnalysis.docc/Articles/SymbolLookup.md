@@ -118,6 +118,71 @@ if let match = matches.first {
 }
 ```
 
+## Context Extraction
+
+SymbolLookup can extract rich contextual information around matched symbols, including surrounding code, documentation, signatures, and scope information.
+
+### Using SymbolContextExtractor
+
+```swift
+import SwiftStaticAnalysis
+
+// Configure what context to extract
+var config = SymbolContextConfiguration()
+config.linesBefore = 3
+config.linesAfter = 3
+config.includeDocumentation = true
+config.includeSignature = true
+config.includeBody = true
+config.includeScope = true
+
+// Or use the convenience preset
+let config = SymbolContextConfiguration.all
+
+// Extract context for matches
+let extractor = SymbolContextExtractor()
+let contexts = try await extractor.extractContext(for: matches, configuration: config)
+
+for match in matches {
+    if let context = contexts[match] {
+        // Access context information
+        if let doc = context.documentation {
+            print("Documentation: \(doc.summary ?? "")")
+        }
+        if let signature = context.completeSignature {
+            print("Signature: \(signature)")
+        }
+        for line in context.linesBefore {
+            print("\(line.lineNumber): \(line.content)")
+        }
+    }
+}
+```
+
+### Context Configuration Options
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `linesBefore` | `Int` | Number of lines before the symbol |
+| `linesAfter` | `Int` | Number of lines after the symbol |
+| `includeScope` | `Bool` | Include containing scope (class/struct/function) |
+| `includeSignature` | `Bool` | Include complete signature |
+| `includeBody` | `Bool` | Include declaration body |
+| `includeDocumentation` | `Bool` | Include documentation comments |
+
+### SymbolContext Structure
+
+```swift
+struct SymbolContext {
+    let linesBefore: [ContextLine]       // Lines before the symbol
+    let linesAfter: [ContextLine]        // Lines after the symbol
+    let scopeContent: ScopeContent?      // Containing scope info
+    let completeSignature: String?       // Full signature text
+    let body: String?                    // Declaration body
+    let documentation: DocumentationComment?  // Parsed doc comment
+}
+```
+
 ## CLI Usage
 
 The `swa symbol` command provides CLI access to symbol lookup:
@@ -146,7 +211,35 @@ swa symbol "Cache.shared" --usages Sources/
 
 # Output as JSON
 swa symbol NetworkManager --format json Sources/
+
+# Show context around matches
+swa symbol "NetworkManager" --context-lines 3 Sources/
+
+# Include documentation and signature
+swa symbol "fetchData" --context-documentation --context-signature Sources/
+
+# Include containing scope
+swa symbol "processItem" --context-scope Sources/
+
+# Include function body
+swa symbol "validate" --context-body Sources/
+
+# All context in JSON format
+swa symbol "CacheManager" --context-all --format json Sources/
 ```
+
+### Context Flags
+
+| Flag | Description |
+|------|-------------|
+| `--context-lines <N>` | Lines of context before and after symbol |
+| `--context-before <N>` | Lines of context before symbol |
+| `--context-after <N>` | Lines of context after symbol |
+| `--context-scope` | Include containing scope |
+| `--context-signature` | Include complete signature |
+| `--context-body` | Include declaration body |
+| `--context-documentation` | Include documentation comments |
+| `--context-all` | Include all context information |
 
 ## Resolution Strategies
 
@@ -197,5 +290,7 @@ let finder = SymbolFinder(configuration: config)
 
 ## See Also
 
-- ``CLIReference``
-- ``UnusedCodeDetection``
+- <doc:CLIReference>
+- <doc:UnusedCodeDetection>
+- <doc:MCPServer>
+- <doc:CIIntegration>

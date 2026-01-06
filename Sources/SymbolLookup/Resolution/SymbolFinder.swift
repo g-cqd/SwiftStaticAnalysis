@@ -311,12 +311,59 @@ extension SymbolFinder {
 // MARK: - Batch Operations
 
 extension SymbolFinder {
+    /// Minimum number of queries required to enable parallel execution.
+    private static let parallelThreshold = 3
+
     /// Finds multiple symbols in a single operation.
     ///
-    /// - Parameter queries: Array of queries to execute.
+    /// - Parameters:
+    ///   - queries: Array of queries to execute.
+    ///   - parallelMode: Parallel execution mode. Defaults to `.maximum`.
     /// - Returns: Dictionary mapping query descriptions to results.
-    public func findMultiple(_ queries: [SymbolQuery]) async throws -> [String: [SymbolMatch]] {
+    ///
+    /// - Note: Parallelization is only used when there are 3+ queries and
+    ///   `parallelMode` is not `.none`. For small numbers of queries,
+    ///   sequential execution is used to avoid TaskGroup overhead.
+    ///
+    /// - Complexity: O(n * m) where n is queries and m is symbols per query.
+    ///   With parallelization, effective time is O(m * n/cores).
+    public func findMultiple(
+        _ queries: [SymbolQuery],
+        parallelMode: ParallelMode = .maximum
+    ) async throws -> [String: [SymbolMatch]] {
+        guard !queries.isEmpty else { return [:] }
+
+        // Use sequential execution for small batches or when parallelization is disabled
+        if queries.count < Self.parallelThreshold || parallelMode == .none {
+            return try await findMultipleSequential(queries)
+        }
+
+        // Parallel execution with concurrency limit
+        let concurrency = parallelMode.toConcurrencyConfiguration()
+        let indexedQueries = queries.enumerated().map { ($0.offset, $0.element) }
+
+        let indexedResults = try await ParallelProcessor.map(
+            indexedQueries,
+            maxConcurrency: concurrency.maxConcurrentTasks
+        ) { [self] (index, query) in
+            let matches = try await self.find(query)
+            return (index, query.description, matches)
+        }
+
+        // Build results dictionary preserving original query order
         var results: [String: [SymbolMatch]] = [:]
+        results.reserveCapacity(queries.count)
+        for (_, description, matches) in indexedResults.sorted(by: { $0.0 < $1.0 }) {
+            results[description] = matches
+        }
+
+        return results
+    }
+
+    /// Sequential implementation of findMultiple for small batches.
+    private func findMultipleSequential(_ queries: [SymbolQuery]) async throws -> [String: [SymbolMatch]] {
+        var results: [String: [SymbolMatch]] = [:]
+        results.reserveCapacity(queries.count)
 
         for query in queries {
             let matches = try await find(query)
@@ -333,6 +380,11 @@ extension SymbolFinder {
     ///
     /// - Note: SAFETY: Lock is acquired for the duration of all IndexStore calls.
     public func findReferencedUSRs(_ usrs: [String]) -> Set<String> {
+        findReferencedUSRsSync(usrs)
+    }
+
+    /// Synchronous implementation that acquires lock once for all USRs.
+    private func findReferencedUSRsSync(_ usrs: [String]) -> Set<String> {
         guard let indexResolver else {
             return []
         }
@@ -350,6 +402,89 @@ extension SymbolFinder {
             }
         }
 
+        return referenced
+    }
+
+    /// Minimum number of USRs required to enable chunked parallel processing.
+    private static let usrChunkThreshold = 50
+
+    /// Chunk size for parallel USR processing.
+    /// Chosen to balance lock contention vs parallelism overhead.
+    private static let usrChunkSize = 100
+
+    /// Checks if any of the given symbols have references using parallel chunked processing.
+    ///
+    /// - Parameters:
+    ///   - usrs: Array of USRs to check.
+    ///   - parallelMode: Parallel execution mode.
+    /// - Returns: Set of USRs that have references.
+    ///
+    /// - Note: For large USR sets (>50), processes USRs in chunks of 100 to balance
+    ///   lock contention against parallelism overhead. Each chunk acquires the lock
+    ///   once for all USRs in that chunk.
+    ///
+    /// - Complexity: O(n) where n is USRs. With parallelization, effective time
+    ///   is O(n / (cores * chunkSize)) * chunkProcessingTime.
+    public func findReferencedUSRs(
+        _ usrs: [String],
+        parallelMode: ParallelMode
+    ) async -> Set<String> {
+        guard indexResolver != nil else {
+            return []
+        }
+
+        guard !usrs.isEmpty else { return [] }
+
+        // Use sequential execution for small batches or when parallelization is disabled
+        if usrs.count < Self.usrChunkThreshold || parallelMode == .none {
+            return findReferencedUSRsSync(usrs)
+        }
+
+        // Split into chunks for parallel processing
+        let chunks = stride(from: 0, to: usrs.count, by: Self.usrChunkSize).map { startIndex in
+            let endIndex = min(startIndex + Self.usrChunkSize, usrs.count)
+            return Array(usrs[startIndex..<endIndex])
+        }
+
+        let concurrency = parallelMode.toConcurrencyConfiguration()
+
+        // Process chunks in parallel, each chunk uses synchronous helper
+        let chunkResults = await ParallelProcessor.compactMap(
+            chunks,
+            maxConcurrency: concurrency.maxConcurrentTasks
+        ) { [self] chunk -> Set<String>? in
+            // Use synchronous helper to avoid async context issues with NSLock
+            let referenced = self.checkReferencesForChunkSync(chunk)
+            return referenced.isEmpty ? nil : referenced
+        }
+
+        // Combine results from all chunks
+        var allReferenced = Set<String>()
+        for chunkSet in chunkResults {
+            allReferenced.formUnion(chunkSet)
+        }
+
+        return allReferenced
+    }
+
+    /// Synchronous helper for checking references in a chunk.
+    ///
+    /// - Parameter chunk: Array of USRs to check.
+    /// - Returns: Set of USRs that have references.
+    ///
+    /// - Note: SAFETY: Lock is acquired for the entire chunk.
+    private func checkReferencesForChunkSync(_ chunk: [String]) -> Set<String> {
+        guard let indexResolver else { return [] }
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        var referenced = Set<String>()
+        for usr in chunk {
+            if indexResolver.hasReferencesSync(usr: usr) {
+                referenced.insert(usr)
+            }
+        }
         return referenced
     }
 }

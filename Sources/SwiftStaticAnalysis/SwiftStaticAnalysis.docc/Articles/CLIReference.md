@@ -198,6 +198,21 @@ swa symbol [OPTIONS] <QUERY> <PATHS>...
 | `--limit <N>` | Maximum results to return | - |
 | `-f, --format <FORMAT>` | Output format: `text`, `json`, `xcode` | `text` |
 
+#### Context Options
+
+Extract contextual information around matched symbols:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--context-lines <N>` | Lines of context before and after symbol | - |
+| `--context-before <N>` | Lines of context before symbol | - |
+| `--context-after <N>` | Lines of context after symbol | - |
+| `--context-scope` | Include containing scope information | `false` |
+| `--context-signature` | Include complete signature | `false` |
+| `--context-body` | Include declaration body | `false` |
+| `--context-documentation` | Include documentation comments | `false` |
+| `--context-all` | Include all context information | `false` |
+
 #### Query Patterns
 
 | Pattern | Example | Description |
@@ -237,6 +252,21 @@ swa symbol NetworkManager --index-store-path .build/debug/index/store Sources/
 
 # JSON output for tooling
 swa symbol "APIClient" --format json Sources/
+
+# Show 3 lines of context before and after
+swa symbol "NetworkManager" --context-lines 3 Sources/
+
+# Include documentation and signature
+swa symbol "fetchData" --context-documentation --context-signature Sources/
+
+# Show containing scope
+swa symbol "processItem" --context-scope Sources/
+
+# Include function body
+swa symbol "validate" --context-body Sources/
+
+# All context in JSON format (for LLM prompts)
+swa symbol "CacheManager" --context-all --format json Sources/
 ```
 
 ## Configuration File
@@ -476,7 +506,9 @@ swift package plugin analyze
 
 ## See Also
 
-- ``GettingStarted``
-- ``UnusedCodeDetection``
-- ``CloneDetection``
-- ``CIIntegration``
+- <doc:GettingStarted>
+- <doc:UnusedCodeDetection>
+- <doc:CloneDetection>
+- <doc:SymbolLookup>
+- <doc:MCPServer>
+- <doc:CIIntegration>

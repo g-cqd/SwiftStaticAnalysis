@@ -203,7 +203,7 @@ public struct UnusedConfiguration: Codable, Sendable, Equatable {
         if let legacy = parallel {
             return ParallelMode.from(legacyParallel: legacy)
         }
-        return .none
+        return .maximum
     }
 }
 
@@ -277,6 +277,6 @@ public struct DuplicatesConfiguration: Codable, Sendable, Equatable {
         if let legacy = parallel {
             return ParallelMode.from(legacyParallel: legacy)
         }
-        return .none
+        return .maximum
     }
 }
