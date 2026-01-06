@@ -66,13 +66,8 @@ public struct SymbolContext: Sendable, Codable, Equatable {
 
     /// Whether this context has any data.
     public var isEmpty: Bool {
-        linesBefore.isEmpty &&
-        linesAfter.isEmpty &&
-        scopeContent == nil &&
-        completeSignature == nil &&
-        body == nil &&
-        documentation == nil &&
-        declarationSource == nil
+        linesBefore.isEmpty && linesAfter.isEmpty && scopeContent == nil && completeSignature == nil && body == nil
+            && documentation == nil && declarationSource == nil
     }
 }
 
@@ -365,12 +360,7 @@ public struct SymbolContextConfiguration: Sendable, Codable, Equatable {
 
     /// Whether any context extraction is configured.
     public var wantsContext: Bool {
-        linesBefore > 0 ||
-        linesAfter > 0 ||
-        includeScope ||
-        includeSignature ||
-        includeBody ||
-        includeDocumentation
+        linesBefore > 0 || linesAfter > 0 || includeScope || includeSignature || includeBody || includeDocumentation
     }
 
     /// Whether line context is requested.

@@ -165,7 +165,8 @@ public enum CodebaseContextError: Error, LocalizedError, Sendable {
         case .enumerationFailed(let path):
             return "Failed to enumerate files in: '\(path)'"
         case .noCodebaseSpecified:
-            return "No codebase path specified. Please provide 'codebase_path' parameter or start the server with a default path."
+            return
+                "No codebase path specified. Please provide 'codebase_path' parameter or start the server with a default path."
         }
     }
 }

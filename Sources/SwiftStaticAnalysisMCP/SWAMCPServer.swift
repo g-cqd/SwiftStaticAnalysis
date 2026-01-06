@@ -139,7 +139,7 @@ extension SWAMCPServer {
                 inputSchema: .object([
                     "type": .string("object"),
                     "properties": .object([
-                        "codebase_path": codebasePathProperty,
+                        "codebase_path": codebasePathProperty
                     ]),
                     "required": .array([]),
                 ])

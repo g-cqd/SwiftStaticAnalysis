@@ -167,10 +167,9 @@ public final class ScopeNodeFinder: SyntaxVisitor {
         let endLoc = node.endLocation(converter: converter)
 
         // Check if target is within this node's range
-        let startsBeforeOrAt = startLoc.line < targetLine ||
-            (startLoc.line == targetLine && startLoc.column <= targetColumn)
-        let endsAfterOrAt = endLoc.line > targetLine ||
-            (endLoc.line == targetLine && endLoc.column >= targetColumn)
+        let startsBeforeOrAt =
+            startLoc.line < targetLine || (startLoc.line == targetLine && startLoc.column <= targetColumn)
+        let endsAfterOrAt = endLoc.line > targetLine || (endLoc.line == targetLine && endLoc.column >= targetColumn)
 
         if startsBeforeOrAt && endsAfterOrAt {
             scopeStack.append(node)

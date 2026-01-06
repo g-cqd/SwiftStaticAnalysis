@@ -139,7 +139,8 @@ public actor FileContentCache {
             return true
         }
 
-        guard let currentDate = try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate] as? Date else {
+        guard let currentDate = try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate] as? Date
+        else {
             // Can't get current date, assume valid
             return true
         }

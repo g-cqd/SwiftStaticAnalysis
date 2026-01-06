@@ -22,46 +22,46 @@ struct SWAMCPServerTests {
         // Create main source file
         let mainFile = tempDir.appendingPathComponent("Main.swift")
         try """
-            import Foundation
+        import Foundation
 
-            class NetworkManager {
-                static let shared = NetworkManager()
-                private init() {}
+        class NetworkManager {
+            static let shared = NetworkManager()
+            private init() {}
 
-                func fetch(id: Int) -> Data {
-                    Data()
-                }
-
-                func fetch(name: String) -> Data {
-                    Data()
-                }
+            func fetch(id: Int) -> Data {
+                Data()
             }
 
-            func unusedFunction() {
-                print("never called")
+            func fetch(name: String) -> Data {
+                Data()
             }
+        }
 
-            let globalConstant = 42
-            """.write(to: mainFile, atomically: true, encoding: .utf8)
+        func unusedFunction() {
+            print("never called")
+        }
+
+        let globalConstant = 42
+        """.write(to: mainFile, atomically: true, encoding: .utf8)
 
         // Create a duplicate file for clone detection
         let utilsFile = tempDir.appendingPathComponent("Utils.swift")
         try """
-            import Foundation
+        import Foundation
 
-            class CacheManager {
-                static let shared = CacheManager()
-                private init() {}
+        class CacheManager {
+            static let shared = CacheManager()
+            private init() {}
 
-                func fetch(id: Int) -> Data {
-                    Data()
-                }
+            func fetch(id: Int) -> Data {
+                Data()
             }
+        }
 
-            func helperFunction() -> Int {
-                return 42
-            }
-            """.write(to: utilsFile, atomically: true, encoding: .utf8)
+        func helperFunction() -> Int {
+            return 42
+        }
+        """.write(to: utilsFile, atomically: true, encoding: .utf8)
 
         return tempDir.path
     }
@@ -257,7 +257,6 @@ struct SWAMCPServerTests {
         #expect(error.localizedDescription.contains("outside"))
     }
 }
-
 
 // MARK: - Tool Schema Tests
 

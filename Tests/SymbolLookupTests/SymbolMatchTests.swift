@@ -179,7 +179,7 @@ struct SymbolMatchUnitTests {
             source: .syntaxTree
         )
 
-        var dict = [SymbolMatch: String]()
+        var dict: [SymbolMatch: String] = [:]
         dict[match1] = "first"
         dict[match2] = "second"
 

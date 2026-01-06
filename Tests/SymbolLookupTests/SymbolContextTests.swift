@@ -361,12 +361,13 @@ struct SymbolContextExtractorTests {
     func parseDocWithThrows() {
         let extractor = SymbolContextExtractor()
 
-        let doc = extractor.parseDocumentation(rawComment: """
-            /// Loads a resource.
-            /// - Parameter name: Resource name.
-            /// - Throws: ResourceError if not found.
-            /// - Returns: The loaded resource.
-            """)
+        let doc = extractor.parseDocumentation(
+            rawComment: """
+                /// Loads a resource.
+                /// - Parameter name: Resource name.
+                /// - Throws: ResourceError if not found.
+                /// - Returns: The loaded resource.
+                """)
 
         #expect(doc.summary == "Loads a resource.")
         #expect(doc.parameters.count == 1)
@@ -378,10 +379,11 @@ struct SymbolContextExtractorTests {
     func parseDocWithNotes() {
         let extractor = SymbolContextExtractor()
 
-        let doc = extractor.parseDocumentation(rawComment: """
-            /// Main function.
-            /// - Note: Must be called on main thread.
-            """)
+        let doc = extractor.parseDocumentation(
+            rawComment: """
+                /// Main function.
+                /// - Note: Must be called on main thread.
+                """)
 
         #expect(doc.summary == "Main function.")
         #expect(doc.notes.count == 1)

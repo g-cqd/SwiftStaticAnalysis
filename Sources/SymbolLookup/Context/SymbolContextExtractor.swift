@@ -202,22 +202,24 @@ extension SymbolContextExtractor {
         var before: [SourceLine] = []
         let startBefore = max(0, lineIndex - linesBefore)
         for i in startBefore..<lineIndex where i < lines.count {
-            before.append(SourceLine(
-                lineNumber: i + 1,
-                content: lines[i],
-                isHighlighted: false
-            ))
+            before.append(
+                SourceLine(
+                    lineNumber: i + 1,
+                    content: lines[i],
+                    isHighlighted: false
+                ))
         }
 
         // Extract lines after (including and after the symbol line)
         var after: [SourceLine] = []
         let endAfter = min(lines.count, lineIndex + linesAfter + 1)
         for i in lineIndex..<endAfter {
-            after.append(SourceLine(
-                lineNumber: i + 1,
-                content: lines[i],
-                isHighlighted: i == lineIndex
-            ))
+            after.append(
+                SourceLine(
+                    lineNumber: i + 1,
+                    content: lines[i],
+                    isHighlighted: i == lineIndex
+                ))
         }
 
         return (before, after)
@@ -337,7 +339,8 @@ extension SymbolContextExtractor {
             // Check for - Returns:
             if lowercased.hasPrefix("- returns:") || lowercased.hasPrefix("- return:") {
                 inSummary = false
-                returns = String(line.dropFirst(lowercased.hasPrefix("- returns:") ? 10 : 9)).trimmingCharacters(in: .whitespaces)
+                returns = String(line.dropFirst(lowercased.hasPrefix("- returns:") ? 10 : 9)).trimmingCharacters(
+                    in: .whitespaces)
                 continue
             }
 
@@ -408,9 +411,9 @@ extension SymbolContextExtractor {
 
         // - Parameters:
         //   - name: description
-        if lowercased.hasPrefix("- ") && !lowercased.hasPrefix("- parameter") &&
-           !lowercased.hasPrefix("- returns") && !lowercased.hasPrefix("- throws") &&
-           !lowercased.hasPrefix("- note") && !lowercased.hasPrefix("- return") {
+        if lowercased.hasPrefix("- ") && !lowercased.hasPrefix("- parameter") && !lowercased.hasPrefix("- returns")
+            && !lowercased.hasPrefix("- throws") && !lowercased.hasPrefix("- note") && !lowercased.hasPrefix("- return")
+        {
             let rest = String(line.dropFirst(2))
             if let colonIndex = rest.firstIndex(of: ":") {
                 let name = String(rest[..<colonIndex]).trimmingCharacters(in: .whitespaces)
