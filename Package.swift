@@ -54,10 +54,23 @@ let package = Package(
             name: "StaticAnalysisCommandPlugin",
             targets: ["StaticAnalysisCommandPlugin"]
         ),
+
+        // MCP server library
+        .library(
+            name: "SwiftStaticAnalysisMCP",
+            targets: ["SwiftStaticAnalysisMCP"]
+        ),
+
+        // MCP server executable
+        .executable(
+            name: "swa-mcp",
+            targets: ["swa-mcp"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.10.0"),
         .package(
             url: "https://github.com/swiftlang/indexstore-db.git", revision: "cb3b960568f18a3cc018923f5824323b5c4edd0b"),
         .package(url: "https://github.com/swiftlang/swift-format.git", from: "602.0.0"),
@@ -184,6 +197,31 @@ let package = Package(
             ]
         ),
 
+        // MARK: - MCP Server
+        .target(
+            name: "SwiftStaticAnalysisMCP",
+            dependencies: [
+                "SwiftStaticAnalysis",
+                .product(name: "MCP", package: "swift-sdk"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+                .enableExperimentalFeature("StrictConcurrency"),
+            ]
+        ),
+
+        .executableTarget(
+            name: "swa-mcp",
+            dependencies: [
+                "SwiftStaticAnalysisMCP",
+                .product(name: "MCP", package: "swift-sdk"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+                .enableExperimentalFeature("StrictConcurrency"),
+            ]
+        ),
+
         // MARK: - Tests
         .testTarget(
             name: "SwiftStaticAnalysisCoreTests",
@@ -221,6 +259,13 @@ let package = Package(
                 "UnusedCodeDetector",
                 "SymbolLookup",
             ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "SwiftStaticAnalysisMCPTests",
+            dependencies: ["SwiftStaticAnalysisMCP"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]
