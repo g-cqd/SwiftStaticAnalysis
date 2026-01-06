@@ -406,18 +406,29 @@ jobs:
 
       - name: Build Universal Binary
         run: |
+          # Build arm64
           swift build -c release --arch arm64
           cp .build/arm64-apple-macosx/release/swa .build/swa-arm64
+          cp .build/arm64-apple-macosx/release/swa-mcp .build/swa-mcp-arm64
 
+          # Build x86_64
           swift build -c release --arch x86_64
           cp .build/x86_64-apple-macosx/release/swa .build/swa-x86_64
+          cp .build/x86_64-apple-macosx/release/swa-mcp .build/swa-mcp-x86_64
 
+          # Create Universal Binaries
           mkdir -p .build/release
+          
           lipo -create -output .build/release/swa \
             .build/swa-arm64 \
             .build/swa-x86_64
 
+          lipo -create -output .build/release/swa-mcp \
+            .build/swa-mcp-arm64 \
+            .build/swa-mcp-x86_64
+
           lipo -info .build/release/swa
+          lipo -info .build/release/swa-mcp
 
       - name: Package Binaries
         run: |
@@ -427,10 +438,14 @@ jobs:
           for ARCH in universal arm64 x86_64; do
             if [[ "$ARCH" == "universal" ]]; then
               cp .build/release/swa release/swa
+              cp .build/release/swa-mcp release/swa-mcp
             else
               cp .build/swa-$ARCH release/swa
+              cp .build/swa-mcp-$ARCH release/swa-mcp
             fi
+            
             tar -C release -czvf "release/swa-${VERSION}-macos-${ARCH}.tar.gz" swa
+            tar -C release -czvf "release/swa-mcp-${VERSION}-macos-${ARCH}.tar.gz" swa-mcp
           done
 
           cd release && shasum -a 256 *.tar.gz > checksums.txt
@@ -461,11 +476,20 @@ jobs:
           .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "${VERSION}")
           \`\`\`
 
-          **Pre-built Binary (macOS):**
+          **Pre-built Binaries (macOS):**
+          
+          **CLI Tool (swa):**
           \`\`\`bash
           # Universal (Apple Silicon + Intel)
           curl -L https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/${TAG}/swa-${VERSION}-macos-universal.tar.gz | tar xz
           sudo mv swa /usr/local/bin/
+          \`\`\`
+
+          **MCP Server (swa-mcp):**
+          \`\`\`bash
+          # Universal (Apple Silicon + Intel)
+          curl -L https://github.com/g-cqd/SwiftStaticAnalysis/releases/download/${TAG}/swa-mcp-${VERSION}-macos-universal.tar.gz | tar xz
+          sudo mv swa-mcp /usr/local/bin/
           \`\`\`
 
           ### Checksums
@@ -485,7 +509,7 @@ jobs:
           draft: false
           prerelease: ${{ contains(needs.prepare-release.outputs.version, 'alpha') || contains(needs.prepare-release.outputs.version, 'beta') }}
           files: |
-            release/swa-${{ needs.prepare-release.outputs.version }}-macos-*.tar.gz
+            release/*.tar.gz
             release/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
