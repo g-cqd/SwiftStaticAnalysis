@@ -599,14 +599,6 @@ swift package --allow-writing-to-directory ./docs \
   --output-path ./docs
 ```
 
-## Implementation References
-
-- Parallel reachability BFS: `Sources/UnusedCodeDetector/Reachability/ParallelBFS.swift`, `PARALLEL_BFS_STUDY.md`, `PARALLEL_BFS_IMPLEMENTATION_STUDY.md`
-- Parallel clone detection: `Sources/DuplicationDetector/Parallel/ParallelMinHash.swift`, `Sources/DuplicationDetector/Parallel/ParallelLSH.swift`
-- Streaming verification and deduplication: `Sources/DuplicationDetector/Parallel/ParallelVerification.swift`, `Sources/DuplicationDetector/DuplicationDetector.swift`
-- Streaming reachability edges: `Sources/UnusedCodeDetector/Reachability/DependencyExtractor.swift`
-- Scope-aware dataflow analysis: `Sources/UnusedCodeDetector/DataFlow/CFGBuilder.swift`, `Sources/UnusedCodeDetector/DataFlow/LiveVariableAnalysis.swift`
-
 ## Performance
 
 The framework includes several performance optimizations:
