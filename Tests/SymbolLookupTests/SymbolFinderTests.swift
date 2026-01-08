@@ -2,6 +2,7 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
+import Foundation
 import SwiftStaticAnalysisCore
 import Testing
 
@@ -209,5 +210,109 @@ struct IndexStoreResolverTests {
         #expect(usr.contains("14NetworkMonitor"))
         // "shared" has 6 characters
         #expect(usr.contains("6shared"))
+    }
+}
+
+@Suite("AccessLevelExtractor Tests")
+struct AccessLevelExtractorTests {
+    /// Fixture path helper
+    private func fixturePath(_ name: String) -> String {
+        let testDir = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        return testDir.appendingPathComponent("Fixtures/SymbolLookup/\(name)").path
+    }
+
+    @Test("Extracts public access level")
+    func extractsPublicAccessLevel() {
+        let extractor = AccessLevelExtractor()
+        let file = fixturePath("SymbolVariety.swift")
+
+        // NetworkMonitor is a public class at line 23
+        let accessLevel = extractor.extractAccessLevel(file: file, line: 23, column: 1)
+
+        #expect(accessLevel == .public)
+    }
+
+    @Test("Extracts internal access level for default")
+    func extractsInternalAccessLevelForDefault() {
+        let extractor = AccessLevelExtractor()
+        let file = fixturePath("SymbolVariety.swift")
+
+        // DataManager is an internal class (no modifier) at line 40
+        let accessLevel = extractor.extractAccessLevel(file: file, line: 40, column: 1)
+
+        #expect(accessLevel == .internal)
+    }
+
+    @Test("Extracts private access level")
+    func extractsPrivateAccessLevel() {
+        let extractor = AccessLevelExtractor()
+        let file = fixturePath("SymbolVariety.swift")
+
+        // privateHelper is a private function at line 276
+        let accessLevel = extractor.extractAccessLevel(file: file, line: 276, column: 1)
+
+        #expect(accessLevel == .private)
+    }
+
+    @Test("Returns internal for non-existent file")
+    func returnsInternalForNonExistentFile() {
+        let extractor = AccessLevelExtractor()
+
+        let accessLevel = extractor.extractAccessLevel(
+            file: "/non/existent/file.swift",
+            line: 1,
+            column: 1
+        )
+
+        #expect(accessLevel == .internal)
+    }
+
+    @Test("Enriches SymbolMatch with correct access level")
+    func enrichesSymbolMatchWithCorrectAccessLevel() {
+        let extractor = AccessLevelExtractor()
+        let file = fixturePath("SymbolVariety.swift")
+
+        // Create a match with incorrect access level (simulating IndexStore result)
+        let originalMatch = SymbolMatch(
+            usr: "test:usr",
+            name: "NetworkMonitor",
+            kind: .class,
+            accessLevel: .internal,  // IndexStore would return this incorrectly
+            file: file,
+            line: 23,
+            column: 1,
+            source: .indexStore
+        )
+
+        let enrichedMatch = extractor.enrichWithAccessLevel(originalMatch)
+
+        #expect(enrichedMatch.accessLevel == .public)
+        #expect(enrichedMatch.name == originalMatch.name)
+        #expect(enrichedMatch.kind == originalMatch.kind)
+        #expect(enrichedMatch.file == originalMatch.file)
+        #expect(enrichedMatch.line == originalMatch.line)
+    }
+
+    @Test("Batch extracts access levels efficiently")
+    func batchExtractsAccessLevelsEfficiently() {
+        let extractor = AccessLevelExtractor()
+        let file = fixturePath("SymbolVariety.swift")
+
+        let locations: [(file: String, line: Int, column: Int)] = [
+            (file, 23, 1),   // public class NetworkMonitor
+            (file, 40, 1),   // internal class DataManager
+            (file, 66, 1),   // public struct User
+            (file, 276, 1),  // private func privateHelper
+        ]
+
+        let accessLevels = extractor.extractAccessLevels(for: locations)
+
+        #expect(accessLevels.count == 4)
+        #expect(accessLevels[0] == .public)
+        #expect(accessLevels[1] == .internal)
+        #expect(accessLevels[2] == .public)
+        #expect(accessLevels[3] == .private)
     }
 }

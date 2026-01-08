@@ -52,6 +52,7 @@ public final class SymbolFinder: @unchecked Sendable {
     private let lock = NSLock()
     private let indexResolver: IndexStoreResolver?
     private let syntaxResolver: SyntaxResolver
+    private let accessLevelExtractor: AccessLevelExtractor
     private let configuration: Configuration
 
     /// Configuration for the symbol finder.
@@ -97,6 +98,7 @@ public final class SymbolFinder: @unchecked Sendable {
         let reader = try IndexStoreReader(indexStorePath: indexStorePath)
         self.indexResolver = IndexStoreResolver(reader: reader)
         self.syntaxResolver = SyntaxResolver()
+        self.accessLevelExtractor = AccessLevelExtractor()
         self.configuration = configuration
     }
 
@@ -106,6 +108,7 @@ public final class SymbolFinder: @unchecked Sendable {
     public init(configuration: Configuration = .default) {
         self.indexResolver = nil
         self.syntaxResolver = SyntaxResolver()
+        self.accessLevelExtractor = AccessLevelExtractor()
         self.configuration = configuration
     }
 
@@ -126,6 +129,7 @@ public final class SymbolFinder: @unchecked Sendable {
             self.indexResolver = nil
         }
         self.syntaxResolver = SyntaxResolver()
+        self.accessLevelExtractor = AccessLevelExtractor()
         self.configuration = configuration
     }
 
@@ -145,6 +149,12 @@ extension SymbolFinder {
     public func find(_ query: SymbolQuery) async throws -> [SymbolMatch] {
         // Try IndexStore first (synchronous)
         var matches = resolveWithIndex(query.pattern)
+
+        // Enrich IndexStore results with access levels from source
+        // IndexStore doesn't expose access levels, so we extract them from the source files
+        if !matches.isEmpty {
+            matches = accessLevelExtractor.enrichWithAccessLevels(matches)
+        }
 
         // Fall back to syntax if needed (async)
         if matches.isEmpty && configuration.useSyntaxFallback && !configuration.sourceFiles.isEmpty {

@@ -241,6 +241,141 @@ struct SymbolLookupIntegrationTests {
         #expect(results.first?.accessLevel == .public)
     }
 
+    @Test("Detects public access level for public types")
+    func detectsPublicAccessLevelForPublicTypes() async throws {
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
+
+        // NetworkMonitor is declared as 'public final class'
+        let results = try await finder.findByName("NetworkMonitor")
+
+        #expect(!results.isEmpty)
+        #expect(results.first?.accessLevel == .public)
+    }
+
+    @Test("Detects internal access level for internal types")
+    func detectsInternalAccessLevelForInternalTypes() async throws {
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
+
+        // DataManager is declared without access modifier (internal by default)
+        let results = try await finder.findByName("DataManager")
+
+        #expect(!results.isEmpty)
+        #expect(results.first?.accessLevel == .internal)
+    }
+
+    @Test("Detects public access level for public enums")
+    func detectsPublicAccessLevelForPublicEnums() async throws {
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
+
+        // NetworkError is declared as 'public enum'
+        let results = try await finder.findByName("NetworkError")
+
+        #expect(!results.isEmpty)
+        #expect(results.first?.accessLevel == .public)
+    }
+
+    @Test("Detects public access level for public functions")
+    func detectsPublicAccessLevelForPublicFunctions() async throws {
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
+
+        // createDefaultUser is declared as 'public func'
+        let results = try await finder.findByName("createDefaultUser")
+
+        #expect(!results.isEmpty)
+        #expect(results.first?.accessLevel == .public)
+    }
+
+    @Test("Detects internal access level for internal functions")
+    func detectsInternalAccessLevelForInternalFunctions() async throws {
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
+
+        // internalHelper is declared as 'func' (internal by default)
+        let results = try await finder.findByName("internalHelper")
+
+        #expect(!results.isEmpty)
+        #expect(results.first?.accessLevel == .internal)
+    }
+
+    @Test("Detects private access level for private functions")
+    func detectsPrivateAccessLevelForPrivateFunctions() async throws {
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
+
+        // privateHelper is declared as 'private func'
+        let results = try await finder.findByName("privateHelper")
+
+        #expect(!results.isEmpty)
+        #expect(results.first?.accessLevel == .private)
+    }
+
+    @Test("Detects public access level for public global variables")
+    func detectsPublicAccessLevelForPublicGlobalVariables() async throws {
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
+
+        // defaultTimeout is declared as 'public let'
+        let results = try await finder.findByName("defaultTimeout")
+
+        #expect(!results.isEmpty)
+        #expect(results.first?.accessLevel == .public)
+    }
+
+    @Test("Detects internal access level for internal global variables")
+    func detectsInternalAccessLevelForInternalGlobalVariables() async throws {
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
+
+        // internalCounter is declared as 'var' (internal by default)
+        let results = try await finder.findByName("internalCounter")
+
+        #expect(!results.isEmpty)
+        #expect(results.first?.accessLevel == .internal)
+    }
+
+    @Test("Detects private access level for private global variables")
+    func detectsPrivateAccessLevelForPrivateGlobalVariables() async throws {
+        let finder = SymbolFinder(
+            configuration: .init(
+                useSyntaxFallback: true,
+                sourceFiles: [fixtureFile]
+            ))
+
+        // privateState is declared as 'private var'
+        let results = try await finder.findByName("privateState")
+
+        #expect(!results.isEmpty)
+        #expect(results.first?.accessLevel == .private)
+    }
+
     // MARK: - Multiple Results
 
     @Test("Finds multiple symbols with same name")

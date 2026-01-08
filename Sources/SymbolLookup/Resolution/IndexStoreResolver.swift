@@ -339,7 +339,7 @@ extension IndexStoreResolver {
             usr: occurrence.symbol.usr,
             name: occurrence.symbol.name,
             kind: occurrence.symbol.kind.toDeclarationKind(),
-            accessLevel: .internal,  // IndexStore doesn't expose access level
+            accessLevel: .internal,  // Placeholder: SymbolFinder enriches this from source
             file: occurrence.file,
             line: occurrence.line,
             column: occurrence.column,
