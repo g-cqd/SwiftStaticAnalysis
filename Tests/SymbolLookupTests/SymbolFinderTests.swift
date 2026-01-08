@@ -301,9 +301,9 @@ struct AccessLevelExtractorTests {
         let file = fixturePath("SymbolVariety.swift")
 
         let locations: [(file: String, line: Int, column: Int)] = [
-            (file, 23, 1),   // public class NetworkMonitor
-            (file, 40, 1),   // internal class DataManager
-            (file, 66, 1),   // public struct User
+            (file, 23, 1),  // public class NetworkMonitor
+            (file, 40, 1),  // internal class DataManager
+            (file, 66, 1),  // public struct User
             (file, 276, 1),  // private func privateHelper
         ]
 

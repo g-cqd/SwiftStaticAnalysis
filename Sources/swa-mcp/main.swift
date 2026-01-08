@@ -21,7 +21,7 @@ struct SWAMCPCommand {
 
         // Version
         if arguments.contains("--version") || arguments.contains("-v") {
-            print("swa-mcp 0.1.0")
+            print("swa-mcp 0.1.1")
             return
         }
 
