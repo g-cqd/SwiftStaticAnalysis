@@ -131,7 +131,7 @@ extension SWAMCPServer {
         ),
     ])
 
-    private static func buildToolList(defaultRootPath: String?) -> [Tool] {
+    private static func buildToolList(defaultRootPath _: String?) -> [Tool] {
         [
             Tool(
                 name: "get_codebase_info",
@@ -607,20 +607,8 @@ extension SWAMCPServer {
         let detector = UnusedCodeDetector(configuration: config)
         let results = try await detector.detectUnused(in: files)
 
-        let output = results.map { unused -> [String: Any] in
-            [
-                "name": unused.declaration.name,
-                "kind": unused.declaration.kind.rawValue,
-                "file": String(unused.declaration.location.file.dropFirst(context.rootPath.count + 1)),
-                "line": unused.declaration.location.line,
-                "reason": unused.reason.rawValue,
-                "confidence": unused.confidence.rawValue,
-                "suggestion": unused.suggestion,
-            ]
-        }
-
-        let jsonData = try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys])
-        return .init(content: [.text(String(data: jsonData, encoding: .utf8) ?? "[]")], isError: false)
+        let output = MCPTextFormatter.formatUnused(results, rootPath: context.rootPath)
+        return .init(content: [.text(output)], isError: false)
     }
 
     private func handleDetectDuplicates(_ arguments: [String: Value]?) async throws -> CallTool.Result {
@@ -669,25 +657,8 @@ extension SWAMCPServer {
         let detector = DuplicationDetector(configuration: config)
         let results = try await detector.detectClones(in: files)
 
-        let output = results.map { group -> [String: Any] in
-            [
-                "type": group.type.rawValue,
-                "similarity": group.similarity,
-                "occurrences": group.occurrences,
-                "duplicated_lines": group.duplicatedLines,
-                "clones": group.clones.map { clone -> [String: Any] in
-                    [
-                        "file": String(clone.file.dropFirst(context.rootPath.count + 1)),
-                        "start_line": clone.startLine,
-                        "end_line": clone.endLine,
-                        "token_count": clone.tokenCount,
-                    ]
-                },
-            ]
-        }
-
-        let jsonData = try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys])
-        return .init(content: [.text(String(data: jsonData, encoding: .utf8) ?? "[]")], isError: false)
+        let output = MCPTextFormatter.formatClones(results, rootPath: context.rootPath)
+        return .init(content: [.text(output)], isError: false)
     }
 
     private func handleReadFile(_ arguments: [String: Value]?) async throws -> CallTool.Result {
@@ -765,44 +736,64 @@ extension SWAMCPServer {
             matches = Array(matches.prefix(limit))
         }
 
-        // Extract context for each match if requested
-        var contextExtractor: SymbolContextExtractor?
+        // Format output with optional context
+        var output = MCPTextFormatter.formatSymbols(matches, rootPath: context.rootPath)
+
+        // Add context if requested
         if contextConfig.wantsContext {
-            contextExtractor = SymbolContextExtractor()
-        }
-
-        var output: [[String: Any]] = []
-        for decl in matches {
-            var matchOutput: [String: Any] = [
-                "name": decl.name,
-                "kind": decl.kind.rawValue,
-                "access_level": decl.accessLevel.rawValue,
-                "file": String(decl.location.file.dropFirst(context.rootPath.count + 1)),
-                "line": decl.location.line,
-                "column": decl.location.column,
-            ]
-
-            // Add context if requested and extractor is available
-            if let extractor = contextExtractor, contextConfig.wantsContext {
-                // Create a SymbolMatch from the Declaration for context extraction
-                let symbolMatch = SymbolMatch.from(
-                    declaration: decl,
-                    source: .syntaxTree
-                )
-
+            let extractor = SymbolContextExtractor()
+            for decl in matches {
+                let symbolMatch = SymbolMatch.from(declaration: decl, source: .syntaxTree)
                 if let symbolContext = try? await extractor.extractContext(
                     for: symbolMatch,
                     configuration: contextConfig
                 ) {
-                    matchOutput["context"] = buildContextOutput(symbolContext)
+                    output += formatContext(symbolContext)
                 }
             }
-
-            output.append(matchOutput)
         }
 
-        let jsonData = try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys])
-        return .init(content: [.text(String(data: jsonData, encoding: .utf8) ?? "[]")], isError: false)
+        return .init(content: [.text(output)], isError: false)
+    }
+
+    /// Format symbol context in compact text.
+    private func formatContext(_ ctx: SymbolContext) -> String {
+        var output = ""
+
+        if let doc = ctx.documentation, doc.hasContent {
+            if let summary = doc.summary {
+                output += "\n    /// \(summary)"
+            }
+            for param in doc.parameters {
+                output += "\n    /// @param \(param.name): \(param.description)"
+            }
+            if let returns = doc.returns {
+                output += "\n    /// @returns \(returns)"
+            }
+        }
+
+        if let sig = ctx.completeSignature {
+            output += "\n    sig: \(sig)"
+        }
+
+        for line in ctx.linesBefore {
+            output += "\n    \(line.lineNumber): \(line.content)"
+        }
+        for line in ctx.linesAfter {
+            output += "\n    \(line.lineNumber): \(line.content)"
+        }
+
+        if let body = ctx.body {
+            for line in body.split(separator: "\n", omittingEmptySubsequences: false) {
+                output += "\n    | \(line)"
+            }
+        }
+
+        if let scope = ctx.scopeContent {
+            output += "\n    in: \(scope.kind.rawValue) \(scope.name ?? "") L\(scope.startLine)-\(scope.endLine)"
+        }
+
+        return output
     }
 
     /// Build a SymbolContextConfiguration from MCP arguments.
@@ -825,61 +816,6 @@ extension SWAMCPServer {
         )
     }
 
-    /// Build context output dictionary for JSON serialization.
-    private func buildContextOutput(_ context: SymbolContext) -> [String: Any] {
-        var output: [String: Any] = [:]
-
-        if !context.linesBefore.isEmpty {
-            output["lines_before"] = context.linesBefore.map { line in
-                ["line_number": line.lineNumber, "content": line.content]
-            }
-        }
-
-        if !context.linesAfter.isEmpty {
-            output["lines_after"] = context.linesAfter.map { line in
-                ["line_number": line.lineNumber, "content": line.content]
-            }
-        }
-
-        if let scope = context.scopeContent {
-            output["scope"] = [
-                "kind": scope.kind.rawValue,
-                "name": scope.name as Any,
-                "start_line": scope.startLine,
-                "end_line": scope.endLine,
-            ]
-        }
-
-        if let signature = context.completeSignature {
-            output["signature"] = signature
-        }
-
-        if let body = context.body {
-            output["body"] = body
-        }
-
-        if let doc = context.documentation, doc.hasContent {
-            var docOutput: [String: Any] = [:]
-            if let summary = doc.summary {
-                docOutput["summary"] = summary
-            }
-            if !doc.parameters.isEmpty {
-                docOutput["parameters"] = doc.parameters.map { param in
-                    ["name": param.name, "description": param.description]
-                }
-            }
-            if let returns = doc.returns {
-                docOutput["returns"] = returns
-            }
-            if let throwsDoc = doc.throws {
-                docOutput["throws"] = throwsDoc
-            }
-            output["documentation"] = docOutput
-        }
-
-        return output
-    }
-
     private func handleAnalyzeFile(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         guard let args = arguments, let path = args["path"]?.stringValue else {
             return .init(content: [.text("Missing required parameter: path")], isError: true)
@@ -893,7 +829,6 @@ extension SWAMCPServer {
         let includeReferences = args["include_references"]?.boolValue ?? true
         let maxReferences = args["max_references"]?.intValue ?? 100
         let includeImports = args["include_imports"]?.boolValue ?? true
-        let includeScopes = args["include_scopes"]?.boolValue ?? false
 
         // Parse declaration kind filters
         var kindFilters: Set<DeclarationKind>?
@@ -908,78 +843,27 @@ extension SWAMCPServer {
         let analyzer = StaticAnalyzer()
         let result = try await analyzer.analyze([validatedPath])
 
-        var output: [String: Any] = [
-            "file": String(validatedPath.dropFirst(context.rootPath.count + 1)),
-            "declaration_count": result.declarations.declarations.count,
-            "reference_count": result.references.references.count,
-        ]
+        var declarations = result.declarations.declarations
 
-        if includeDeclarations {
-            var declarations = result.declarations.declarations
-
-            // Filter by kind if specified
-            if let filters = kindFilters {
-                declarations = declarations.filter { filters.contains($0.kind) }
-            }
-
-            // Filter out imports if requested
-            if !includeImports {
-                declarations = declarations.filter { $0.kind != .import }
-            }
-
-            let declarationsOutput = declarations.map { decl -> [String: Any] in
-                var declOutput: [String: Any] = [
-                    "name": decl.name,
-                    "kind": decl.kind.rawValue,
-                    "access_level": decl.accessLevel.rawValue,
-                    "line": decl.location.line,
-                ]
-
-                // Include scope info if requested
-                if includeScopes {
-                    declOutput["scope_id"] = decl.scope.id
-                }
-
-                // Include additional metadata for better context
-                if !decl.genericParameters.isEmpty {
-                    declOutput["generic_parameters"] = decl.genericParameters
-                }
-                if let sig = decl.signature {
-                    declOutput["signature"] = sig.displayString
-                }
-
-                return declOutput
-            }
-            output["declarations"] = declarationsOutput
+        // Filter by kind if specified
+        if let filters = kindFilters {
+            declarations = declarations.filter { filters.contains($0.kind) }
         }
 
-        if includeReferences {
-            let references = result.references.references.prefix(maxReferences).map { ref -> [String: Any] in
-                [
-                    "identifier": ref.identifier,
-                    "context": ref.context.rawValue,
-                    "line": ref.location.line,
-                ]
-            }
-            output["references"] = Array(references)
+        // Filter out imports if requested
+        if !includeImports {
+            declarations = declarations.filter { $0.kind != .import }
         }
 
-        // Include scope hierarchy if requested
-        if includeScopes {
-            let scopes = result.scopes.scopes.values.map { scope -> [String: Any] in
-                [
-                    "id": scope.id.id,
-                    "kind": scope.kind.rawValue,
-                    "name": scope.name ?? "",
-                    "line": scope.location.line,
-                    "parent_id": scope.parent?.id as Any,
-                ]
-            }
-            output["scopes"] = scopes
-        }
+        let refs = includeReferences ? Array(result.references.references.prefix(maxReferences)) : []
+        let output = MCPTextFormatter.formatFileAnalysis(
+            file: validatedPath,
+            declarations: includeDeclarations ? declarations : [],
+            references: refs,
+            rootPath: context.rootPath
+        )
 
-        let jsonData = try JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys])
-        return .init(content: [.text(String(data: jsonData, encoding: .utf8) ?? "{}")], isError: false)
+        return .init(content: [.text(output)], isError: false)
     }
 }
 
@@ -1085,6 +969,152 @@ extension Value {
         switch self {
         case .array(let value): return value
         default: return nil
+        }
+    }
+}
+
+// MARK: - Compact Text Formatters
+
+/// Text formatting utilities optimized for LLM consumption.
+/// Grouped by file, minimal markup, positional semantics.
+enum MCPTextFormatter {
+    /// Format unused code results in compact text.
+    static func formatUnused(_ unused: [UnusedCode], rootPath: String) -> String {
+        if unused.isEmpty { return "UNUSED 0 items\n(none)" }
+
+        var output = "UNUSED \(unused.count) items"
+
+        // Group by file
+        let byFile = Dictionary(grouping: unused) { $0.declaration.location.file }
+        let sortedFiles = byFile.keys.sorted()
+
+        for file in sortedFiles {
+            guard let items = byFile[file] else { continue }
+            let sortedItems = items.sorted { $0.declaration.location.line < $1.declaration.location.line }
+            let relativePath = file.hasPrefix(rootPath) ? String(file.dropFirst(rootPath.count + 1)) : file
+
+            output += "\n\n\(relativePath)"
+            for item in sortedItems {
+                let d = item.declaration
+                let conf = String(item.confidence.rawValue.prefix(1)).uppercased()
+                let reason = shortReason(item.reason)
+                output += "\n  \(d.location.line) \(d.kind.rawValue) \(d.name) [\(conf)] \(reason)"
+            }
+        }
+        return output
+    }
+
+    /// Format clone groups in compact text.
+    static func formatClones(_ clones: [CloneGroup], rootPath: String) -> String {
+        if clones.isEmpty { return "CLONES 0 groups\n(none)" }
+
+        var output = "CLONES \(clones.count) groups"
+
+        // Group by type
+        let byType = Dictionary(grouping: clones) { $0.type }
+
+        for type in [CloneType.exact, .near, .semantic] {
+            guard let groups = byType[type], !groups.isEmpty else { continue }
+
+            let totalLines = groups.reduce(0) { $0 + $1.duplicatedLines }
+            output += "\n\n\(type.rawValue) \(groups.count) groups \(totalLines) duplicated lines"
+
+            for (index, group) in groups.enumerated() {
+                let simStr = group.similarity < 1.0 ? " \(Int(group.similarity * 100))%" : ""
+                let linesPerOccurrence = group.duplicatedLines / max(1, group.occurrences - 1)
+                output += "\n  [\(index + 1)]\(simStr) \(group.occurrences)x \(linesPerOccurrence)L"
+
+                // Group by file
+                let byFile = Dictionary(grouping: group.clones) { $0.file }
+                for (file, fileClones) in byFile.sorted(by: { $0.key < $1.key }) {
+                    let relativePath = file.hasPrefix(rootPath) ? String(file.dropFirst(rootPath.count + 1)) : file
+                    let ranges = fileClones.map { "\($0.startLine)-\($0.endLine)" }.joined(separator: " ")
+                    output += "\n    \(relativePath): \(ranges)"
+                }
+            }
+        }
+        return output
+    }
+
+    /// Format symbol matches in compact text.
+    static func formatSymbols(_ matches: [Declaration], rootPath: String) -> String {
+        if matches.isEmpty { return "SYMBOLS 0 matches\n(none)" }
+
+        var output = "SYMBOLS \(matches.count) matches"
+
+        // Group by file
+        let byFile = Dictionary(grouping: matches) { $0.location.file }
+        let sortedFiles = byFile.keys.sorted()
+
+        for file in sortedFiles {
+            guard let fileMatches = byFile[file] else { continue }
+            let sorted = fileMatches.sorted { $0.location.line < $1.location.line }
+            let relativePath = file.hasPrefix(rootPath) ? String(file.dropFirst(rootPath.count + 1)) : file
+
+            output += "\n\n\(relativePath)"
+            for match in sorted {
+                var line = "  \(match.location.line):\(match.location.column) \(match.kind.rawValue) \(match.name)"
+                if !match.genericParameters.isEmpty {
+                    line += "<\(match.genericParameters.joined(separator: ","))>"
+                }
+                line += " \(match.accessLevel.rawValue)"
+                if let sig = match.signature {
+                    line += " \(sig.selectorString)"
+                }
+                output += "\n\(line)"
+            }
+        }
+        return output
+    }
+
+    /// Format file analysis in compact text.
+    static func formatFileAnalysis(
+        file: String,
+        declarations: [Declaration],
+        references: [Reference],
+        rootPath: String
+    ) -> String {
+        let relativePath = file.hasPrefix(rootPath) ? String(file.dropFirst(rootPath.count + 1)) : file
+        var output = "FILE \(relativePath)\ndecl: \(declarations.count)  ref: \(references.count)"
+
+        if !declarations.isEmpty {
+            output += "\n\nDECLARATIONS"
+            let byKind = Dictionary(grouping: declarations) { $0.kind }
+            for kind in byKind.keys.sorted(by: { $0.rawValue < $1.rawValue }) {
+                guard let kindDecls = byKind[kind] else { continue }
+                let sorted = kindDecls.sorted { $0.location.line < $1.location.line }
+                for d in sorted {
+                    var line = "  \(d.location.line) \(d.kind.rawValue) \(d.name) \(d.accessLevel.rawValue)"
+                    if let sig = d.signature {
+                        line += " \(sig.selectorString)"
+                    }
+                    output += "\n\(line)"
+                }
+            }
+        }
+
+        if !references.isEmpty {
+            output += "\n\nREFERENCES"
+            let byIdent = Dictionary(grouping: references.prefix(100)) { $0.identifier }
+            for (ident, refs) in byIdent.sorted(by: { $0.key < $1.key }) {
+                let lines = refs.map { String($0.location.line) }.joined(separator: " ")
+                output += "\n  \(ident): \(lines)"
+            }
+            if references.count > 100 {
+                output += "\n  ... (\(references.count - 100) more)"
+            }
+        }
+
+        return output
+    }
+
+    private static func shortReason(_ reason: UnusedReason) -> String {
+        switch reason {
+        case .neverReferenced: return "unused"
+        case .onlyAssigned: return "written-only"
+        case .onlySelfReferenced: return "self-ref"
+        case .importNotUsed: return "unused-import"
+        case .parameterUnused: return "unused-param"
         }
     }
 }

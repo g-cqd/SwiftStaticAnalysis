@@ -16,7 +16,7 @@ struct SWA: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "swa",
         abstract: "Swift Static Analysis - Analyze Swift code for issues",
-        version: "0.1.1",
+        version: "0.1.2",
         subcommands: [
             Analyze.self,
             Duplicates.self,
@@ -100,12 +100,10 @@ struct Analyze: AsyncParsableCommand {
     }
 
     private func outputText(clones: [CloneGroup], unused: [UnusedCode]) {
-        print("\n=== Duplication Report ===")
-        print("Clone groups found: \(clones.count)")
+        print("CLONES \(clones.count) groups")
         OutputFormatter.printCloneGroupsText(clones)
 
-        print("\n=== Unused Code Report ===")
-        print("Unused items found: \(unused.count)")
+        print("\nUNUSED \(unused.count) items")
         OutputFormatter.printUnusedText(unused)
     }
 
@@ -201,7 +199,7 @@ struct Duplicates: AsyncParsableCommand {
 
         switch format {
         case .text:
-            print("Found \(clones.count) clone group(s)")
+            print("CLONES \(clones.count) groups")
             OutputFormatter.printCloneGroupsText(clones)
 
         case .json:
@@ -411,7 +409,7 @@ struct Unused: AsyncParsableCommand {
 
         switch format {
         case .text:
-            print("Found \(unused.count) potentially unused item(s)")
+            print("UNUSED \(unused.count) items")
             OutputFormatter.printUnusedText(unused)
 
         case .json:
@@ -586,10 +584,8 @@ struct Symbol: AsyncParsableCommand {
 
         switch format {
         case .text:
-            print("Found \(matches.count) symbol(s):\n")
-            for match in matches {
-                outputMatchText(match, context: contexts[match])
-            }
+            print("SYMBOLS \(matches.count) matches for '\(query)'")
+            OutputFormatter.printSymbolsText(matches, contexts: contexts)
 
         case .json:
             outputMatchesJSON(matches, contexts: contexts)
@@ -599,97 +595,6 @@ struct Symbol: AsyncParsableCommand {
                 let desc = "\(match.kind.rawValue) '\(match.name)'"
                 print("\(match.file):\(match.line):\(match.column): note: \(desc)")
             }
-        }
-    }
-
-    private func outputMatchText(_ match: SymbolMatch, context: SymbolContext?) {
-        // Build symbol name with optional signature
-        var symbolName = match.name
-        if !match.genericParameters.isEmpty {
-            symbolName += "<\(match.genericParameters.joined(separator: ", "))>"
-        }
-        if let sig = match.signature {
-            symbolName += sig.selectorString
-        }
-
-        var line = "\(match.kind.rawValue) \(symbolName)"
-        if let containingType = match.containingType {
-            line = "\(containingType).\(line)"
-        }
-        print("  \(line)")
-        print("    Location: \(match.file):\(match.line):\(match.column)")
-        print("    Access: \(match.accessLevel.rawValue)")
-        if let sig = match.signature {
-            print("    Signature: \(sig.displayString)")
-        }
-        if let usr = match.usr {
-            print("    USR: \(usr)")
-        }
-
-        // Output context if available
-        if let ctx = context, !ctx.isEmpty {
-            print()
-            outputContextText(ctx)
-        }
-        print()
-    }
-
-    private func outputContextText(_ context: SymbolContext) {
-        // Documentation
-        if let doc = context.documentation, doc.hasContent {
-            print("    Documentation:")
-            if let summary = doc.summary {
-                print("      \(summary)")
-            }
-            for param in doc.parameters {
-                print("      - Parameter \(param.name): \(param.description)")
-            }
-            if let returns = doc.returns {
-                print("      - Returns: \(returns)")
-            }
-            if let throwsDoc = doc.throws {
-                print("      - Throws: \(throwsDoc)")
-            }
-        }
-
-        // Complete signature
-        if let sig = context.completeSignature {
-            print("    Complete Signature:")
-            print("      \(sig)")
-        }
-
-        // Line context
-        if !context.linesBefore.isEmpty || !context.linesAfter.isEmpty {
-            print("    Source Context:")
-            let allLines = context.linesBefore + context.linesAfter
-            let maxLineNum = allLines.map(\.lineNumber).max() ?? 0
-            let lineNumWidth = String(maxLineNum).count
-
-            for line in context.linesBefore {
-                print("      \(line.formatted(lineNumberWidth: lineNumWidth))")
-            }
-            for line in context.linesAfter {
-                print("      \(line.formatted(lineNumberWidth: lineNumWidth))")
-            }
-        }
-
-        // Body
-        if let body = context.body {
-            print("    Body:")
-            let bodyLines = body.split(separator: "\n", omittingEmptySubsequences: false)
-            let preview = bodyLines.prefix(10)
-            for bodyLine in preview {
-                print("      \(bodyLine)")
-            }
-            if bodyLines.count > 10 {
-                print("      ... (\(bodyLines.count - 10) more lines)")
-            }
-        }
-
-        // Scope
-        if let scope = context.scopeContent {
-            print("    Containing Scope: \(scope.kind.rawValue)\(scope.name.map { " '\($0)'" } ?? "")")
-            print("      Lines \(scope.startLine)-\(scope.endLine)")
         }
     }
 
@@ -715,10 +620,8 @@ struct Symbol: AsyncParsableCommand {
 
         switch format {
         case .text:
-            print("Found \(usages.count) usage(s) of \(matches.count) symbol(s):\n")
-            for usage in usages {
-                print("  \(usage.locationString) (\(usage.kind.rawValue))")
-            }
+            print("USAGES \(usages.count) refs of \(matches.count) symbols for '\(query)'")
+            OutputFormatter.printUsagesText(usages)
 
         case .json:
             OutputFormatter.printJSON(usages)
@@ -1042,16 +945,45 @@ struct CombinedReport: Codable {
 // MARK: - OutputFormatter
 
 /// Shared formatting utilities to avoid code duplication across commands.
+///
+/// Text output is optimized for both human and LLM consumption:
+/// - Grouped by file to reduce path repetition
+/// - Positional semantics instead of repeated key labels
+/// - Minimal markup (indentation over brackets)
+/// - Stats/summary at top for quick understanding
 enum OutputFormatter {
-    /// Print clone groups in text format.
+    // MARK: - Text Format (Compact, LLM-optimized)
+
+    /// Print clone groups in compact text format.
+    /// Format: Groups clones by type, shows file:lines compactly.
     static func printCloneGroupsText(_ clones: [CloneGroup], header: String? = nil) {
-        if let header {
-            print(header)
+        if let header { print(header) }
+        if clones.isEmpty {
+            print("(none)")
+            return
         }
-        for (index, group) in clones.enumerated() {
-            print("\n[\(index + 1)] \(group.type.rawValue) clone (\(group.occurrences) occurrences)")
-            for clone in group.clones {
-                print("  - \(clone.file):\(clone.startLine)-\(clone.endLine)")
+
+        // Group by type for better organization
+        let byType = Dictionary(grouping: clones) { $0.type }
+
+        for type in [CloneType.exact, .near, .semantic] {
+            guard let groups = byType[type], !groups.isEmpty else { continue }
+
+            let totalLines = groups.reduce(0) { $0 + $1.duplicatedLines }
+            print("\n\(type.rawValue) \(groups.count) groups \(totalLines) duplicated lines")
+
+            for (index, group) in groups.enumerated() {
+                let simStr = group.similarity < 1.0 ? " \(Int(group.similarity * 100))%" : ""
+                print(
+                    "  [\(index + 1)]\(simStr) \(group.occurrences)x \(group.duplicatedLines / max(1, group.occurrences - 1))L"
+                )
+
+                // Group clone locations by file for compactness
+                let byFile = Dictionary(grouping: group.clones) { $0.file }
+                for (file, fileClones) in byFile.sorted(by: { $0.key < $1.key }) {
+                    let ranges = fileClones.map { "\($0.startLine)-\($0.endLine)" }.joined(separator: " ")
+                    print("    \(file): \(ranges)")
+                }
             }
         }
     }
@@ -1067,10 +999,41 @@ enum OutputFormatter {
         }
     }
 
-    /// Print unused code items in text format.
+    /// Print unused code items in compact text format.
+    /// Format: Grouped by file, one line per item with kind/name/line/confidence/reason.
     static func printUnusedText(_ unused: [UnusedCode]) {
-        for item in unused {
-            print("[\(item.confidence.rawValue)] \(item.declaration.location): \(item.suggestion)")
+        if unused.isEmpty {
+            print("(none)")
+            return
+        }
+
+        // Group by file
+        let byFile = Dictionary(grouping: unused) { $0.declaration.location.file }
+        let sortedFiles = byFile.keys.sorted()
+
+        for file in sortedFiles {
+            guard let items = byFile[file] else { continue }
+            let sortedItems = items.sorted { $0.declaration.location.line < $1.declaration.location.line }
+
+            print("\n\(file)")
+            for item in sortedItems {
+                let d = item.declaration
+                let conf = String(item.confidence.rawValue.prefix(1)).uppercased()
+                let reasonShort = shortReason(item.reason)
+                // Format: line kind name [confidence] reason
+                print("  \(d.location.line) \(d.kind.rawValue) \(d.name) [\(conf)] \(reasonShort)")
+            }
+        }
+    }
+
+    /// Shorten unused reason for compact display.
+    private static func shortReason(_ reason: UnusedReason) -> String {
+        switch reason {
+        case .neverReferenced: return "unused"
+        case .onlyAssigned: return "written-only"
+        case .onlySelfReferenced: return "self-ref"
+        case .importNotUsed: return "unused-import"
+        case .parameterUnused: return "unused-param"
         }
     }
 
@@ -1090,6 +1053,128 @@ enum OutputFormatter {
             let json = String(data: data, encoding: .utf8)
         {
             print(json)
+        }
+    }
+
+    // MARK: - Symbol Output (Compact)
+
+    /// Print symbol matches in compact text format.
+    /// Format: Grouped by file, essential info on single lines.
+    static func printSymbolsText(_ matches: [SymbolMatch], contexts: [SymbolMatch: SymbolContext] = [:]) {
+        if matches.isEmpty {
+            print("(none)")
+            return
+        }
+
+        // Group by file
+        let byFile = Dictionary(grouping: matches) { $0.file }
+        let sortedFiles = byFile.keys.sorted()
+
+        for file in sortedFiles {
+            guard let fileMatches = byFile[file] else { continue }
+            let sorted = fileMatches.sorted { $0.line < $1.line }
+
+            print("\n\(file)")
+            for match in sorted {
+                var line = "  \(match.line):\(match.column) \(match.kind.rawValue) \(match.name)"
+                if !match.genericParameters.isEmpty {
+                    line += "<\(match.genericParameters.joined(separator: ","))>"
+                }
+                line += " \(match.accessLevel.rawValue)"
+                if let sig = match.signature {
+                    line += " \(sig.selectorString)"
+                }
+                print(line)
+
+                // Compact context output
+                if let ctx = contexts[match], !ctx.isEmpty {
+                    printContextCompact(ctx, indent: "    ")
+                }
+            }
+        }
+    }
+
+    /// Print symbol usages in compact text format.
+    static func printUsagesText(_ usages: [SymbolOccurrence]) {
+        if usages.isEmpty {
+            print("(none)")
+            return
+        }
+
+        // Group by file
+        let byFile = Dictionary(grouping: usages) { $0.file }
+        let sortedFiles = byFile.keys.sorted()
+
+        for file in sortedFiles {
+            guard let fileUsages = byFile[file] else { continue }
+            let sorted = fileUsages.sorted { $0.line < $1.line }
+
+            print("\n\(file)")
+            // Compact format: line:col (kind) on single line, multiple per line if short
+            let formatted = sorted.map { "\($0.line):\($0.column)(\($0.kind.rawValue.prefix(3)))" }
+            // Print in rows of reasonable width
+            var currentLine = "  "
+            for item in formatted {
+                if currentLine.count + item.count > 100 {
+                    print(currentLine)
+                    currentLine = "  "
+                }
+                currentLine += item + " "
+            }
+            if currentLine.count > 2 {
+                print(currentLine)
+            }
+        }
+    }
+
+    /// Print context in compact format.
+    private static func printContextCompact(_ ctx: SymbolContext, indent: String) {
+        // Documentation summary
+        if let doc = ctx.documentation, doc.hasContent {
+            if let summary = doc.summary {
+                print("\(indent)/// \(summary)")
+            }
+            for param in doc.parameters {
+                print("\(indent)/// @param \(param.name): \(param.description)")
+            }
+            if let returns = doc.returns {
+                print("\(indent)/// @returns \(returns)")
+            }
+            if let throwsDoc = doc.throws {
+                print("\(indent)/// @throws \(throwsDoc)")
+            }
+        }
+
+        // Complete signature
+        if let sig = ctx.completeSignature {
+            print("\(indent)sig: \(sig)")
+        }
+
+        // Context lines before
+        if !ctx.linesBefore.isEmpty {
+            for line in ctx.linesBefore {
+                print("\(indent)\(line.lineNumber): \(line.content)")
+            }
+        }
+
+        // Context lines after
+        if !ctx.linesAfter.isEmpty {
+            for line in ctx.linesAfter {
+                print("\(indent)\(line.lineNumber): \(line.content)")
+            }
+        }
+
+        // Body
+        if let body = ctx.body {
+            let lines = body.split(separator: "\n", omittingEmptySubsequences: false)
+            for line in lines {
+                print("\(indent)| \(line)")
+            }
+        }
+
+        // Containing scope
+        if let scope = ctx.scopeContent {
+            print("\(indent)in: \(scope.kind.rawValue) \(scope.name ?? "") L\(scope.startLine)-\(scope.endLine)")
         }
     }
 }
@@ -1131,21 +1216,6 @@ func canonicalizePath(_ path: String) throws -> String {
     }
 
     return resolvedURL.path
-}
-
-/// Validates that a path doesn't traverse outside expected boundaries.
-///
-/// - Parameters:
-///   - path: The path to validate.
-///   - basePath: The expected base directory (if any).
-/// - Returns: `true` if the path is within expected boundaries.
-func isPathWithinBoundaries(_ path: String, basePath: String?) -> Bool {
-    guard let basePath else { return true }
-
-    let normalizedPath = (path as NSString).standardizingPath
-    let normalizedBase = (basePath as NSString).standardizingPath
-
-    return normalizedPath.hasPrefix(normalizedBase)
 }
 
 func findSwiftFiles(in paths: [String], excludePaths: [String]? = nil) throws -> [String] {

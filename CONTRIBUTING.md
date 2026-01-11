@@ -38,6 +38,62 @@ Thank you for your interest in contributing to SwiftStaticAnalysis! This documen
    swift run swa --help
    ```
 
+## AI-Assisted Development (Vibe Coding)
+
+This project embraces AI-assisted development with Claude Code. Whether you're contributing manually or with AI assistance, follow these guidelines to ensure quality contributions.
+
+### Working with Claude Code
+
+When using Claude Code for contributions:
+
+1. **Plan First, Code Second**
+   - Use Plan Mode (Shift+Tab twice) for complex changes
+   - Review the plan before allowing code modifications
+   - Complex features should have an approved implementation plan
+
+2. **Tests First (RED-GREEN-REFACTOR)**
+   - Write failing tests before implementation code
+   - The failing test is your contract with the AI
+   - Only mark work complete when tests pass
+
+3. **Iterative Refinement**
+   - Make small, focused changes
+   - Run tests after each iteration
+   - Review generated code for style and patterns
+
+4. **Human Review Required**
+   - All AI-generated code must be reviewed
+   - Watch for unsafe patterns, force unwraps, and concurrency issues
+   - Verify naming conventions match project standards
+
+### CLAUDE.md Configuration
+
+The project may include a `CLAUDE.md` file with repo-specific instructions. If contributing new conventions or workflows, consider updating this file.
+
+Key conventions for AI-assisted work:
+- Use Swift 6 strict concurrency
+- Follow Swift API Design Guidelines
+- Run `swift test --parallel` before commits
+- Use `swift-format` for code formatting
+
+### Quality Gates
+
+Before submitting AI-assisted contributions:
+
+```bash
+# Format code
+swift-format format -i -r Sources/ Tests/
+
+# Run all tests
+swift test --parallel
+
+# Check for unused code
+swift run swa unused --sensible-defaults Sources/
+
+# Check for duplicates
+swift run swa duplicates Sources/
+```
+
 ## Code Guidelines
 
 ### Swift API Design
@@ -134,17 +190,18 @@ Place test fixtures in `Tests/Fixtures/`:
    ```bash
    git checkout -b feature/amazing-feature
    ```
-3. **Make your changes** with clear, atomic commits
-4. **Add tests** for new functionality
-5. **Ensure tests pass**:
+3. **Plan your implementation** (especially for complex changes)
+4. **Write tests first** for new functionality
+5. **Make your changes** with clear, atomic commits
+6. **Ensure tests pass**:
    ```bash
    swift test --parallel
    ```
-6. **Push** to your fork:
+7. **Push** to your fork:
    ```bash
    git push origin feature/amazing-feature
    ```
-7. **Open a Pull Request** with a clear description
+8. **Open a Pull Request** with a clear description
 
 ### Commit Messages
 
@@ -165,6 +222,7 @@ Prefix commits with:
 - `refactor:` - Code refactoring
 - `test:` - Adding tests
 - `docs:` - Documentation changes
+- `chore:` - Maintenance tasks
 
 ### Pull Request Guidelines
 
@@ -172,6 +230,7 @@ Prefix commits with:
 - Reference any related issues
 - Include before/after examples if applicable
 - Ensure CI passes
+- Note if AI-assisted: "AI-assisted with Claude Code" in description
 
 ## Reporting Issues
 
@@ -200,16 +259,41 @@ SwiftStaticAnalysis/
 │   ├── SwiftStaticAnalysisCore/    # Core parsing and models
 │   ├── DuplicationDetector/        # Clone detection algorithms
 │   ├── UnusedCodeDetector/         # Unused code detection
+│   ├── SymbolLookup/               # Symbol search and resolution
+│   ├── SwiftStaticAnalysisMCP/     # MCP server for AI tools
 │   ├── swa/                        # CLI tool
+│   ├── swa-mcp/                    # MCP server binary
 │   ├── StaticAnalysisBuildPlugin/  # Build-time analysis plugin
 │   └── StaticAnalysisCommandPlugin/# On-demand analysis plugin
 ├── Tests/
 │   ├── SwiftStaticAnalysisCoreTests/
 │   ├── DuplicationDetectorTests/
 │   ├── UnusedCodeDetectorTests/
+│   ├── SymbolLookupTests/
+│   ├── CLITests/
 │   └── Fixtures/                   # Test data
+├── docs/                           # Research and documentation
 └── .github/workflows/              # CI/CD
 ```
+
+## MCP Server for AI Tools
+
+The project includes an MCP (Model Context Protocol) server that exposes static analysis tools for AI assistants like Claude Code.
+
+### Using the MCP Server
+
+```bash
+# Run the MCP server
+swift run swa-mcp /path/to/codebase
+```
+
+### Available Tools
+
+- `detect_unused_code` - Find unused declarations
+- `detect_duplicates` - Find code clones
+- `search_symbols` - Search for symbols by name
+- `analyze_file` - Full analysis of a single file
+- `read_file` - Read file contents with line numbers
 
 ## Getting Help
 

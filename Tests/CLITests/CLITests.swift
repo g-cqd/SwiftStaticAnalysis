@@ -179,11 +179,11 @@ struct CLICommandTests {
         let output = try await runSWA(["duplicates", "--format", "text", fixture])
 
         #expect(output.succeeded, "Command should succeed")
-        // Text format always shows "Found X clone group(s)"
-        let headerPattern = #/Found \d+ clone group/#
+        // Text format always shows "CLONES N groups"
+        let headerPattern = #/CLONES \d+ groups/#
         #expect(
             output.stdout.contains(headerPattern),
-            "Text format should include 'Found N clone group(s)' header"
+            "Text format should include 'CLONES N groups' header"
         )
     }
 
