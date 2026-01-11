@@ -7,16 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-01-11
+
 ### Added
-- `ParallelMode` (`none`, `safe`, `maximum`) with `--parallel-mode` CLI support and `parallelMode` configuration for unused/duplicates
-- Streaming verification APIs (`StreamingVerifier`, `VerificationProgress`) backed by swift-async-algorithms
-- Streaming candidate pair generation (LSH) and streaming clone-group deduplication utilities
-- Streaming reachability edge extraction via `DependencyExtractor.streamEdges`
+- **MCP Server**: New `swa-mcp` tool for Model Context Protocol integration
+  - Dynamic `codebase_path` support for all tools
+  - Symbol context extraction capabilities
+- **Compact Output**: New LLM-optimized text output format for CLI results
+
+### Fixed
+- **IndexStore**: Correct access level extraction from source code for IndexStore results
 
 ### Changed
-- Deprecated legacy `--parallel` CLI flag and `parallel` config option in favor of `parallelMode`
-- Added ignore patterns for generated analysis artifacts to `.gitignore`
-- Applied consistent formatting to streaming/parallel components
+- Documentation cleanup
+- Updated version sync targets to include `swa-mcp`
 
 ## [0.0.24] - 2026-01-05
 
