@@ -30,13 +30,17 @@ public struct ArenaConfiguration: Sendable {
 // MARK: - ArenaBlock
 
 /// A contiguous block of memory in the arena.
-final class ArenaBlock: @unchecked Sendable {
+///
+/// ArenaBlock is a class (reference type) because it manages raw memory
+/// and needs reference semantics for the block array. It is NOT thread-safe
+/// and should only be accessed by its owning Arena.
+final class ArenaBlock {
     // MARK: Lifecycle
 
     init(capacity: Int) {
         storage = UnsafeMutableRawPointer.allocate(
             byteCount: capacity,
-            alignment: 8,
+            alignment: 8
         )
         self.capacity = capacity
         offset = 0
@@ -89,17 +93,18 @@ final class ArenaBlock: @unchecked Sendable {
 /// Arena provides extremely fast allocation by simply incrementing a pointer.
 /// Memory is freed all at once when the arena is destroyed or reset.
 ///
-/// Thread Safety: Arena is NOT thread-safe. Use separate arenas per thread
-/// or synchronize access externally.
+/// Thread Safety: Arena is NOT thread-safe. Each arena should be used by a
+/// single owner at a time. The noncopyable constraint enforces single-ownership
+/// at compile time, preventing accidental sharing across threads.
 ///
 /// Example:
 /// ```swift
-/// let arena = Arena()
+/// var arena = Arena()
 /// let ptr = arena.allocate(size: 100, alignment: 8)
 /// // Use memory...
 /// arena.reset() // All allocations freed
 /// ```
-public final class Arena: @unchecked Sendable {
+public struct Arena: ~Copyable {
     // MARK: Lifecycle
 
     public init(configuration: ArenaConfiguration = ArenaConfiguration()) {
@@ -149,7 +154,7 @@ public final class Arena: @unchecked Sendable {
     ///   - alignment: Alignment requirement (default: 8).
     /// - Returns: Pointer to allocated memory.
     @discardableResult
-    public func allocate(size: Int, alignment: Int = 8) -> UnsafeMutableRawPointer {
+    public mutating func allocate(size: Int, alignment: Int = 8) -> UnsafeMutableRawPointer {
         // Try allocating from current block
         if currentBlockIndex >= 0 {
             if let ptr = blocks[currentBlockIndex].allocate(size: size, alignment: alignment) {
@@ -164,7 +169,7 @@ public final class Arena: @unchecked Sendable {
         blocks.append(newBlock)
         currentBlockIndex = blocks.count - 1
 
-        guard let ptr = newBlock.allocate(size: size, alignment: alignment) else {
+        guard let ptr = blocks[currentBlockIndex].allocate(size: size, alignment: alignment) else {
             fatalError("Failed to allocate \(size) bytes in fresh arena block")
         }
 
@@ -176,7 +181,7 @@ public final class Arena: @unchecked Sendable {
     ///
     /// - Parameter count: Number of elements to allocate.
     /// - Returns: Typed buffer pointer.
-    public func allocate<T>(count: Int) -> UnsafeMutableBufferPointer<T> {
+    public mutating func allocate<T>(count: Int) -> UnsafeMutableBufferPointer<T> {
         let size = count * MemoryLayout<T>.stride
         let alignment = MemoryLayout<T>.alignment
         let raw = allocate(size: size, alignment: alignment)
@@ -189,7 +194,7 @@ public final class Arena: @unchecked Sendable {
     /// - Parameter value: Value to store.
     /// - Returns: Pointer to the stored value.
     @discardableResult
-    public func store<T>(_ value: T) -> UnsafeMutablePointer<T> {
+    public mutating func store<T>(_ value: T) -> UnsafeMutablePointer<T> {
         let buffer = allocate(count: 1) as UnsafeMutableBufferPointer<T>
         guard let baseAddress = buffer.baseAddress else {
             fatalError("Arena allocation failed: buffer has no base address")
@@ -202,7 +207,7 @@ public final class Arena: @unchecked Sendable {
     ///
     /// - Parameter array: Array to copy.
     /// - Returns: Buffer pointer to the copied array.
-    public func copy<T>(_ array: [T]) -> UnsafeMutableBufferPointer<T> {
+    public mutating func copy<T>(_ array: [T]) -> UnsafeMutableBufferPointer<T> {
         let buffer = allocate(count: array.count) as UnsafeMutableBufferPointer<T>
         for (i, element) in array.enumerated() {
             buffer[i] = element
@@ -216,9 +221,9 @@ public final class Arena: @unchecked Sendable {
     ///
     /// This is O(n) where n is the number of blocks, but each block's
     /// memory is not individually freed - just the offset is reset.
-    public func reset() {
-        for block in blocks {
-            block.reset()
+    public mutating func reset() {
+        for i in 0..<blocks.count {
+            blocks[i].reset()
         }
         currentBlockIndex = blocks.isEmpty ? -1 : 0
         _totalBytesAllocated = 0
@@ -227,7 +232,7 @@ public final class Arena: @unchecked Sendable {
     /// Release all memory back to the system.
     ///
     /// Unlike reset(), this actually frees the underlying memory.
-    public func release() {
+    public mutating func release() {
         blocks.removeAll()
         currentBlockIndex = -1
         _totalBytesAllocated = 0
@@ -246,7 +251,7 @@ public final class Arena: @unchecked Sendable {
     private var _totalBytesAllocated: Int = 0
     private var _peakBytesAllocated: Int = 0
 
-    private func updateStats(size: Int) {
+    private mutating func updateStats(size: Int) {
         _totalAllocations += 1
         _totalBytesAllocated += size
         _peakBytesAllocated = max(_peakBytesAllocated, _totalBytesAllocated)
@@ -258,11 +263,11 @@ public final class Arena: @unchecked Sendable {
 /// Protocol for types that can be allocated in an arena.
 public protocol ArenaAllocatable {
     /// Create an instance in the given arena.
-    static func allocate(in arena: Arena, count: Int) -> UnsafeMutableBufferPointer<Self>
+    static func allocate(in arena: inout Arena, count: Int) -> UnsafeMutableBufferPointer<Self>
 }
 
 extension ArenaAllocatable {
-    public static func allocate(in arena: Arena, count: Int) -> UnsafeMutableBufferPointer<Self> {
+    public static func allocate(in arena: inout Arena, count: Int) -> UnsafeMutableBufferPointer<Self> {
         arena.allocate(count: count)
     }
 }
@@ -311,7 +316,7 @@ extension Bool: ArenaAllocatable {}
 ///
 /// Example:
 /// ```swift
-/// let arena = Arena()
+/// var arena = Arena()
 /// arena.withScope {
 ///     let data = $0.allocate(count: 1000) as UnsafeMutableBufferPointer<Int>
 ///     // Use data...
@@ -322,7 +327,7 @@ extension Arena {
     ///
     /// - Parameter body: Closure that uses the arena.
     /// - Returns: The result of the closure.
-    public func withScope<T>(_ body: (Arena) throws -> T) rethrows -> T {
+    public mutating func withScope<T>(_ body: (inout Arena) throws -> T) rethrows -> T {
         let startOffset = blocks.isEmpty ? 0 : blocks[max(0, currentBlockIndex)].offset
         let startBlock = currentBlockIndex
 
@@ -339,40 +344,69 @@ extension Arena {
             }
         }
 
-        return try body(self)
+        return try body(&self)
     }
+}
+
+// MARK: - ArenaBox
+
+/// A reference-type wrapper around Arena for scenarios requiring reference semantics.
+///
+/// This is used internally by ThreadLocalArena and other systems that need
+/// to store arenas in contexts that require reference types (e.g., TLS).
+final class ArenaBox {
+    // MARK: Lifecycle
+
+    init(configuration: ArenaConfiguration = ArenaConfiguration()) {
+        arena = Arena(configuration: configuration)
+    }
+
+    // MARK: Internal
+
+    var arena: Arena
 }
 
 // MARK: - ThreadLocalArena
 
 /// Provides a thread-local arena for concurrent use.
+///
+/// Each thread gets its own arena instance, preventing the need for
+/// synchronization when allocating memory.
 public enum ThreadLocalArena {
     // MARK: Public
 
-    /// Get the arena for the current thread.
-    public static var current: Arena {
-        if let ptr = pthread_getspecific(tlsKey) {
-            return Unmanaged<Arena>.fromOpaque(ptr).takeUnretainedValue()
-        }
-
-        let arena = Arena()
-        pthread_setspecific(tlsKey, Unmanaged.passRetained(arena).toOpaque())
-        return arena
+    /// Execute a closure with the current thread's arena.
+    ///
+    /// - Parameter body: Closure that uses the arena.
+    /// - Returns: The result of the closure.
+    public static func withCurrent<T>(_ body: (inout Arena) throws -> T) rethrows -> T {
+        try body(&currentBox.arena)
     }
 
     /// Reset the current thread's arena.
     public static func reset() {
-        current.reset()
+        currentBox.arena.reset()
     }
 
     // MARK: Private
+
+    /// Get the ArenaBox for the current thread.
+    private static var currentBox: ArenaBox {
+        if let ptr = pthread_getspecific(tlsKey) {
+            return Unmanaged<ArenaBox>.fromOpaque(ptr).takeUnretainedValue()
+        }
+
+        let box = ArenaBox()
+        pthread_setspecific(tlsKey, Unmanaged.passRetained(box).toOpaque())
+        return box
+    }
 
     /// Thread-local storage for arenas.
     private static let tlsKey: pthread_key_t = {
         var key: pthread_key_t = 0
         pthread_key_create(&key) { ptr in
             // Destructor called when thread exits
-            Unmanaged<Arena>.fromOpaque(ptr).release()
+            Unmanaged<ArenaBox>.fromOpaque(ptr).release()
         }
         return key
     }()

@@ -269,11 +269,26 @@ public struct SoATokenStorage: Sendable {
 /// This version uses raw memory buffers allocated from an arena,
 /// providing even better cache performance and eliminating Swift
 /// array overhead.
+///
+/// Thread Safety: Marked `@unchecked Sendable` because it contains
+/// `UnsafeBufferPointer` fields which the compiler cannot verify. It IS
+/// thread-safe because:
+/// - All properties are immutable (`let`)
+/// - The underlying arena memory remains valid for the arena's lifetime
+/// - All access operations are read-only
+///
+/// **Important**: The arena that allocated this storage must remain alive
+/// for the duration of this storage's use.
 public struct ArenaTokenStorage: @unchecked Sendable {
     // MARK: Lifecycle
 
     /// Create from SoATokenStorage, allocating in the given arena.
-    public init(from storage: SoATokenStorage, arena: Arena) {
+    ///
+    /// - Parameters:
+    ///   - storage: The source SoA token storage to copy from.
+    ///   - arena: The arena to allocate memory in. Passed as `inout` because
+    ///     Arena is noncopyable and allocation mutates the arena's state.
+    public init(from storage: SoATokenStorage, arena: inout Arena) {
         count = storage.count
 
         // Allocate and copy kinds

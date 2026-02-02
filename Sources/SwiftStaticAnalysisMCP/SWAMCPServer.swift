@@ -127,7 +127,7 @@ extension SWAMCPServer {
     private static let codebasePathProperty: Value = .object([
         "type": .string("string"),
         "description": .string(
-            "Path to the codebase to analyze. Can be absolute or relative. If not specified, uses the default codebase."
+            "Path to the codebase to analyze. Can be absolute or relative."
         ),
     ])
 
@@ -141,7 +141,7 @@ extension SWAMCPServer {
                     "properties": .object([
                         "codebase_path": codebasePathProperty
                     ]),
-                    "required": .array([]),
+                    "required": .array([.string("codebase_path")]),
                 ])
             ),
             Tool(
@@ -161,7 +161,7 @@ extension SWAMCPServer {
                             "description": .string("Maximum number of files to return (default: all)"),
                         ]),
                     ]),
-                    "required": .array([]),
+                    "required": .array([.string("codebase_path")]),
                 ])
             ),
             Tool(
@@ -237,7 +237,7 @@ extension SWAMCPServer {
                                 "Specific paths within the codebase to analyze (default: entire codebase)"),
                         ]),
                     ]),
-                    "required": .array([]),
+                    "required": .array([.string("codebase_path")]),
                 ])
             ),
             Tool(
@@ -281,7 +281,7 @@ extension SWAMCPServer {
                                 "Specific paths within the codebase to analyze (default: entire codebase)"),
                         ]),
                     ]),
-                    "required": .array([]),
+                    "required": .array([.string("codebase_path")]),
                 ])
             ),
             Tool(
@@ -305,7 +305,7 @@ extension SWAMCPServer {
                             "description": .string("Ending line number (1-indexed, optional)"),
                         ]),
                     ]),
-                    "required": .array([.string("path")]),
+                    "required": .array([.string("codebase_path"), .string("path")]),
                 ])
             ),
             Tool(
@@ -381,7 +381,7 @@ extension SWAMCPServer {
                             "description": .string("Include all context information"),
                         ]),
                     ]),
-                    "required": .array([.string("query")]),
+                    "required": .array([.string("codebase_path"), .string("query")]),
                 ])
             ),
             Tool(
@@ -428,7 +428,7 @@ extension SWAMCPServer {
                             "description": .string("Include scope hierarchy information (default: false)"),
                         ]),
                     ]),
-                    "required": .array([.string("path")]),
+                    "required": .array([.string("codebase_path"), .string("path")]),
                 ])
             ),
         ]

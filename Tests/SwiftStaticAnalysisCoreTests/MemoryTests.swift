@@ -13,7 +13,7 @@ import Testing
 struct ArenaAllocationTests {
     @Test("Arena can allocate raw memory")
     func basicAllocation() {
-        let arena = Arena()
+        var arena = Arena()
         _ = arena.allocate(size: 100, alignment: 8)
         #expect(arena.totalAllocations == 1)
         #expect(arena.totalBytesAllocated >= 100)
@@ -21,7 +21,7 @@ struct ArenaAllocationTests {
 
     @Test("Arena can allocate typed memory")
     func typedAllocation() {
-        let arena = Arena()
+        var arena = Arena()
         let buffer: UnsafeMutableBufferPointer<Int> = arena.allocate(count: 10)
         #expect(buffer.count == 10)
 
@@ -36,7 +36,7 @@ struct ArenaAllocationTests {
 
     @Test("Arena store and copy work correctly")
     func storeAndCopy() {
-        let arena = Arena()
+        var arena = Arena()
 
         // Store single value
         let ptr = arena.store(42)
@@ -53,7 +53,7 @@ struct ArenaAllocationTests {
 
     @Test("Arena reset clears allocations but keeps capacity")
     func reset() {
-        let arena = Arena()
+        var arena = Arena()
 
         // Make some allocations
         for _ in 0..<100 {
@@ -71,7 +71,7 @@ struct ArenaAllocationTests {
 
     @Test("Arena release frees all memory")
     func release() {
-        let arena = Arena()
+        var arena = Arena()
 
         // Make some allocations
         for _ in 0..<10 {
@@ -88,7 +88,7 @@ struct ArenaAllocationTests {
 
     @Test("Arena handles large allocations")
     func largeAllocation() {
-        let arena = Arena(configuration: ArenaConfiguration(blockSize: 1024))
+        var arena = Arena(configuration: ArenaConfiguration(blockSize: 1024))
 
         // Allocate more than block size
         _ = arena.allocate(size: 10000, alignment: 8)
@@ -97,7 +97,7 @@ struct ArenaAllocationTests {
 
     @Test("Arena respects alignment")
     func alignment() {
-        let arena = Arena()
+        var arena = Arena()
 
         // Various alignments
         for alignment in [1, 2, 4, 8, 16, 32] {
@@ -109,7 +109,7 @@ struct ArenaAllocationTests {
 
     @Test("Arena scoped allocation resets correctly")
     func scopedAllocation() {
-        let arena = Arena()
+        var arena = Arena()
 
         // Pre-scope allocation
         arena.allocate(size: 100, alignment: 8)
@@ -134,7 +134,7 @@ struct ArenaAllocationTests {
 
     @Test("Arena statistics are accurate")
     func statistics() {
-        let arena = Arena()
+        var arena = Arena()
 
         arena.allocate(size: 100, alignment: 8)
         arena.allocate(size: 200, alignment: 8)
@@ -153,15 +153,15 @@ struct ArenaAllocationTests {
 struct ArenaAllocatableTests {
     @Test("Primitive types are arena allocatable")
     func primitiveTypes() {
-        let arena = Arena()
+        var arena = Arena()
 
-        let ints: UnsafeMutableBufferPointer<Int> = Int.allocate(in: arena, count: 10)
+        let ints: UnsafeMutableBufferPointer<Int> = Int.allocate(in: &arena, count: 10)
         #expect(ints.count == 10)
 
-        let doubles: UnsafeMutableBufferPointer<Double> = Double.allocate(in: arena, count: 5)
+        let doubles: UnsafeMutableBufferPointer<Double> = Double.allocate(in: &arena, count: 5)
         #expect(doubles.count == 5)
 
-        let bools: UnsafeMutableBufferPointer<Bool> = Bool.allocate(in: arena, count: 20)
+        let bools: UnsafeMutableBufferPointer<Bool> = Bool.allocate(in: &arena, count: 20)
         #expect(bools.count == 20)
     }
 }
@@ -172,21 +172,25 @@ struct ArenaAllocatableTests {
 struct ThreadLocalArenaTests {
     @Test("Thread local arena provides arena for current thread")
     func currentArena() {
-        let arena = ThreadLocalArena.current
-
-        // Same thread should get same arena
-        let arena2 = ThreadLocalArena.current
-        #expect(arena === arena2)
+        // Use withCurrent to access the thread-local arena
+        ThreadLocalArena.withCurrent { arena in
+            arena.allocate(size: 100, alignment: 8)
+            #expect(arena.totalAllocations >= 1)
+        }
     }
 
     @Test("Thread local arena reset works")
     func tlsReset() {
-        let arena = ThreadLocalArena.current
-        arena.allocate(size: 1000, alignment: 8)
-        #expect(arena.totalBytesAllocated > 0)
+        ThreadLocalArena.withCurrent { arena in
+            arena.allocate(size: 1000, alignment: 8)
+            #expect(arena.totalBytesAllocated > 0)
+        }
 
         ThreadLocalArena.reset()
-        #expect(arena.totalBytesAllocated == 0)
+
+        ThreadLocalArena.withCurrent { arena in
+            #expect(arena.totalBytesAllocated == 0)
+        }
     }
 }
 
@@ -580,8 +584,8 @@ struct ArenaTokenStorageTests {
         soaStorage.append(kind: .keyword, offset: 0, length: 4, line: 1)
         soaStorage.append(kind: .identifier, offset: 5, length: 3, line: 1)
 
-        let arena = Arena()
-        let arenaStorage = ArenaTokenStorage(from: soaStorage, arena: arena)
+        var arena = Arena()
+        let arenaStorage = ArenaTokenStorage(from: soaStorage, arena: &arena)
 
         #expect(arenaStorage.count == 2)
         #expect(arenaStorage.kind(at: 0) == .keyword)
@@ -898,7 +902,7 @@ struct SliceBasedTokenSequenceTests {
             file: path,
             source: mmf,
             tokens: tokens,
-            kinds: kinds,
+            kinds: kinds
         )
 
         #expect(sequence.count == 2)

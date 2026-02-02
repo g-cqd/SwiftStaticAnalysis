@@ -29,8 +29,14 @@ public enum MemoryMappedFileError: Error, Sendable {
 /// the process's address space. Reads are performed directly from the
 /// kernel's page cache without additional copying.
 ///
-/// Thread Safety: The mapping itself is thread-safe for reads. Multiple
-/// threads can read from the same mapping concurrently.
+/// Thread Safety: This type is marked `@unchecked Sendable` because it contains
+/// an `UnsafeRawPointer` which the compiler cannot verify. However, it IS
+/// thread-safe for the following reasons:
+/// - All properties are immutable after initialization (`let`)
+/// - The memory mapping is read-only (`PROT_READ`)
+/// - The underlying file descriptor and mapping remain valid for the object's lifetime
+///
+/// Multiple threads can read from the same mapping concurrently without synchronization.
 ///
 /// Example:
 /// ```swift
@@ -45,7 +51,7 @@ public final class MemoryMappedFile: @unchecked Sendable {
     ///
     /// - Parameter path: Path to the file to map.
     /// - Throws: `MemoryMappedFileError` if the file cannot be mapped.
-    public init(path: String) throws {
+    public init(path: String) throws(MemoryMappedFileError) {
         self.path = path
 
         // Open the file
@@ -251,6 +257,12 @@ public final class MemoryMappedFile: @unchecked Sendable {
 ///
 /// Slices reference the underlying mapped memory without copying.
 /// They are lightweight and can be created freely.
+///
+/// Thread Safety: Marked `@unchecked Sendable` because it contains an
+/// `UnsafeRawPointer`. It is thread-safe because:
+/// - The underlying memory mapping is read-only
+/// - The parent `MemoryMappedFile` reference keeps the mapping alive
+/// - All slice operations are read-only
 public struct FileSlice: @unchecked Sendable {
     // MARK: Lifecycle
 
@@ -275,29 +287,35 @@ public struct FileSlice: @unchecked Sendable {
     }
 
     /// Create a sub-slice.
-    public func subslice(offset: Int, length: Int) -> Self {
+    ///
+    /// The returned slice borrows from this slice and references the same
+    /// underlying memory mapping.
+    public borrowing func subslice(offset: Int, length: Int) -> Self {
         let validOffset = max(0, min(offset, self.length))
         let validLength = min(length, self.length - validOffset)
         return Self(
             base: base.advanced(by: validOffset),
             length: validLength,
-            file: file,
+            file: file
         )
     }
 
     /// Convert to a String (creates a copy).
-    public func asString() -> String? {
+    ///
+    /// This creates a copy of the underlying bytes as a Swift String.
+    /// For zero-copy access, use `asRawBuffer()` instead.
+    public borrowing func asString() -> String? {
         guard length > 0 else { return "" }
         let buffer = UnsafeBufferPointer(
             start: base.assumingMemoryBound(to: UInt8.self),
-            count: length,
+            count: length
         )
         // swiftlint:disable:next optional_data_string_conversion
         return String(decoding: buffer, as: UTF8.self)
     }
 
     /// Convert to a byte array (creates a copy).
-    public func asBytes() -> [UInt8] {
+    public borrowing func asBytes() -> [UInt8] {
         guard length > 0 else { return [] }
         var result = [UInt8](repeating: 0, count: length)
         result.withUnsafeMutableBytes { dest in
@@ -307,7 +325,10 @@ public struct FileSlice: @unchecked Sendable {
     }
 
     /// Get a raw buffer pointer (zero-copy).
-    public func asRawBuffer() -> UnsafeRawBufferPointer {
+    ///
+    /// The returned pointer is only valid while this slice (and its parent
+    /// `MemoryMappedFile`) remains alive.
+    public borrowing func asRawBuffer() -> UnsafeRawBufferPointer {
         UnsafeRawBufferPointer(start: base, count: length)
     }
 
