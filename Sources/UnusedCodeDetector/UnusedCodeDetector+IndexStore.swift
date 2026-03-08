@@ -23,6 +23,7 @@ extension UnusedCodeDetector {
             checkFreshness: true,
             warnOnStale: configuration.warnOnStaleIndex,
             hybridMode: configuration.hybridMode,
+            logger: configuration.logger,
         )
         let fallbackManager = IndexStoreFallbackManager(configuration: fallbackConfig)
 
@@ -45,8 +46,8 @@ extension UnusedCodeDetector {
         case .reachability(let reason):
             // Log the reason and fall back
             if configuration.warnOnStaleIndex {
-                print("Note: \(reason.description)")
-                print("Falling back to reachability-based analysis.")
+                configuration.logger.warning("Note: \(reason.description)")
+                configuration.logger.warning("Falling back to reachability-based analysis.")
             }
             return try await detectUnusedWithReachability(in: files)
         }

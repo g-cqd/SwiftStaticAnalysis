@@ -27,39 +27,12 @@ import SwiftSyntax
 /// - Type (class, struct, enum, protocol, actor, extension)
 /// - Function/Method
 /// - Closure
-public final class ScopeNodeFinder: SyntaxVisitor {
-    /// The target line number (1-indexed).
-    private let targetLine: Int
-
-    /// The target column number (1-indexed).
-    private let targetColumn: Int
-
+public final class ScopeNodeFinder: SourceLocationSyntaxVisitor {
     /// The innermost scope containing the target position.
     public private(set) var innermostScope: Syntax?
 
     /// Stack of all scopes containing the target (outermost to innermost).
     public private(set) var scopeStack: [Syntax] = []
-
-    /// The converter for source locations.
-    private var converter: SourceLocationConverter?
-
-    /// Creates a new scope finder.
-    ///
-    /// - Parameters:
-    ///   - targetLine: The line number to search for (1-indexed).
-    ///   - targetColumn: The column number to search for (1-indexed).
-    public init(targetLine: Int, targetColumn: Int) {
-        self.targetLine = targetLine
-        self.targetColumn = targetColumn
-        super.init(viewMode: .sourceAccurate)
-    }
-
-    // MARK: - Visitor Methods
-
-    public override func visit(_ node: SourceFileSyntax) -> SyntaxVisitorContinueKind {
-        converter = SourceLocationConverter(fileName: "", tree: node)
-        return .visitChildren
-    }
 
     public override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
         checkScope(Syntax(node))
@@ -161,24 +134,14 @@ public final class ScopeNodeFinder: SyntaxVisitor {
 
     /// Checks if the target position is within the node and pushes it to the scope stack.
     private func checkScope(_ node: Syntax) -> SyntaxVisitorContinueKind {
-        guard let converter else { return .visitChildren }
-
-        let startLoc = node.startLocation(converter: converter)
-        let endLoc = node.endLocation(converter: converter)
-
-        // Check if target is within this node's range
-        let startsBeforeOrAt =
-            startLoc.line < targetLine || (startLoc.line == targetLine && startLoc.column <= targetColumn)
-        let endsAfterOrAt = endLoc.line > targetLine || (endLoc.line == targetLine && endLoc.column >= targetColumn)
-
-        if startsBeforeOrAt && endsAfterOrAt {
+        if containsTarget(node) {
             scopeStack.append(node)
             innermostScope = node
             return .visitChildren
         }
 
         // If we're past the target, no need to continue
-        if startLoc.line > targetLine {
+        if isPastTarget(node) {
             return .skipChildren
         }
 

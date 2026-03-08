@@ -19,36 +19,9 @@ import SwiftSyntax
 ///     print("Found: \(decl)")
 /// }
 /// ```
-public final class DeclarationNodeFinder: SyntaxVisitor {
-    /// The target line number (1-indexed).
-    private let targetLine: Int
-
-    /// The target column number (1-indexed).
-    private let targetColumn: Int
-
+public final class DeclarationNodeFinder: SourceLocationSyntaxVisitor {
     /// The found declaration node, if any.
     public private(set) var foundDeclaration: Syntax?
-
-    /// The converter for source locations.
-    private var converter: SourceLocationConverter?
-
-    /// Creates a new declaration node finder.
-    ///
-    /// - Parameters:
-    ///   - targetLine: The line number to search for (1-indexed).
-    ///   - targetColumn: The column number to search for (1-indexed).
-    public init(targetLine: Int, targetColumn: Int) {
-        self.targetLine = targetLine
-        self.targetColumn = targetColumn
-        super.init(viewMode: .sourceAccurate)
-    }
-
-    // MARK: - Visitor Methods
-
-    public override func visit(_ node: SourceFileSyntax) -> SyntaxVisitorContinueKind {
-        converter = SourceLocationConverter(fileName: "", tree: node)
-        return .visitChildren
-    }
 
     public override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
         checkAndStore(Syntax(node))
@@ -144,16 +117,13 @@ public final class DeclarationNodeFinder: SyntaxVisitor {
 
     /// Checks if a node matches the target location and stores it if so.
     private func checkAndStore(_ node: Syntax) {
-        guard let converter else { return }
-
-        let location = node.startLocation(converter: converter)
+        guard let location = startLocation(of: node) else { return }
 
         // Check if this declaration starts at the target line
         if location.line == targetLine {
             // If we already have a match, prefer the one closer to the target column
             if let existing = foundDeclaration {
-                let existingLoc = existing.startLocation(converter: converter)
-                if abs(location.column - targetColumn) < abs(existingLoc.column - targetColumn) {
+                if isCloserToTargetColumn(candidate: node, than: existing) {
                     foundDeclaration = node
                 }
             } else {

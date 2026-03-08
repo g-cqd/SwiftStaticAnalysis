@@ -785,4 +785,50 @@ struct IndexStoreFallbackManagerTests {
 
         #expect(status.isUsable == false)
     }
+
+    @Test("Stale index warning uses configured logger")
+    func staleIndexWarningUsesLogger() async {
+        let recorder = LogRecorder()
+        let config = FallbackConfiguration(
+            warnOnStale: true,
+            logger: AnalysisLogger { level, message in
+                Task {
+                    await recorder.record(level: level, message: message)
+                }
+            }
+        )
+        let manager = IndexStoreFallbackManager(configuration: config)
+
+        manager.logStaleIndexWarning([
+            "A.swift",
+            "B.swift",
+            "C.swift",
+            "D.swift",
+            "E.swift",
+            "F.swift",
+        ])
+
+        for _ in 0..<1_000 where (await recorder.entries.count) < 7 {
+            await Task.yield()
+        }
+
+        let entries = await recorder.entries
+        #expect(entries.count == 7)
+        #expect(entries.allSatisfy { $0.level == .warning })
+        #expect(entries.contains { $0.message.contains("Index store is stale") })
+        #expect(entries.contains { $0.message.contains("... and 1 more") })
+    }
+}
+
+private actor LogRecorder {
+    struct Entry: Sendable {
+        let level: AnalysisLogLevel
+        let message: String
+    }
+
+    private(set) var entries: [Entry] = []
+
+    func record(level: AnalysisLogLevel, message: String) {
+        entries.append(Entry(level: level, message: message))
+    }
 }

@@ -385,22 +385,28 @@ public enum StreamingCloneDeduplication {
         _ stream: AsyncStream<CloneGroup>,
         bufferSize: Int = 100
     ) -> AsyncStream<CloneGroup> {
-        AsyncStream(bufferingPolicy: .bufferingNewest(bufferSize)) { continuation in
-            Task {
-                var seen = Set<String>()
+        TaskBackedAsyncStream.makeStream(
+            bufferingPolicy: .bufferingNewest(bufferSize)
+        ) { continuation in
+            defer { continuation.finish() }
 
-                for await group in stream {
-                    let fingerprint = group.clones
-                        .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
-                        .sorted()
-                        .joined(separator: "|")
+            var seen = Set<String>()
+            var processedGroups = 0
 
-                    if seen.insert(fingerprint).inserted {
-                        continuation.yield(group)
-                    }
+            for await group in stream {
+                let fingerprint = group.clones
+                    .map { "\($0.file):\($0.startLine)-\($0.endLine)" }
+                    .sorted()
+                    .joined(separator: "|")
+
+                if seen.insert(fingerprint).inserted {
+                    continuation.yield(group)
                 }
 
-                continuation.finish()
+                processedGroups += 1
+                if await TaskCooperation.checkpoint(iteration: processedGroups) {
+                    return
+                }
             }
         }
     }

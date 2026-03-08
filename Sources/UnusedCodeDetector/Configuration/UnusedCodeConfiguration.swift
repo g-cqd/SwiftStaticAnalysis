@@ -3,6 +3,7 @@
 //  MIT License
 
 import Foundation
+import SwiftStaticAnalysisCore
 
 // MARK: - UnusedCodeConfiguration
 
@@ -34,6 +35,7 @@ public struct UnusedCodeConfiguration: Sendable {
         ignorePreviewProviders: Bool = true,
         ignoreViewBody: Bool = true,
         useParallelBFS: Bool = false,
+        logger: AnalysisLogger = .osLog(category: "UnusedCodeDetector"),
     ) {
         self.detectVariables = detectVariables
         self.detectFunctions = detectFunctions
@@ -58,6 +60,7 @@ public struct UnusedCodeConfiguration: Sendable {
         self.ignorePreviewProviders = ignorePreviewProviders
         self.ignoreViewBody = ignoreViewBody
         self.useParallelBFS = useParallelBFS
+        self.logger = logger
     }
 
     // MARK: Public
@@ -171,6 +174,9 @@ public struct UnusedCodeConfiguration: Sendable {
     ///
     /// Enable via `--parallel` CLI flag.
     public var useParallelBFS: Bool
+
+    /// Logger used for warnings and fallback notices in library code.
+    public var logger: AnalysisLogger
 
     /// Use IndexStoreDB for accurate detection (deprecated, use mode instead).
     @available(*, deprecated, message: "Use mode = .indexStore instead")

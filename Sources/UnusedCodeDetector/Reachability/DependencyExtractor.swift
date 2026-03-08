@@ -142,30 +142,42 @@ public struct DependencyExtractor: Sendable {
         }
         let declByName = declByNameMutable
 
-        return AsyncStream(bufferingPolicy: .bufferingNewest(bufferSize)) { continuation in
-            Task {
-                for declaration in declarations.declarations {
-                    let edges = self.computeEdgesForDeclaration(
-                        declaration,
-                        references: references,
-                        declByName: declByName
-                    )
-                    for edge in edges {
-                        continuation.yield(edge)
+        return TaskBackedAsyncStream.makeStream(
+            bufferingPolicy: .bufferingNewest(bufferSize)
+        ) { continuation in
+            defer { continuation.finish() }
+
+            var yieldedEdges = 0
+
+            for declaration in declarations.declarations {
+                let edges = self.computeEdgesForDeclaration(
+                    declaration,
+                    references: references,
+                    declByName: declByName
+                )
+                for edge in edges {
+                    continuation.yield(edge)
+                    yieldedEdges += 1
+
+                    if await TaskCooperation.checkpoint(iteration: yieldedEdges) {
+                        return
                     }
                 }
+            }
 
-                // Also stream protocol witness edges
-                if self.configuration.trackProtocolWitnesses {
-                    for await edge in self.streamProtocolWitnessEdges(
-                        result: result,
-                        declByName: declByName
-                    ) {
-                        continuation.yield(edge)
+            // Also stream protocol witness edges
+            if self.configuration.trackProtocolWitnesses {
+                for await edge in self.streamProtocolWitnessEdges(
+                    result: result,
+                    declByName: declByName
+                ) {
+                    continuation.yield(edge)
+                    yieldedEdges += 1
+
+                    if await TaskCooperation.checkpoint(iteration: yieldedEdges) {
+                        return
                     }
                 }
-
-                continuation.finish()
             }
         }
     }
@@ -180,27 +192,37 @@ public struct DependencyExtractor: Sendable {
             $0.kind == .class || $0.kind == .struct || $0.kind == .enum
         }
 
-        return AsyncStream { continuation in
-            Task {
-                // Stream protocol witness edges
-                for proto in protocols {
-                    for edge in self.computeProtocolWitnessEdges(
-                        for: proto,
-                        result: result,
-                        declByName: declByName
-                    ) {
-                        continuation.yield(edge)
+        return TaskBackedAsyncStream.makeStream { continuation in
+            defer { continuation.finish() }
+
+            var yieldedEdges = 0
+
+            // Stream protocol witness edges
+            for proto in protocols {
+                for edge in self.computeProtocolWitnessEdges(
+                    for: proto,
+                    result: result,
+                    declByName: declByName
+                ) {
+                    continuation.yield(edge)
+                    yieldedEdges += 1
+
+                    if await TaskCooperation.checkpoint(iteration: yieldedEdges) {
+                        return
                     }
                 }
+            }
 
-                // Stream type method edges
-                for type in types {
-                    for edge in self.computeTypeMethodEdges(for: type, result: result) {
-                        continuation.yield(edge)
+            // Stream type method edges
+            for type in types {
+                for edge in self.computeTypeMethodEdges(for: type, result: result) {
+                    continuation.yield(edge)
+                    yieldedEdges += 1
+
+                    if await TaskCooperation.checkpoint(iteration: yieldedEdges) {
+                        return
                     }
                 }
-
-                continuation.finish()
             }
         }
     }

@@ -225,38 +225,19 @@ public enum ParallelConnectedComponents {
         visited: AtomicBitmap,
         maxConcurrency: Int
     ) async -> [Int] {
-        let nodeCount = graph.nodeCount
-        let chunkSize = max(1, nodeCount / maxConcurrency)
+        await ParallelFrontierExpansion.expandRangeParallel(
+            nodeCount: graph.nodeCount,
+            maxConcurrency: maxConcurrency
+        ) { node in
+            guard !visited.test(node) else { return false }
 
-        return await withTaskGroup(of: [Int].self) { group in
-            for chunk in (0..<nodeCount).chunks(ofCount: chunkSize) {
-                group.addTask {
-                    var localNext: [Int] = []
-
-                    for node in chunk {
-                        // Skip already visited
-                        guard !visited.test(node) else { continue }
-
-                        // Check if any neighbor is in frontier
-                        for neighbor in graph.adjacency[node] {
-                            if frontierBitmap.test(neighbor) {
-                                if visited.testAndSet(node) {
-                                    localNext.append(node)
-                                }
-                                break  // Only need one neighbor in frontier
-                            }
-                        }
-                    }
-
-                    return localNext
+            for neighbor in graph.adjacency[node] {
+                if frontierBitmap.test(neighbor) {
+                    return visited.testAndSet(node)
                 }
             }
 
-            var result: [Int] = []
-            for await partial in group {
-                result.append(contentsOf: partial)
-            }
-            return result
+            return false
         }
     }
 

@@ -6,6 +6,7 @@ import DuplicationDetector
 import Foundation
 import MCP
 import SwiftStaticAnalysisCore
+import SwiftStaticAnalysisOutput
 import SymbolLookup
 import UnusedCodeDetector
 
@@ -607,7 +608,7 @@ extension SWAMCPServer {
         let detector = UnusedCodeDetector(configuration: config)
         let results = try await detector.detectUnused(in: files)
 
-        let output = MCPTextFormatter.formatUnused(results, rootPath: context.rootPath)
+        let output = CompactTextFormatter.formatUnused(results, rootPath: context.rootPath)
         return .init(content: [.text(output)], isError: false)
     }
 
@@ -657,7 +658,7 @@ extension SWAMCPServer {
         let detector = DuplicationDetector(configuration: config)
         let results = try await detector.detectClones(in: files)
 
-        let output = MCPTextFormatter.formatClones(results, rootPath: context.rootPath)
+        let output = CompactTextFormatter.formatClones(results, rootPath: context.rootPath)
         return .init(content: [.text(output)], isError: false)
     }
 
@@ -978,64 +979,6 @@ extension Value {
 /// Text formatting utilities optimized for LLM consumption.
 /// Grouped by file, minimal markup, positional semantics.
 enum MCPTextFormatter {
-    /// Format unused code results in compact text.
-    static func formatUnused(_ unused: [UnusedCode], rootPath: String) -> String {
-        if unused.isEmpty { return "UNUSED 0 items\n(none)" }
-
-        var output = "UNUSED \(unused.count) items"
-
-        // Group by file
-        let byFile = Dictionary(grouping: unused) { $0.declaration.location.file }
-        let sortedFiles = byFile.keys.sorted()
-
-        for file in sortedFiles {
-            guard let items = byFile[file] else { continue }
-            let sortedItems = items.sorted { $0.declaration.location.line < $1.declaration.location.line }
-            let relativePath = file.hasPrefix(rootPath) ? String(file.dropFirst(rootPath.count + 1)) : file
-
-            output += "\n\n\(relativePath)"
-            for item in sortedItems {
-                let d = item.declaration
-                let conf = String(item.confidence.rawValue.prefix(1)).uppercased()
-                let reason = shortReason(item.reason)
-                output += "\n  \(d.location.line) \(d.kind.rawValue) \(d.name) [\(conf)] \(reason)"
-            }
-        }
-        return output
-    }
-
-    /// Format clone groups in compact text.
-    static func formatClones(_ clones: [CloneGroup], rootPath: String) -> String {
-        if clones.isEmpty { return "CLONES 0 groups\n(none)" }
-
-        var output = "CLONES \(clones.count) groups"
-
-        // Group by type
-        let byType = Dictionary(grouping: clones) { $0.type }
-
-        for type in [CloneType.exact, .near, .semantic] {
-            guard let groups = byType[type], !groups.isEmpty else { continue }
-
-            let totalLines = groups.reduce(0) { $0 + $1.duplicatedLines }
-            output += "\n\n\(type.rawValue) \(groups.count) groups \(totalLines) duplicated lines"
-
-            for (index, group) in groups.enumerated() {
-                let simStr = group.similarity < 1.0 ? " \(Int(group.similarity * 100))%" : ""
-                let linesPerOccurrence = group.duplicatedLines / max(1, group.occurrences - 1)
-                output += "\n  [\(index + 1)]\(simStr) \(group.occurrences)x \(linesPerOccurrence)L"
-
-                // Group by file
-                let byFile = Dictionary(grouping: group.clones) { $0.file }
-                for (file, fileClones) in byFile.sorted(by: { $0.key < $1.key }) {
-                    let relativePath = file.hasPrefix(rootPath) ? String(file.dropFirst(rootPath.count + 1)) : file
-                    let ranges = fileClones.map { "\($0.startLine)-\($0.endLine)" }.joined(separator: " ")
-                    output += "\n    \(relativePath): \(ranges)"
-                }
-            }
-        }
-        return output
-    }
-
     /// Format symbol matches in compact text.
     static func formatSymbols(_ matches: [Declaration], rootPath: String) -> String {
         if matches.isEmpty { return "SYMBOLS 0 matches\n(none)" }
@@ -1106,15 +1049,5 @@ enum MCPTextFormatter {
         }
 
         return output
-    }
-
-    private static func shortReason(_ reason: UnusedReason) -> String {
-        switch reason {
-        case .neverReferenced: return "unused"
-        case .onlyAssigned: return "written-only"
-        case .onlySelfReferenced: return "self-ref"
-        case .importNotUsed: return "unused-import"
-        case .parameterUnused: return "unused-param"
-        }
     }
 }

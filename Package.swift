@@ -131,6 +131,20 @@ let package = Package(
             ]
         ),
 
+        // MARK: - Shared Output Formatting
+        .target(
+            name: "SwiftStaticAnalysisOutput",
+            dependencies: [
+                "SwiftStaticAnalysisCore",
+                "DuplicationDetector",
+                "UnusedCodeDetector",
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+                .enableExperimentalFeature("StrictConcurrency"),
+            ]
+        ),
+
         // MARK: - Symbol Lookup
         .target(
             name: "SymbolLookup",
@@ -150,6 +164,7 @@ let package = Package(
             name: "swa",
             dependencies: [
                 "SwiftStaticAnalysisCore",
+                "SwiftStaticAnalysisOutput",
                 "DuplicationDetector",
                 "UnusedCodeDetector",
                 "SymbolLookup",
@@ -203,6 +218,7 @@ let package = Package(
             name: "SwiftStaticAnalysisMCP",
             dependencies: [
                 "SwiftStaticAnalysisCore",
+                "SwiftStaticAnalysisOutput",
                 "DuplicationDetector",
                 "UnusedCodeDetector",
                 "SymbolLookup",
@@ -251,6 +267,13 @@ let package = Package(
         .testTarget(
             name: "SymbolLookupTests",
             dependencies: ["SymbolLookup"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "SwiftStaticAnalysisOutputTests",
+            dependencies: ["SwiftStaticAnalysisOutput"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

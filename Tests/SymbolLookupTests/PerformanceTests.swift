@@ -208,7 +208,9 @@ struct RegexCachePerformanceTests {
     func sharedCacheAccessible() {
         let shared = RegexCache.shared
 
-        #expect(shared != nil)
+        _ = shared.regex(for: "shared_cache_accessible")
+
+        #expect(shared.count >= 1)
     }
 }
 

@@ -35,11 +35,18 @@ public enum ParallelFrontierExpansion {
             for chunk in frontier.chunks(ofCount: chunkSize) {
                 group.addTask {
                     var localNext: [Int] = []
+                    var processedNodes = 0
+
                     for node in chunk {
                         for neighbor in getNeighbors(node) {
                             if testAndSetVisited(neighbor) {
                                 localNext.append(neighbor)
                             }
+                        }
+
+                        processedNodes += 1
+                        if await TaskCooperation.checkpoint(iteration: processedNodes) {
+                            break
                         }
                     }
                     return localNext
@@ -75,9 +82,16 @@ public enum ParallelFrontierExpansion {
             for chunk in (0..<nodeCount).chunks(ofCount: chunkSize) {
                 group.addTask {
                     var localNext: [Int] = []
+                    var processedNodes = 0
+
                     for node in chunk {
                         if shouldExpand(node) {
                             localNext.append(node)
+                        }
+
+                        processedNodes += 1
+                        if await TaskCooperation.checkpoint(iteration: processedNodes) {
+                            break
                         }
                     }
                     return localNext

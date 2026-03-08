@@ -293,16 +293,7 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
             // Warn about stale files if applicable
             if case .stale(_, let staleFiles) = status {
                 if configuration.warnOnStale {
-                    // Log warning (in a real implementation, use proper logging)
-                    print(
-                        "Warning: Index store is stale. \(staleFiles.count) file(s) have been modified since last build:",
-                    )
-                    for file in staleFiles.prefix(5) {
-                        print("  - \(file)")
-                    }
-                    if staleFiles.count > 5 {
-                        print("  ... and \(staleFiles.count - 5) more")
-                    }
+                    logStaleIndexWarning(staleFiles)
                 }
             }
 
@@ -321,6 +312,20 @@ public final class IndexStoreFallbackManager: @unchecked Sendable {
 
     /// Path to libIndexStore.dylib.
     private let libIndexStorePath: String?
+
+    func logStaleIndexWarning(_ staleFiles: [String]) {
+        configuration.logger.warning(
+            "Index store is stale. \(staleFiles.count) file(s) have been modified since last build:"
+        )
+
+        for file in staleFiles.prefix(5) {
+            configuration.logger.warning("  - \(file)")
+        }
+
+        if staleFiles.count > 5 {
+            configuration.logger.warning("  ... and \(staleFiles.count - 5) more")
+        }
+    }
 
     /// Find files that are newer than the index.
     private func findStaleFiles(
@@ -517,12 +522,14 @@ public struct FallbackConfiguration: Sendable {
         warnOnStale: Bool = true,
         hybridMode: Bool = false,
         maxStaleness: TimeInterval = 3600,  // 1 hour
+        logger: AnalysisLogger = .osLog(category: "IndexStoreFallback"),
     ) {
         self.autoBuild = autoBuild
         self.checkFreshness = checkFreshness
         self.warnOnStale = warnOnStale
         self.hybridMode = hybridMode
         self.maxStaleness = maxStaleness
+        self.logger = logger
     }
 
     // MARK: Public
@@ -562,4 +569,7 @@ public struct FallbackConfiguration: Sendable {
 
     /// Maximum staleness (in seconds) before considering a rebuild.
     public var maxStaleness: TimeInterval
+
+    /// Logger used for fallback warnings.
+    public var logger: AnalysisLogger
 }

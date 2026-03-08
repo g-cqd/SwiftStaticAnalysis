@@ -580,13 +580,8 @@ struct ScopeNodeFinderTests {
     func finderInitialization() {
         let finder = ScopeNodeFinder(targetLine: 10, targetColumn: 5)
 
-        // Verify it can be walked
-        let source = "let x = 5"
-        let tree = Parser.parse(source: source)
-        finder.walk(tree)
-
-        // Should complete without error
-        #expect(true)
+        #expect(finder.targetLine == 10)
+        #expect(finder.targetColumn == 5)
     }
 
     @Test("ContextScopeKind rawValues are correct")

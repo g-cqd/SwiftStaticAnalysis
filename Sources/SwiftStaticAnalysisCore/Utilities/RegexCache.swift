@@ -3,6 +3,7 @@
 //  MIT License
 
 import Foundation
+import Synchronization
 
 // MARK: - RegexCache
 
@@ -19,7 +20,7 @@ import Foundation
 /// ```
 ///
 /// - Note: This class is safe to use from multiple threads/tasks.
-public final class RegexCache: @unchecked Sendable {
+public final class RegexCache: Sendable {
     // MARK: Lifecycle
 
     /// Creates a new regex cache.
@@ -39,29 +40,24 @@ public final class RegexCache: @unchecked Sendable {
     /// - Parameter pattern: The regex pattern string.
     /// - Returns: The compiled regex, or nil if the pattern is invalid.
     public func regex(for pattern: String) -> Regex<AnyRegexOutput>? {
-        lock.lock()
-        defer { lock.unlock() }
-
-        // Check cache first
-        if let cached = cache[pattern] {
-            return cached
-        }
-
-        // Compile and cache
-        guard let compiled = try? Regex(pattern) else {
-            return nil
-        }
-
-        // Evict oldest entry if at capacity
-        if cache.count >= capacity {
-            // Simple eviction: remove first entry
-            if let firstKey = cache.keys.first {
-                cache.removeValue(forKey: firstKey)
+        storage.withLock { storage in
+            if let cached = storage.cache[pattern] {
+                return cached
             }
-        }
 
-        cache[pattern] = compiled
-        return compiled
+            guard let compiled = try? Regex(pattern) else {
+                return nil
+            }
+
+            if storage.cache.count >= capacity,
+                let firstKey = storage.cache.keys.first
+            {
+                storage.cache.removeValue(forKey: firstKey)
+            }
+
+            storage.cache[pattern] = compiled
+            return compiled
+        }
     }
 
     /// Checks if a pattern is already cached.
@@ -69,30 +65,33 @@ public final class RegexCache: @unchecked Sendable {
     /// - Parameter pattern: The regex pattern string.
     /// - Returns: True if the pattern is cached.
     public func isCached(_ pattern: String) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return cache[pattern] != nil
+        storage.withLock { storage in
+            storage.cache[pattern] != nil
+        }
     }
 
     /// Clears all cached patterns.
     public func clear() {
-        lock.lock()
-        defer { lock.unlock() }
-        cache.removeAll()
+        storage.withLock { storage in
+            storage.cache.removeAll()
+        }
     }
 
     /// Number of patterns currently cached.
     public var count: Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return cache.count
+        storage.withLock { storage in
+            storage.cache.count
+        }
     }
 
     // MARK: Private
 
     private let capacity: Int
-    private var cache: [String: Regex<AnyRegexOutput>] = [:]
-    private let lock = NSLock()
+    private let storage = Mutex(Storage())
+
+    private struct Storage {
+        var cache: [String: Regex<AnyRegexOutput>] = [:]
+    }
 }
 
 // MARK: - CompiledPatterns

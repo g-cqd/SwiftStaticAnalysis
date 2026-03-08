@@ -6,6 +6,7 @@ import ArgumentParser
 import DuplicationDetector
 import Foundation
 import SwiftStaticAnalysisCore
+import SwiftStaticAnalysisOutput
 import SymbolLookup
 import UnusedCodeDetector
 
@@ -958,34 +959,7 @@ enum OutputFormatter {
     /// Format: Groups clones by type, shows file:lines compactly.
     static func printCloneGroupsText(_ clones: [CloneGroup], header: String? = nil) {
         if let header { print(header) }
-        if clones.isEmpty {
-            print("(none)")
-            return
-        }
-
-        // Group by type for better organization
-        let byType = Dictionary(grouping: clones) { $0.type }
-
-        for type in [CloneType.exact, .near, .semantic] {
-            guard let groups = byType[type], !groups.isEmpty else { continue }
-
-            let totalLines = groups.reduce(0) { $0 + $1.duplicatedLines }
-            print("\n\(type.rawValue) \(groups.count) groups \(totalLines) duplicated lines")
-
-            for (index, group) in groups.enumerated() {
-                let simStr = group.similarity < 1.0 ? " \(Int(group.similarity * 100))%" : ""
-                print(
-                    "  [\(index + 1)]\(simStr) \(group.occurrences)x \(group.duplicatedLines / max(1, group.occurrences - 1))L"
-                )
-
-                // Group clone locations by file for compactness
-                let byFile = Dictionary(grouping: group.clones) { $0.file }
-                for (file, fileClones) in byFile.sorted(by: { $0.key < $1.key }) {
-                    let ranges = fileClones.map { "\($0.startLine)-\($0.endLine)" }.joined(separator: " ")
-                    print("    \(file): \(ranges)")
-                }
-            }
-        }
+        print(CompactTextFormatter.formatClones(clones, includeHeader: false))
     }
 
     /// Print clone groups in Xcode-compatible warning format.
@@ -1002,39 +976,7 @@ enum OutputFormatter {
     /// Print unused code items in compact text format.
     /// Format: Grouped by file, one line per item with kind/name/line/confidence/reason.
     static func printUnusedText(_ unused: [UnusedCode]) {
-        if unused.isEmpty {
-            print("(none)")
-            return
-        }
-
-        // Group by file
-        let byFile = Dictionary(grouping: unused) { $0.declaration.location.file }
-        let sortedFiles = byFile.keys.sorted()
-
-        for file in sortedFiles {
-            guard let items = byFile[file] else { continue }
-            let sortedItems = items.sorted { $0.declaration.location.line < $1.declaration.location.line }
-
-            print("\n\(file)")
-            for item in sortedItems {
-                let d = item.declaration
-                let conf = String(item.confidence.rawValue.prefix(1)).uppercased()
-                let reasonShort = shortReason(item.reason)
-                // Format: line kind name [confidence] reason
-                print("  \(d.location.line) \(d.kind.rawValue) \(d.name) [\(conf)] \(reasonShort)")
-            }
-        }
-    }
-
-    /// Shorten unused reason for compact display.
-    private static func shortReason(_ reason: UnusedReason) -> String {
-        switch reason {
-        case .neverReferenced: return "unused"
-        case .onlyAssigned: return "written-only"
-        case .onlySelfReferenced: return "self-ref"
-        case .importNotUsed: return "unused-import"
-        case .parameterUnused: return "unused-param"
-        }
+        print(CompactTextFormatter.formatUnused(unused, includeHeader: false))
     }
 
     /// Print unused code items in Xcode-compatible warning format.

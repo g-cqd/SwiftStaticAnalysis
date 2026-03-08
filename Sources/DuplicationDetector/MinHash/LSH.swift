@@ -200,13 +200,23 @@ public struct LSHIndex: Sendable, LSHQueryable {
     ///   - startBand: Starting band index (inclusive).
     ///   - endBand: Ending band index (exclusive).
     /// - Returns: Candidate pairs found in the specified bands.
-    public func findCandidatePairsInBands(from startBand: Int, to endBand: Int) -> Set<DocumentPair> {
+    public func findCandidatePairsInBands(from startBand: Int, to endBand: Int) async -> Set<DocumentPair> {
         var candidates = Set<DocumentPair>()
+        var inspectedPairs = 0
 
         for band in startBand..<min(endBand, bands) {
+            if Task.isCancelled {
+                return candidates
+            }
+
             for (_, docIds) in buckets[band] {
                 for pair in docIds.combinations(ofCount: 2) {
                     candidates.insert(DocumentPair(id1: pair[0], id2: pair[1]))
+                    inspectedPairs += 1
+
+                    if await TaskCooperation.checkpoint(iteration: inspectedPairs) {
+                        return candidates
+                    }
                 }
             }
         }
@@ -236,7 +246,7 @@ public struct LSHIndex: Sendable, LSHQueryable {
                 let endBand = chunk.upperBound
 
                 group.addTask {
-                    self.findCandidatePairsInBands(from: startBand, to: endBand)
+                    await self.findCandidatePairsInBands(from: startBand, to: endBand)
                 }
             }
 
@@ -263,24 +273,34 @@ public struct LSHIndex: Sendable, LSHQueryable {
         let bands = self.bands
         let buckets = self.buckets
 
-        return AsyncStream(bufferingPolicy: .bufferingNewest(bufferSize)) { continuation in
-            Task {
-                var seen = Set<DocumentPair>()
+        return TaskBackedAsyncStream.makeStream(
+            bufferingPolicy: .bufferingNewest(bufferSize)
+        ) { continuation in
+            defer { continuation.finish() }
 
-                for band in 0..<bands {
-                    for (_, docIds) in buckets[band] {
-                        for pair in docIds.combinations(ofCount: 2) {
-                            let documentPair = DocumentPair(id1: pair[0], id2: pair[1])
+            var inspectedPairs = 0
+            var seen = Set<DocumentPair>()
 
-                            // Deduplicate on the fly
-                            if seen.insert(documentPair).inserted {
-                                continuation.yield(documentPair)
-                            }
+            for band in 0..<bands {
+                if Task.isCancelled {
+                    return
+                }
+
+                for (_, docIds) in buckets[band] {
+                    for pair in docIds.combinations(ofCount: 2) {
+                        let documentPair = DocumentPair(id1: pair[0], id2: pair[1])
+
+                        // Deduplicate on the fly
+                        if seen.insert(documentPair).inserted {
+                            continuation.yield(documentPair)
+                        }
+
+                        inspectedPairs += 1
+                        if await TaskCooperation.checkpoint(iteration: inspectedPairs) {
+                            return
                         }
                     }
                 }
-
-                continuation.finish()
             }
         }
     }

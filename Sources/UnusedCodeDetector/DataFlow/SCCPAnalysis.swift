@@ -197,7 +197,7 @@ public struct SCCPResult: Sendable {
 // MARK: - SCCPAnalysis
 
 /// Performs Sparse Conditional Constant Propagation analysis.
-public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:this type_body_length
+public final class SCCPAnalysis: Sendable {  // swiftlint:disable:this type_body_length
     // MARK: Lifecycle
 
     public init(configuration: Configuration = .default) {
@@ -244,58 +244,27 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
     /// - Parameter cfg: The control flow graph to analyze.
     /// - Returns: Analysis results.
     public func analyze(_ cfg: ControlFlowGraph) -> SCCPResult {
-        // Reset state
-        self.cfg = cfg
-        values = [:]
-        executableEdges = []
-        ssaWorklist = []
-        cfgWorklist = []
-        visitedBlocks = []
-
-        // Initialize: entry edge is executable
-        cfgWorklist.append(CFGEdge(from: .entry, to: cfg.entryBlock))
-
-        var iterations = 0
-
-        // Main worklist loop
-        while !cfgWorklist.isEmpty || !ssaWorklist.isEmpty, iterations < configuration.maxIterations {
-            iterations += 1
-
-            // Process CFG edges
-            while let edge = cfgWorklist.popLast() {
-                if executableEdges.insert(edge).inserted {
-                    visitBlock(edge.to)
-                }
-            }
-
-            // Process SSA definitions
-            while let variable = ssaWorklist.popLast() {
-                propagateValue(variable)
-            }
-        }
-
-        // Find unreachable blocks
-        let unreachableBlocks = findUnreachableBlocks(cfg)
-
-        // Find dead branches
-        let deadBranches = configuration.detectDeadBranches ? findDeadBranches(cfg) : []
-
-        // Find propagatable constants
-        let constants = findPropagatableConstants(cfg)
-
-        return SCCPResult(
-            cfg: cfg,
-            variableValues: values,
-            executableEdges: executableEdges,
-            unreachableBlocks: unreachableBlocks,
-            deadBranches: deadBranches,
-            propagatableConstants: constants,
-        )
+        var session = SCCPAnalysisSession(configuration: configuration, cfg: cfg)
+        return session.run()
     }
 
     // MARK: Private
 
     private let configuration: Configuration
+}
+
+private struct SCCPAnalysisSession {
+    // MARK: Lifecycle
+
+    init(configuration: SCCPAnalysis.Configuration, cfg: ControlFlowGraph) {
+        self.configuration = configuration
+        self.cfg = cfg
+    }
+
+    // MARK: Private
+
+    private let configuration: SCCPAnalysis.Configuration
+    private let cfg: ControlFlowGraph
 
     /// Lattice values for variables.
     private var values: [String: LatticeValue] = [:]
@@ -312,32 +281,60 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
     /// Blocks that have been visited.
     private var visitedBlocks: Set<BlockID> = []
 
-    /// The CFG being analyzed.
-    private var cfg: ControlFlowGraph?
+    // MARK: - Execution
+
+    mutating func run() -> SCCPResult {
+        cfgWorklist.append(CFGEdge(from: .entry, to: cfg.entryBlock))
+
+        var iterations = 0
+
+        while !cfgWorklist.isEmpty || !ssaWorklist.isEmpty, iterations < configuration.maxIterations {
+            iterations += 1
+
+            while let edge = cfgWorklist.popLast() {
+                if executableEdges.insert(edge).inserted {
+                    visitBlock(edge.to)
+                }
+            }
+
+            while let variable = ssaWorklist.popLast() {
+                propagateValue(variable)
+            }
+        }
+
+        let unreachableBlocks = findUnreachableBlocks()
+        let deadBranches = configuration.detectDeadBranches ? findDeadBranches() : []
+        let constants = findPropagatableConstants()
+
+        return SCCPResult(
+            cfg: cfg,
+            variableValues: values,
+            executableEdges: executableEdges,
+            unreachableBlocks: unreachableBlocks,
+            deadBranches: deadBranches,
+            propagatableConstants: constants,
+        )
+    }
 
     // MARK: - Block Processing
 
-    private func visitBlock(_ blockID: BlockID) {
-        guard let cfg, let block = cfg.blocks[blockID] else { return }
+    private mutating func visitBlock(_ blockID: BlockID) {
+        guard let block = cfg.blocks[blockID] else { return }
 
         let firstVisit = !visitedBlocks.contains(blockID)
         visitedBlocks.insert(blockID)
 
-        // Process statements
         for statement in block.statements {
             evaluateStatement(statement)
         }
 
-        // Process terminator
         if let terminator = block.terminator {
             processTerminator(terminator, in: blockID, firstVisit: firstVisit)
         }
     }
 
-    private func evaluateStatement(_ statement: CFGStatement) {
-        // Try to evaluate assignments
+    private mutating func evaluateStatement(_ statement: CFGStatement) {
         for variable in statement.defs {
-            // Check by name for ignored variables
             if configuration.ignoredVariables.contains(variable.name) {
                 continue
             }
@@ -348,48 +345,39 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
     }
 
     private func evaluateExpression(_ syntax: Syntax) -> LatticeValue {
-        // Integer literals
-        if let intLit = syntax.as(IntegerLiteralExprSyntax.self) {
-            if let value = Int(intLit.literal.text) {
-                return .constant(.int(value))
-            }
+        if let intLit = syntax.as(IntegerLiteralExprSyntax.self),
+            let value = Int(intLit.literal.text)
+        {
+            return .constant(.int(value))
         }
 
-        // Boolean literals
         if let boolLit = syntax.as(BooleanLiteralExprSyntax.self) {
             let value = boolLit.literal.text == "true"
             return .constant(.bool(value))
         }
 
-        // String literals
         if configuration.trackStrings, let strLit = syntax.as(StringLiteralExprSyntax.self) {
-            // Extract string content (simplified)
             let content = strLit.segments.description
             return .constant(.string(content))
         }
 
-        // Nil literal
         if syntax.is(NilLiteralExprSyntax.self) {
             return .constant(.nil)
         }
 
-        // Variable reference - use current lattice value
         if let declRef = syntax.as(DeclReferenceExprSyntax.self) {
             let name = declRef.baseName.text
             return values[name] ?? .top
         }
 
-        // Binary operators
         if let infixExpr = syntax.as(InfixOperatorExprSyntax.self) {
             return evaluateBinaryOp(infixExpr)
         }
 
-        // Prefix operators (!, -)
         if let prefixExpr = syntax.as(PrefixOperatorExprSyntax.self) {
             return evaluatePrefixOp(prefixExpr)
         }
 
-        // For complex expressions, return bottom (non-constant)
         return .bottom
     }
 
@@ -402,22 +390,17 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
         let leftValue = evaluateExpression(Syntax(expr.leftOperand))
         let rightValue = evaluateExpression(Syntax(expr.rightOperand))
 
-        // If either operand is top, we can't evaluate yet
         if case .top = leftValue { return .top }
         if case .top = rightValue { return .top }
-
-        // If either operand is bottom, result is bottom
         if case .bottom = leftValue { return .bottom }
         if case .bottom = rightValue { return .bottom }
 
-        // Both are constants - evaluate
         guard case .constant(let left) = leftValue,
             case .constant(let right) = rightValue
         else {
             return .bottom
         }
 
-        // Arithmetic operations
         if case .int(let l) = left, case .int(let r) = right {
             switch opText {
             case "+": return .constant(.int(l + r))
@@ -435,7 +418,6 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
             }
         }
 
-        // Boolean operations
         if case .bool(let l) = left, case .bool(let r) = right {
             switch opText {
             case "&&": return .constant(.bool(l && r))
@@ -450,8 +432,7 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
     }
 
     private func evaluatePrefixOp(_ expr: PrefixOperatorExprSyntax) -> LatticeValue {
-        let op = expr.operator
-        let opText = op.text
+        let opText = expr.operator.text
         let operandValue = evaluateExpression(Syntax(expr.expression))
 
         if case .top = operandValue { return .top }
@@ -463,16 +444,16 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
 
         switch opText {
         case "!":
-            if case .bool(let b) = operand {
-                return .constant(.bool(!b))
+            if case .bool(let value) = operand {
+                return .constant(.bool(!value))
             }
 
         case "-":
-            if case .int(let i) = operand {
-                return .constant(.int(-i))
+            if case .int(let value) = operand {
+                return .constant(.int(-value))
             }
-            if case .double(let d) = operand {
-                return .constant(.double(-d))
+            if case .double(let value) = operand {
+                return .constant(.double(-value))
             }
 
         default:
@@ -484,26 +465,22 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
 
     // MARK: - Terminator Processing
 
-    private func processTerminator(_ terminator: Terminator, in blockID: BlockID, firstVisit: Bool) {
+    private mutating func processTerminator(_ terminator: Terminator, in blockID: BlockID, firstVisit: Bool) {
         switch terminator {
         case .branch(let target):
             cfgWorklist.append(CFGEdge(from: blockID, to: target))
 
         case .conditionalBranch(let condition, let trueTarget, let falseTarget):
-            // Try to evaluate the condition
             let condValue = evaluateCondition(condition)
 
             switch condValue {
             case .constant(.bool(true)):
-                // Only true branch is executable
                 cfgWorklist.append(CFGEdge(from: blockID, to: trueTarget))
 
             case .constant(.bool(false)):
-                // Only false branch is executable
                 cfgWorklist.append(CFGEdge(from: blockID, to: falseTarget))
 
             case .top:
-                // Unknown - conservatively mark both as potentially executable
                 if firstVisit {
                     cfgWorklist.append(CFGEdge(from: blockID, to: trueTarget))
                     cfgWorklist.append(CFGEdge(from: blockID, to: falseTarget))
@@ -511,13 +488,11 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
 
             case .bottom,
                 .constant:
-                // Non-constant or unknown constant type - both branches executable
                 cfgWorklist.append(CFGEdge(from: blockID, to: trueTarget))
                 cfgWorklist.append(CFGEdge(from: blockID, to: falseTarget))
             }
 
         case .switch(_, let cases, let defaultTarget):
-            // For switches, conservatively mark all cases as executable
             for (_, target) in cases {
                 cfgWorklist.append(CFGEdge(from: blockID, to: target))
             }
@@ -528,7 +503,6 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
         case .return,
             .throw,
             .unreachable:
-            // Terminal - connect to exit
             cfgWorklist.append(CFGEdge(from: blockID, to: .exit))
 
         case .fallthrough(let target):
@@ -547,10 +521,6 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
     }
 
     private func evaluateCondition(_ condition: String) -> LatticeValue {
-        // Simple condition evaluation
-        // In a full implementation, we would parse and evaluate the condition expression
-
-        // Check for literal booleans
         if condition.trimmingCharacters(in: .whitespaces) == "true" {
             return .constant(.bool(true))
         }
@@ -558,19 +528,17 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
             return .constant(.bool(false))
         }
 
-        // Check if condition is a simple variable we track
         let trimmed = condition.trimmingCharacters(in: .whitespaces)
         if let value = values[trimmed] {
             return value
         }
 
-        // Unknown - return bottom
         return .bottom
     }
 
     // MARK: - Value Propagation
 
-    private func updateValue(variable: String, value: LatticeValue) {
+    private mutating func updateValue(variable: String, value: LatticeValue) {
         let oldValue = values[variable] ?? .top
         let newValue = oldValue.meet(value)
 
@@ -580,7 +548,8 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
         }
     }
 
-    private func propagateValue(_ variable: String) {
+    private mutating func propagateValue(_ variable: String) {
+        _ = variable
         // In a full SSA-based implementation, we would propagate
         // the value to all uses of this variable.
         // For now, re-evaluation happens on the next block visit.
@@ -588,13 +557,12 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
 
     // MARK: - Result Computation
 
-    private func findUnreachableBlocks(_ cfg: ControlFlowGraph) -> Set<BlockID> {
+    private func findUnreachableBlocks() -> Set<BlockID> {
         var unreachable = Set<BlockID>()
 
         for id in cfg.blockOrder {
             if id == .entry { continue }
 
-            // A block is unreachable if no executable edge leads to it
             let hasExecutableIncoming = executableEdges.contains { $0.to == id }
             if !hasExecutableIncoming {
                 unreachable.insert(id)
@@ -604,7 +572,7 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
         return unreachable
     }
 
-    private func findDeadBranches(_ cfg: ControlFlowGraph) -> [DeadBranch] {
+    private func findDeadBranches() -> [DeadBranch] {
         var deadBranches: [DeadBranch] = []
 
         for id in cfg.blockOrder {
@@ -613,7 +581,6 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
             if case .conditionalBranch(let condition, let trueTarget, let falseTarget) = block.terminator {
                 let condValue = evaluateCondition(condition)
 
-                // Get location from last statement or estimate
                 let location: SwiftStaticAnalysisCore.SourceLocation =
                     if let lastStmt = block.statements.last {
                         lastStmt.location
@@ -623,7 +590,6 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
 
                 switch condValue {
                 case .constant(.bool(true)):
-                    // False branch is dead
                     if !executableEdges.contains(CFGEdge(from: id, to: falseTarget)) {
                         deadBranches.append(
                             DeadBranch(
@@ -635,7 +601,6 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
                     }
 
                 case .constant(.bool(false)):
-                    // True branch is dead
                     if !executableEdges.contains(CFGEdge(from: id, to: trueTarget)) {
                         deadBranches.append(
                             DeadBranch(
@@ -655,7 +620,7 @@ public final class SCCPAnalysis: @unchecked Sendable {  // swiftlint:disable:thi
         return deadBranches
     }
 
-    private func findPropagatableConstants(_ cfg: ControlFlowGraph) -> [(
+    private func findPropagatableConstants() -> [(
         variable: String,
         value: ConstantValue,
         location: SwiftStaticAnalysisCore.SourceLocation,

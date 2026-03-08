@@ -68,7 +68,7 @@ public struct ParallelVerifier: Sendable {
 
         // Fall back to sequential for small batches
         guard pairs.count >= minParallelPairs else {
-            return verifySequential(pairs, documentMap: documentMap)
+            return await verifySequential(pairs, documentMap: documentMap)
         }
 
         // Parallel verification with chunking
@@ -77,7 +77,7 @@ public struct ParallelVerifier: Sendable {
         return await withTaskGroup(of: [ClonePairInfo].self) { group in
             for chunk in pairs.chunks(ofCount: chunkSize) {
                 group.addTask {
-                    self.verifySequential(Array(chunk), documentMap: documentMap)
+                    await self.verifySequential(Array(chunk), documentMap: documentMap)
                 }
             }
 
@@ -122,12 +122,18 @@ public struct ParallelVerifier: Sendable {
     private func verifySequential(
         _ pairs: [DocumentPair],
         documentMap: [Int: ShingledDocument]
-    ) -> [ClonePairInfo] {
+    ) async -> [ClonePairInfo] {
         var results: [ClonePairInfo] = []
+        var processedPairs = 0
 
         for pair in pairs {
             if let verified = verifyPair(pair, documentMap: documentMap) {
                 results.append(verified)
+            }
+
+            processedPairs += 1
+            if await TaskCooperation.checkpoint(iteration: processedPairs) {
+                break
             }
         }
 
@@ -196,6 +202,10 @@ public struct BatchVerifier: Sendable {
 
             if let handler = progressHandler {
                 await handler(processedCount, pairs.count)
+            }
+
+            if await TaskCooperation.checkpoint(iteration: processedCount) {
+                break
             }
         }
 
@@ -297,30 +307,34 @@ public struct StreamingVerifier: Sendable {
         let batchSize = self.batchSize
         let verifier = self.verifier
 
-        return AsyncStream(bufferingPolicy: .bufferingNewest(bufferSize)) { continuation in
-            Task {
-                var processedCount = 0
+        return TaskBackedAsyncStream.makeStream(
+            bufferingPolicy: .bufferingNewest(bufferSize)
+        ) { continuation in
+            defer { continuation.finish() }
 
-                for chunk in pairs.chunks(ofCount: batchSize) {
-                    let batch = Set(chunk)
+            var processedCount = 0
 
-                    let batchResults = await verifier.verifyCandidatePairs(
-                        batch,
-                        documentMap: documentMap
+            for chunk in pairs.chunks(ofCount: batchSize) {
+                let batch = Set(chunk)
+
+                let batchResults = await verifier.verifyCandidatePairs(
+                    batch,
+                    documentMap: documentMap
+                )
+
+                processedCount += chunk.count
+
+                continuation.yield(
+                    VerificationProgress(
+                        processed: processedCount,
+                        total: total,
+                        batchResults: batchResults
                     )
+                )
 
-                    processedCount += chunk.count
-
-                    continuation.yield(
-                        VerificationProgress(
-                            processed: processedCount,
-                            total: total,
-                            batchResults: batchResults
-                        )
-                    )
+                if await TaskCooperation.checkpoint(iteration: processedCount) {
+                    return
                 }
-
-                continuation.finish()
             }
         }
     }
@@ -339,22 +353,29 @@ public struct StreamingVerifier: Sendable {
         let batchSize = self.batchSize
         let verifier = self.verifier
 
-        return AsyncStream(bufferingPolicy: .bufferingNewest(bufferSize * batchSize)) { continuation in
-            Task {
-                for chunk in pairs.chunks(ofCount: batchSize) {
-                    let batch = Set(chunk)
+        return TaskBackedAsyncStream.makeStream(
+            bufferingPolicy: .bufferingNewest(bufferSize * batchSize)
+        ) { continuation in
+            defer { continuation.finish() }
 
-                    let batchResults = await verifier.verifyCandidatePairs(
-                        batch,
-                        documentMap: documentMap
-                    )
+            var yieldedResults = 0
 
-                    for result in batchResults {
-                        continuation.yield(result)
+            for chunk in pairs.chunks(ofCount: batchSize) {
+                let batch = Set(chunk)
+
+                let batchResults = await verifier.verifyCandidatePairs(
+                    batch,
+                    documentMap: documentMap
+                )
+
+                for result in batchResults {
+                    continuation.yield(result)
+                    yieldedResults += 1
+
+                    if await TaskCooperation.checkpoint(iteration: yieldedResults) {
+                        return
                     }
                 }
-
-                continuation.finish()
             }
         }
     }
