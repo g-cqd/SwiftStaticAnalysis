@@ -104,16 +104,27 @@ public struct ShingleGenerator: Sendable {
     ///   - kinds: The token kinds (for normalization).
     /// - Returns: Array of shingles.
     public func generate(tokens: [String], kinds: [TokenKind]? = nil) -> [Shingle] {
+        generate(tokens: ArraySlice(tokens), kinds: kinds.map { ArraySlice($0) })
+    }
+
+    /// Generate shingles from a slice of a token sequence.
+    ///
+    /// Accepting `ArraySlice` lets the duplication-detector hot path
+    /// (`generateBlockDocuments`) reuse a single owning `[String]` /
+    /// `[TokenKind]` allocation across many block windows, instead of
+    /// `Array(tokens[i..<j])`-copying per window.
+    func generate(tokens: ArraySlice<String>, kinds: ArraySlice<TokenKind>?) -> [Shingle] {
         guard tokens.count >= shingleSize else { return [] }
 
-        let normalizedTokens: [String] =
+        let normalizedTokens: ArraySlice<String> =
             if normalize, let kinds {
-                normalizeTokens(tokens, kinds: kinds)
+                ArraySlice(normalizeTokens(Array(tokens), kinds: Array(kinds)))
             } else {
                 tokens
             }
 
         var shingles: [Shingle] = []
+        shingles.reserveCapacity(normalizedTokens.count - shingleSize + 1)
 
         for (i, window) in normalizedTokens.windows(ofCount: shingleSize).enumerated() {
             let shingleTokens = Array(window)
@@ -134,7 +145,7 @@ public struct ShingleGenerator: Sendable {
     ) -> ShingledDocument {
         let tokens = sequence.tokens.map(\.text)
         let kinds = sequence.tokens.map(\.kind)
-        let shingles = generate(tokens: tokens, kinds: kinds)
+        let shingles = generate(tokens: ArraySlice(tokens), kinds: ArraySlice(kinds))
 
         let startLine = sequence.tokens.first?.line ?? 1
         let endLine = sequence.tokens.last?.line ?? startLine
@@ -144,7 +155,7 @@ public struct ShingleGenerator: Sendable {
             startLine: startLine,
             endLine: endLine,
             tokenCount: sequence.tokens.count,
-            shingleHashes: Set(shingles.map(\.hash)),
+            shingleHashes: shingleHashSet(from: shingles),
             shingles: shingles,
             id: id,
         )
@@ -166,18 +177,20 @@ public struct ShingleGenerator: Sendable {
     ) -> [ShingledDocument] {
         guard sequence.tokens.count >= blockSize else { return [] }
 
-        var documents: [ShingledDocument] = []
-        var currentId = startId
-
-        // Use sliding window approach for overlapping blocks
+        // Materialise the texts/kinds arrays once; downstream calls take
+        // `ArraySlice` so no per-window Array copy is created.
         let tokens = sequence.tokens.map(\.text)
         let kinds = sequence.tokens.map(\.kind)
         let stride = max(1, blockSize / 2)  // 50% overlap
 
+        var documents: [ShingledDocument] = []
+        documents.reserveCapacity((sequence.tokens.count - blockSize) / stride + 1)
+        var currentId = startId
+
         var i = 0
         while i + blockSize <= sequence.tokens.count {
-            let blockTokens = Array(tokens[i..<(i + blockSize)])
-            let blockKinds = Array(kinds[i..<(i + blockSize)])
+            let blockTokens = tokens[i..<(i + blockSize)]
+            let blockKinds = kinds[i..<(i + blockSize)]
             let shingles = generate(tokens: blockTokens, kinds: blockKinds)
 
             let startLine = sequence.tokens[i].line
@@ -189,7 +202,7 @@ public struct ShingleGenerator: Sendable {
                     startLine: startLine,
                     endLine: endLine,
                     tokenCount: blockSize,
-                    shingleHashes: Set(shingles.map(\.hash)),
+                    shingleHashes: shingleHashSet(from: shingles),
                     shingles: shingles,
                     id: currentId,
                 ))
@@ -199,6 +212,18 @@ public struct ShingleGenerator: Sendable {
         }
 
         return documents
+    }
+
+    /// Build the `Set<UInt64>` of shingle hashes without the intermediate
+    /// `[UInt64]` that `Set(shingles.map(\.hash))` would allocate. Reserves
+    /// up to `shingles.count` slots since hash collisions are negligible.
+    private func shingleHashSet(from shingles: [Shingle]) -> Set<UInt64> {
+        var hashes = Set<UInt64>()
+        hashes.reserveCapacity(shingles.count)
+        for shingle in shingles {
+            hashes.insert(shingle.hash)
+        }
+        return hashes
     }
 
     // MARK: Private
