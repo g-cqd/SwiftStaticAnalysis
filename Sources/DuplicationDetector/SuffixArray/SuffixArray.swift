@@ -11,14 +11,14 @@ import Foundation
 /// The suffix array is an integer array containing the starting indices of all
 /// lexicographically sorted suffixes of the input. Combined with the LCP array,
 /// it enables linear-time detection of all repeated substrings.
-public struct SuffixArray: Sendable {
+package struct SuffixArray: Sendable {
     // MARK: Lifecycle
 
     /// Creates a suffix array from an array of integers (token IDs).
     ///
     /// - Parameter tokens: Array of integer token IDs.
     /// - Note: Token IDs should be in range [0, alphabetSize).
-    public init(tokens: [Int]) {
+    package init(tokens: [Int]) {
         length = tokens.count
         if tokens.isEmpty {
             array = []
@@ -30,16 +30,16 @@ public struct SuffixArray: Sendable {
     // MARK: Public
 
     /// The suffix array - indices of sorted suffixes.
-    public let array: [Int]
+    package let array: [Int]
 
     /// The original input length.
-    public let length: Int
+    package let length: Int
 
     /// Creates a suffix array from an array of strings.
     ///
     /// - Parameter strings: Array of string tokens.
     /// - Returns: The suffix array and the token-to-ID mapping.
-    public static func fromStrings(_ strings: [String]) -> (Self, [String: Int]) {
+    package static func fromStrings(_ strings: [String]) -> (Self, [String: Int]) {
         // Build alphabet mapping and convert to token IDs in one pass
         var alphabet: [String: Int] = [:]
         var tokens: [Int] = []
@@ -60,7 +60,7 @@ public struct SuffixArray: Sendable {
     }
 
     /// Get the suffix starting at the i-th position in sorted order.
-    public subscript(i: Int) -> Int {
+    package subscript(i: Int) -> Int {
         array[i]
     }
 }
@@ -344,7 +344,7 @@ extension SuffixArray {
     ///   - pattern: The pattern to search for (as token IDs).
     ///   - tokens: The original token array.
     /// - Returns: Range of indices in the suffix array where pattern occurs.
-    public func search(pattern: [Int], in tokens: [Int]) -> Range<Int>? {
+    package func search(pattern: [Int], in tokens: [Int]) -> Range<Int>? {
         guard !pattern.isEmpty, !array.isEmpty else { return nil }
 
         // Find lower bound
@@ -394,7 +394,7 @@ extension SuffixArray {
     }
 
     /// Get all occurrences of a pattern.
-    public func findOccurrences(of pattern: [Int], in tokens: [Int]) -> [Int] {
+    package func findOccurrences(of pattern: [Int], in tokens: [Int]) -> [Int] {
         guard let range = search(pattern: pattern, in: tokens) else { return [] }
         return (range.lowerBound..<range.upperBound).map { array[$0] }
     }

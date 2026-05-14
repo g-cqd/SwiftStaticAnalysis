@@ -11,7 +11,7 @@ import Foundation
 /// The LCP array `lcp[i]` contains the length of the longest common prefix
 /// between `suffixArray[i-1]` and `suffixArray[i]`. This enables finding
 /// all repeated substrings by scanning for values >= threshold.
-public struct LCPArray: Sendable {
+package struct LCPArray: Sendable {
     // MARK: Lifecycle
 
     /// Creates an LCP array from a suffix array and the original tokens.
@@ -21,7 +21,7 @@ public struct LCPArray: Sendable {
     /// - Parameters:
     ///   - suffixArray: The suffix array.
     ///   - tokens: The original token array (as integers).
-    public init(suffixArray: SuffixArray, tokens: [Int]) {
+    package init(suffixArray: SuffixArray, tokens: [Int]) {
         self.suffixArray = suffixArray
         array = LCPArrayBuilder.build(suffixArray: suffixArray, tokens: tokens)
     }
@@ -29,19 +29,19 @@ public struct LCPArray: Sendable {
     // MARK: Public
 
     /// The LCP values. `lcp[i]` = LCP of SA[i-1] and SA[i]. lcp[0] is always 0.
-    public let array: [Int]
+    package let array: [Int]
 
     /// The suffix array this LCP array corresponds to.
-    public let suffixArray: SuffixArray
+    package let suffixArray: SuffixArray
 
     /// Get the LCP value at index i.
-    public subscript(i: Int) -> Int {
+    package subscript(i: Int) -> Int {
         array[i]
     }
 
     /// Find all positions where LCP >= threshold.
     /// These represent repeated substrings of at least `threshold` tokens.
-    public func findRepeatsAboveThreshold(_ threshold: Int) -> [Int] {
+    package func findRepeatsAboveThreshold(_ threshold: Int) -> [Int] {
         var positions: [Int] = []
         for i in 1..<array.count where array[i] >= threshold {
             positions.append(i)
@@ -105,10 +105,10 @@ enum LCPArrayBuilder {
 // MARK: - DetectedRepeat
 
 /// A detected repeat (clone candidate) from LCP array analysis.
-public struct DetectedRepeat: Sendable, Hashable {
+package struct DetectedRepeat: Sendable, Hashable {
     // MARK: Lifecycle
 
-    public init(positions: [Int], length: Int) {
+    package init(positions: [Int], length: Int) {
         self.positions = positions.sorted()
         self.length = length
     }
@@ -116,13 +116,13 @@ public struct DetectedRepeat: Sendable, Hashable {
     // MARK: Public
 
     /// Starting positions of all occurrences in the original token array.
-    public let positions: [Int]
+    package let positions: [Int]
 
     /// Length of the repeated substring (in tokens).
-    public let length: Int
+    package let length: Int
 
     /// Number of occurrences.
-    public var occurrences: Int { positions.count }
+    package var occurrences: Int { positions.count }
 }
 
 extension LCPArray {
@@ -134,7 +134,7 @@ extension LCPArray {
     ///
     /// - Parameter minLength: Minimum length of repeats to find.
     /// - Returns: Array of detected repeats.
-    public func findMaximalRepeats(minLength: Int) -> [DetectedRepeat] {
+    package func findMaximalRepeats(minLength: Int) -> [DetectedRepeat] {
         guard array.count > 1 else { return [] }
 
         var repeats: [DetectedRepeat] = []
@@ -206,7 +206,7 @@ extension LCPArray {
     ///
     /// - Parameter minLength: Minimum length of repeats to find.
     /// - Returns: Array of repeat groups.
-    public func findRepeatGroups(minLength: Int) -> [RepeatGroup] {
+    package func findRepeatGroups(minLength: Int) -> [RepeatGroup] {
         let sa = suffixArray.array
         let n = array.count
         guard n > 1 else { return [] }
@@ -278,10 +278,10 @@ extension LCPArray {
 // MARK: - RepeatGroup
 
 /// A group of positions sharing a common repeated substring.
-public struct RepeatGroup: Sendable {
+package struct RepeatGroup: Sendable {
     // MARK: Lifecycle
 
-    public init(positions: [Int], length: Int, suffixArrayIndices: [Int]) {
+    package init(positions: [Int], length: Int, suffixArrayIndices: [Int]) {
         self.positions = positions.sorted()
         self.length = length
         self.suffixArrayIndices = suffixArrayIndices
@@ -290,14 +290,14 @@ public struct RepeatGroup: Sendable {
     // MARK: Public
 
     /// Starting positions of all occurrences.
-    public let positions: [Int]
+    package let positions: [Int]
 
     /// Length of the common repeated substring.
-    public let length: Int
+    package let length: Int
 
     /// Indices in the suffix array where these positions appear.
-    public let suffixArrayIndices: [Int]
+    package let suffixArrayIndices: [Int]
 
     /// Number of occurrences.
-    public var occurrences: Int { positions.count }
+    package var occurrences: Int { positions.count }
 }
