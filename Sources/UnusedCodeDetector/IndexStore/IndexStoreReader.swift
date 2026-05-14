@@ -49,7 +49,7 @@ public struct IndexedSymbol: Sendable {
 
 /// Kinds of symbols in the index store.
 /// Exhaustive mapping from IndexStoreDB symbol kinds. // swa:ignore-unused-cases
-public enum IndexedSymbolKind: String, Sendable, DeclarationKindConvertible {
+public enum IndexedSymbolKind: String, Sendable {
     case `class`
     case `struct`
     case `enum`

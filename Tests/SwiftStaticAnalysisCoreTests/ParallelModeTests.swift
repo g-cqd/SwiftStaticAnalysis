@@ -20,13 +20,6 @@ struct ParallelModeTests {
         #expect(ParallelMode.maximum.isParallel == true)
     }
 
-    @Test("usesStreaming only true for maximum mode")
-    func usesStreamingProperty() {
-        #expect(ParallelMode.none.usesStreaming == false)
-        #expect(ParallelMode.safe.usesStreaming == false)
-        #expect(ParallelMode.maximum.usesStreaming == true)
-    }
-
     // MARK: - Legacy Conversion
 
     @Test("from(legacyParallel:) maps correctly")

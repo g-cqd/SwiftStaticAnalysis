@@ -166,13 +166,13 @@ public enum DependencyKind: String, Sendable, Codable {
 ///    `DeclarationNode`, `DependencyEdge`) are `Sendable`, allowing safe actor isolation.
 ///
 /// 2. **Compile-Time Safety**: The actor model provides compile-time guarantees
-///    against data races, unlike `NSLock` which relies on correct manual usage.
+///    against data races, unlike manual locking which relies on correct usage.
 ///
 /// 3. **Structured Concurrency**: Integrates naturally with Swift's `async`/`await`
 ///    pattern used throughout the codebase.
 ///
-/// - SeeAlso: `IndexBasedDependencyGraph` which uses `NSLock` instead because
-///   it depends on the non-`Sendable` `IndexStoreDB` type.
+/// - SeeAlso: `IndexBasedDependencyGraph` which uses `Synchronization.Mutex`
+///   instead because it depends on the non-`Sendable` `IndexStoreDB` type.
 public actor ReachabilityGraph {
     // MARK: Lifecycle
 

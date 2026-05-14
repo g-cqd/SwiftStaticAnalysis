@@ -4,14 +4,6 @@
 
 import Foundation
 
-// MARK: - DeclarationKindConvertible
-
-/// Protocol for types that can be converted to DeclarationKind.
-public protocol DeclarationKindConvertible {
-    /// Convert to a DeclarationKind.
-    func toDeclarationKind() -> DeclarationKind
-}
-
 // MARK: - DeclarationKindFilter
 
 /// Shared logic for determining whether a declaration kind should be reported.

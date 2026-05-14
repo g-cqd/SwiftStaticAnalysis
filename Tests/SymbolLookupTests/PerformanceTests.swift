@@ -221,7 +221,6 @@ struct ParallelModeConfigurationTests {
         let mode = ParallelMode.none
 
         #expect(!mode.isParallel)
-        #expect(!mode.usesStreaming)
     }
 
     @Test("Safe mode is parallel")
@@ -229,15 +228,13 @@ struct ParallelModeConfigurationTests {
         let mode = ParallelMode.safe
 
         #expect(mode.isParallel)
-        #expect(!mode.usesStreaming)
     }
 
-    @Test("Maximum mode is parallel with streaming")
+    @Test("Maximum mode is parallel")
     func maximumModeIsParallelWithStreaming() {
         let mode = ParallelMode.maximum
 
         #expect(mode.isParallel)
-        #expect(mode.usesStreaming)
     }
 
     @Test("Legacy parallel true maps to safe")

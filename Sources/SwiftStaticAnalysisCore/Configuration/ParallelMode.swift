@@ -4,16 +4,21 @@
 
 import Foundation
 
-import class Foundation.ProcessInfo
-
 // MARK: - ParallelMode
 
 /// Parallel execution mode for analysis operations.
 ///
-/// This enum supports three execution modes with different performance/memory tradeoffs:
-/// - `none`: Sequential execution, deterministic, lowest memory usage
-/// - `safe`: Current parallel behavior (TaskGroup-based), deterministic via sorting
-/// - `maximum`: Maximum parallelism with streaming (future async-algorithms support)
+/// This enum supports three execution modes with different performance/memory
+/// tradeoffs:
+/// - `none`: Sequential execution, deterministic, lowest memory usage.
+/// - `safe`: Default parallel behaviour (TaskGroup-based), deterministic via
+///   per-task result sorting.
+/// - `maximum`: Higher concurrency (`highThroughput` preset). Note that
+///   `.safe` and `.maximum` differ only in their `ConcurrencyConfiguration`
+///   shape (max files / max tasks); the streaming/backpressure path is
+///   reached via explicit streaming APIs (e.g. `StreamingVerifier`), not by
+///   choosing `.maximum`. See `TaskBackedAsyncStream` for the buffering
+///   policy details.
 ///
 /// Example usage in `.swa.json`:
 /// ```json
@@ -32,9 +37,9 @@ public enum ParallelMode: String, Codable, Sendable, CaseIterable {
     /// Recommended default for most codebases.
     case safe
 
-    /// Maximum parallelism with async-algorithms streaming.
-    /// Enables backpressure and memory-bounded processing for very large codebases.
-    /// Results require explicit sorting at boundaries.
+    /// Higher-concurrency execution (`highThroughput` preset). Same
+    /// task-group plumbing as `.safe`; results still require sorting at
+    /// boundaries when determinism matters.
     case maximum
 }
 
@@ -57,11 +62,6 @@ extension ParallelMode {
         case .safe, .maximum:
             true
         }
-    }
-
-    /// Whether this mode uses streaming (async-algorithms).
-    public var usesStreaming: Bool {
-        self == .maximum
     }
 }
 
