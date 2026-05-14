@@ -9,6 +9,34 @@ import Foundation
     import simd
 #endif
 
+// MARK: - Mersenne-prime arithmetic
+
+/// 2^61 − 1: the largest Mersenne prime that fits inside `UInt64`. Used as
+/// the MinHash modulus because reduction modulo it collapses to a couple
+/// of shifts and masks, with no 64-bit hardware divide.
+@inlinable
+func mersenne61Reduce(_ value: UInt64) -> UInt64 {
+    // `(r & M) + (r >> 61)` reduces values < 2^122 to < 2 * M; one more
+    // fold caps the result at < M. Coefficients are kept < 2^61, so the
+    // (a * x + b) product fits in 2 * 2^61 before this reduction.
+    let mask: UInt64 = (1 &<< 61) &- 1
+    let result = (value & mask) &+ (value &>> 61)
+    return result >= mask ? result &- mask : result
+}
+
+/// SplitMix64 — the standard high-quality 64-bit PRNG for seeding other
+/// algorithms. Replaces the LCG-derived `(rng >> 33) | 1` mixer used in
+/// the original MinHash coefficient generator.
+@inlinable
+func splitMix64(_ state: inout UInt64) -> UInt64 {
+    state &+= 0x9E37_79B9_7F4A_7C15
+    var value = state
+    value = (value ^ (value &>> 30)) &* 0xBF58_476D_1CE4_E5B9
+    value = (value ^ (value &>> 27)) &* 0x94D0_49BB_1331_11EB
+    value = value ^ (value &>> 31)
+    return value
+}
+
 // MARK: - MinHashSignature
 
 /// A MinHash signature representing a document.
@@ -56,18 +84,22 @@ public struct MinHashGenerator: Sendable {
     public init(numHashes: Int = 128, seed: UInt64 = 42) {
         self.numHashes = numHashes
 
-        // Generate random coefficients using LCG with given seed
+        // Generate independent coefficients via SplitMix64. The Mersenne-prime
+        // reduction requires `a` and `b` < M_61, so each draw is masked to
+        // 61 bits; `a` is forced non-zero so the universal-hash family is
+        // injective.
+        let mask: UInt64 = (1 &<< 61) &- 1
         var rng = seed
         var a: [UInt64] = []
         var b: [UInt64] = []
+        a.reserveCapacity(numHashes)
+        b.reserveCapacity(numHashes)
 
         for _ in 0..<numHashes {
-            // Linear congruential generator
-            rng = rng &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-            a.append((rng >> 33) | 1)  // Ensure odd for better distribution
-
-            rng = rng &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-            b.append(rng >> 33)
+            var coefficientA = splitMix64(&rng) & mask
+            if coefficientA == 0 { coefficientA = 1 }
+            a.append(coefficientA)
+            b.append(splitMix64(&rng) & mask)
         }
 
         coefficientsA = a
@@ -116,73 +148,102 @@ public struct MinHashGenerator: Sendable {
 
     // MARK: Private
 
-    /// Large prime for modulo operation.
-    private static let largePrime: UInt64 = 4_294_967_311  // Next prime after 2^32
+    /// Mersenne prime M_61 = 2^61 − 1. Used as the universal-hashing
+    /// modulus because reduction is branch-free shifts and masks, suitable
+    /// for SIMD lanes.
+    @usableFromInline static let mersenne61: UInt64 = (1 &<< 61) &- 1
 
-    /// Pre-computed hash function coefficients.
+    /// Pre-computed hash function coefficients (each < 2^61 so that the
+    /// product `a * shingle` stays within the Mersenne-reduction window).
     private let coefficientsA: [UInt64]
     private let coefficientsB: [UInt64]
 
     // MARK: - Private Implementation
 
-    /// Scalar implementation of MinHash computation.
+    /// Scalar implementation of MinHash computation. Identical bit-for-bit
+    /// to the SIMD path; kept for `numHashes < 4` and as a reference for
+    /// the equivalence test.
     private func computeSignatureScalar(for hashes: [UInt64]) -> [UInt64] {
         var signature = [UInt64](repeating: UInt64.max, count: numHashes)
-        let prime = Self.largePrime
 
         for shingleHash in hashes {
+            let x = shingleHash & Self.mersenne61
             for i in 0..<numHashes {
-                // h_i(x) = (a_i * x + b_i) mod prime
-                let hashValue = (coefficientsA[i] &* shingleHash &+ coefficientsB[i]) % prime
-                signature[i] = min(signature[i], hashValue)
+                let h = mersenne61Reduce(coefficientsA[i] &* x &+ coefficientsB[i])
+                signature[i] = min(signature[i], h)
             }
         }
 
         return signature
     }
 
-    /// SIMD-optimized implementation of MinHash computation.
+    /// Vectorised implementation of MinHash computation.
     ///
-    /// Processes 4 hash functions at a time using SIMD vectors.
+    /// Processes 4 hash functions at a time using `SIMD4<UInt64>`. The
+    /// modulus is the Mersenne prime `M_61 = 2^61 − 1`, so reduction is
+    /// `(r & M_61) + (r >> 61)` with one fold for carry — no hardware
+    /// divide, fully SIMD-vectorisable across the lane.
     private func computeSignatureSIMD(for hashes: [UInt64]) -> [UInt64] {
         var signature = [UInt64](repeating: UInt64.max, count: numHashes)
 
-        // Process in chunks of 4 for SIMD
         let chunks = numHashes / 4
+        let mask = SIMD4<UInt64>(repeating: Self.mersenne61)
 
-        for shingleHash in hashes {
-            // SIMD path: process 4 at a time
-            for chunk in 0..<chunks {
-                let baseIdx = chunk * 4
+        coefficientsA.withUnsafeBufferPointer { aPtr in
+            coefficientsB.withUnsafeBufferPointer { bPtr in
+                signature.withUnsafeMutableBufferPointer { sigPtr in
+                    for shingleHash in hashes {
+                        let x = SIMD4<UInt64>(repeating: shingleHash & Self.mersenne61)
 
-                // Load coefficients
-                let a0 = coefficientsA[baseIdx]
-                let a1 = coefficientsA[baseIdx + 1]
-                let a2 = coefficientsA[baseIdx + 2]
-                let a3 = coefficientsA[baseIdx + 3]
+                        for chunk in 0..<chunks {
+                            let baseIdx = chunk * 4
+                            let a = SIMD4<UInt64>(
+                                aPtr[baseIdx],
+                                aPtr[baseIdx + 1],
+                                aPtr[baseIdx + 2],
+                                aPtr[baseIdx + 3]
+                            )
+                            let b = SIMD4<UInt64>(
+                                bPtr[baseIdx],
+                                bPtr[baseIdx + 1],
+                                bPtr[baseIdx + 2],
+                                bPtr[baseIdx + 3]
+                            )
 
-                let b0 = coefficientsB[baseIdx]
-                let b1 = coefficientsB[baseIdx + 1]
-                let b2 = coefficientsB[baseIdx + 2]
-                let b3 = coefficientsB[baseIdx + 3]
+                            // (a * x + b) using wrapping arithmetic, then
+                            // Mersenne-61 reduction folded once.
+                            var product = a &* x &+ b
+                            product = (product & mask) &+ (product &>> 61)
+                            // One more conditional fold for the carry.
+                            let overflow: SIMD4<UInt64> = SIMD4<UInt64>(
+                                product[0] >= Self.mersenne61 ? Self.mersenne61 : 0,
+                                product[1] >= Self.mersenne61 ? Self.mersenne61 : 0,
+                                product[2] >= Self.mersenne61 ? Self.mersenne61 : 0,
+                                product[3] >= Self.mersenne61 ? Self.mersenne61 : 0
+                            )
+                            product = product &- overflow
 
-                // Compute hashes (using wrapping arithmetic)
-                let h0 = (a0 &* shingleHash &+ b0) % Self.largePrime
-                let h1 = (a1 &* shingleHash &+ b1) % Self.largePrime
-                let h2 = (a2 &* shingleHash &+ b2) % Self.largePrime
-                let h3 = (a3 &* shingleHash &+ b3) % Self.largePrime
+                            // SIMD min into the running signature.
+                            let current = SIMD4<UInt64>(
+                                sigPtr[baseIdx],
+                                sigPtr[baseIdx + 1],
+                                sigPtr[baseIdx + 2],
+                                sigPtr[baseIdx + 3]
+                            )
+                            let reduced = pointwiseMin(current, product)
+                            sigPtr[baseIdx] = reduced[0]
+                            sigPtr[baseIdx + 1] = reduced[1]
+                            sigPtr[baseIdx + 2] = reduced[2]
+                            sigPtr[baseIdx + 3] = reduced[3]
+                        }
 
-                // Update minimums
-                signature[baseIdx] = min(signature[baseIdx], h0)
-                signature[baseIdx + 1] = min(signature[baseIdx + 1], h1)
-                signature[baseIdx + 2] = min(signature[baseIdx + 2], h2)
-                signature[baseIdx + 3] = min(signature[baseIdx + 3], h3)
-            }
-
-            // Handle remainder
-            for i in (chunks * 4)..<numHashes {
-                let hashValue = (coefficientsA[i] &* shingleHash &+ coefficientsB[i]) % Self.largePrime
-                signature[i] = min(signature[i], hashValue)
+                        // Scalar tail for the remainder.
+                        for i in (chunks * 4)..<numHashes {
+                            let h = mersenne61Reduce(aPtr[i] &* x[0] &+ bPtr[i])
+                            sigPtr[i] = min(sigPtr[i], h)
+                        }
+                    }
+                }
             }
         }
 
