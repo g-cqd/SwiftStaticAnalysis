@@ -76,35 +76,32 @@ public final class IndexStoreAnalyzer: Sendable {
     // MARK: Public
 
     /// Analyze all symbols and return their usage information.
+    ///
+    /// Before 0.2.0 this method was O(definitions × total_occurrences):
+    /// each definition triggered a separate `findOccurrences(ofUSR:)` index
+    /// query. We now sweep every analysed file once via
+    /// `reader.allOccurrencesByUSR(in:)` and look up locally, dropping the
+    /// cost to O(total_occurrences) regardless of how many definitions exist.
     public func analyzeUsage() -> [SymbolUsage] {
+        let occurrencesByUSR = reader.allOccurrencesByUSR(in: files)
+
         var usageMap: [String: SymbolUsage] = [:]
+        usageMap.reserveCapacity(occurrencesByUSR.count)
 
-        // Get all definitions from the index store
-        let allDefs = reader.allDefinitions()
-
-        // Filter to only files we care about
-        for def in allDefs {
-            // Check if this definition is in one of our files
-            guard files.contains(def.file) else {
+        for (usr, occurrences) in occurrencesByUSR {
+            // Find the canonical definition occurrence (definition or
+            // declaration role, located inside one of our analysed files).
+            guard let definition = occurrences.first(where: { occ in
+                occ.roles.isDefinitionLike && files.contains(occ.file)
+            }) else {
                 continue
             }
 
-            guard def.roles.isDefinitionLike else {
+            if shouldSkipSymbol(definition.symbol) {
                 continue
             }
 
-            // Skip system symbols and certain kinds
-            if shouldSkipSymbol(def.symbol) {
-                continue
-            }
-
-            let usr = def.symbol.usr
-
-            // If we haven't seen this symbol yet, analyze it
-            if usageMap[usr] == nil {
-                let usage = analyzeSymbol(def)
-                usageMap[usr] = usage
-            }
+            usageMap[usr] = makeSymbolUsage(definition: definition, occurrences: occurrences)
         }
 
         return Array(usageMap.values)
@@ -123,15 +120,17 @@ public final class IndexStoreAnalyzer: Sendable {
     /// Files to analyze.
     private let files: Set<String>
 
-    /// Analyze a specific symbol's usage.
-    private func analyzeSymbol(_ definition: IndexedOccurrence) -> SymbolUsage {
+    /// Build a `SymbolUsage` from a precomputed occurrence list.
+    ///
+    /// Pure function over `occurrences` - no index round-trip - so callers
+    /// that already paid for an N-sweep can use it without re-querying.
+    private func makeSymbolUsage(
+        definition: IndexedOccurrence,
+        occurrences: [IndexedOccurrence]
+    ) -> SymbolUsage {
         let symbol = definition.symbol
         let usr = symbol.usr
 
-        // Get all occurrences
-        let occurrences = reader.findOccurrences(ofUSR: usr)
-
-        // Count references (exclude definitions)
         var referenceCount = 0
         var definitionFiles = Set<String>()
         var referenceFiles = Set<String>()

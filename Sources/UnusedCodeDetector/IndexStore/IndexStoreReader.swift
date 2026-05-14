@@ -399,6 +399,39 @@ public final class IndexStoreReader: @unchecked Sendable {
         return hasRef
     }
 
+    /// All index occurrences across `files`, grouped by USR.
+    ///
+    /// This is the avoid-the-N+1 building block for callers that need every
+    /// occurrence of every definition. The previous pattern in
+    /// `IndexStoreAnalyzer.analyzeUsage` called `findOccurrences(ofUSR:)` per
+    /// definition, paying one index round-trip for every symbol. Iterating
+    /// each file once and grouping locally is O(total_occurrences) instead
+    /// of O(definitions * total_occurrences).
+    ///
+    /// - Parameter files: Files to include. Pass the empty set to sweep
+    ///   every file the index knows about (caller pays for the bigger walk).
+    /// - Returns: Dictionary mapping each USR to its full occurrence list.
+    public func allOccurrencesByUSR(in files: Set<String>) -> [String: [IndexedOccurrence]] {
+        var byUSR: [String: [IndexedOccurrence]] = [:]
+        for filePath in files {
+            let occurrences = db.symbolOccurrences(inFilePath: filePath)
+            for occurrence in occurrences {
+                let indexedSymbol = convertSymbol(occurrence.symbol)
+                let roles = convertRoles(occurrence.roles)
+                byUSR[occurrence.symbol.usr, default: []].append(
+                    IndexedOccurrence(
+                        symbol: indexedSymbol,
+                        file: occurrence.location.path,
+                        line: occurrence.location.line,
+                        column: occurrence.location.utf8Column,
+                        roles: roles,
+                    )
+                )
+            }
+        }
+        return byUSR
+    }
+
     /// Get all definitions from canonical symbol occurrences.
     public func allDefinitions() -> [IndexedOccurrence] {
         var occurrences: [IndexedOccurrence] = []
