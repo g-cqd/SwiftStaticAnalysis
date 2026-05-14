@@ -11,6 +11,10 @@ public struct ArenaConfiguration: Sendable {
     // MARK: Lifecycle
 
     public init(blockSize: Int = defaultBlockSize, alignment: Int = 8) {
+        precondition(
+            alignment > 0 && alignment.nonzeroBitCount == 1,
+            "Arena alignment must be a positive power of two; got \(alignment)"
+        )
         self.blockSize = blockSize
         self.alignment = alignment
     }
@@ -205,12 +209,17 @@ public struct Arena: ~Copyable {
 
     /// Allocate and copy an array.
     ///
+    /// Uses `withUnsafeBufferPointer` + `update(from:count:)` so the copy
+    /// vectorises through the compiler's `memcpy` lowering instead of the
+    /// previous element-by-element assignment.
+    ///
     /// - Parameter array: Array to copy.
     /// - Returns: Buffer pointer to the copied array.
     public mutating func copy<T>(_ array: [T]) -> UnsafeMutableBufferPointer<T> {
         let buffer = allocate(count: array.count) as UnsafeMutableBufferPointer<T>
-        for (i, element) in array.enumerated() {
-            buffer[i] = element
+        array.withUnsafeBufferPointer { source in
+            guard let dest = buffer.baseAddress, let src = source.baseAddress else { return }
+            dest.update(from: src, count: array.count)
         }
         return buffer
     }
