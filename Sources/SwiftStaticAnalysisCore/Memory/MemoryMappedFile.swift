@@ -19,6 +19,12 @@ public enum MemoryMappedFileError: Error, Sendable {
     case mappingFailed(String, Int32)
     case invalidRange
     case fileEmpty
+    /// The path resolves to a non-regular file (FIFO, device, socket, directory).
+    /// Memory-mapping such targets either blocks indefinitely (FIFO) or reads
+    /// unbounded data (`/dev/zero`).
+    case notRegularFile(String)
+    /// The file exceeds the configured size cap.
+    case fileTooLarge(String, size: Int, limit: Int)
 }
 
 // MARK: - MemoryMappedFile
@@ -47,26 +53,59 @@ public enum MemoryMappedFileError: Error, Sendable {
 public final class MemoryMappedFile: @unchecked Sendable {
     // MARK: Lifecycle
 
+    /// Default upper bound for the file size accepted by `init(path:)`.
+    /// 256 MiB is enough for the largest Swift sources seen in practice and
+    /// caps the worst-case CPU cost of full-file scans (`findLineRanges`).
+    public static let defaultSizeLimit: Int = 256 * 1024 * 1024
+
+    /// `O_NOFOLLOW` opens fail if the final path component is a symlink.
+    /// The MCP layer (`CodebaseContext.validatePath`) is responsible for
+    /// rejecting symlinks *within* the codebase that point outside; this is
+    /// belt-and-braces for callers that bypass the MCP layer.
+    private static var openFlags: Int32 {
+        #if canImport(Darwin)
+            return O_RDONLY | O_NOFOLLOW
+        #else
+            return O_RDONLY
+        #endif
+    }
+
     /// Initialize a memory-mapped file.
     ///
-    /// - Parameter path: Path to the file to map.
-    /// - Throws: `MemoryMappedFileError` if the file cannot be mapped.
-    public init(path: String) throws(MemoryMappedFileError) {
+    /// Rejects non-regular files (FIFOs, devices, sockets) and files larger
+    /// than `sizeLimit`. The previous implementation would happily map
+    /// `/dev/zero`, leading to a multi-gigabyte byte scan in `findLineRanges`.
+    ///
+    /// - Parameters:
+    ///   - path: Path to the file to map.
+    ///   - sizeLimit: Maximum mapping size in bytes. Defaults to
+    ///     `MemoryMappedFile.defaultSizeLimit` (256 MiB).
+    /// - Throws: `MemoryMappedFileError` if the file is missing, not a
+    ///   regular file, empty, larger than `sizeLimit`, or cannot be mapped.
+    public init(path: String, sizeLimit: Int = MemoryMappedFile.defaultSizeLimit)
+        throws(MemoryMappedFileError)
+    {
         self.path = path
 
-        // Open the file
-        let fd = open(path, O_RDONLY)
+        let fd = open(path, Self.openFlags)
         guard fd >= 0 else {
             throw MemoryMappedFileError.fileNotFound(path)
         }
         fileDescriptor = fd
 
-        // Get file size
         var statBuf = stat()
         guard fstat(fd, &statBuf) == 0 else {
             close(fd)
             throw MemoryMappedFileError.mappingFailed(path, errno)
         }
+
+        // Reject anything that isn't a regular file. `S_IFMT` masks out the
+        // permission bits so we can compare against the file-type constants.
+        guard (statBuf.st_mode & S_IFMT) == S_IFREG else {
+            close(fd)
+            throw MemoryMappedFileError.notRegularFile(path)
+        }
+
         size = Int(statBuf.st_size)
 
         guard size > 0 else {
@@ -74,7 +113,11 @@ public final class MemoryMappedFile: @unchecked Sendable {
             throw MemoryMappedFileError.fileEmpty
         }
 
-        // Map the file
+        guard size <= sizeLimit else {
+            close(fd)
+            throw MemoryMappedFileError.fileTooLarge(path, size: size, limit: sizeLimit)
+        }
+
         let mapped = mmap(
             nil,
             size,
@@ -91,7 +134,6 @@ public final class MemoryMappedFile: @unchecked Sendable {
 
         data = UnsafeRawPointer(mappedPointer)
 
-        // Advise the kernel about our access pattern (sequential)
         madvise(UnsafeMutableRawPointer(mutating: data), size, MADV_SEQUENTIAL)
     }
 

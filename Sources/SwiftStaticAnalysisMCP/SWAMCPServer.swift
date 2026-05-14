@@ -55,32 +55,30 @@ public actor SWAMCPServer {
     }
 
     /// Get or create a CodebaseContext for the given path.
+    ///
+    /// The path is canonicalised (tilde expansion + symlink resolution) before
+    /// being used as a cache key, so equivalent paths share a single context
+    /// and a hostile path cannot bypass the sandbox via aliasing.
+    ///
     /// - Parameter path: The codebase path, or nil to use the default.
     /// - Returns: The CodebaseContext for the specified path.
     /// - Throws: `CodebaseContextError` if no path is provided and no default exists.
-    private func getContext(for path: String?) throws -> CodebaseContext {
+    private func getContext(for path: String?) throws(CodebaseContextError) -> CodebaseContext {
         if let path = path {
-            // Resolve the path
-            let expandedPath = NSString(string: path).expandingTildeInPath
-            let resolvedPath: String
-            if expandedPath.hasPrefix("/") {
-                resolvedPath = expandedPath
-            } else {
-                resolvedPath = FileManager.default.currentDirectoryPath + "/" + expandedPath
-            }
+            let resolvedPath = PathUtilities.canonicalize(
+                path,
+                relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            )
 
-            // Check cache first
             if let cached = contextCache[resolvedPath] {
                 return cached
             }
 
-            // Create and cache new context
             let context = try CodebaseContext(rootPath: resolvedPath)
             contextCache[resolvedPath] = context
             return context
         }
 
-        // No path provided, use default
         guard let defaultContext = defaultContext else {
             throw CodebaseContextError.noCodebaseSpecified
         }
@@ -175,9 +173,11 @@ extension SWAMCPServer {
                         "codebase_path": codebasePathProperty,
                         "mode": .object([
                             "type": .string("string"),
-                            "enum": .array([.string("simple"), .string("reachability")]),
+                            "enum": .array([
+                                .string("simple"), .string("reachability"), .string("indexStore"),
+                            ]),
                             "description": .string(
-                                "Detection mode: 'simple' (fast, syntax-only) or 'reachability' (graph-based, more accurate)"
+                                "Detection mode: 'simple' (fast, syntax-only), 'reachability' (graph-based) or 'indexStore' (cross-module, most accurate)"
                             ),
                         ]),
                         "min_confidence": .object([
@@ -662,6 +662,21 @@ extension SWAMCPServer {
         return .init(content: [.text(output)], isError: false)
     }
 
+    /// Maximum file size accepted by `read_file` (10 MiB). Larger files would
+    /// either DoS the calling LLM or be a sign that the path leaked outside
+    /// the codebase.
+    static let readFileMaxBytes: Int = 10 * 1024 * 1024
+
+    /// Maximum span of lines accepted by `read_file` (50,000 lines).
+    static let readFileMaxLineSpan: Int = 50_000
+
+    /// File extensions that `read_file` will accept. Everything else is
+    /// rejected — the MCP tool exists to inspect source code, not binaries,
+    /// not character devices, not log files.
+    static let readFileAllowedExtensions: Set<String> = [
+        "swift", "md", "json", "yml", "yaml", "txt", "toml", "plist",
+    ]
+
     private func handleReadFile(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         guard let args = arguments, let path = args["path"]?.stringValue else {
             return .init(content: [.text("Missing required parameter: path")], isError: true)
@@ -671,25 +686,121 @@ extension SWAMCPServer {
         let context = try getContext(for: codebasePath)
 
         let validatedPath = try context.validatePath(path)
-        let content = try String(contentsOfFile: validatedPath, encoding: .utf8)
 
-        var lines = content.components(separatedBy: .newlines)
-
-        if let startLine = args["start_line"]?.intValue,
-            let endLine = args["end_line"]?.intValue
-        {
-            let start = max(1, startLine) - 1
-            let end = min(lines.count, endLine)
-            lines = Array(lines[start..<end])
+        let url = URL(fileURLWithPath: validatedPath)
+        let ext = url.pathExtension.lowercased()
+        guard Self.readFileAllowedExtensions.contains(ext) else {
+            return .init(
+                content: [
+                    .text(
+                        "Refusing to read '\(path)': extension '.\(ext)' is not in the allowlist (\(Self.readFileAllowedExtensions.sorted().joined(separator: ", ")))."
+                    )
+                ],
+                isError: true
+            )
         }
 
-        let output = lines.enumerated().map { (index, line) in
-            let lineNum = (args["start_line"]?.intValue ?? 1) + index
+        // Reject anything that isn't a regular file. This blocks FIFOs,
+        // character/block devices (/dev/zero, /dev/random), sockets, and
+        // directories — all of which would either DoS the server (FIFO,
+        // /dev/zero) or produce garbage output.
+        let attributes: [FileAttributeKey: Any]
+        do {
+            attributes = try FileManager.default.attributesOfItem(atPath: validatedPath)
+        } catch {
+            return .init(
+                content: [.text("Cannot stat '\(path)': \(error.localizedDescription)")],
+                isError: true
+            )
+        }
+        guard let fileType = attributes[.type] as? FileAttributeType, fileType == .typeRegular else {
+            return .init(
+                content: [.text("Refusing to read '\(path)': not a regular file.")],
+                isError: true
+            )
+        }
+
+        let size = (attributes[.size] as? Int) ?? 0
+        guard size <= Self.readFileMaxBytes else {
+            return .init(
+                content: [
+                    .text(
+                        "Refusing to read '\(path)': file is \(size) bytes; limit is \(Self.readFileMaxBytes) bytes (10 MiB)."
+                    )
+                ],
+                isError: true
+            )
+        }
+
+        let content = try String(contentsOfFile: validatedPath, encoding: .utf8)
+        var lines = content.components(separatedBy: .newlines)
+        let totalLines = lines.count
+
+        // Validate the requested line range BEFORE slicing. The previous
+        // implementation would call `lines[start..<end]` even if
+        // `endLine < startLine`, hitting a Swift precondition crash.
+        let startLineArg = args["start_line"]?.intValue
+        let endLineArg = args["end_line"]?.intValue
+        var startOffset = 0
+        if let startLine = startLineArg, let endLine = endLineArg {
+            guard startLine >= 1, endLine >= startLine else {
+                return .init(
+                    content: [
+                        .text(
+                            "Invalid line range: start_line=\(startLine), end_line=\(endLine). Require start_line >= 1 and end_line >= start_line."
+                        )
+                    ],
+                    isError: true
+                )
+            }
+            let span = endLine - startLine + 1
+            guard span <= Self.readFileMaxLineSpan else {
+                return .init(
+                    content: [
+                        .text(
+                            "Refusing to read \(span) lines from '\(path)': limit is \(Self.readFileMaxLineSpan) lines."
+                        )
+                    ],
+                    isError: true
+                )
+            }
+            let start = max(1, startLine) - 1
+            let end = min(totalLines, endLine)
+            startOffset = start
+            lines = Array(lines[start..<max(start, end)])
+        }
+
+        let output = lines.enumerated().map { index, line in
+            let lineNum = startOffset + 1 + index
             return "\(lineNum): \(line)"
         }.joined(separator: "\n")
 
         return .init(content: [.text(output)], isError: false)
     }
+
+    /// Maximum length of a `search_symbols` query (256 chars). Longer queries
+    /// dramatically increase the cost of catastrophic backtracking and have
+    /// no legitimate use.
+    static let searchSymbolsMaxQueryLength = 256
+
+    /// Total wall-clock budget allotted to all regex matches in a single
+    /// `search_symbols` call. Once exceeded, regex evaluation stops and only
+    /// the partial result set is returned with a warning.
+    static let searchSymbolsRegexBudget: Duration = .milliseconds(2500)
+
+    /// Patterns containing nested quantifiers that are notorious for
+    /// catastrophic backtracking. These are pre-emptively rejected.
+    ///
+    /// `Regex` is value-typed and the array is never mutated after init, so
+    /// `nonisolated(unsafe)` is sound. The Swift stdlib does not yet declare
+    /// `Regex` itself as `Sendable`.
+    nonisolated(unsafe) private static let reDoSAntipatterns: [Regex<AnyRegexOutput>] = {
+        let raw = [
+            #"\([^)]*[*+][^)]*\)\s*[*+]"#,  // (...*)* / (...+)+
+            #"\(\.\*\)\s*[*+]"#,  // (.*)+ / (.*)*
+        ]
+        return raw.compactMap { try? Regex($0) }
+    }()
 
     private func handleSearchSymbols(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         guard let args = arguments, let query = args["query"]?.stringValue else {
@@ -699,20 +810,65 @@ extension SWAMCPServer {
         let codebasePath = args["codebase_path"]?.stringValue
         let context = try getContext(for: codebasePath)
 
+        let useRegex = args["use_regex"]?.boolValue ?? false
+
+        if useRegex {
+            guard query.utf8.count <= Self.searchSymbolsMaxQueryLength else {
+                return .init(
+                    content: [
+                        .text(
+                            "Refusing regex query of \(query.utf8.count) bytes (limit \(Self.searchSymbolsMaxQueryLength))."
+                        )
+                    ],
+                    isError: true
+                )
+            }
+            for antipattern in Self.reDoSAntipatterns where query.contains(antipattern) {
+                return .init(
+                    content: [
+                        .text(
+                            "Refusing regex query: contains a nested-quantifier antipattern known for catastrophic backtracking."
+                        )
+                    ],
+                    isError: true
+                )
+            }
+        }
+
+        // Pre-compile the regex once so we don't pay the compile cost per
+        // declaration; this is also where a malformed regex fails fast.
+        let compiledRegex: Regex<AnyRegexOutput>?
+        if useRegex {
+            do {
+                compiledRegex = try Regex(query)
+            } catch {
+                return .init(
+                    content: [.text("Invalid regex pattern: \(error.localizedDescription)")],
+                    isError: true
+                )
+            }
+        } else {
+            compiledRegex = nil
+        }
+
         let files = try context.findSwiftFiles()
 
         // Build context configuration if requested
         let contextConfig = buildContextConfiguration(from: args)
 
-        // Check if we should use regex matching
-        let useRegex = args["use_regex"]?.boolValue ?? false
-
         let analyzer = StaticAnalyzer()
         let result = try await analyzer.analyze(files)
 
+        let deadline = ContinuousClock.now.advanced(by: Self.searchSymbolsRegexBudget)
+        var regexBudgetExhausted = false
+
         var matches = result.declarations.declarations.filter { decl in
-            if useRegex {
-                return (try? Regex(query).firstMatch(in: decl.name)) != nil
+            if let regex = compiledRegex {
+                if ContinuousClock.now >= deadline {
+                    regexBudgetExhausted = true
+                    return false
+                }
+                return decl.name.contains(regex)
             } else {
                 return decl.name.localizedCaseInsensitiveContains(query)
             }
@@ -752,6 +908,11 @@ extension SWAMCPServer {
                     output += formatContext(symbolContext)
                 }
             }
+        }
+
+        if regexBudgetExhausted {
+            output +=
+                "\n\n# warning: regex evaluation budget (\(Self.searchSymbolsRegexBudget)) exhausted; results may be incomplete."
         }
 
         return .init(content: [.text(output)], isError: false)

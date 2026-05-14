@@ -70,7 +70,9 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
-        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.10.0"),
+        // 0.12.0 contains the NetworkTransport race-condition fix required to
+        // compile under Swift 6 strict concurrency.
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.12.0"),
         .package(
             url: "https://github.com/swiftlang/indexstore-db.git", revision: "cb3b960568f18a3cc018923f5824323b5c4edd0b"),
         .package(url: "https://github.com/swiftlang/swift-format.git", from: "602.0.0"),
