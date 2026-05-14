@@ -4,48 +4,92 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.0.x   | :white_check_mark: |
+| 0.1.x   | :white_check_mark: |
+| < 0.1.0 | :x:                |
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please report it through GitHub Issues.
+**Please do not file public GitHub Issues for security reports.** Use GitHub's
+[Private Vulnerability Reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability)
+instead:
 
-For sensitive security matters, please prefix your issue title with `[SECURITY]`.
+1. Open the repository's **Security** tab.
+2. Click **Report a vulnerability**.
+3. Submit a private advisory describing the issue and reproduction steps.
+
+For urgent / out-of-band reports, send the report to the maintainer's GitHub
+profile email; mark the subject `[SECURITY] swiftstaticanalysis`.
 
 We will:
-- Acknowledge receipt within 48 hours
-- Provide an initial assessment within 7 days
-- Work with you to understand and resolve the issue
+- Acknowledge receipt within 48 hours.
+- Provide an initial assessment within 7 days.
+- Coordinate fix and disclosure timing with the reporter.
 
 ## Security Features
 
-SwiftStaticAnalysis implements several security measures:
+SwiftStaticAnalysis ships several defence-in-depth features. They reduce
+risk; they are not a guarantee.
+
+### MCP Sandbox
+
+The `swa-mcp` server enforces a sandbox around a single codebase root:
+
+- `CodebaseContext.validatePath` canonicalises both the candidate and the
+  root via `URL.resolvingSymlinksInPath()` before applying a separator-aware
+  prefix check (`canonical == root || canonical.hasPrefix(root + "/")`).
+  This closes the sibling-path-prefix bypass and the symlink-escape attack
+  that affected 0.1.4 and earlier.
+- `findSwiftFiles` skips symbolic links whose canonical target falls
+  outside the codebase root, so a hostile repository cannot expose
+  arbitrary host files via `Sources/normal.swift -> /etc/passwd`.
+- `handleReadFile` rejects non-regular files (FIFOs, devices, sockets),
+  enforces a 10 MiB size cap, an extension allowlist, and validates the
+  requested line range before slicing.
+- `handleSearchSymbols` caps query length at 256 bytes, refuses
+  nested-quantifier ReDoS antipatterns (`(.*)+`, `(a+)+`), compiles the
+  regex once, and aborts after a 2.5 s wall-clock budget if matching is
+  catastrophic.
 
 ### Memory Safety
-- Uses Swift's memory-safe constructs throughout
-- Memory-mapped I/O prevents loading entire large files into memory
-- Arena allocation provides controlled memory management
 
-### No Code Execution
-- Static analysis only - no dynamic code evaluation
-- Does not execute or compile analyzed code
-- Safe to run on untrusted codebases
+- `MemoryMappedFile.init` calls `fstat` to verify the target is a regular
+  file (rejects `/dev/zero`, FIFOs, etc.), caps mappings at 256 MiB, and
+  uses `O_NOFOLLOW` on Darwin.
+- All Swift code is built under Swift 6 strict concurrency and language
+  mode `v6`. Synchronisation primitives are the stdlib
+  `Synchronization.Mutex` and `Synchronization.Atomic` (no manual
+  `NSLock`).
 
-### File System Safety
-- Read-only analysis by default
-- No network connectivity required
-- Output only to explicitly specified locations
+### No Network Connectivity
 
-### Data Handling
-- No collection of telemetry or analytics
-- No external service dependencies
-- All processing happens locally
+The analyzer does not make outbound network calls. The MCP server
+communicates over stdio only; it does not bind a network socket.
+
+### No Telemetry
+
+No analytics, telemetry, or remote logging. All processing happens
+locally.
+
+## Known Limitations
+
+- **`swa unused --auto-build` invokes `swift build`** in the analysed
+  codebase. SPM interprets `Package.swift` as Swift source code at
+  parse time, so building an untrusted project is equivalent to
+  executing its `Package.swift`. The `auto_build` flag is NOT exposed
+  via the MCP tool surface; CLI invocations against untrusted
+  codebases should not pass `--auto-build`.
+- **`Process` invocations inherit the parent environment.** Variables
+  such as `DEVELOPER_DIR`, `DYLD_INSERT_LIBRARIES`, and
+  `SWIFTPM_HOOKS_DIR` are not currently scrubbed; treat this as a
+  caveat when running on shared machines.
 
 ## Best Practices
 
 When using SwiftStaticAnalysis:
 
-1. **Run in sandboxed environments** for untrusted code
-2. **Review output** before taking automated actions
-3. **Keep updated** to receive security fixes
-4. **Report issues** promptly through proper channels
+1. **Review output** before taking automated actions on remediation
+   suggestions.
+2. **Pin the version** in `Package.resolved`; SwiftStaticAnalysis pulls
+   in `indexstore-db` by revision and `mattt/eventsource` transitively.
+3. **Do not enable `--auto-build`** on untrusted codebases.
+4. **Keep updated** to receive security fixes.

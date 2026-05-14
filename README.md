@@ -364,6 +364,18 @@ Declarations or parameters named `_` are always skipped as explicitly unused.
 
 ## CLI Reference
 
+### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Ran successfully; no findings (or informational command like `symbol`). |
+| `2` | Ran successfully; findings reported. CI integrations should treat this as a failed build. |
+| `64` | Argument validation failed (`--min-tokens`, `--min-similarity`, `--limit` out of range; unknown option value). |
+| `1` | Other error (IO, configuration parse, etc.). |
+
+This contract lets `swa analyze . --format xcode` gate a CI run without an
+extra `grep` pass: a green build means exit `0`, findings produce exit `2`.
+
 ### `swa analyze`
 
 Run full analysis (duplicates + unused code).
@@ -603,11 +615,30 @@ swift package --allow-writing-to-directory ./docs \
 
 The framework includes several performance optimizations:
 
-- **Memory-Mapped I/O**: Zero-copy file reading for large codebases
-- **SoA Token Storage**: Cache-efficient struct-of-arrays layout
-- **Arena Allocation**: Reduced allocation overhead for temporary data
-- **Parallel Processing**: Concurrent parsing, reachability edge building, and optional parallel BFS/clone detection via `ParallelMode`
-- **SIMD-Accelerated Hashing**: Fast MinHash signature computation
+- **Memory-Mapped I/O**: every analyzer hot path (parser, duplication
+  engines, ignore-directive scanner) reads source via
+  `MemoryMappedFile` for files ≥ 4 KiB. Line-range lookup is memoised.
+- **Bounded LRU parser caches**: `SwiftFileParser` and `ZeroCopyParser`
+  cap retained syntax trees / mapped files to keep long-running MCP
+  sessions within memory and file-descriptor budgets.
+- **DenseGraph reachability**: `IndexBasedDependencyGraph` projects
+  USR-keyed adjacency lists onto contiguous integer indices for
+  cache-efficient BFS over bit-packed visited sets.
+- **Parallel Processing**: Concurrent parsing, reachability edge
+  building, and opt-in parallel BFS / clone detection via `ParallelMode`.
+  Direction-optimising parallel BFS (Beamer et al.) is available via
+  `ParallelBFS.computeReachable` and is selected by
+  `--parallel-mode safe|maximum` for large graphs.
+- **MinHash + LSH**: signature computation processes 4 hash lanes per
+  inner-loop iteration. *Note: the routine is named `computeSignatureSIMD`
+  but is currently scalar unrolled — a real `SIMD4<UInt64>` + Mersenne-prime
+  rewrite is on the roadmap.*
+- **Arena allocator**: provided in `SwiftStaticAnalysisCore.Memory` for
+  scratch-buffer-heavy callers. *Note: not yet adopted by `SA-IS`; the
+  duplication detector uses heap-backed `[Int]` arrays today.*
+
+> Some of these optimisations were retroactively wired into hot paths in
+> 0.2.0; see `AUDIT.md` for the full performance-truthing record.
 
 ## Testing
 

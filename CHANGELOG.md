@@ -7,6 +7,132 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+This release closes the audit (see `AUDIT.md`) findings most critical to
+correctness and safety. Eight commits land:
+
+### Security (CRITICAL/HIGH)
+
+- **CRITICAL**: MCP path traversal via sibling-path prefix bypass. The
+  sandbox check no longer accepts `/tmp/codebase-secret` for a root of
+  `/tmp/codebase`. `validatePath` now canonicalises both the candidate
+  and the root via `URL.resolvingSymlinksInPath()` and uses a
+  separator-aware prefix check.
+- **CRITICAL**: MCP symlink escape from inside the sandbox. A
+  `Sources/normal.swift -> /etc/passwd` symlink inside the analysed
+  codebase is rejected by `validatePath` *and* by `findSwiftFiles`.
+- **HIGH**: `handleReadFile` now requires a regular file, an allow-listed
+  extension (`.swift/.md/.json/.yml/.yaml/.txt/.toml/.plist`), and caps
+  reads at 10 MiB. Line ranges are validated before slicing (no more
+  precondition crash when `end_line < start_line`).
+- **HIGH**: `handleSearchSymbols` enforces a 256-byte query length cap, a
+  2.5 s regex-evaluation budget, and pre-emptive rejection of
+  catastrophic-backtracking antipatterns.
+- **HIGH**: `MemoryMappedFile.init` requires `S_IFREG`, caps mappings at
+  256 MiB by default, and uses `O_NOFOLLOW` on Darwin.
+
+### Fixed
+
+- **Defaults parity**: `swa analyze` and `swa unused` now produce
+  identical findings on the same project. Both default
+  `--treat-*-as-root` flags to `true`. (Before this commit `analyze`
+  defaulted them to `false` while `unused` defaulted them to `true`.)
+- **CI exit codes**: every subcommand now exits `2` when findings are
+  reported, so `--format xcode` actually gates a build. Validation
+  failures exit `64` per ArgumentParser convention. `--report` mode and
+  `symbol` (informational) remain at `0`.
+- **`--min-tokens` validation**: bounded to `1...10_000` (regression from
+  0.0.14 rediscovered by the audit).
+- **`--min-similarity` validation**: bounded to `0.0...1.0`.
+- **`swa symbol --limit`**: must be `>= 1`.
+- **Concurrency contract**: `IndexBasedDependencyGraph.generateReport()`
+  now reads the graph under a single `lock.withLock { ... }` scope.
+  `detectRoots()` no longer iterates and mutates the same dictionary.
+- **MCP schema**: `detect_unused_code` tool now correctly advertises the
+  `indexStore` mode in its JSON schema.
+- **MCP regex search**: `(try? Regex(q).firstMatch(in: name)) != nil`
+  per-declaration is replaced by a single compiled regex shared across
+  all matches.
+- **MCP path resolution**: tilde expansion now goes through
+  `PathUtilities.canonicalize` (no NSString bridge); path equivalence
+  uses canonical paths so a hostile alias cannot bypass the cache.
+- **`swa-mcp` shutdown**: replaced the unresumable `withCheckedContinuation`
+  with `Task.sleep(for: .seconds(.greatestFiniteMagnitude))` so SIGINT
+  propagates.
+
+### Performance
+
+- **MemoryMappedFile is now wired through hot paths**: `SwiftFileParser`,
+  `_DuplicationEngine.addCodeSnippets`,
+  `DuplicationDetector.extractTokenSequences`,
+  `MinHashCloneDetector.detect`, `IncrementalDuplicationDetector.detect`,
+  and `IgnoreDirectiveScanner.scan` all read source via the new
+  `SourceFileReader` helper, which mmaps files ≥ 4 KiB.
+- **`findLineRanges` memoised**: the first call performs a full byte
+  scan; subsequent `line(_:)` / snippet calls are O(1) lookups.
+- **`IndexBasedDependencyGraph` BFS over `DenseGraph`**: replaces the
+  `Set<String>/Deque<String>` walk with bit-packed `Bitmap` traversal
+  over contiguous integer indices. The dense projection is cached on
+  the instance and invalidated on `addEdge`.
+- **`IndexStoreAnalyzer.analyzeUsage()` N+1 fix**: a single file-sweep
+  via `IndexStoreReader.allOccurrencesByUSR(in:)` replaces the previous
+  per-symbol `findOccurrences(ofUSR:)` calls. Drops the dominant cost
+  from O(definitions × occurrences) to O(occurrences).
+- **Bounded parser caches**: `SwiftFileParser.cache` and
+  `ZeroCopyParser.cache` are now LRU-bounded (256 / 64 entries by
+  default). This closes the OOM/file-descriptor exhaustion risk for
+  long-running MCP sessions.
+
+### Concurrency
+
+- `TaskBackedAsyncStream.makeStream` default buffering is now
+  `.bufferingNewest(256)` (was `.unbounded`).
+- `ParallelFrontierExpansion.expandParallel` / `expandRangeParallel` call
+  `group.cancelAll()` once any worker observes `Task.isCancelled`,
+  propagating cancellation to peer tasks.
+- Dropped `@unchecked Sendable` from `IndexStoreAnalyzer` and
+  `IndexStoreFallbackManager` (all stored state is `let`).
+- Removed `ConcurrencyConfiguration.enableParallelProcessing` (dead) and
+  `batchSize` (unused). Setting `maxConcurrentFiles: 1` still forces
+  serial execution. **Breaking** for direct callers; CLI/MCP unaffected.
+
+### Dependencies
+
+- `swift-atomics` removed in favour of stdlib `Synchronization.Atomic`.
+  `AtomicBitmap` migrates to `Atomic<UInt64>` via a small `AtomicWord`
+  wrapper (the only consumer of the dependency).
+- `modelcontextprotocol/swift-sdk` requirement bumped to `from: "0.12.0"`
+  for the upstream `NetworkTransport` race-condition fix.
+- `swift-syntax`, `indexstore-db`, `swift-collections`, `swift-algorithms`,
+  `swift-async-algorithms`, `swift-format`, `swift-argument-parser`
+  updated to their latest minor versions.
+
+### Code quality
+
+- `FNV-1a` is centralised in `Sources/SwiftStaticAnalysisCore/Utilities/FNV1a.swift`.
+  Previous inline copies in `ChangeDetector`, `ShingleGenerator`, `LSH`,
+  and `MemoryMappedFile.FileSlice.hash` now route through it.
+- `ParallelMode.usesStreaming` deleted (zero call sites; the docstring
+  promised behaviour that no consumer implemented).
+- `DeclarationKindConvertible` protocol deleted (single-conformer
+  abstraction with no readers of the protocol type).
+- Stale "uses NSLock" doc comments updated to reference
+  `Synchronization.Mutex`.
+- `ConfigurationLoader.load(from:)` and `loadFromFile(_:)` use typed
+  throws (`throws(ConfigurationError)`).
+
+### Added
+
+- `Sources/SwiftStaticAnalysisCore/Utilities/PathUtilities.swift`:
+  centralised tilde expansion and canonicalisation.
+- `Sources/SwiftStaticAnalysisCore/Memory/SourceFileReader.swift`: single
+  entry point for source reads, with mmap-backed `readSource(at:)` and
+  `readLines(at:)`.
+- `Tests/SwiftStaticAnalysisMCPTests/CodebaseContextTests.swift`: 5 new
+  security-regression tests (sibling-path bypass, symlink escape, glob
+  metacharacter escaping, tilde handling, findSwiftFiles symlink skip).
+- `Tests/CLITests/CLITests.swift`: 5 new CLI tests for the exit-code
+  contract, `analyze` ↔ `unused` parity, and numeric-argument validation.
+
 ## [0.1.2] - 2026-01-11
 
 ### Added
