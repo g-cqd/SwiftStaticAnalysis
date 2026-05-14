@@ -26,9 +26,9 @@ private final class AtomicWord: Sendable {
 /// Thread-safe bitmap for parallel BFS visited tracking.
 ///
 /// Uses stdlib `Atomic<UInt64>` (via `AtomicWord`) for lock-free concurrent
-/// access. The `@unchecked Sendable` annotation reflects that the array of
-/// reference-typed `AtomicWord`s is read-only after init while the atomic
-/// fields are themselves `Sendable`.
+/// access. The class itself is plain `Sendable` because every stored
+/// property is `let` and the wrapped atomic-word references are themselves
+/// `Sendable`.
 ///
 /// ## Performance Characteristics
 ///
@@ -36,7 +36,7 @@ private final class AtomicWord: Sendable {
 /// - `test`: O(1) atomic load
 /// - `popCount`: O(n/64) where n is bitmap size
 /// - Memory: ~n/8 bytes for n bits plus per-word reference overhead
-public final class AtomicBitmap: @unchecked Sendable {
+public final class AtomicBitmap: Sendable {
     // MARK: Lifecycle
 
     /// Create a bitmap with the given number of bits, all initially unset.

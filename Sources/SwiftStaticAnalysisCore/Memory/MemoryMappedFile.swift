@@ -156,6 +156,17 @@ public final class MemoryMappedFile: @unchecked Sendable {
         slice(offset: 0, length: size)
     }
 
+    /// Borrow the entire mapping as a `RawSpan`.
+    ///
+    /// The closure receives a lifetime-bounded view of the mapped bytes.
+    /// `RawSpan` is `~Escapable`, so the compiler will refuse to let the
+    /// view escape past the file's lifetime.
+    public func withRawSpan<T>(_ body: (RawSpan) throws -> T) rethrows -> T {
+        let buffer = UnsafeRawBufferPointer(start: data, count: size)
+        let span = RawSpan(_unsafeBytes: buffer)
+        return try body(span)
+    }
+
     // MARK: - Access
 
     /// Get a slice of the mapped file.
@@ -390,6 +401,18 @@ public struct FileSlice: @unchecked Sendable {
     /// `MemoryMappedFile`) remains alive.
     public borrowing func asRawBuffer() -> UnsafeRawBufferPointer {
         UnsafeRawBufferPointer(start: base, count: length)
+    }
+
+    /// Borrow the slice contents as a `RawSpan`.
+    ///
+    /// `RawSpan` is `~Escapable`: the closure receives a lifetime-bounded
+    /// view that cannot outlive this slice (and therefore cannot outlive
+    /// the owning `MemoryMappedFile`). Prefer this over `asRawBuffer()`
+    /// for new code — the compiler enforces safety.
+    public borrowing func withRawSpan<T>(_ body: (RawSpan) throws -> T) rethrows -> T {
+        let buffer = UnsafeRawBufferPointer(start: base, count: length)
+        let span = RawSpan(_unsafeBytes: buffer)
+        return try body(span)
     }
 
     /// Compare with another slice for equality.

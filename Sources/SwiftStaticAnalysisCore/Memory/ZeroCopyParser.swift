@@ -363,17 +363,24 @@ public actor ZeroCopyParser {
     }
 
     private func computeLineRanges(from source: String) -> [(Int, Int)] {
+        // Iterate the UTF-8 view directly. The previous implementation
+        // built an `Array(source.utf8)` (full file copy into a fresh
+        // `[UInt8]`) just to enumerate bytes. With `UTF8View` we get the
+        // same byte-by-byte iteration without the allocation.
         var ranges: [(Int, Int)] = []
         var lineStart = 0
-        let bytes = Array(source.utf8)
-
-        for (i, byte) in bytes.enumerated() where byte == 0x0A {  // '\n'
-            ranges.append((lineStart, i - lineStart))
-            lineStart = i + 1
+        var index = 0
+        let utf8 = source.utf8
+        for byte in utf8 {
+            if byte == 0x0A {  // '\n'
+                ranges.append((lineStart, index - lineStart))
+                lineStart = index + 1
+            }
+            index += 1
         }
 
-        if lineStart < bytes.count {
-            ranges.append((lineStart, bytes.count - lineStart))
+        if lineStart < index {
+            ranges.append((lineStart, index - lineStart))
         }
 
         return ranges
