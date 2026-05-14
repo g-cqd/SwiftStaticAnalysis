@@ -585,6 +585,22 @@ struct IndexedOccurrenceTests {
 
 @Suite("IndexedSymbolRoles Tests")
 struct IndexedSymbolRolesTests {
+    @Test("Definition-like roles include declaration and definition")
+    func definitionLikeRolesIncludeDeclarationAndDefinition() {
+        #expect(IndexedSymbolRoles.definition.isDefinitionLike)
+        #expect(IndexedSymbolRoles.declaration.isDefinitionLike)
+        #expect(!IndexedSymbolRoles.reference.isDefinitionLike)
+    }
+
+    @Test("Usage roles include write accesses")
+    func usageRolesIncludeWriteAccesses() {
+        #expect(IndexedSymbolRoles.reference.indicatesUsage)
+        #expect(IndexedSymbolRoles.call.indicatesUsage)
+        #expect(IndexedSymbolRoles.read.indicatesUsage)
+        #expect(IndexedSymbolRoles.write.indicatesUsage)
+        #expect(!IndexedSymbolRoles.definition.indicatesUsage)
+    }
+
     @Test("Role options")
     func roleOptions() {
         var roles = IndexedSymbolRoles()
@@ -830,5 +846,64 @@ private actor LogRecorder {
 
     func record(level: AnalysisLogLevel, message: String) {
         entries.append(Entry(level: level, message: message))
+    }
+}
+
+// MARK: - HybridMergeTests
+
+@Suite("Hybrid Merge Tests")
+struct HybridMergeTests {
+    @Test("Hybrid merge keeps distinct declarations with identical names")
+    func hybridMergeKeepsDistinctDeclarationsWithIdenticalNames() {
+        let detector = UnusedCodeDetector()
+        let first = makeUnusedCode(name: "shared", file: "/tmp/A.swift", line: 10, confidence: .high)
+        let second = makeUnusedCode(name: "shared", file: "/tmp/B.swift", line: 10, confidence: .medium)
+
+        let merged = detector.mergeHybridResults(indexResults: [first], syntaxResults: [second])
+
+        #expect(merged.count == 2)
+    }
+
+    @Test("Hybrid merge prefers index result for identical declaration identity")
+    func hybridMergePrefersIndexResultForIdenticalDeclarationIdentity() {
+        let detector = UnusedCodeDetector()
+        let syntax = makeUnusedCode(name: "shared", file: "/tmp/A.swift", line: 10, confidence: .medium)
+        let index = makeUnusedCode(
+            name: "shared",
+            file: "/tmp/A.swift",
+            line: 10,
+            confidence: .high,
+            suggestion: "Index result"
+        )
+
+        let merged = detector.mergeHybridResults(indexResults: [index], syntaxResults: [syntax])
+
+        #expect(merged.count == 1)
+        #expect(merged.first?.confidence == .high)
+        #expect(merged.first?.suggestion == "Index result")
+    }
+
+    private func makeUnusedCode(
+        name: String,
+        file: String,
+        line: Int,
+        confidence: Confidence,
+        suggestion: String = "Consider removing this declaration"
+    ) -> UnusedCode {
+        let location = SourceLocation(file: file, line: line, column: 1, offset: 0)
+        let declaration = Declaration(
+            name: name,
+            kind: .function,
+            location: location,
+            range: SourceRange(start: location, end: location),
+            scope: .global,
+        )
+
+        return UnusedCode(
+            declaration: declaration,
+            reason: .neverReferenced,
+            confidence: confidence,
+            suggestion: suggestion
+        )
     }
 }

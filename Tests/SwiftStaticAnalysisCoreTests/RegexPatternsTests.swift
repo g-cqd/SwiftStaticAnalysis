@@ -45,4 +45,31 @@ struct RegexPatternsTests {
         #expect("`class`".contains(backtickedIdentifierRegex) == true)
         #expect("class".contains(backtickedIdentifierRegex) == false)
     }
+
+    @Test("Path helpers classify tests and fixtures accurately")
+    func pathHelpersClassifyTestsAndFixturesAccurately() {
+        #expect(matchesTestFilePath("/project/Tests/MyTests.swift"))
+        #expect(matchesTestFilePath("/project/SampleTest.swift"))
+        #expect(!matchesTestFilePath("/project/Testing.swift"))
+        #expect(pathMatchesTestsGlob("/project/Tests/MyTests.swift"))
+        #expect(!pathMatchesTestsGlob("/project/Sources/MyTests.swift"))
+        #expect(pathMatchesTestFileSuffixGlob("/project/SampleTests.swift"))
+        #expect(!pathMatchesTestFileSuffixGlob("/project/SampleTest.swift"))
+        #expect(pathMatchesFixturesGlob("/project/Fixtures/Data.swift"))
+        #expect(!pathMatchesFixturesGlob("/project/Sources/Data.swift"))
+    }
+
+    @Test("Backticked identifier helper matches only wrapped names")
+    func backtickedIdentifierHelperMatchesOnlyWrappedNames() {
+        #expect(isBacktickedIdentifier("`class`"))
+        #expect(!isBacktickedIdentifier("class"))
+        #expect(!isBacktickedIdentifier("`not`valid`"))
+    }
+
+    @Test("Swift USR helper extracts type marker")
+    func swiftUSRHelperExtractsTypeMarker() {
+        #expect(swiftUSRTypeContextMarker(in: "s:14NetworkMonitorC6sharedACvpZ") == "C")
+        #expect(swiftUSRTypeContextMarker(in: "s:7MyModelV") == "V")
+        #expect(swiftUSRTypeContextMarker(in: "c:@F@main") == nil)
+    }
 }

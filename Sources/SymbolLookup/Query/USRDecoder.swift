@@ -2,27 +2,7 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
-import RegexBuilder
-
-// MARK: - USR Type Context Pattern
-
-/// Matches Swift USR type context pattern: `s:<length><name><kind-marker>`
-///
-/// Examples:
-/// - `s:14NetworkMonitorC` - Class
-/// - `s:7MyModelV` - Struct
-/// - `s:6StatusO` - Enum
-/// - `s:10MyProtocolP` - Protocol
-///
-/// Captures the kind marker character (C/V/O/P).
-private nonisolated(unsafe) let usrTypeContextRegex = Regex {
-    "s:"
-    OneOrMore(.digit)
-    OneOrMore(.word)
-    Capture {
-        One(CharacterClass.anyOf("CVOP"))
-    }
-}
+import SwiftStaticAnalysisCore
 
 // MARK: - USRDecoder
 
@@ -262,9 +242,7 @@ public struct USRDecoder: Sendable {
         if usr.contains("FC") {
             return .function
         }
-        // Type markers at context position using RegexBuilder
-        if let match = usr.firstMatch(of: usrTypeContextRegex) {
-            let marker = match.output.1
+        if let marker = swiftUSRTypeContextMarker(in: usr) {
             switch marker {
             case "C": return .type  // Class/Actor
             case "V": return .struct

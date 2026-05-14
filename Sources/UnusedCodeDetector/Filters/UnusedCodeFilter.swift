@@ -2,40 +2,7 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
-import RegexBuilder
 import SwiftStaticAnalysisCore
-
-// MARK: - Pre-compiled Glob Patterns
-
-/// Pre-compiled regex for `**/Tests/**` glob pattern.
-///
-/// Matches any path containing the `/Tests/` directory.
-private nonisolated(unsafe) let testsGlobRegex = Regex {
-    ZeroOrMore(.any)
-    "/Tests/"
-    ZeroOrMore(.any)
-}
-
-/// Pre-compiled regex for `**/*Tests.swift` glob pattern.
-///
-/// Matches any path ending with a filename that ends in `Tests.swift`.
-private nonisolated(unsafe) let testFileSuffixGlobRegex = Regex {
-    ZeroOrMore(.any)
-    OneOrMore {
-        CharacterClass.anyOf("/").inverted
-    }
-    "Tests.swift"
-    Anchor.endOfSubject
-}
-
-/// Pre-compiled regex for `**/Fixtures/**` glob pattern.
-///
-/// Matches any path containing the `/Fixtures/` directory.
-private nonisolated(unsafe) let fixturesGlobRegex = Regex {
-    ZeroOrMore(.any)
-    "/Fixtures/"
-    ZeroOrMore(.any)
-}
 
 // MARK: - UnusedCodeFilterConfiguration
 
@@ -115,13 +82,12 @@ public struct UnusedCodeFilter: Sendable {
     public init(configuration: UnusedCodeFilterConfiguration = .none) {
         self.configuration = configuration
 
-        // Pre-compile glob patterns to regex pattern strings
-        compiledPathPatterns = configuration.excludePathPatterns.compactMap { pattern in
-            Self.globToRegexPattern(pattern)
-        }
-
-        // Store name patterns for on-demand compilation
-        namePatterns = configuration.excludeNamePatterns
+        compiledPathPatterns = CompiledPatterns(
+            configuration.excludePathPatterns
+                .filter { !Self.isCommonGlob($0) }
+                .compactMap(Self.globToRegexPattern)
+        )
+        namePatterns = CompiledPatterns(configuration.excludeNamePatterns)
     }
 
     // MARK: Public
@@ -133,7 +99,7 @@ public struct UnusedCodeFilter: Sendable {
 
     /// Check if a name is a backticked identifier.
     public static func isBacktickedIdentifier(_ name: String) -> Bool {
-        name.hasPrefix("`") && name.hasSuffix("`")
+        SwiftStaticAnalysisCore.isBacktickedIdentifier(name)
     }
 
     /// Check if a name looks like a test suite.
@@ -146,16 +112,14 @@ public struct UnusedCodeFilter: Sendable {
     /// Uses pre-compiled patterns for common globs, falling back to
     /// dynamic compilation for custom patterns.
     public static func matchesGlobPattern(_ path: String, pattern: String) -> Bool {
-        // Try pre-compiled patterns first for common globs
         switch pattern {
         case "**/Tests/**":
-            return path.contains(testsGlobRegex)
+            return pathMatchesTestsGlob(path)
         case "**/*Tests.swift":
-            return path.contains(testFileSuffixGlobRegex)
+            return pathMatchesTestFileSuffixGlob(path)
         case "**/Fixtures/**":
-            return path.contains(fixturesGlobRegex)
+            return pathMatchesFixturesGlob(path)
         default:
-            // Fall back to dynamic compilation
             let regexPattern = globToRegexPattern(pattern)
             guard let regex = try? Regex(regexPattern) else {
                 return false
@@ -212,46 +176,33 @@ public struct UnusedCodeFilter: Sendable {
             return true
         }
 
-        // Check path patterns using pre-compiled where available
-        for (index, pattern) in configuration.excludePathPatterns.enumerated() {
-            // Use pre-compiled patterns for common globs
+        for pattern in configuration.excludePathPatterns {
             switch pattern {
             case "**/Tests/**":
-                if filePath.contains(testsGlobRegex) { return true }
+                if pathMatchesTestsGlob(filePath) { return true }
             case "**/*Tests.swift":
-                if filePath.contains(testFileSuffixGlobRegex) { return true }
+                if pathMatchesTestFileSuffixGlob(filePath) { return true }
             case "**/Fixtures/**":
-                if filePath.contains(fixturesGlobRegex) { return true }
+                if pathMatchesFixturesGlob(filePath) { return true }
             default:
-                // Fall back to compiled pattern string
-                if index < compiledPathPatterns.count,
-                    let regex = try? Regex(compiledPathPatterns[index]),
-                    filePath.contains(regex)
-                {
-                    return true
-                }
+                break
             }
         }
 
-        // Check name patterns
-        for pattern in namePatterns {
-            if let regex = try? Regex(pattern),
-                name.contains(regex)
-            {
-                return true
-            }
+        if compiledPathPatterns.anyMatches(filePath) {
+            return true
         }
 
-        return false
+        return namePatterns.anyMatches(name)
     }
 
     // MARK: Private
 
-    /// Pre-compiled glob-to-regex pattern strings (Sendable).
-    private let compiledPathPatterns: [String]
+    /// Pre-compiled custom path patterns.
+    private let compiledPathPatterns: CompiledPatterns
 
-    /// Name pattern strings for on-demand compilation (Sendable).
-    private let namePatterns: [String]
+    /// Pre-compiled name patterns.
+    private let namePatterns: CompiledPatterns
 
     /// Convert a glob pattern to a regex pattern string.
     ///
@@ -296,6 +247,15 @@ public struct UnusedCodeFilter: Sendable {
             .replacingOccurrences(of: doubleStarPlaceholder, with: ".*")
             .replacingOccurrences(of: singleStarPlaceholder, with: "[^/]*")
             .replacingOccurrences(of: questionPlaceholder, with: ".")
+    }
+
+    private static func isCommonGlob(_ pattern: String) -> Bool {
+        switch pattern {
+        case "**/Tests/**", "**/*Tests.swift", "**/Fixtures/**":
+            return true
+        default:
+            return false
+        }
     }
 }
 

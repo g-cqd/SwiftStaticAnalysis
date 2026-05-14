@@ -86,7 +86,7 @@ public final class IndexStoreAnalyzer: @unchecked Sendable {
                 continue
             }
 
-            guard def.roles.contains(.definition) || def.roles.contains(.declaration) else {
+            guard def.roles.isDefinitionLike else {
                 continue
             }
 
@@ -134,11 +134,11 @@ public final class IndexStoreAnalyzer: @unchecked Sendable {
         var referenceFiles = Set<String>()
 
         for occ in occurrences {
-            if occ.roles.contains(.definition) || occ.roles.contains(.declaration) {
+            if occ.roles.isDefinitionLike {
                 definitionFiles.insert(occ.file)
             }
 
-            if occ.roles.contains(.reference) || occ.roles.contains(.call) || occ.roles.contains(.read) {
+            if occ.roles.indicatesUsage {
                 referenceCount += 1
                 referenceFiles.insert(occ.file)
             }
@@ -148,8 +148,7 @@ public final class IndexStoreAnalyzer: @unchecked Sendable {
         let onlySelfReferenced = referenceCount > 0 && referenceFiles.isSubset(of: definitionFiles)
 
         // Check if it's a test symbol
-        let isTestSymbol =
-            symbol.name.hasPrefix("test") || definition.file.contains("Tests") || definition.file.contains("Test")
+        let isTestSymbol = matchesTestFilePath(definition.file) && symbol.name.hasPrefix("test")
 
         let definitionLocation = SourceLocation(
             file: definition.file,

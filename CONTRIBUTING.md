@@ -150,6 +150,12 @@ swift test --filter DuplicationDetectorTests
 
 # Run with verbose output
 swift test -v
+
+# Run mutation testing for one package/feature profile
+scripts/run-mutation-tests.sh --profile core
+
+# Run mutation testing for the full package graph
+scripts/run-mutation-tests.sh --profile all
 ```
 
 ### Writing Tests

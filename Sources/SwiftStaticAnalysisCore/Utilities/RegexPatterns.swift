@@ -2,6 +2,7 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
+import Foundation
 import RegexBuilder
 
 // MARK: - USR Patterns
@@ -96,4 +97,71 @@ public nonisolated(unsafe) let backtickedIdentifierRegex = Regex {
         CharacterClass.anyOf("`").inverted
     }
     "`"
+}
+
+// MARK: - Path Helpers
+
+/// Returns `true` when the path contains a `Tests` directory.
+public func pathMatchesTestsGlob(_ path: String) -> Bool {
+    URL(fileURLWithPath: path).pathComponents.contains("Tests")
+}
+
+/// Returns `true` when the path ends with a `*Tests.swift` filename.
+public func pathMatchesTestFileSuffixGlob(_ path: String) -> Bool {
+    URL(fileURLWithPath: path).lastPathComponent.hasSuffix("Tests.swift")
+}
+
+/// Returns `true` when the path contains a `Fixtures` directory.
+public func pathMatchesFixturesGlob(_ path: String) -> Bool {
+    URL(fileURLWithPath: path).pathComponents.contains("Fixtures")
+}
+
+/// Returns `true` when the path looks like a test file.
+public func matchesTestFilePath(_ path: String) -> Bool {
+    let fileName = URL(fileURLWithPath: path).lastPathComponent
+    return pathMatchesTestsGlob(path)
+        || fileName.hasSuffix("Tests.swift")
+        || fileName.hasSuffix("Test.swift")
+}
+
+/// Returns `true` when the identifier is wrapped in backticks.
+public func isBacktickedIdentifier(_ identifier: String) -> Bool {
+    guard identifier.count >= 2, identifier.first == "`", identifier.last == "`" else {
+        return false
+    }
+
+    return identifier.dropFirst().dropLast().allSatisfy { $0 != "`" }
+}
+
+/// Returns the type-context marker for a Swift USR when present.
+public func swiftUSRTypeContextMarker(in usr: String) -> Character? {
+    guard usr.hasPrefix("s:") else {
+        return nil
+    }
+
+    let content = usr.dropFirst(2)
+    var index = content.startIndex
+    var lengthDigits = ""
+
+    guard index < content.endIndex, content[index].isNumber else {
+        return nil
+    }
+
+    while index < content.endIndex, content[index].isNumber {
+        lengthDigits.append(content[index])
+        index = content.index(after: index)
+    }
+
+    guard let nameLength = Int(lengthDigits), nameLength > 0 else {
+        return nil
+    }
+
+    guard let markerIndex = content.index(index, offsetBy: nameLength, limitedBy: content.endIndex),
+        markerIndex < content.endIndex
+    else {
+        return nil
+    }
+
+    let marker = content[markerIndex]
+    return ["C", "V", "O", "P"].contains(marker) ? marker : nil
 }

@@ -1,0 +1,49 @@
+name: Mutation Testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Mutation profile to run (or `all`)"
+        required: true
+        default: "all"
+
+env:
+  XCODE_VERSION: '26.1.1'
+
+jobs:
+  mutation:
+    name: Mutation Test
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Cache Build and Tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            .bin
+            .build
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData
+          key: mutation-${{ runner.os }}-${{ github.event.inputs.profile }}-${{ hashFiles('Package.swift', 'Package.resolved', 'scripts/bootstrap-muter.sh', 'scripts/run-mutation-tests.sh') }}
+          restore-keys: |
+            mutation-${{ runner.os }}-${{ github.event.inputs.profile }}-
+            mutation-${{ runner.os }}-
+
+      - name: Make Scripts Executable
+        run: chmod +x scripts/bootstrap-muter.sh scripts/run-mutation-tests.sh
+
+      - name: Run Mutation Tests
+        run: scripts/run-mutation-tests.sh --profile "${{ github.event.inputs.profile }}" --output-dir mutation-artifacts
+
+      - name: Upload Mutation Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-${{ github.event.inputs.profile }}
+          path: mutation-artifacts
+          retention-days: 14

@@ -3,6 +3,7 @@
 //  MIT License
 
 import Foundation
+import Synchronization
 import SwiftStaticAnalysisCore
 import UnusedCodeDetector
 
@@ -13,7 +14,7 @@ import UnusedCodeDetector
 ///
 /// ## Thread Safety Design
 ///
-/// This class uses `@unchecked Sendable` with `NSLock` for thread safety instead
+/// This class uses `Mutex` for thread safety instead
 /// of Swift's `actor` model. This design choice was made because:
 ///
 /// 1. **Non-Sendable Dependency**: `IndexStoreDB` from the `IndexStoreDB` package
@@ -24,18 +25,14 @@ import UnusedCodeDetector
 ///    `self`. In an actor context, these closures would need to be `@Sendable`,
 ///    but they access actor-isolated state.
 ///
-/// 3. **Performance**: The `NSLock` pattern allows synchronous access for
+/// 3. **Performance**: The `Mutex` pattern allows synchronous access for
 ///    read-heavy operations without the overhead of `await` at every call site.
 ///
-/// ## SAFETY: Lock Usage
+/// ## SAFETY: Mutex Usage
 ///
-/// The `lock` protects all access to `indexResolver` which wraps the non-Sendable
-/// `IndexStoreDB`. The lock is acquired before any IndexStore operation and
-/// released immediately after. All public async methods properly acquire the
-/// lock for IndexStore operations.
-///
-/// - **Invariant**: `indexResolver` is only accessed while `lock` is held.
-/// - **No Deadlock**: Lock is never held across await points.
+/// The `Mutex` protects all access to `indexResolver` which wraps the non-Sendable
+/// `IndexStoreDB`. All public async methods perform IndexStore work synchronously
+/// inside the mutex and never hold the lock across an `await`.
 ///
 /// - SeeAlso: `IndexBasedDependencyGraph` which uses the same pattern.
 /// - SeeAlso: `ReachabilityGraph` which uses `actor` (no non-Sendable deps).
@@ -45,12 +42,8 @@ import UnusedCodeDetector
 /// 1. If IndexStore is available, use USR-based O(log n) lookup
 /// 2. Fall back to syntax-based O(n) resolution when needed
 /// 3. Combine results and deduplicate by location
-public final class SymbolFinder: @unchecked Sendable {
-    // SAFETY: lock protects all access to indexResolver. The lock is acquired
-    // before any IndexStore operation and released immediately after, ensuring
-    // no data races on the underlying non-Sendable IndexStoreDB.
-    private let lock = NSLock()
-    private let indexResolver: IndexStoreResolver?
+public final class SymbolFinder: Sendable {
+    private let indexResolver: Mutex<IndexStoreResolver?>
     private let syntaxResolver: SyntaxResolver
     private let accessLevelExtractor: AccessLevelExtractor
     private let configuration: Configuration
@@ -96,7 +89,7 @@ public final class SymbolFinder: @unchecked Sendable {
         configuration: Configuration = .default
     ) throws {
         let reader = try IndexStoreReader(indexStorePath: indexStorePath)
-        self.indexResolver = IndexStoreResolver(reader: reader)
+        self.indexResolver = Mutex(IndexStoreResolver(reader: reader))
         self.syntaxResolver = SyntaxResolver()
         self.accessLevelExtractor = AccessLevelExtractor()
         self.configuration = configuration
@@ -106,7 +99,7 @@ public final class SymbolFinder: @unchecked Sendable {
     ///
     /// - Parameter configuration: Finder configuration.
     public init(configuration: Configuration = .default) {
-        self.indexResolver = nil
+        self.indexResolver = Mutex(nil)
         self.syntaxResolver = SyntaxResolver()
         self.accessLevelExtractor = AccessLevelExtractor()
         self.configuration = configuration
@@ -124,9 +117,9 @@ public final class SymbolFinder: @unchecked Sendable {
         if let indexPath = IndexStorePathFinder.findIndexStorePath(in: projectPath),
             let reader = try? IndexStoreReader(indexStorePath: indexPath)
         {
-            self.indexResolver = IndexStoreResolver(reader: reader)
+            self.indexResolver = Mutex(IndexStoreResolver(reader: reader))
         } else {
-            self.indexResolver = nil
+            self.indexResolver = Mutex(nil)
         }
         self.syntaxResolver = SyntaxResolver()
         self.accessLevelExtractor = AccessLevelExtractor()
@@ -135,7 +128,7 @@ public final class SymbolFinder: @unchecked Sendable {
 
     /// Whether IndexStore is available.
     public var hasIndexStore: Bool {
-        indexResolver != nil
+        indexResolver.withLock { $0 != nil }
     }
 }
 
@@ -239,16 +232,14 @@ extension SymbolFinder {
     /// - Parameter pattern: The query pattern to resolve.
     /// - Returns: Array of matching symbols.
     ///
-    /// - Note: SAFETY: Lock is acquired for the duration of the IndexStore call.
     private func resolveWithIndex(_ pattern: SymbolQuery.Pattern) -> [SymbolMatch] {
-        guard let indexResolver else { return [] }
+        indexResolver.withLock { indexResolver in
+            guard let indexResolver else {
+                return []
+            }
 
-        // SAFETY: Lock protects access to indexResolver which wraps non-Sendable IndexStoreDB.
-        // Lock is released immediately after the synchronous operation completes.
-        lock.lock()
-        defer { lock.unlock() }
-
-        return indexResolver.resolveSync(pattern)
+            return indexResolver.resolveSync(pattern)
+        }
     }
 
     /// Finds usages using IndexStore (thread-safe, synchronous).
@@ -256,16 +247,14 @@ extension SymbolFinder {
     /// - Parameter match: The symbol to find usages for.
     /// - Returns: Array of occurrence locations.
     ///
-    /// - Note: SAFETY: Lock is acquired for the duration of the IndexStore call.
     private func findUsagesWithIndex(_ match: SymbolMatch) -> [SymbolOccurrence] {
-        guard let indexResolver else { return [] }
+        indexResolver.withLock { indexResolver in
+            guard let indexResolver else {
+                return []
+            }
 
-        // SAFETY: Lock protects access to indexResolver which wraps non-Sendable IndexStoreDB.
-        // Lock is released immediately after the synchronous operation completes.
-        lock.lock()
-        defer { lock.unlock() }
-
-        return indexResolver.findUsagesSync(of: match)
+            return indexResolver.findUsagesSync(of: match)
+        }
     }
 }
 
@@ -388,31 +377,27 @@ extension SymbolFinder {
     /// - Parameter usrs: Array of USRs to check.
     /// - Returns: Set of USRs that have references.
     ///
-    /// - Note: SAFETY: Lock is acquired for the duration of all IndexStore calls.
     public func findReferencedUSRs(_ usrs: [String]) -> Set<String> {
         findReferencedUSRsSync(usrs)
     }
 
     /// Synchronous implementation that acquires lock once for all USRs.
     private func findReferencedUSRsSync(_ usrs: [String]) -> Set<String> {
-        guard let indexResolver else {
-            return []
-        }
-
-        // SAFETY: Lock protects access to indexResolver which wraps non-Sendable IndexStoreDB.
-        // Lock is held for all reference checks to avoid repeated lock/unlock overhead.
-        lock.lock()
-        defer { lock.unlock() }
-
-        var referenced = Set<String>()
-
-        for usr in usrs {
-            if indexResolver.hasReferencesSync(usr: usr) {
-                referenced.insert(usr)
+        indexResolver.withLock { indexResolver in
+            guard let indexResolver else {
+                return []
             }
-        }
 
-        return referenced
+            var referenced = Set<String>()
+
+            for usr in usrs {
+                if indexResolver.hasReferencesSync(usr: usr) {
+                    referenced.insert(usr)
+                }
+            }
+
+            return referenced
+        }
     }
 
     /// Minimum number of USRs required to enable chunked parallel processing.
@@ -439,7 +424,7 @@ extension SymbolFinder {
         _ usrs: [String],
         parallelMode: ParallelMode
     ) async -> Set<String> {
-        guard indexResolver != nil else {
+        guard hasIndexStore else {
             return []
         }
 
@@ -463,7 +448,6 @@ extension SymbolFinder {
             chunks,
             maxConcurrency: concurrency.maxConcurrentTasks
         ) { [self] chunk -> Set<String>? in
-            // Use synchronous helper to avoid async context issues with NSLock
             let referenced = self.checkReferencesForChunkSync(chunk)
             return referenced.isEmpty ? nil : referenced
         }
@@ -482,19 +466,19 @@ extension SymbolFinder {
     /// - Parameter chunk: Array of USRs to check.
     /// - Returns: Set of USRs that have references.
     ///
-    /// - Note: SAFETY: Lock is acquired for the entire chunk.
     private func checkReferencesForChunkSync(_ chunk: [String]) -> Set<String> {
-        guard let indexResolver else { return [] }
-
-        lock.lock()
-        defer { lock.unlock() }
-
-        var referenced = Set<String>()
-        for usr in chunk {
-            if indexResolver.hasReferencesSync(usr: usr) {
-                referenced.insert(usr)
+        indexResolver.withLock { indexResolver in
+            guard let indexResolver else {
+                return []
             }
+
+            var referenced = Set<String>()
+            for usr in chunk {
+                if indexResolver.hasReferencesSync(usr: usr) {
+                    referenced.insert(usr)
+                }
+            }
+            return referenced
         }
-        return referenced
     }
 }

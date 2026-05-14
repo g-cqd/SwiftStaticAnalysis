@@ -113,26 +113,10 @@ extension UnusedCodeDetector {
 
     /// Detect unused code using hybrid mode (index + syntax).
     func detectWithHybridMode(db: IndexStoreDB, files: [String]) async throws -> [UnusedCode] {
-        // Get results from both methods
         let indexResults = detectWithIndexGraph(db: db, files: files)
         let syntaxResults = try await detectUnusedWithReachability(in: files)
 
-        // Merge results, preferring index results for higher confidence
-        var resultsByName: [String: UnusedCode] = [:]
-
-        // Add index results first (higher confidence)
-        for result in indexResults {
-            resultsByName[result.declaration.name] = result
-        }
-
-        // Add syntax results only if not already present
-        for result in syntaxResults where resultsByName[result.declaration.name] == nil {
-            resultsByName[result.declaration.name] = result
-        }
-
-        return Array(resultsByName.values)
-            .filter { $0.confidence >= configuration.minimumConfidence }
-            .sorted { $0.confidence > $1.confidence }
+        return mergeHybridResults(indexResults: indexResults, syntaxResults: syntaxResults)
     }
 
     /// Check if an index node should be reported.
@@ -150,6 +134,50 @@ extension UnusedCodeDetector {
     func convertIndexKind(_ kind: IndexedSymbolKind) -> DeclarationKind {
         kind.toDeclarationKind()
     }
+
+    func mergeHybridResults(indexResults: [UnusedCode], syntaxResults: [UnusedCode]) -> [UnusedCode] {
+        var resultsByIdentity: [UnusedCodeIdentity: UnusedCode] = [:]
+
+        for result in syntaxResults {
+            resultsByIdentity[UnusedCodeIdentity(result)] = result
+        }
+
+        for result in indexResults {
+            resultsByIdentity[UnusedCodeIdentity(result)] = result
+        }
+
+        return resultsByIdentity.values.map { $0 }
+            .filter { $0.confidence >= configuration.minimumConfidence }
+            .sorted { lhs, rhs in
+                if lhs.confidence != rhs.confidence {
+                    return lhs.confidence > rhs.confidence
+                }
+
+                if lhs.declaration.location.file != rhs.declaration.location.file {
+                    return lhs.declaration.location.file < rhs.declaration.location.file
+                }
+                if lhs.declaration.location.line != rhs.declaration.location.line {
+                    return lhs.declaration.location.line < rhs.declaration.location.line
+                }
+                return lhs.declaration.location.column < rhs.declaration.location.column
+            }
+    }
+}
+
+private struct UnusedCodeIdentity: Hashable, Sendable {
+    init(_ result: UnusedCode) {
+        name = result.declaration.name
+        kind = result.declaration.kind
+        file = result.declaration.location.file
+        line = result.declaration.location.line
+        column = result.declaration.location.column
+    }
+
+    let name: String
+    let kind: DeclarationKind
+    let file: String
+    let line: Int
+    let column: Int
 }
 
 // MARK: - Project Discovery

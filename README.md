@@ -626,7 +626,19 @@ swift test --filter IgnoreDirectiveTests
 
 # Run with verbose output
 swift test -v
+
+# List mutation-testing profiles
+scripts/run-mutation-tests.sh --list-profiles
+
+# Run mutation testing for one package/feature profile
+scripts/run-mutation-tests.sh --profile core
+
+# Run mutation testing for the full package graph
+scripts/run-mutation-tests.sh --profile all --output-dir .tmp/mutation
 ```
+
+Mutation profiles are split by package and entry-point feature: `core`, `duplication`, `unused`, `symbol`, `output`, `umbrella`, `cli`, and `mcp`.
+The repository bootstraps `muter` into `.bin/` on demand, so mutation testing does not depend on a global installation.
 
 ## Contributing
 

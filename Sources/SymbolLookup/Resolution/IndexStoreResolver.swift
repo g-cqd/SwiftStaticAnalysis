@@ -95,11 +95,7 @@ public struct IndexStoreResolver: SymbolResolver, UsageResolver, ReferenceChecke
         let occurrences = reader.findOccurrences(ofUSR: usr)
 
         return occurrences.compactMap { occ -> SymbolOccurrence? in
-            // Filter to references only (not definitions)
-            guard
-                occ.roles.contains(.reference) || occ.roles.contains(.call) || occ.roles.contains(.read)
-                    || occ.roles.contains(.write)
-            else {
+            guard occ.roles.indicatesUsage else {
                 return nil
             }
 

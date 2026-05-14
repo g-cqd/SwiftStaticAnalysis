@@ -180,6 +180,16 @@ public struct IndexedSymbolRoles: OptionSet, Sendable {
     public static let implicit = Self(rawValue: 1 << 7)
 
     public let rawValue: UInt64
+
+    /// Whether the occurrence represents a declaration site.
+    public var isDefinitionLike: Bool {
+        contains(.definition) || contains(.declaration)
+    }
+
+    /// Whether the occurrence represents an actual use-site.
+    public var indicatesUsage: Bool {
+        contains(.reference) || contains(.call) || contains(.read) || contains(.write)
+    }
 }
 
 // MARK: - IndexStoreReader

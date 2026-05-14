@@ -5,6 +5,7 @@
 import Collections
 import Foundation
 import IndexStoreDB
+import Synchronization
 import SwiftStaticAnalysisCore
 
 // MARK: - IndexSymbolNode
@@ -134,7 +135,7 @@ public enum IndexDependencyKind: String, Sendable, Codable {
 ///
 /// ## Thread Safety Design
 ///
-/// This class uses `@unchecked Sendable` with `NSLock` for thread safety instead of
+/// This class uses `Mutex` for thread safety instead of
 /// Swift's `actor` model. This design choice was made because:
 ///
 /// 1. **Non-Sendable Dependency**: `IndexStoreDB` from the `IndexStoreDB` package is not
@@ -145,7 +146,7 @@ public enum IndexDependencyKind: String, Sendable, Codable {
 ///    `forEachRelatedSymbolOccurrence`) that capture `self`. In an actor context,
 ///    these closures would need to be `@Sendable`, but they mutate actor-isolated state.
 ///
-/// 3. **Performance**: The `NSLock` pattern allows synchronous access for read-heavy
+/// 3. **Performance**: The `Mutex` pattern allows synchronous access for read-heavy
 ///    operations without the overhead of `await` at every call site.
 ///
 /// - SeeAlso: `ReachabilityGraph` which uses the `actor` pattern because it has no
@@ -167,15 +168,23 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
 
     /// Get all root nodes.
     public var rootNodes: [IndexSymbolNode] {
-        roots.compactMap { nodes[$0] }
+        lock.withLock { _ in
+            roots.compactMap { nodes[$0] }
+        }
     }
 
     /// Total number of nodes.
-    public var nodeCount: Int { nodes.count }
+    public var nodeCount: Int {
+        lock.withLock { _ in
+            nodes.count
+        }
+    }
 
     /// Total number of edges.
     public var edgeCount: Int {
-        edges.values.reduce(0) { $0 + $1.count }
+        lock.withLock { _ in
+            edges.values.reduce(0) { $0 + $1.count }
+        }
     }
 
     // MARK: - Graph Building
@@ -184,27 +193,18 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
     ///
     /// - Parameter db: The IndexStoreDB database.
     public func build(from db: IndexStoreDB) {
-        lock.lock()
-        defer { lock.unlock() }
+        lock.withLock { _ in
+            nodes.removeAll()
+            edges.removeAll()
+            reverseEdges.removeAll()
+            roots.removeAll()
+            reachableCache = nil
 
-        // Clear any existing data
-        nodes.removeAll()
-        edges.removeAll()
-        reverseEdges.removeAll()
-        roots.removeAll()
-        reachableCache = nil
-
-        // First pass: collect all definitions in analysis files
-        collectDefinitions(from: db)
-
-        // Second pass: build edges from references
-        buildEdges(from: db)
-
-        // Third pass: resolve protocol witnesses
-        resolveProtocolWitnesses(from: db)
-
-        // Fourth pass: detect roots
-        detectRoots()
+            collectDefinitions(from: db)
+            buildEdges(from: db)
+            resolveProtocolWitnesses(from: db)
+            detectRoots()
+        }
     }
 
     // MARK: - Reachability Analysis
@@ -212,9 +212,12 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
     // swa:ignore-duplicates - Standard BFS reachability algorithm used in multiple graph implementations
     /// Compute all reachable nodes from the root set using BFS.
     public func computeReachable() -> Set<String> {
-        lock.lock()
-        defer { lock.unlock() }
+        lock.withLock { _ in
+            computeReachableLocked()
+        }
+    }
 
+    private func computeReachableLocked() -> Set<String> {
         if let cached = reachableCache {
             return cached
         }
@@ -244,30 +247,40 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
 
     /// Get all unreachable nodes (excluding external symbols).
     public func computeUnreachable() -> [IndexSymbolNode] {
-        let reachable = computeReachable()
-        return nodes.values.filter { node in
-            !reachable.contains(node.usr) && !node.isExternal
+        lock.withLock { _ in
+            let reachable = computeReachableLocked()
+            return nodes.values.filter { node in
+                !reachable.contains(node.usr) && !node.isExternal
+            }
         }
     }
 
     /// Check if a symbol is reachable.
     public func isReachable(usr: String) -> Bool {
-        computeReachable().contains(usr)
+        lock.withLock { _ in
+            computeReachableLocked().contains(usr)
+        }
     }
 
     /// Get a node by USR.
     public func node(for usr: String) -> IndexSymbolNode? {
-        nodes[usr]
+        lock.withLock { _ in
+            nodes[usr]
+        }
     }
 
     /// Get outgoing edges for a node.
     public func outgoingEdges(for usr: String) -> Set<IndexDependencyEdge> {
-        edges[usr] ?? []
+        lock.withLock { _ in
+            edges[usr] ?? []
+        }
     }
 
     /// Get incoming edges for a node.
     public func incomingEdges(for usr: String) -> Set<IndexDependencyEdge> {
-        reverseEdges[usr] ?? []
+        lock.withLock { _ in
+            reverseEdges[usr] ?? []
+        }
     }
 
     // MARK: Private
@@ -291,7 +304,7 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
     private let analysisFiles: Set<String>
 
     /// Lock for thread safety (required because IndexStoreDB is not Sendable).
-    private let lock = NSLock()
+    private let lock = Mutex(())
 
     /// Collect all symbol definitions from files in scope.
     private func collectDefinitions(from db: IndexStoreDB) {
@@ -301,7 +314,7 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
                 let roles = occurrence.roles
 
                 // Only process definitions and declarations
-                guard roles.contains(.definition) || roles.contains(.declaration) else {
+                guard isDefinitionLike(roles) else {
                     continue
                 }
 
@@ -341,8 +354,7 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
         let targetUSR = occurrence.symbol.usr
 
         // Skip definitions without relations
-        guard roles.contains(.reference) || roles.contains(.call) || roles.contains(.read) || roles.contains(.write)
-        else {
+        guard indicatesUsage(roles) else {
             return
         }
 
@@ -486,18 +498,10 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
             return .mainFunction
         }
 
-        // Check for test methods
-        if configuration.treatTestsAsRoot,
-            node.name.hasPrefix("test"),
-            node.kind == .function || node.kind == .method
-        {
-            return .testMethod
-        }
-
-        // Check file path for test indicator
         if configuration.treatTestsAsRoot,
             let file = node.definitionFile,
-            file.contains("Tests") || file.contains("Test")
+            matchesTestFilePath(file),
+            node.name.hasPrefix("test")
         {
             if node.kind == .function || node.kind == .method {
                 return .testMethod
@@ -511,6 +515,14 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
 
         return nil
     }
+}
+
+private func isDefinitionLike(_ roles: SymbolRole) -> Bool {
+    roles.contains(.definition) || roles.contains(.declaration)
+}
+
+private func indicatesUsage(_ roles: SymbolRole) -> Bool {
+    roles.contains(.reference) || roles.contains(.call) || roles.contains(.read) || roles.contains(.write)
 }
 
 // MARK: - IndexGraphConfiguration

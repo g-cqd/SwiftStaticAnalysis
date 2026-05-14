@@ -74,7 +74,6 @@ let package = Package(
         .package(
             url: "https://github.com/swiftlang/indexstore-db.git", revision: "cb3b960568f18a3cc018923f5824323b5c4edd0b"),
         .package(url: "https://github.com/swiftlang/swift-format.git", from: "602.0.0"),
-        .package(url: "https://github.com/g-cqd/SwiftProjectKit.git", from: "0.0.21"),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.3"),
         .package(url: "https://github.com/apple/swift-async-algorithms.git", .upToNextMajor(from: "1.1.1")),
         .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.0"),
@@ -274,6 +273,13 @@ let package = Package(
         .testTarget(
             name: "SwiftStaticAnalysisOutputTests",
             dependencies: ["SwiftStaticAnalysisOutput"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "SwiftStaticAnalysisTests",
+            dependencies: ["SwiftStaticAnalysis"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]
