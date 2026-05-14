@@ -150,7 +150,7 @@ struct Duplicates: AsyncParsableCommand {
     var config: String?
 
     @Option(name: .long, help: "Clone types to detect")
-    var types: [CloneTypeArg] = [.exact]
+    var types: [CloneType] = [.exact]
 
     @Option(name: .long, help: "Minimum tokens for a clone")
     var minTokens: Int?
@@ -159,7 +159,7 @@ struct Duplicates: AsyncParsableCommand {
     var minSimilarity: Double?
 
     @Option(name: .long, help: "Detection algorithm (rollingHash, suffixArray, minHashLSH)")
-    var algorithm: AlgorithmArg?
+    var algorithm: DetectionAlgorithm?
 
     @Option(name: .long, parsing: .upToNextOption, help: "Paths to exclude (glob patterns)")
     var excludePaths: [String] = []
@@ -168,7 +168,7 @@ struct Duplicates: AsyncParsableCommand {
     var parallel: Bool = false
 
     @Option(name: .long, help: "Parallel mode (none, safe, maximum)")
-    var parallelMode: ParallelModeArg?
+    var parallelMode: ParallelMode?
 
     @Option(name: .shortAndLong, help: "Output format")
     var format: OutputFormat = .xcode
@@ -196,14 +196,14 @@ struct Duplicates: AsyncParsableCommand {
         // Merge CLI args with config (CLI takes precedence)
         let effectiveMinTokens = minTokens ?? dupConfig?.minTokens ?? 50
         let effectiveMinSimilarity = minSimilarity ?? dupConfig?.minSimilarity ?? 0.8
-        let effectiveAlgorithm = algorithm?.toAlgorithm ?? parseAlgorithm(dupConfig?.algorithm)
-        let effectiveTypes = types.isEmpty ? parseCloneTypes(dupConfig?.types) : Set(types.map(\.toCloneType))
+        let effectiveAlgorithm = algorithm ?? parseAlgorithm(dupConfig?.algorithm)
+        let effectiveTypes = types.isEmpty ? parseCloneTypes(dupConfig?.types) : Set(types)
         let effectiveExcludePaths = excludePaths.isEmpty ? (dupConfig?.excludePaths ?? []) : excludePaths
 
         // Resolve parallel mode: CLI --parallel-mode > CLI --parallel > config
         let effectiveParallelMode: ParallelMode =
             if let mode = parallelMode {
-                mode.toParallelMode
+                mode
             } else if parallel {
                 .maximum
             } else {
@@ -263,13 +263,13 @@ struct Unused: AsyncParsableCommand {
     var ignorePublic: Bool = false
 
     @Option(name: .long, help: "Detection mode")
-    var mode: DetectionModeArg?
+    var mode: DetectionMode?
 
     @Option(name: .long, help: "Path to index store")
     var indexStorePath: String?
 
     @Option(name: .long, help: "Minimum confidence level (low, medium, high)")
-    var minConfidence: ConfidenceArg?
+    var minConfidence: Confidence?
 
     @Flag(name: .long, help: "Generate reachability report")
     var report: Bool = false
@@ -323,7 +323,7 @@ struct Unused: AsyncParsableCommand {
     var parallel: Bool = false
 
     @Option(name: .long, help: "Parallel mode (none, safe, maximum)")
-    var parallelMode: ParallelModeArg?
+    var parallelMode: ParallelMode?
 
     // swiftlint:disable:next function_body_length
     func run() async throws {
@@ -335,7 +335,7 @@ struct Unused: AsyncParsableCommand {
         let unusedConfig = swaConfig?.unused
 
         // Merge CLI args with config (CLI takes precedence)
-        let effectiveMode = mode?.toDetectionMode ?? parseDetectionMode(unusedConfig?.mode)
+        let effectiveMode = mode ?? parseDetectionMode(unusedConfig?.mode)
         let effectiveIndexStorePath = indexStorePath ?? unusedConfig?.indexStorePath
         let effectiveIgnorePublic = ignorePublic || (unusedConfig?.ignorePublicAPI ?? false)
         let effectiveSensibleDefaults = sensibleDefaults || (unusedConfig?.sensibleDefaults ?? false)
@@ -365,7 +365,7 @@ struct Unused: AsyncParsableCommand {
         // Resolve parallel mode: CLI --parallel-mode > CLI --parallel > config
         let effectiveParallelMode: ParallelMode =
             if let mode = parallelMode {
-                mode.toParallelMode
+                mode
             } else if parallel {
                 .maximum
             } else {
@@ -478,10 +478,10 @@ struct Symbol: AsyncParsableCommand {
     var usr: Bool = false
 
     @Option(name: .long, help: "Filter by kind (function, method, variable, class, struct, enum, protocol)")
-    var kind: [DeclarationKindArg] = []
+    var kind: [DeclarationKind] = []
 
     @Option(name: .long, help: "Filter by access level (private, internal, public, open)")
-    var access: [AccessLevelArg] = []
+    var access: [AccessLevel] = []
 
     @Option(name: .long, help: "Search within type scope")
     var inType: String?
@@ -567,8 +567,8 @@ struct Symbol: AsyncParsableCommand {
                 .all
             }
 
-        let kindFilter: Set<DeclarationKind>? = kind.isEmpty ? nil : Set(kind.map(\.toDeclarationKind))
-        let accessFilter: Set<AccessLevel>? = access.isEmpty ? nil : Set(access.map(\.toAccessLevel))
+        let kindFilter: Set<DeclarationKind>? = kind.isEmpty ? nil : Set(kind)
+        let accessFilter: Set<AccessLevel>? = access.isEmpty ? nil : Set(access)
 
         let symbolQuery = SymbolQuery(
             pattern: pattern,
@@ -684,53 +684,9 @@ struct Symbol: AsyncParsableCommand {
     }
 }
 
-// MARK: - DeclarationKindArg
-
-enum DeclarationKindArg: String, ExpressibleByArgument, CaseIterable {
-    case function
-    case method
-    case variable
-    case constant
-    case `class`
-    case `struct`
-    case `enum`
-    case `protocol`
-    case initializer
-
-    var toDeclarationKind: DeclarationKind {
-        switch self {
-        case .function: .function
-        case .method: .method
-        case .variable: .variable
-        case .constant: .constant
-        case .class: .class
-        case .struct: .struct
-        case .enum: .enum
-        case .protocol: .protocol
-        case .initializer: .initializer
-        }
-    }
-}
-
-// MARK: - AccessLevelArg
-
-enum AccessLevelArg: String, ExpressibleByArgument, CaseIterable {
-    case `private`
-    case `fileprivate`
-    case `internal`
-    case `public`
-    case `open`
-
-    var toAccessLevel: AccessLevel {
-        switch self {
-        case .private: .private
-        case .fileprivate: .fileprivate
-        case .internal: .internal
-        case .public: .public
-        case .open: .open
-        }
-    }
-}
+// `DeclarationKindArg` and `AccessLevelArg` were deleted in 0.2.0. The
+// domain enums now conform directly to `ExpressibleByArgument` via the
+// retroactive extensions in `CLIConformances.swift`.
 
 // MARK: - Configuration Loading Helpers
 
@@ -838,9 +794,9 @@ func parseDetectionMode(_ mode: String?) -> DetectionMode {
     }
 }
 
-func parseConfidence(_ confidence: String?) -> ConfidenceArg? {
+func parseConfidence(_ confidence: String?) -> Confidence? {
     guard let confidence else { return nil }
-    return ConfidenceArg(rawValue: confidence.lowercased())
+    return Confidence(rawValue: confidence.lowercased())
 }
 
 // swiftlint:disable:next function_parameter_count
@@ -850,7 +806,7 @@ func filterUnusedResults(
     excludeDeinit: Bool,
     excludeEnumCases: Bool,
     excludeTestSuites: Bool,
-    minConfidence: ConfidenceArg?,
+    minConfidence: Confidence?,
 ) -> [UnusedCode] {
     var results: [UnusedCode] = []
 
@@ -884,7 +840,7 @@ func filterUnusedResults(
 
         // Filter by minimum confidence
         if let minConf = minConfidence {
-            if item.confidence < minConf.toConfidence {
+            if item.confidence < minConf {
                 continue
             }
         }
@@ -903,100 +859,10 @@ enum OutputFormat: String, ExpressibleByArgument, CaseIterable {
     case xcode
 }
 
-// MARK: - CloneTypeArg
-
-/// Validated clone type argument for CLI.
-enum CloneTypeArg: String, ExpressibleByArgument, CaseIterable {
-    case exact
-    case near
-    case semantic
-
-    // MARK: Internal
-
-    var toCloneType: CloneType {
-        switch self {
-        case .exact: .exact
-        case .near: .near
-        case .semantic: .semantic
-        }
-    }
-}
-
-// MARK: - DetectionModeArg
-
-/// Validated detection mode argument for CLI.
-enum DetectionModeArg: String, ExpressibleByArgument, CaseIterable {
-    case simple
-    case reachability
-    case indexStore
-
-    // MARK: Internal
-
-    var toDetectionMode: DetectionMode {
-        switch self {
-        case .simple: .simple
-        case .reachability: .reachability
-        case .indexStore: .indexStore
-        }
-    }
-}
-
-// MARK: - AlgorithmArg
-
-/// Validated algorithm argument for CLI.
-enum AlgorithmArg: String, ExpressibleByArgument, CaseIterable {
-    case rollingHash
-    case suffixArray
-    case minHashLSH
-
-    // MARK: Internal
-
-    var toAlgorithm: DetectionAlgorithm {
-        switch self {
-        case .rollingHash: .rollingHash
-        case .suffixArray: .suffixArray
-        case .minHashLSH: .minHashLSH
-        }
-    }
-}
-
-// MARK: - ConfidenceArg
-
-/// Validated confidence argument for CLI.
-enum ConfidenceArg: String, ExpressibleByArgument, CaseIterable {
-    case low
-    case medium
-    case high
-
-    // MARK: Internal
-
-    var toConfidence: Confidence {
-        switch self {
-        case .low: .low
-        case .medium: .medium
-        case .high: .high
-        }
-    }
-}
-
-// MARK: - ParallelModeArg
-
-/// Validated parallel mode argument for CLI.
-enum ParallelModeArg: String, ExpressibleByArgument, CaseIterable {
-    case none
-    case safe
-    case maximum
-
-    // MARK: Internal
-
-    var toParallelMode: ParallelMode {
-        switch self {
-        case .none: .none
-        case .safe: .safe
-        case .maximum: .maximum
-        }
-    }
-}
+// The five `*Arg` mirror enums (`CloneTypeArg`, `DetectionModeArg`,
+// `AlgorithmArg`, `ConfidenceArg`, `ParallelModeArg`) were deleted in
+// 0.2.0 in favour of `@retroactive ExpressibleByArgument` conformances
+// on the domain enums themselves; see `CLIConformances.swift`.
 
 // MARK: - CombinedReport
 

@@ -28,7 +28,7 @@ public enum UnusedReason: String, Sendable, Codable {
 // MARK: - Confidence
 
 /// Confidence level for unused code detection.
-public enum Confidence: String, Sendable, Codable, Comparable {
+public enum Confidence: String, Sendable, Codable, Comparable, CaseIterable {
     /// Definitely unused (private, no references found).
     case high
 
@@ -91,7 +91,7 @@ public struct UnusedCode: Sendable, Codable {
 // MARK: - DetectionMode
 
 /// Mode for unused code detection.
-public enum DetectionMode: String, Sendable, Codable {
+public enum DetectionMode: String, Sendable, Codable, CaseIterable {
     /// Simple reference counting (fast, approximate).
     case simple
 

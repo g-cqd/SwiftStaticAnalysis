@@ -37,7 +37,7 @@ public enum DeclarationKind: String, Sendable, Codable, CaseIterable {
 
 /// Swift access level modifiers.
 /// Intentionally exhaustive for API completeness. // swa:ignore-unused-cases
-public enum AccessLevel: String, Sendable, Codable, Comparable {
+public enum AccessLevel: String, Sendable, Codable, Comparable, CaseIterable {
     case `private`
     case `fileprivate`
     case `internal`

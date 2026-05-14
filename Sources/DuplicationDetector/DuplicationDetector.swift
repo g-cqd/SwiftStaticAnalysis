@@ -103,7 +103,7 @@ public struct CloneGroup: Sendable, Codable {
 // MARK: - DetectionAlgorithm
 
 /// Algorithm used for clone detection.
-public enum DetectionAlgorithm: String, Sendable, Codable {
+public enum DetectionAlgorithm: String, Sendable, Codable, CaseIterable {
     /// Rolling hash (Rabin-Karp) - fast, may have false positives.
     case rollingHash
 
