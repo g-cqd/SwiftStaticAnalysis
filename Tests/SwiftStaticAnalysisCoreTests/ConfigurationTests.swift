@@ -27,7 +27,7 @@ struct SWAConfigurationTests {
     func codable() throws {
         let config = SWAConfiguration(
             version: 1,
-            format: "xcode",
+            format: .xcode,
             excludePaths: ["**/Tests/**"],
             unused: UnusedConfiguration(
                 enabled: true,
@@ -76,7 +76,7 @@ struct SWAConfigurationTests {
         let config = try decoder.decode(SWAConfiguration.self, from: data)
 
         #expect(config.version == 1)
-        #expect(config.format == "text")
+        #expect(config.format == .text)
         #expect(config.excludePaths == ["**/Fixtures/**", "**/Generated/**"])
         #expect(config.unused?.enabled == true)
         #expect(config.unused?.mode == "simple")
@@ -128,7 +128,7 @@ struct SWAConfigurationTests {
 
         #expect(config.version == nil)
         #expect(config.resolvedVersion == SWAConfiguration.currentVersion)
-        #expect(config.format == "xcode")
+        #expect(config.format == .xcode)
         #expect(config.unused?.sensibleDefaults == true)
     }
 
@@ -378,7 +378,7 @@ struct ConfigurationLoaderTests {
         let config = try loader.load(from: tempDir)
 
         #expect(config?.version == 1)
-        #expect(config?.format == "json")
+        #expect(config?.format == .json)
         #expect(config?.unused?.enabled == true)
         #expect(config?.unused?.mode == "reachability")
     }
@@ -393,6 +393,77 @@ struct ConfigurationLoaderTests {
 
         let configPath = tempDir.appendingPathComponent(".swa.json")
         try "{ invalid json }".write(to: configPath, atomically: true, encoding: .utf8)
+
+        let loader = ConfigurationLoader()
+
+        #expect(throws: ConfigurationError.self) {
+            _ = try loader.loadFromFile(configPath)
+        }
+    }
+
+    @Test("Loader rejects bogus format value at load time")
+    func rejectsBogusFormat() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let configPath = tempDir.appendingPathComponent(".swa.json")
+        try #"{ "version": 1, "format": "bogus" }"#
+            .write(to: configPath, atomically: true, encoding: .utf8)
+
+        let loader = ConfigurationLoader()
+
+        #expect(throws: ConfigurationError.self) {
+            _ = try loader.loadFromFile(configPath)
+        }
+    }
+
+    @Test("Loader rejects bogus detection mode at load time")
+    func rejectsBogusDetectionMode() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let configPath = tempDir.appendingPathComponent(".swa.json")
+        try #"{ "version": 1, "unused": { "mode": "telepathic" } }"#
+            .write(to: configPath, atomically: true, encoding: .utf8)
+
+        let loader = ConfigurationLoader()
+
+        var thrown: ConfigurationError?
+        do {
+            _ = try loader.loadFromFile(configPath)
+        } catch let error as ConfigurationError {
+            thrown = error
+        }
+
+        guard let error = thrown else {
+            Issue.record("Expected ConfigurationError")
+            return
+        }
+        if case .invalidFieldValue(let field, let value, _, _) = error {
+            #expect(field == "unused.mode")
+            #expect(value == "telepathic")
+        } else {
+            Issue.record("Expected invalidFieldValue, got \(error)")
+        }
+    }
+
+    @Test("Loader rejects bogus algorithm and clone type")
+    func rejectsBogusDuplicatesValues() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let configPath = tempDir.appendingPathComponent(".swa.json")
+        try #"{ "version": 1, "duplicates": { "types": ["exact", "imaginary"] } }"#
+            .write(to: configPath, atomically: true, encoding: .utf8)
 
         let loader = ConfigurationLoader()
 
@@ -436,7 +507,7 @@ struct ConfigurationMergingTests {
     func cliOverridesConfig() {
         let fileConfig = SWAConfiguration(
             version: 1,
-            format: "text",
+            format: .text,
             unused: UnusedConfiguration(
                 enabled: true,
                 mode: "simple",
@@ -446,7 +517,7 @@ struct ConfigurationMergingTests {
 
         let cliConfig = SWAConfiguration(
             version: 1,
-            format: "xcode",
+            format: .xcode,
             unused: UnusedConfiguration(
                 mode: "reachability",
             ),
@@ -454,7 +525,7 @@ struct ConfigurationMergingTests {
 
         let merged = fileConfig.merging(with: cliConfig)
 
-        #expect(merged.format == "xcode")
+        #expect(merged.format == .xcode)
         #expect(merged.unused?.mode == "reachability")
         #expect(merged.unused?.enabled == true)
         #expect(merged.unused?.sensibleDefaults == false)
@@ -464,7 +535,7 @@ struct ConfigurationMergingTests {
     func nilCLIPreservesConfig() {
         let fileConfig = SWAConfiguration(
             version: 1,
-            format: "json",
+            format: .json,
             excludePaths: ["**/Tests/**"],
             duplicates: DuplicatesConfiguration(
                 enabled: true,
@@ -478,7 +549,7 @@ struct ConfigurationMergingTests {
 
         let merged = fileConfig.merging(with: cliConfig)
 
-        #expect(merged.format == "json")
+        #expect(merged.format == .json)
         #expect(merged.excludePaths == ["**/Tests/**"])
         #expect(merged.duplicates?.enabled == true)
         #expect(merged.duplicates?.minTokens == 100)

@@ -91,9 +91,11 @@ public final class IndexStoreAnalyzer: Sendable {
         for (usr, occurrences) in occurrencesByUSR {
             // Find the canonical definition occurrence (definition or
             // declaration role, located inside one of our analysed files).
-            guard let definition = occurrences.first(where: { occ in
-                occ.roles.isDefinitionLike && files.contains(occ.file)
-            }) else {
+            guard
+                let definition = occurrences.first(where: { occ in
+                    occ.roles.isDefinitionLike && files.contains(occ.file)
+                })
+            else {
                 continue
             }
 

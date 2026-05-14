@@ -851,18 +851,11 @@ func filterUnusedResults(
     return results
 }
 
-// MARK: - OutputFormat
-
-enum OutputFormat: String, ExpressibleByArgument, CaseIterable {
-    case text
-    case json
-    case xcode
-}
-
-// The five `*Arg` mirror enums (`CloneTypeArg`, `DetectionModeArg`,
-// `AlgorithmArg`, `ConfidenceArg`, `ParallelModeArg`) were deleted in
-// 0.2.0 in favour of `@retroactive ExpressibleByArgument` conformances
-// on the domain enums themselves; see `CLIConformances.swift`.
+// The local `OutputFormat` enum and five `*Arg` mirror enums
+// (`CloneTypeArg`, `DetectionModeArg`, `AlgorithmArg`, `ConfidenceArg`,
+// `ParallelModeArg`) were deleted in 0.2.0. The domain enums conform
+// to `ExpressibleByArgument` directly; see `CLIConformances.swift`.
+// `OutputFormat` now lives in `SwiftStaticAnalysisCore`.
 
 // MARK: - CombinedReport
 

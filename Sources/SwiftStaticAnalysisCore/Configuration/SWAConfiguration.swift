@@ -32,7 +32,7 @@ public struct SWAConfiguration: Codable, Sendable, Equatable {
 
     public init(
         version: Int? = nil,
-        format: String? = nil,
+        format: OutputFormat? = nil,
         excludePaths: [String]? = nil,
         unused: UnusedConfiguration? = nil,
         duplicates: DuplicatesConfiguration? = nil,
@@ -55,8 +55,8 @@ public struct SWAConfiguration: Codable, Sendable, Equatable {
     /// Configuration file format version (optional, defaults to 1).
     public var version: Int?
 
-    /// Global output format: "text", "json", or "xcode".
-    public var format: String?
+    /// Global output format.
+    public var format: OutputFormat?
 
     /// Global path exclusion patterns (glob syntax).
     public var excludePaths: [String]?

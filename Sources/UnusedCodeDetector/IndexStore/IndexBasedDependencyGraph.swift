@@ -5,8 +5,8 @@
 import Collections
 import Foundation
 import IndexStoreDB
-import Synchronization
 import SwiftStaticAnalysisCore
+import Synchronization
 
 // MARK: - IndexSymbolNode
 

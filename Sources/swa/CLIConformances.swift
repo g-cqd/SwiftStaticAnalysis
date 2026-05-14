@@ -21,3 +21,4 @@ extension DetectionMode: ExpressibleByArgument {}
 extension DetectionAlgorithm: ExpressibleByArgument {}
 extension Confidence: ExpressibleByArgument {}
 extension ParallelMode: ExpressibleByArgument {}
+extension OutputFormat: ExpressibleByArgument {}

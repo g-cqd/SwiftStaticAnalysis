@@ -702,7 +702,8 @@ extension SWAMCPServer {
             case .notRegularFile(let path):
                 return "Refusing to read '\(path)': not a regular file."
             case .fileTooLarge(let path, let size, let limit):
-                return "Refusing to read '\(path)': file is \(size) bytes; limit is \(limit) bytes (\(limit / 1024 / 1024) MiB)."
+                return
+                    "Refusing to read '\(path)': file is \(size) bytes; limit is \(limit) bytes (\(limit / 1024 / 1024) MiB)."
             }
         }
     }

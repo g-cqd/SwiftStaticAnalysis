@@ -54,12 +54,15 @@ public struct ConfigurationLoader: Sendable {
             throw ConfigurationError.fileReadError(path: filePath.path, underlying: error)
         }
 
+        let configuration: SWAConfiguration
         do {
             let decoder = JSONDecoder()
-            return try decoder.decode(SWAConfiguration.self, from: data)
+            configuration = try decoder.decode(SWAConfiguration.self, from: data)
         } catch {
             throw ConfigurationError.parseError(path: filePath.path, underlying: error)
         }
+        try configuration.validate(path: filePath.path)
+        return configuration
     }
 
     /// Find the configuration file in a directory.
@@ -92,6 +95,9 @@ public enum ConfigurationError: Error, CustomStringConvertible, Sendable {
     /// The configuration version is not supported.
     case unsupportedVersion(version: Int, path: String)
 
+    /// A field value is not one of the accepted options.
+    case invalidFieldValue(field: String, value: String, allowed: [String], path: String)
+
     // MARK: Public
 
     public var description: String {
@@ -104,6 +110,71 @@ public enum ConfigurationError: Error, CustomStringConvertible, Sendable {
 
         case .unsupportedVersion(let version, let path):
             "Unsupported configuration version \(version) in \(path). Supported versions: 1"
+
+        case .invalidFieldValue(let field, let value, let allowed, let path):
+            "Invalid value '\(value)' for field '\(field)' in \(path). Allowed: \(allowed.joined(separator: ", "))"
+        }
+    }
+}
+
+// MARK: - Validation
+
+extension SWAConfiguration {
+    /// Validate string-typed fields against their known allowed values.
+    /// Throws ``ConfigurationError/invalidFieldValue(field:value:allowed:path:)`` on any mismatch.
+    ///
+    /// Wire format keeps detector-specific enums (mode, algorithm, types, minConfidence)
+    /// as strings so that ``SWAConfiguration`` doesn't pull in the detector modules.
+    /// Validation happens here at the configuration-load boundary.
+    public func validate(path: String) throws(ConfigurationError) {
+        if let unused {
+            if let mode = unused.mode {
+                try Self.check(value: mode, in: Self.allowedDetectionModes, field: "unused.mode", path: path)
+            }
+            if let minConfidence = unused.minConfidence {
+                try Self.check(
+                    value: minConfidence,
+                    in: Self.allowedConfidences,
+                    field: "unused.minConfidence",
+                    path: path,
+                )
+            }
+        }
+        if let duplicates {
+            if let algorithm = duplicates.algorithm {
+                try Self.check(
+                    value: algorithm,
+                    in: Self.allowedAlgorithms,
+                    field: "duplicates.algorithm",
+                    path: path,
+                )
+            }
+            if let types = duplicates.types {
+                for value in types {
+                    try Self.check(
+                        value: value,
+                        in: Self.allowedCloneTypes,
+                        field: "duplicates.types",
+                        path: path,
+                    )
+                }
+            }
+        }
+    }
+
+    static let allowedDetectionModes = ["simple", "reachability", "indexStore"]
+    static let allowedConfidences = ["low", "medium", "high"]
+    static let allowedAlgorithms = ["rollingHash", "suffixArray", "minHashLSH"]
+    static let allowedCloneTypes = ["exact", "near", "semantic"]
+
+    private static func check(
+        value: String,
+        in allowed: [String],
+        field: String,
+        path: String,
+    ) throws(ConfigurationError) {
+        guard allowed.contains(value) else {
+            throw .invalidFieldValue(field: field, value: value, allowed: allowed, path: path)
         }
     }
 }

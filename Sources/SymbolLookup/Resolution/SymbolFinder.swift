@@ -3,8 +3,8 @@
 //  MIT License
 
 import Foundation
-import Synchronization
 import SwiftStaticAnalysisCore
+import Synchronization
 import UnusedCodeDetector
 
 /// Main coordinator for symbol lookup operations.

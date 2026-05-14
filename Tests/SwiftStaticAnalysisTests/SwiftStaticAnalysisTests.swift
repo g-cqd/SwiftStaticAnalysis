@@ -1,8 +1,7 @@
-import Testing
-
 import SwiftStaticAnalysis
 import SwiftStaticAnalysisAll
 import SwiftStaticAnalysisMCP
+import Testing
 
 @Suite("SwiftStaticAnalysis Re-Export Tests")
 struct SwiftStaticAnalysisTests {
