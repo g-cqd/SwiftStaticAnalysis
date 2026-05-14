@@ -98,6 +98,7 @@ let package = Package(
                 .product(name: "SwiftParser", package: "swift-syntax"),
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "Algorithms", package: "swift-algorithms"),
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

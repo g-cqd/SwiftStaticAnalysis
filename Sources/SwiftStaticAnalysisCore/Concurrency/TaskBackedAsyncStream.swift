@@ -2,6 +2,7 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
+import AsyncAlgorithms
 import Foundation
 
 // MARK: - TaskBackedAsyncStream
@@ -42,6 +43,49 @@ public enum TaskBackedAsyncStream {
                 task.cancel()
             }
         }
+    }
+}
+
+// MARK: - BackpressuredChannelStream
+
+/// Backbone for streaming async results with **true backpressure**.
+///
+/// Wraps `AsyncChannel` from swift-async-algorithms with the same
+/// "producer task cancelled when iteration terminates" semantics as
+/// `TaskBackedAsyncStream`. Unlike `AsyncStream` with `.bufferingNewest`,
+/// the producer **suspends** when the consumer hasn't drained the latest
+/// element. This makes "memory-bounded streaming" honest at the cost of
+/// limiting throughput to whatever the consumer can accept.
+///
+/// Use when:
+/// - `ParallelMode.maximum` is selected and the caller wants memory-bounded
+///   processing.
+/// - The result stream is expensive enough that dropping elements would
+///   lose work (e.g. verified clone pairs that won't be recomputed).
+///
+/// Avoid when:
+/// - The consumer is uniformly fast; the buffer-and-drop semantics of
+///   `TaskBackedAsyncStream` are cheaper.
+public enum BackpressuredChannelStream {
+    /// Create an `AsyncChannel` plus a producer `Task` that fills it. The
+    /// returned channel cancels the producer on `finish()`.
+    ///
+    /// The producer closure receives the channel; it should send via
+    /// `await channel.send(_:)` (suspends on backpressure) and call
+    /// `channel.finish()` when done.
+    ///
+    /// - Parameter operation: Async producer that pushes elements through
+    ///   the channel and finishes it.
+    /// - Returns: The channel for the consumer to iterate.
+    public static func makeChannel<Element: Sendable>(
+        operation: @escaping @Sendable (AsyncChannel<Element>) async -> Void
+    ) -> AsyncChannel<Element> {
+        let channel = AsyncChannel<Element>()
+        Task {
+            await operation(channel)
+            channel.finish()
+        }
+        return channel
     }
 }
 

@@ -380,6 +380,51 @@ public struct StreamingVerifier: Sendable {
         }
     }
 
+    /// Stream verified results with **true backpressure**.
+    ///
+    /// Uses `AsyncChannel` from swift-async-algorithms: the producer
+    /// suspends on `await channel.send(_:)` when the consumer hasn't
+    /// drained the latest element. Unlike `streamResults(_:documentMap:)`
+    /// (which uses `AsyncStream.bufferingNewest` and drops old elements
+    /// under buffer pressure), this variant guarantees no clone-pair
+    /// result is dropped.
+    ///
+    /// Use this when `ParallelMode.maximum` selects memory-bounded
+    /// processing and dropping a verified clone pair would be expensive
+    /// (each pair is the result of substantial token-level work).
+    ///
+    /// - Parameters:
+    ///   - candidatePairs: Set of candidate document pairs.
+    ///   - documentMap: Map from document ID to shingled document.
+    /// - Returns: `AsyncChannel` of verified clone pairs.
+    public func streamResultsBackpressured(
+        _ candidatePairs: Set<DocumentPair>,
+        documentMap: [Int: ShingledDocument]
+    ) -> AsyncChannel<ClonePairInfo> {
+        let pairs = Array(candidatePairs)
+        let batchSize = self.batchSize
+        let verifier = self.verifier
+
+        return BackpressuredChannelStream.makeChannel { channel in
+            var yieldedResults = 0
+            for chunk in pairs.chunks(ofCount: batchSize) {
+                if Task.isCancelled { return }
+                let batch = Set(chunk)
+                let batchResults = await verifier.verifyCandidatePairs(
+                    batch,
+                    documentMap: documentMap
+                )
+                for result in batchResults {
+                    await channel.send(result)
+                    yieldedResults += 1
+                    if await TaskCooperation.checkpoint(iteration: yieldedResults) {
+                        return
+                    }
+                }
+            }
+        }
+    }
+
     /// Collect all results from streaming (convenience method).
     ///
     /// - Parameters:
