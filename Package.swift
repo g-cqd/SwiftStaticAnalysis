@@ -12,10 +12,17 @@ let package = Package(
         .iOS(.v18),
     ],
     products: [
-        // Unified library (re-exports all components)
+        // Umbrella for analyzer libraries (Core, Duplication, Unused, Symbol).
+        // Importing this product does NOT pull in the MCP SDK; use
+        // `SwiftStaticAnalysisAll` if you need the MCP server.
         .library(
             name: "SwiftStaticAnalysis",
             targets: ["SwiftStaticAnalysis"]
+        ),
+        // Umbrella plus MCP server library.
+        .library(
+            name: "SwiftStaticAnalysisAll",
+            targets: ["SwiftStaticAnalysisAll"]
         ),
         // Core library for parsing and analysis infrastructure
         .library(
@@ -103,7 +110,8 @@ let package = Package(
             name: "DuplicationDetector",
             dependencies: [
                 "SwiftStaticAnalysisCore",
-                "UnusedCodeDetector",  // For AtomicBitmap, Bitmap
+                // 0.2.0: AtomicBitmap/Bitmap moved to SwiftStaticAnalysisCore;
+                // the prior reverse dependency on UnusedCodeDetector is gone.
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
@@ -197,7 +205,7 @@ let package = Package(
             path: "Sources/StaticAnalysisCommandPlugin"
         ),
 
-        // MARK: - Unified Module (re-exports all components)
+        // MARK: - Umbrella (analyzer libraries only; no MCP).
         .target(
             name: "SwiftStaticAnalysis",
             dependencies: [
@@ -205,6 +213,17 @@ let package = Package(
                 "DuplicationDetector",
                 "UnusedCodeDetector",
                 "SymbolLookup",
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+
+        // MARK: - Umbrella + MCP server.
+        .target(
+            name: "SwiftStaticAnalysisAll",
+            dependencies: [
+                "SwiftStaticAnalysis",
                 "SwiftStaticAnalysisMCP",
             ],
             swiftSettings: [
@@ -279,7 +298,11 @@ let package = Package(
         ),
         .testTarget(
             name: "SwiftStaticAnalysisTests",
-            dependencies: ["SwiftStaticAnalysis"],
+            dependencies: [
+                "SwiftStaticAnalysis",
+                "SwiftStaticAnalysisAll",
+                "SwiftStaticAnalysisMCP",
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

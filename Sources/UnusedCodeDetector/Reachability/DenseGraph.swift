@@ -3,6 +3,7 @@
 //  MIT License
 
 import Foundation
+import SwiftStaticAnalysisCore
 
 // MARK: - DenseGraph
 

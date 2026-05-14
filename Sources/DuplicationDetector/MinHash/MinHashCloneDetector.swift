@@ -6,7 +6,6 @@ import Algorithms
 import Collections
 import Foundation
 import SwiftStaticAnalysisCore
-import UnusedCodeDetector  // For AtomicBitmap, Bitmap
 
 // MARK: - ClonePairInfo
 

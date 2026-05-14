@@ -5,7 +5,7 @@
 import Foundation
 import Testing
 
-@testable import UnusedCodeDetector
+@testable import SwiftStaticAnalysisCore
 
 @Suite("Atomic Bitmap Tests")
 struct AtomicBitmapTests {

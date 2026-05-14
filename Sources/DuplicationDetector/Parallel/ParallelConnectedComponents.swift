@@ -5,8 +5,9 @@
 import Algorithms
 import Collections
 import Foundation
-import SwiftStaticAnalysisCore  // For ParallelFrontierExpansion
-import UnusedCodeDetector  // For AtomicBitmap, Bitmap
+// AtomicBitmap / Bitmap live in SwiftStaticAnalysisCore as of 0.2.0;
+// no separate `UnusedCodeDetector` import is needed.
+import SwiftStaticAnalysisCore
 
 // MARK: - ParallelConnectedComponents
 

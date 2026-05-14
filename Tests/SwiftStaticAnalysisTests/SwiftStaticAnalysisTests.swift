@@ -1,10 +1,12 @@
 import Testing
 
 import SwiftStaticAnalysis
+import SwiftStaticAnalysisAll
+import SwiftStaticAnalysisMCP
 
 @Suite("SwiftStaticAnalysis Re-Export Tests")
 struct SwiftStaticAnalysisTests {
-    @Test("umbrella module re-exports the public API surface")
+    @Test("analyzer-only umbrella re-exports the public API surface")
     func reexportsPublicAPIs() throws {
         let duplication = DuplicationConfiguration.highPerformance
         #expect(duplication.algorithm == .suffixArray)
@@ -20,7 +22,10 @@ struct SwiftStaticAnalysisTests {
 
         let location = SourceLocation(file: "Sources/Example.swift", line: 7, column: 3)
         #expect(location.line == 7)
+    }
 
+    @Test("SwiftStaticAnalysisAll exports the MCP server alongside analyzers")
+    func swiftStaticAnalysisAllExportsMCP() throws {
         _ = try SWAMCPServer(codebasePath: nil)
     }
 }

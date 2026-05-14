@@ -1,14 +1,16 @@
-/// SwiftStaticAnalysis - A high-performance Swift static analysis framework.
+/// SwiftStaticAnalysis — high-performance Swift static analysis framework.
 ///
-/// This module re-exports the five main components:
-/// - ``SwiftStaticAnalysisCore``: Core infrastructure and models
-/// - ``DuplicationDetector``: Clone detection algorithms
-/// - ``UnusedCodeDetector``: Unused code detection
-/// - ``SymbolLookup``: Symbol resolution and lookup
-/// - ``SwiftStaticAnalysisMCP``: MCP server for AI agent integration
+/// This module re-exports the four analyzer components:
+/// - ``SwiftStaticAnalysisCore``: core infrastructure and models
+/// - ``DuplicationDetector``: clone detection algorithms
+/// - ``UnusedCodeDetector``: unused code detection
+/// - ``SymbolLookup``: symbol resolution and lookup
+///
+/// MCP server support is in a separate product, `SwiftStaticAnalysisAll`,
+/// so consumers that just want the analyzer libraries do not pull in the
+/// `modelcontextprotocol/swift-sdk` dependency.
 
 @_exported import DuplicationDetector
 @_exported import SwiftStaticAnalysisCore
-@_exported import SwiftStaticAnalysisMCP
 @_exported import SymbolLookup
 @_exported import UnusedCodeDetector
