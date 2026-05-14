@@ -219,22 +219,33 @@ public final class MemoryMappedFile: @unchecked Sendable {
 
     /// Find line boundaries in the file.
     ///
+    /// The first call performs a full byte scan; subsequent calls reuse the
+    /// cached result. A serial dispatch queue serialises construction so that
+    /// concurrent callers see a consistent snapshot — the type itself is
+    /// `@unchecked Sendable` and the cache is the one mutable field.
+    ///
     /// - Returns: Array of (offset, length) tuples for each line.
     public func findLineRanges() -> [(offset: Int, length: Int)] {
-        var ranges: [(Int, Int)] = []
-        var lineStart = 0
+        lineRangesQueue.sync {
+            if let cached = cachedLineRanges {
+                return cached
+            }
+            var ranges: [(Int, Int)] = []
+            ranges.reserveCapacity(max(8, size / 32))
+            var lineStart = 0
 
-        for i in 0..<size where data.load(fromByteOffset: i, as: UInt8.self) == 0x0A {  // '\n'
-            ranges.append((lineStart, i - lineStart))
-            lineStart = i + 1
+            for i in 0..<size where data.load(fromByteOffset: i, as: UInt8.self) == 0x0A {
+                ranges.append((lineStart, i - lineStart))
+                lineStart = i + 1
+            }
+
+            if lineStart < size {
+                ranges.append((lineStart, size - lineStart))
+            }
+
+            cachedLineRanges = ranges
+            return ranges
         }
-
-        // Handle last line without newline
-        if lineStart < size {
-            ranges.append((lineStart, size - lineStart))
-        }
-
-        return ranges
     }
 
     /// Get the contents of a specific line (0-indexed).
@@ -285,6 +296,13 @@ public final class MemoryMappedFile: @unchecked Sendable {
     }
 
     // MARK: Private
+
+    /// Cached line ranges (lazily computed by `findLineRanges`).
+    private var cachedLineRanges: [(offset: Int, length: Int)]?
+
+    /// Serial queue guarding `cachedLineRanges` against concurrent
+    /// initialisation.
+    private let lineRangesQueue = DispatchQueue(label: "swa.MemoryMappedFile.lineRanges")
 
     /// Pointer to the mapped memory.
     private let data: UnsafeRawPointer

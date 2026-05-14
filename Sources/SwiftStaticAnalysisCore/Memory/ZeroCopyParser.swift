@@ -122,17 +122,26 @@ public struct ZeroCopyParsedFile: Sendable {
 // MARK: - ZeroCopyParser
 
 /// Parser that uses memory-mapped I/O and SoA storage for optimal performance.
+///
+/// The parse cache is **bounded** (default 64 entries) with LRU eviction.
+/// Each cached entry retains a `MemoryMappedFile` which holds an open file
+/// descriptor; the default macOS ulimit is 256, so an unbounded cache would
+/// have exhausted the file-descriptor budget on long-running MCP sessions.
 public actor ZeroCopyParser {
     // MARK: Lifecycle
 
-    public init(configuration: ZeroCopyParserConfiguration = .default) {
+    public init(configuration: ZeroCopyParserConfiguration = .default, cacheLimit: Int = 64) {
         self.configuration = configuration
+        self.cacheLimit = max(1, cacheLimit)
     }
 
     // MARK: Public
 
     /// Configuration.
     public let configuration: ZeroCopyParserConfiguration
+
+    /// Maximum number of cached parses to retain before LRU eviction.
+    public let cacheLimit: Int
 
     /// Number of cached files.
     public var cacheSize: Int {
@@ -150,6 +159,7 @@ public actor ZeroCopyParser {
         if let cached = cache[path] {
             let currentModDate = try fileModificationDate(path)
             if cached.modificationDate >= currentModDate {
+                touch(path)
                 return cached.parsedFile
             }
         }
@@ -169,9 +179,12 @@ public actor ZeroCopyParser {
 
         // Cache result
         let modDate = try fileModificationDate(path)
-        cache[path] = CachedZeroCopyParse(
-            parsedFile: parsedFile,
-            modificationDate: modDate,
+        insertIntoCache(
+            path,
+            CachedZeroCopyParse(
+                parsedFile: parsedFile,
+                modificationDate: modDate,
+            )
         )
 
         return parsedFile
@@ -180,6 +193,7 @@ public actor ZeroCopyParser {
     /// Parse multiple files.
     public func parseAll(_ paths: [String]) async throws -> [ZeroCopyParsedFile] {
         var results: [ZeroCopyParsedFile] = []
+        results.reserveCapacity(paths.count)
         for path in paths {
             try results.append(parse(path))
         }
@@ -196,11 +210,13 @@ public actor ZeroCopyParser {
     /// Clear the parse cache.
     public func clearCache() {
         cache.removeAll()
+        accessOrder.removeAll()
     }
 
     /// Invalidate cache for a specific file.
     public func invalidateCache(for path: String) {
         cache.removeValue(forKey: path)
+        accessOrder.removeAll(where: { $0 == path })
     }
 
     // MARK: Private
@@ -213,6 +229,24 @@ public actor ZeroCopyParser {
 
     /// Cache of parsed files.
     private var cache: [String: CachedZeroCopyParse] = [:]
+
+    /// Access order (front = most recently used).
+    private var accessOrder: [String] = []
+
+    private func touch(_ path: String) {
+        if let index = accessOrder.firstIndex(of: path) {
+            accessOrder.remove(at: index)
+        }
+        accessOrder.insert(path, at: 0)
+    }
+
+    private func insertIntoCache(_ path: String, _ entry: CachedZeroCopyParse) {
+        if cache[path] == nil, cache.count >= cacheLimit, let evicted = accessOrder.popLast() {
+            cache.removeValue(forKey: evicted)
+        }
+        cache[path] = entry
+        touch(path)
+    }
 
     // MARK: - Private Implementation
 

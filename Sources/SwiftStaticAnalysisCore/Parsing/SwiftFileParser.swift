@@ -10,12 +10,24 @@ import SwiftSyntax
 
 /// Actor-based Swift file parser with AST caching.
 ///
-/// Provides thread-safe parsing of Swift source files with
-/// automatic caching to avoid re-parsing unchanged files.
+/// Provides thread-safe parsing of Swift source files with automatic caching
+/// to avoid re-parsing unchanged files. The cache is **bounded** (default
+/// 256 entries) with LRU eviction: each `parse(_:)` call promotes the entry
+/// to most-recently-used; once `cacheLimit` is exceeded the least-recently-
+/// used entry is evicted. This is a ship-blocker for long-running MCP
+/// sessions, which previously could retain unbounded SwiftSyntax trees.
 public actor SwiftFileParser {
     // MARK: Lifecycle
 
-    public init() {}
+    /// Initialise with an optional cache limit.
+    ///
+    /// - Parameter cacheLimit: Maximum number of cached parses to retain.
+    ///   Each entry retains a full SwiftSyntax tree (often several MB).
+    ///   Default 256 is safe for most CLI invocations and bounded enough
+    ///   for long-running MCP servers.
+    public init(cacheLimit: Int = 256) {
+        self.cacheLimit = max(1, cacheLimit)
+    }
 
     // MARK: Public
 
@@ -23,6 +35,9 @@ public actor SwiftFileParser {
     public var cacheSize: Int {
         cache.count
     }
+
+    /// Maximum number of cached parses to retain before LRU eviction.
+    public let cacheLimit: Int
 
     // MARK: - Parsing
 
@@ -36,6 +51,7 @@ public actor SwiftFileParser {
         if let cached = cache[filePath] {
             let currentModDate = try fileModificationDate(filePath)
             if cached.modificationDate >= currentModDate {
+                touch(filePath)
                 return cached.syntax
             }
         }
@@ -46,11 +62,14 @@ public actor SwiftFileParser {
 
         // Cache the result
         let modDate = try fileModificationDate(filePath)
-        let lineCount = source.components(separatedBy: "\n").count
-        cache[filePath] = CachedParse(
-            syntax: syntax,
-            modificationDate: modDate,
-            lineCount: lineCount,
+        let lineCount = source.utf8.lazy.count(where: { $0 == 0x0A }) + 1
+        insertIntoCache(
+            filePath,
+            CachedParse(
+                syntax: syntax,
+                modificationDate: modDate,
+                lineCount: lineCount,
+            )
         )
 
         return syntax
@@ -63,6 +82,7 @@ public actor SwiftFileParser {
     /// - Throws: `AnalysisError` if any file cannot be parsed.
     public func parseAll(_ paths: [String]) async throws -> [String: SourceFileSyntax] {
         var results: [String: SourceFileSyntax] = [:]
+        results.reserveCapacity(paths.count)
 
         // Parse files - note: we're already in an actor so this is sequential
         // For true parallelism, callers should use TaskGroup
@@ -96,7 +116,7 @@ public actor SwiftFileParser {
     /// - Parameter source: Swift source code string.
     /// - Returns: Number of lines in the source.
     public func lineCount(source: String) throws -> Int {
-        source.components(separatedBy: "\n").count
+        source.utf8.lazy.count(where: { $0 == 0x0A }) + 1
     }
 
     // MARK: - Cache Management
@@ -104,11 +124,13 @@ public actor SwiftFileParser {
     /// Invalidate the cache for a specific file.
     public func invalidateCache(for path: String) {
         cache.removeValue(forKey: path)
+        accessOrder.removeAll(where: { $0 == path })
     }
 
     /// Clear the entire cache.
     public func clearCache() {
         cache.removeAll()
+        accessOrder.removeAll()
     }
 
     // MARK: Private
@@ -123,7 +145,30 @@ public actor SwiftFileParser {
     /// Cached parsed files.
     private var cache: [String: CachedParse] = [:]
 
+    /// Access order (front = most recently used).
+    ///
+    /// Kept as a parallel array because we expect cacheLimit to be small
+    /// (default 256) — linear scans of an array fit comfortably in L1 and
+    /// avoid the overhead of a doubly-linked list at this scale. If
+    /// cacheLimit grows past a few thousand, switch to a real LRU.
+    private var accessOrder: [String] = []
+
     // MARK: - Private Helpers
+
+    private func touch(_ path: String) {
+        if let index = accessOrder.firstIndex(of: path) {
+            accessOrder.remove(at: index)
+        }
+        accessOrder.insert(path, at: 0)
+    }
+
+    private func insertIntoCache(_ path: String, _ entry: CachedParse) {
+        if cache[path] == nil, cache.count >= cacheLimit, let evicted = accessOrder.popLast() {
+            cache.removeValue(forKey: evicted)
+        }
+        cache[path] = entry
+        touch(path)
+    }
 
     private func readFile(_ path: String) throws -> String {
         let url = URL(fileURLWithPath: path)
