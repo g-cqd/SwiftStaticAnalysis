@@ -1,43 +1,49 @@
 # Performance Optimization
 
-Optimize analysis performance for large codebases.
+Tune analysis performance for large codebases.
+
+> For the full performance model — what each advertised feature actually
+> does and where it sits in the codebase — see <doc:Performance>.
 
 ## Overview
 
-SwiftStaticAnalysis is designed to handle large Swift codebases efficiently. This guide covers the built-in optimizations and how to tune performance for your specific needs.
+SwiftStaticAnalysis is designed to handle large Swift codebases
+efficiently. This guide focuses on **what you can tune** as a user.
+For the design rationale behind the perf primitives, read
+<doc:Performance>.
 
-## Built-in Optimizations
+## Built-in optimisations
 
-### Memory-Mapped I/O
+### Memory-mapped I/O
 
-Files are memory-mapped rather than read entirely into memory, reducing allocation overhead for large files.
+Files at or above 4 KiB are read via `MemoryMappedFile`
+(`Sources/SwiftStaticAnalysisCore/Memory/MemoryMappedFile.swift`).
+Every parser hot path routes through `SourceFileReader.readSource(at:)`
+which selects mmap automatically based on size.
 
-**Benefit**: Near-zero memory overhead for file reading, OS-managed caching.
+**Benefit**: kernel-managed page cache; no full-file `Data` allocation
+for large sources.
 
-### SoA Token Storage
+### SoA-style consumer paths
 
-Tokens are stored in a Struct-of-Arrays (SoA) layout rather than Array-of-Structs (AoS):
+The duplication detectors' shingle generator and SuffixArray builder
+operate on `ArraySlice` of the underlying tokens, so windowed access
+does not allocate new arrays per shingle. The Suffix Array's S/L type
+classification is stored as a `Bitmap` (1 bit per suffix) rather than
+`[Bool]` (1 byte per suffix).
 
-```swift
-// Traditional AoS (poor cache locality)
-struct Token { var kind: Kind; var offset: Int; var length: Int }
-var tokens: [Token]
+**Benefit**: substantially fewer allocations on the duplication hot
+path; 8× memory reduction on the SA-IS classification vector.
 
-// SoA layout (excellent cache locality)
-struct TokenStorage {
-    var kinds: [Kind]
-    var offsets: [Int]
-    var lengths: [Int]
-}
-```
+### Arena allocation
 
-**Benefit**: 2-3x faster iteration for algorithms that scan specific token properties.
+`Arena` (in `Sources/SwiftStaticAnalysisCore/Memory/Arena.swift`) is a
+bump allocator with `~Copyable` semantics for single-ownership safety.
+Aligning by power-of-two is enforced by a precondition; bulk copies use
+`update(from:count:)` for compiler-level `memcpy` lowering.
 
-### Arena Allocation
-
-Temporary data structures use arena allocation to reduce memory fragmentation:
-
-**Benefit**: Faster allocation, batch deallocation, reduced GC pressure.
+**Benefit**: faster scratch allocation for callers that can express
+their lifetime in a single arena scope.
 
 ### Parallel Processing
 

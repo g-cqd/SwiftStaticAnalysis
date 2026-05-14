@@ -149,34 +149,47 @@ Perform full static analysis on a specific Swift file.
 
 ## Programmatic Usage
 
-You can also use the MCP server programmatically:
+You can also use the MCP server programmatically. The MCP server type
+lives in `SwiftStaticAnalysisMCP`; the convenience umbrella for
+embedding is `SwiftStaticAnalysisAll`.
 
 ```swift
-import SwiftStaticAnalysisMCP
+// In Package.swift
+.product(name: "SwiftStaticAnalysisAll", package: "SwiftStaticAnalysis")
+
+// In your source
+import SwiftStaticAnalysisAll  // re-exports SwiftStaticAnalysisMCP + analysers
 import MCP
 
-// Create server with default codebase
 let server = try SWAMCPServer(codebasePath: "/path/to/codebase")
+// Or pass `nil` to require `codebase_path` per tool call.
 
-// Or create without default (dynamic paths)
-let dynamicServer = try SWAMCPServer(codebasePath: nil)
-
-// Start with stdio transport
 let transport = StdioTransport()
 try await server.start(transport: transport)
 ```
 
+If you only need the analyser libraries (no MCP), import
+`SwiftStaticAnalysis` instead — it doesn't transitively pull in
+`modelcontextprotocol/swift-sdk`.
+
 ## Security
 
-The MCP server implements sandboxed access to ensure secure operation:
+See <doc:Security> for the full sandbox model. Highlights:
 
-- All file operations are restricted to the configured codebase root
-- Path traversal attempts (e.g., `../../../etc/passwd`) are rejected
-- Absolute paths outside the sandbox are blocked
-- Only Swift files within the codebase can be read
+- `CodebaseContext.validatePath` canonicalises both the candidate and
+  the root via `URL.resolvingSymlinksInPath()` and applies a
+  separator-aware prefix check, blocking sibling-path bypass and
+  symlink escape.
+- `read_file` and the `ReadResource` handler share a single guard:
+  extension allow-list, regular-file check, 10 MiB cap, line-range
+  validation.
+- `search_symbols` enforces a 2.5 s wall-clock budget, a 1024-byte
+  per-symbol input cap, and a ReDoS antipattern prefilter.
 
 ## See Also
 
+- <doc:Architecture>
+- <doc:Security>
 - <doc:CLIReference>
 - <doc:SymbolLookup>
 - <doc:CIIntegration>
