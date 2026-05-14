@@ -1,0 +1,76 @@
+name: Benchmarks
+
+on:
+  pull_request:
+    paths:
+      - 'Sources/DuplicationDetector/**'
+      - 'Sources/UnusedCodeDetector/**'
+      - 'Sources/SwiftStaticAnalysisCore/**'
+      - 'Sources/SymbolLookup/**'
+      - 'Sources/swa-bench/**'
+      - 'Package.swift'
+      - '.github/workflows/benchmarks.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  bench:
+    name: Run benchmarks
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode toolchain
+        run: sudo xcode-select -s /Applications/Xcode_16.app || true
+
+      - name: Build release
+        run: swift build -c release --product swa-bench
+
+      - name: Run benchmark scenarios
+        run: |
+          set -euo pipefail
+          mkdir -p .bench
+          # The Sources directory is a stable, repo-local fixture: it exercises
+          # the analyzers on real Swift code rather than synthetic input, which
+          # makes regressions reproducible across runs.
+          FIXTURE=Sources
+          for scenario in duplicates-exact duplicates-near unused-simple unused-reachability symbol-lookup; do
+            echo "::group::$scenario"
+            swift run -c release swa-bench "$scenario" "$FIXTURE" \
+              --warmup 1 --iterations 3 \
+              --output ".bench/${scenario}.json"
+            cat ".bench/${scenario}.json"
+            echo "::endgroup::"
+          done
+
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmarks-${{ github.sha }}
+          path: .bench/
+
+      - name: Summarise into PR comment
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          {
+            echo "### Benchmark Results"
+            echo ""
+            echo "| Scenario | Wall (mean) | Peak RSS (mean) |"
+            echo "|---|---:|---:|"
+            for f in .bench/*.json; do
+              scenario=$(jq -r '.scenario' "$f")
+              wall=$(jq -r '.wallSecondsMean' "$f")
+              rss=$(jq -r '.peakRSSBytesMean' "$f")
+              wall_fmt=$(printf "%.3fs" "$wall")
+              rss_fmt=$(printf "%d MiB" "$((rss / 1024 / 1024))")
+              echo "| $scenario | $wall_fmt | $rss_fmt |"
+            done
+            echo ""
+            echo "_Fixture: \`Sources/\` of this PR. 1 warm-up, 3 iterations._"
+          } > .bench/summary.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file .bench/summary.md

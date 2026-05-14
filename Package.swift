@@ -73,6 +73,12 @@ let package = Package(
             name: "swa-mcp",
             targets: ["swa-mcp"]
         ),
+
+        // Benchmark runner (perf regression gate).
+        .executable(
+            name: "swa-bench",
+            targets: ["swa-bench"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0"),
@@ -254,6 +260,23 @@ let package = Package(
             dependencies: [
                 "SwiftStaticAnalysisMCP",
                 .product(name: "MCP", package: "swift-sdk"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+                .enableExperimentalFeature("StrictConcurrency"),
+            ]
+        ),
+
+        // MARK: - Benchmark runner
+        .executableTarget(
+            name: "swa-bench",
+            dependencies: [
+                "SwiftStaticAnalysis",
+                "SwiftStaticAnalysisCore",
+                "DuplicationDetector",
+                "UnusedCodeDetector",
+                "SymbolLookup",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
