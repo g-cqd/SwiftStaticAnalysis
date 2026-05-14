@@ -187,6 +187,30 @@ Place test fixtures in `Tests/Fixtures/`:
 - `DuplicationScenarios/` - Code samples for clone detection
 - `UnusedCodeScenarios/` - Code samples for unused code detection
 
+### CI gates
+
+Pull requests trigger several automated workflows. Most are soft gates
+(produce output for reviewers without blocking the PR); the standard
+test suite is the only hard gate.
+
+| Workflow | Trigger | Behaviour |
+|---|---|---|
+| `ci.yml` (Test, macOS) | every PR | **hard gate** — must pass |
+| `ci.yml` (Test, Linux) | every PR | soft gate (informational; will become hard once stable) |
+| `ci.yml` (Format / Duplicates / Unused) | every PR | hard gate via the `swa` binary |
+| `benchmarks.yml` | PRs that touch analyzer code | soft gate; posts a perf table to the PR |
+| `mutation-testing.yml` | PRs that touch tested modules | soft gate; matrix-selects the right profile based on paths |
+
+You can run mutation testing locally as well:
+
+```bash
+scripts/run-mutation-tests.sh --list-profiles
+scripts/run-mutation-tests.sh --profile core
+```
+
+The repository bootstraps `muter` into `.bin/` on demand, so you don't
+need a global installation.
+
 ## Submitting Changes
 
 ### Workflow

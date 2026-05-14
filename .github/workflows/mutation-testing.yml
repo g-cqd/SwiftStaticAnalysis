@@ -1,6 +1,7 @@
 name: Mutation Testing
 
 on:
+  # Manual runs (any profile, including `all`).
   workflow_dispatch:
     inputs:
       profile:
@@ -8,12 +9,146 @@ on:
         required: true
         default: "all"
 
+  # Auto-run on PRs that touch tested modules. Each leg of the matrix
+  # is path-filtered to the module it covers, so a PR touching
+  # `Sources/DuplicationDetector` doesn't trigger the unused-code
+  # mutation profile (which would be wasted CI minutes).
+  pull_request:
+    paths:
+      - 'Sources/DuplicationDetector/**'
+      - 'Sources/UnusedCodeDetector/**'
+      - 'Sources/SwiftStaticAnalysisCore/**'
+      - 'Sources/SymbolLookup/**'
+      - 'Sources/SwiftStaticAnalysisOutput/**'
+      - 'scripts/run-mutation-tests.sh'
+      - 'scripts/bootstrap-muter.sh'
+      - '.github/workflows/mutation-testing.yml'
+
 env:
   XCODE_VERSION: '26.1.1'
 
+# Mutation testing is a *soft gate*: it surfaces tests-that-don't-catch-bugs
+# but does not block the PR. Reviewers consult the artifact; baseline drift
+# is tracked over time.
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
-  mutation:
-    name: Mutation Test
+  # Automatic profile selection for PRs based on changed paths. Each job
+  # is gated by its own path filter so unrelated PRs don't pay for it.
+  pr-core:
+    name: Mutation (core)
+    if: github.event_name == 'pull_request'
+    runs-on: macos-15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            core:
+              - 'Sources/SwiftStaticAnalysisCore/**'
+      - if: steps.filter.outputs.core == 'true'
+        run: |
+          sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+          chmod +x scripts/bootstrap-muter.sh scripts/run-mutation-tests.sh
+          scripts/run-mutation-tests.sh --profile core --output-dir mutation-core
+      - if: steps.filter.outputs.core == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-core
+          path: mutation-core
+          retention-days: 14
+
+  pr-duplication:
+    name: Mutation (duplication)
+    if: github.event_name == 'pull_request'
+    runs-on: macos-15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            duplication:
+              - 'Sources/DuplicationDetector/**'
+      - if: steps.filter.outputs.duplication == 'true'
+        run: |
+          sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+          chmod +x scripts/bootstrap-muter.sh scripts/run-mutation-tests.sh
+          scripts/run-mutation-tests.sh --profile duplication --output-dir mutation-duplication
+      - if: steps.filter.outputs.duplication == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-duplication
+          path: mutation-duplication
+          retention-days: 14
+
+  pr-unused:
+    name: Mutation (unused)
+    if: github.event_name == 'pull_request'
+    runs-on: macos-15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            unused:
+              - 'Sources/UnusedCodeDetector/**'
+      - if: steps.filter.outputs.unused == 'true'
+        run: |
+          sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+          chmod +x scripts/bootstrap-muter.sh scripts/run-mutation-tests.sh
+          scripts/run-mutation-tests.sh --profile unused --output-dir mutation-unused
+      - if: steps.filter.outputs.unused == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-unused
+          path: mutation-unused
+          retention-days: 14
+
+  pr-symbol:
+    name: Mutation (symbol)
+    if: github.event_name == 'pull_request'
+    runs-on: macos-15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            symbol:
+              - 'Sources/SymbolLookup/**'
+      - if: steps.filter.outputs.symbol == 'true'
+        run: |
+          sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+          chmod +x scripts/bootstrap-muter.sh scripts/run-mutation-tests.sh
+          scripts/run-mutation-tests.sh --profile symbol --output-dir mutation-symbol
+      - if: steps.filter.outputs.symbol == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-symbol
+          path: mutation-symbol
+          retention-days: 14
+
+  # Manual full-profile runs for releases / periodic audits.
+  manual:
+    name: Mutation (manual)
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     steps:
       - name: Checkout

@@ -205,6 +205,45 @@ jobs:
           retention-days: 30
 
   # ============================================================================
+  # STAGE 2b: Linux smoke test (no IndexStore — that's macOS-only).
+  # ============================================================================
+  # `continue-on-error` while we shake out platform-specific quirks. Once the
+  # Linux build is reliably green for a few PR cycles, promote it to a hard
+  # gate by removing the flag.
+  test-linux:
+    name: Test (Linux)
+    runs-on: ubuntu-latest
+    needs: [format-check]
+    continue-on-error: true
+    container:
+      image: swift:6.0-noble
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache SPM Dependencies
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-linux-${{ hashFiles('Package.resolved') }}
+          restore-keys: spm-linux-
+
+      - name: Build
+        # The MCP server's IndexStore mode is macOS-only (depends on
+        # `libIndexStore.dylib`), but the analyzer libraries themselves
+        # build on Linux. Build the core targets explicitly.
+        run: |
+          swift build --product SwiftStaticAnalysisCore
+          swift build --product DuplicationDetector
+          swift build --product SymbolLookup
+
+      - name: Run tests
+        # IndexStore-dependent tests gate themselves at runtime via
+        # `FileManager.default.fileExists` so they skip cleanly when the
+        # dylib isn't available.
+        run: swift test --parallel || echo "::warning::Linux test run produced failures; not blocking"
+
+  # ============================================================================
   # STAGE 3: CodeQL, Prepare Release, Docs (after tests)
   # ============================================================================
   codeql:
