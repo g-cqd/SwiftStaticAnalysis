@@ -10,6 +10,17 @@ import SwiftStaticAnalysisOutput
 import SymbolLookup
 import UnusedCodeDetector
 
+// MARK: - Diagnostic Output
+
+/// Write a status message to stderr so that JSON/xcode output redirected to
+/// stdout isn't contaminated with progress noise.
+func eprint(_ message: String) {
+    let line = message + "\n"
+    if let data = line.data(using: .utf8) {
+        FileHandle.standardError.write(data)
+    }
+}
+
 // MARK: - SWA
 
 @main
@@ -58,7 +69,7 @@ struct Analyze: AsyncParsableCommand {
 
         let files = try findSwiftFiles(in: paths, excludePaths: swaConfig?.excludePaths)
 
-        print("Analyzing \(files.count) Swift files...")
+        eprint("Analyzing \(files.count) Swift files...")
 
         // Run duplication detection if enabled
         var clones: [CloneGroup] = []
@@ -79,6 +90,12 @@ struct Analyze: AsyncParsableCommand {
 
         // Output results
         outputResults(clones: clones, unused: unused, format: outputFormat)
+
+        // Exit code 2 signals "findings exist" to CI. This is the contract
+        // that lets `swa analyze . --format xcode` gate a build.
+        if !clones.isEmpty || !unused.isEmpty {
+            throw ExitCode(2)
+        }
     }
 
     // MARK: Private
@@ -156,6 +173,18 @@ struct Duplicates: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Output format")
     var format: OutputFormat = .xcode
 
+    /// Argument-level validation. `--min-tokens` is bounded to a sensible
+    /// range to prevent crashes (negative or zero) and pathological behaviour
+    /// (huge values). `--min-similarity` is a Jaccard ratio.
+    func validate() throws {
+        if let minTokens, !(1...10_000).contains(minTokens) {
+            throw ValidationError("--min-tokens must be between 1 and 10000 (got \(minTokens))")
+        }
+        if let minSimilarity, !(0.0...1.0).contains(minSimilarity) {
+            throw ValidationError("--min-similarity must be between 0.0 and 1.0 (got \(minSimilarity))")
+        }
+    }
+
     func run() async throws {
         // Use first path for configuration discovery
         let primaryPath = paths.first ?? "."
@@ -208,6 +237,11 @@ struct Duplicates: AsyncParsableCommand {
 
         case .xcode:
             OutputFormatter.printCloneGroupsXcode(clones)
+        }
+
+        // Exit code 2 signals "findings exist" to CI.
+        if !clones.isEmpty {
+            throw ExitCode(2)
         }
     }
 }
@@ -419,6 +453,11 @@ struct Unused: AsyncParsableCommand {
         case .xcode:
             OutputFormatter.printUnusedXcode(unused)
         }
+
+        // Exit code 2 signals "findings exist" to CI.
+        if !unused.isEmpty {
+            throw ExitCode(2)
+        }
     }
 }
 
@@ -459,8 +498,10 @@ struct Symbol: AsyncParsableCommand {
     @Option(name: .long, help: "Maximum results to return")
     var limit: Int?
 
+    /// Symbol defaults to `xcode` for parity with `analyze`/`duplicates`/`unused`.
+    /// Pass `--format text` for human-readable interactive output.
     @Option(name: .shortAndLong, help: "Output format")
-    var format: OutputFormat = .text
+    var format: OutputFormat = .xcode
 
     // Context flags
     @Option(name: .customLong("context-lines"), help: "Lines of context before and after symbol")
@@ -486,6 +527,12 @@ struct Symbol: AsyncParsableCommand {
 
     @Flag(name: .customLong("context-all"), help: "Include all context")
     var contextAll: Bool = false
+
+    func validate() throws {
+        if let limit, limit < 1 {
+            throw ValidationError("--limit must be >= 1 (got \(limit))")
+        }
+    }
 
     func run() async throws {
         let files = try findSwiftFiles(in: paths, excludePaths: nil)
@@ -628,8 +675,10 @@ struct Symbol: AsyncParsableCommand {
             OutputFormatter.printJSON(usages)
 
         case .xcode:
+            // Emit warning: so Xcode and CI tools gate on usages too.
+            // (Was note: which is informational and ignored by build status.)
             for usage in usages {
-                print("\(usage.file):\(usage.line):\(usage.column): note: Reference (\(usage.kind.rawValue))")
+                print("\(usage.file):\(usage.line):\(usage.column): warning: Reference (\(usage.kind.rawValue))")
             }
         }
     }
@@ -716,19 +765,32 @@ func buildDuplicationConfig(from config: DuplicatesConfiguration?) -> Duplicatio
     )
 }
 
+/// Build an UnusedCodeConfiguration from .swa.json config.
+///
+/// Defaults match `Unused.run()` *and* `UnusedCodeConfiguration.init`
+/// (treat-roots default to `true`, SwiftUI ignores default to `false`).
+/// Before this commit `buildUnusedConfig` (used by `swa analyze`) defaulted
+/// the treat-roots flags to `false`, so `swa analyze .` and `swa unused .`
+/// produced different findings on the same project.
+///
+/// Parallel-mode resolution honours `config.resolvedParallelMode` (the
+/// `--parallel-mode safe|maximum` form), with a fallback to the legacy
+/// `config.parallel` bool. The previous implementation read `config.parallel`
+/// directly, silently ignoring `parallelMode` from `.swa.json` in
+/// `swa analyze`.
 func buildUnusedConfig(from config: UnusedConfiguration?) -> UnusedCodeConfiguration {
     UnusedCodeConfiguration(
         ignorePublicAPI: config?.ignorePublicAPI ?? false,
         mode: parseDetectionMode(config?.mode),
         indexStorePath: config?.indexStorePath,
-        treatPublicAsRoot: config?.treatPublicAsRoot ?? false,
-        treatObjcAsRoot: config?.treatObjcAsRoot ?? false,
-        treatTestsAsRoot: config?.treatTestsAsRoot ?? false,
-        treatSwiftUIViewsAsRoot: config?.treatSwiftUIViewsAsRoot ?? false,
+        treatPublicAsRoot: config?.treatPublicAsRoot ?? true,
+        treatObjcAsRoot: config?.treatObjcAsRoot ?? true,
+        treatTestsAsRoot: config?.treatTestsAsRoot ?? true,
+        treatSwiftUIViewsAsRoot: config?.treatSwiftUIViewsAsRoot ?? true,
         ignoreSwiftUIPropertyWrappers: config?.ignoreSwiftUIPropertyWrappers ?? false,
         ignorePreviewProviders: config?.ignorePreviewProviders ?? false,
         ignoreViewBody: config?.ignoreViewBody ?? false,
-        useParallelBFS: config?.parallel ?? false,
+        useParallelBFS: (config?.resolvedParallelMode ?? .none).isParallel,
     )
 }
 

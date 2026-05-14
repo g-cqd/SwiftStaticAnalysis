@@ -33,6 +33,17 @@ struct CLIOutput: Sendable {
     var succeeded: Bool {
         exitCode == 0
     }
+
+    /// The command ran to completion without an error, either with no
+    /// findings (exit 0) or with findings (exit 2). Validation failures
+    /// (exit 64) and crashes do not satisfy this predicate.
+    ///
+    /// Use this when the test only cares that the command was correctly
+    /// invoked and produced output, not whether the fixture happened to
+    /// contain detectable issues.
+    var ranToCompletion: Bool {
+        exitCode == 0 || exitCode == 2
+    }
 }
 
 // MARK: - CLITestError
@@ -161,7 +172,8 @@ struct CLICommandTests {
         let fixture = try fixtureFile("SimpleClass.swift")
         let output = try await runSWA(["unused", "--format", "xcode", fixture])
 
-        #expect(output.succeeded, "Command should succeed")
+        // Exit 2 (findings) is the contract for CI gating.
+        #expect(output.ranToCompletion, "Command should run to completion (exit 0 or 2)")
         // Xcode format: file:line:column: warning: message
         // OR empty output if no unused code found
         if !output.stdout.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -223,7 +235,7 @@ struct CLICommandTests {
         let fixture = try fixtureFile("SimpleClass.swift")
         let output = try await runSWA(["unused", "--mode", "simple", fixture])
 
-        #expect(output.succeeded, "simple mode should be accepted")
+        #expect(output.ranToCompletion, "simple mode should be accepted (exit 0 or 2)")
     }
 
     @Test("unused command accepts reachability mode")
@@ -231,7 +243,7 @@ struct CLICommandTests {
         let fixture = try fixtureFile("SimpleClass.swift")
         let output = try await runSWA(["unused", "--mode", "reachability", fixture])
 
-        #expect(output.succeeded, "reachability mode should be accepted")
+        #expect(output.ranToCompletion, "reachability mode should be accepted (exit 0 or 2)")
     }
 
     // MARK: - Symbol Lookup Tests
@@ -280,7 +292,7 @@ struct CLICommandTests {
             "duplicates", "--format", "text", "--min-tokens", "20", fixture,
         ])
 
-        #expect(output.succeeded, "Command should succeed")
+        #expect(output.ranToCompletion, "Command should run to completion (exit 0 or 2)")
         // The DuplicatedCode.swift fixture has intentional duplicates
         let headerPattern = #/Found (\d+) clone group/#
         if let match = output.stdout.firstMatch(of: headerPattern) {
@@ -330,6 +342,86 @@ struct CLICommandTests {
 
         #expect(!output.succeeded, "Should fail for invalid mode")
         #expect(output.exitCode != 0, "Exit code should be non-zero for invalid option")
+    }
+
+    // MARK: - Phase 2: Exit codes & numeric validation
+
+    /// Findings produce exit code 2 so that `swa unused . --format xcode` can
+    /// gate a CI build. Before this contract, `swa` always exited 0.
+    @Test("unused exits with code 2 when findings are reported")
+    func unusedExitsTwoOnFindings() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["unused", "--format", "text", fixture])
+
+        // SimpleClass.swift is engineered to contain unused declarations.
+        #expect(output.exitCode == 2, "Expected exit code 2 on findings; got \(output.exitCode)")
+        #expect(output.stdout.contains("UNUSED"))
+    }
+
+    /// `swa analyze` and `swa unused` on the same project must agree on the
+    /// unused-finding count. Before this commit, `analyze` defaulted the
+    /// `--treat-*-as-root` flags to `false` while `unused` defaulted them to
+    /// `true`, so the two commands disagreed silently.
+    @Test("analyze and unused produce the same unused finding count")
+    func analyzeAndUnusedAgreeOnFindings() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+
+        let unusedOut = try await runSWA(["unused", "--format", "json", fixture])
+        let analyzeOut = try await runSWA(["analyze", "--format", "json", fixture])
+
+        // Both should report findings (exit 2).
+        #expect(unusedOut.exitCode == 2)
+        #expect(analyzeOut.exitCode == 2)
+
+        // Extract the JSON arrays and compare cardinality of the unused half.
+        let unusedDataCount = countOccurrences(in: unusedOut.stdout, of: "\"name\"")
+        let analyzeDataCount = countOccurrences(in: analyzeOut.stdout, of: "\"name\"")
+        #expect(
+            unusedDataCount == analyzeDataCount,
+            "analyze (\(analyzeDataCount)) and unused (\(unusedDataCount)) disagree on findings"
+        )
+    }
+
+    @Test("--min-tokens rejects out-of-range values")
+    func minTokensValidation() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let zero = try await runSWA(["duplicates", "--min-tokens", "0", fixture])
+        let huge = try await runSWA(["duplicates", "--min-tokens", "999999", fixture])
+
+        #expect(zero.exitCode != 0)
+        #expect(huge.exitCode != 0)
+        #expect(zero.combined.contains("--min-tokens"))
+        #expect(huge.combined.contains("--min-tokens"))
+    }
+
+    @Test("--min-similarity rejects values outside 0.0...1.0")
+    func minSimilarityValidation() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let negative = try await runSWA(["duplicates", "--min-similarity", "-0.5", fixture])
+        let huge = try await runSWA(["duplicates", "--min-similarity", "2.0", fixture])
+
+        #expect(negative.exitCode != 0)
+        #expect(huge.exitCode != 0)
+        #expect(huge.combined.contains("--min-similarity"))
+    }
+
+    @Test("symbol --limit rejects values < 1")
+    func symbolLimitValidation() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["symbol", "--limit=0", "Foo", fixture])
+
+        #expect(output.exitCode != 0)
+        #expect(output.combined.contains("--limit"))
+    }
+
+    private func countOccurrences(in haystack: String, of needle: String) -> Int {
+        var count = 0
+        var remainder = Substring(haystack)
+        while let range = remainder.range(of: needle) {
+            count += 1
+            remainder = remainder[range.upperBound...]
+        }
+        return count
     }
 
     // MARK: - Helpers
