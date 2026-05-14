@@ -91,8 +91,7 @@ extension ParallelMode {
             if let max = maxConcurrency {
                 ConcurrencyConfiguration(
                     maxConcurrentFiles: max * 2,
-                    maxConcurrentTasks: max * 4,
-                    batchSize: 200
+                    maxConcurrentTasks: max * 4
                 )
             } else {
                 ConcurrencyConfiguration.highThroughput

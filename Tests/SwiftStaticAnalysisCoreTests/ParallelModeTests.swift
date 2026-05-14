@@ -40,15 +40,15 @@ struct ParallelModeTests {
     @Test("toConcurrencyConfiguration returns correct presets")
     func toConcurrencyConfiguration() {
         let noneConfig = ParallelMode.none.toConcurrencyConfiguration()
-        #expect(noneConfig.enableParallelProcessing == false)
         #expect(noneConfig.maxConcurrentFiles == 1)
+        #expect(noneConfig.maxConcurrentTasks == 1)
 
         let safeConfig = ParallelMode.safe.toConcurrencyConfiguration()
-        #expect(safeConfig.enableParallelProcessing == true)
+        #expect(safeConfig.maxConcurrentFiles >= 1)
 
         let maxConfig = ParallelMode.maximum.toConcurrencyConfiguration()
-        #expect(maxConfig.enableParallelProcessing == true)
-        #expect(maxConfig.batchSize == 200)
+        #expect(maxConfig.maxConcurrentFiles >= safeConfig.maxConcurrentFiles)
+        #expect(maxConfig.maxConcurrentTasks >= safeConfig.maxConcurrentTasks)
     }
 
     @Test("toConcurrencyConfiguration respects maxConcurrency override")

@@ -8,20 +8,22 @@ import Foundation
 // MARK: - ConcurrencyConfiguration
 
 /// Configuration for parallel processing in analysis operations.
+///
+/// Setting `maxConcurrentFiles == 1` (and `maxConcurrentTasks == 1`) forces
+/// serial execution. The previous `enableParallelProcessing` flag and the
+/// unused `batchSize` field were removed in 0.2.0 — they had no effect on
+/// the actual `ParallelProcessor` codepaths, which key off `maxConcurrency`
+/// alone.
 public struct ConcurrencyConfiguration: Sendable {
     // MARK: Lifecycle
 
     public init(
         maxConcurrentFiles: Int? = nil,
         maxConcurrentTasks: Int? = nil,
-        enableParallelProcessing: Bool = true,
-        batchSize: Int = 100,
     ) {
         let processorCount = ProcessInfo.processInfo.activeProcessorCount
         self.maxConcurrentFiles = maxConcurrentFiles ?? processorCount
         self.maxConcurrentTasks = maxConcurrentTasks ?? processorCount * 2
-        self.enableParallelProcessing = enableParallelProcessing
-        self.batchSize = batchSize
     }
 
     // MARK: Public
@@ -33,34 +35,26 @@ public struct ConcurrencyConfiguration: Sendable {
     public static let serial = Self(
         maxConcurrentFiles: 1,
         maxConcurrentTasks: 1,
-        enableParallelProcessing: false,
     )
 
     /// High-throughput configuration for powerful machines.
     public static let highThroughput = Self(
         maxConcurrentFiles: ProcessInfo.processInfo.activeProcessorCount * 2,
         maxConcurrentTasks: ProcessInfo.processInfo.activeProcessorCount * 4,
-        batchSize: 200,
     )
 
     /// Conservative configuration for memory-constrained environments.
     public static let conservative = Self(
         maxConcurrentFiles: max(2, ProcessInfo.processInfo.activeProcessorCount / 2),
         maxConcurrentTasks: ProcessInfo.processInfo.activeProcessorCount,
-        batchSize: 50,
     )
 
-    /// Maximum number of files to process concurrently.
+    /// Maximum number of files to process concurrently. Setting this to 1
+    /// forces serial execution end-to-end.
     public let maxConcurrentFiles: Int
 
     /// Maximum number of analysis tasks to run concurrently.
     public let maxConcurrentTasks: Int
-
-    /// Whether to enable parallel processing (can be disabled for debugging).
-    public let enableParallelProcessing: Bool
-
-    /// Chunk size for batching operations.
-    public let batchSize: Int
 }
 
 // MARK: - ParallelProcessor

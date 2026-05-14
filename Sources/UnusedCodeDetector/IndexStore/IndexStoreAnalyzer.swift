@@ -61,7 +61,10 @@ public struct SymbolUsage: Sendable {
 // MARK: - IndexStoreAnalyzer
 
 /// Analyzes symbol usage using the index store.
-public final class IndexStoreAnalyzer: @unchecked Sendable {
+///
+/// All stored state is `let` after init and the underlying `IndexStoreReader`
+/// is already `Sendable`, so no `@unchecked` annotation is required.
+public final class IndexStoreAnalyzer: Sendable {
     // MARK: Lifecycle
 
     /// Initialize with an index store reader and files to analyze.

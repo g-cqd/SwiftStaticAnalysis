@@ -474,15 +474,25 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
     // MARK: - Root Detection
 
     /// Detect root nodes based on configuration.
+    ///
+    /// Iterating a Swift dictionary while mutating it through the same
+    /// reference relies on copy-on-write subtleties that are not guaranteed
+    /// by the language. Collect the rootful USRs first, then apply the
+    /// mutation in a second pass to keep the iteration safe.
     private func detectRoots() {
+        var rootUpdates: [(String, RootReason)] = []
+        rootUpdates.reserveCapacity(nodes.count)
         for (usr, node) in nodes {
             if let reason = determineRootReason(for: node) {
-                var mutableNode = node
-                mutableNode.isRoot = true
-                mutableNode.rootReason = reason
-                nodes[usr] = mutableNode
-                roots.insert(usr)
+                rootUpdates.append((usr, reason))
             }
+        }
+        for (usr, reason) in rootUpdates {
+            guard var node = nodes[usr] else { continue }
+            node.isRoot = true
+            node.rootReason = reason
+            nodes[usr] = node
+            roots.insert(usr)
         }
     }
 
@@ -638,32 +648,45 @@ public struct IndexGraphReport: Sendable {
 
 extension IndexBasedDependencyGraph {
     /// Generate a report of the analysis.
+    ///
+    /// All graph state is read under a single `lock.withLock { ... }` so the
+    /// report is a consistent snapshot. The previous implementation acquired
+    /// the lock for each of `computeReachable`, `computeUnreachable`, and
+    /// `edgeCount` but read `nodes.values` and `roots` outside the lock —
+    /// safe in practice today (only one writer, `build`) but a latent data
+    /// race once any concurrent mutation is introduced.
     public func generateReport() -> IndexGraphReport {
-        let reachable = computeReachable()
-        let unreachableNodes = computeUnreachable()
-        let externalNodes = nodes.values.filter(\.isExternal)
-
-        var unreachableByKind: [IndexedSymbolKind: Int] = [:]
-        for node in unreachableNodes {
-            unreachableByKind[node.kind, default: 0] += 1
-        }
-
-        var rootsByReason: [RootReason: Int] = [:]
-        for usr in roots {
-            if let node = nodes[usr], let reason = node.rootReason {
-                rootsByReason[reason, default: 0] += 1
+        lock.withLock { _ in
+            let reachable = computeReachableLocked()
+            let unreachableNodes = nodes.values.filter { node in
+                !reachable.contains(node.usr) && !node.isExternal
             }
-        }
+            let externalNodes = nodes.values.filter(\.isExternal)
+            let totalEdgeCount = edges.values.reduce(0) { $0 + $1.count }
 
-        return IndexGraphReport(
-            totalSymbols: nodes.count,
-            rootCount: roots.count,
-            reachableCount: reachable.count,
-            unreachableCount: unreachableNodes.count,
-            externalCount: externalNodes.count,
-            edgeCount: edgeCount,
-            unreachableByKind: unreachableByKind,
-            rootsByReason: rootsByReason,
-        )
+            var unreachableByKind: [IndexedSymbolKind: Int] = [:]
+            unreachableByKind.reserveCapacity(unreachableNodes.count)
+            for node in unreachableNodes {
+                unreachableByKind[node.kind, default: 0] += 1
+            }
+
+            var rootsByReason: [RootReason: Int] = [:]
+            for usr in roots {
+                if let node = nodes[usr], let reason = node.rootReason {
+                    rootsByReason[reason, default: 0] += 1
+                }
+            }
+
+            return IndexGraphReport(
+                totalSymbols: nodes.count,
+                rootCount: roots.count,
+                reachableCount: reachable.count,
+                unreachableCount: unreachableNodes.count,
+                externalCount: externalNodes.count,
+                edgeCount: totalEdgeCount,
+                unreachableByKind: unreachableByKind,
+                rootsByReason: rootsByReason,
+            )
+        }
     }
 }

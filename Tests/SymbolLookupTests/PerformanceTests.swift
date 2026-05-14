@@ -258,7 +258,6 @@ struct ParallelModeConfigurationTests {
     func concurrencyConfigNoneIsSerial() {
         let config = ParallelMode.none.toConcurrencyConfiguration()
 
-        #expect(!config.enableParallelProcessing)
         #expect(config.maxConcurrentFiles == 1)
         #expect(config.maxConcurrentTasks == 1)
     }
@@ -267,7 +266,6 @@ struct ParallelModeConfigurationTests {
     func concurrencyConfigSafeUsesDefaults() {
         let config = ParallelMode.safe.toConcurrencyConfiguration()
 
-        #expect(config.enableParallelProcessing)
         #expect(config.maxConcurrentFiles >= 1)
         #expect(config.maxConcurrentTasks >= 1)
     }
@@ -276,7 +274,6 @@ struct ParallelModeConfigurationTests {
     func concurrencyConfigMaximumIsHighThroughput() {
         let config = ParallelMode.maximum.toConcurrencyConfiguration()
 
-        #expect(config.enableParallelProcessing)
         #expect(config.maxConcurrentFiles >= 1)
         #expect(config.maxConcurrentTasks >= config.maxConcurrentFiles)
     }
@@ -296,17 +293,14 @@ struct ConcurrencyConfigurationTests {
     func defaultConfigHasReasonableValues() {
         let config = ConcurrencyConfiguration.default
 
-        #expect(config.enableParallelProcessing)
         #expect(config.maxConcurrentFiles >= 1)
         #expect(config.maxConcurrentTasks >= 1)
-        #expect(config.batchSize == 100)
     }
 
     @Test("Serial configuration is single-threaded")
     func serialConfigIsSingleThreaded() {
         let config = ConcurrencyConfiguration.serial
 
-        #expect(!config.enableParallelProcessing)
         #expect(config.maxConcurrentFiles == 1)
         #expect(config.maxConcurrentTasks == 1)
     }
@@ -315,32 +309,25 @@ struct ConcurrencyConfigurationTests {
     func highThroughputHasLargerValues() {
         let config = ConcurrencyConfiguration.highThroughput
 
-        #expect(config.enableParallelProcessing)
         #expect(config.maxConcurrentFiles >= ConcurrencyConfiguration.default.maxConcurrentFiles)
-        #expect(config.batchSize == 200)
     }
 
     @Test("Conservative configuration has smaller values")
     func conservativeHasSmallerValues() {
         let config = ConcurrencyConfiguration.conservative
 
-        #expect(config.enableParallelProcessing)
         #expect(config.maxConcurrentFiles >= 1)
-        #expect(config.batchSize == 50)
+        #expect(config.maxConcurrentFiles <= ConcurrencyConfiguration.highThroughput.maxConcurrentFiles)
     }
 
     @Test("Custom configuration values are respected")
     func customValuesRespected() {
         let config = ConcurrencyConfiguration(
             maxConcurrentFiles: 8,
-            maxConcurrentTasks: 16,
-            enableParallelProcessing: true,
-            batchSize: 50
+            maxConcurrentTasks: 16
         )
 
         #expect(config.maxConcurrentFiles == 8)
         #expect(config.maxConcurrentTasks == 16)
-        #expect(config.enableParallelProcessing)
-        #expect(config.batchSize == 50)
     }
 }

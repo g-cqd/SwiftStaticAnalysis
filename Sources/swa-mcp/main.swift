@@ -4,6 +4,7 @@
 
 import Foundation
 import MCP
+import SwiftStaticAnalysisCore
 import SwiftStaticAnalysisMCP
 
 /// Parse command line arguments and run the MCP server.
@@ -44,18 +45,16 @@ struct SWAMCPCommand {
             codebasePath = nil
         }
 
-        // Resolve path if provided
-        let absolutePath: String?
-        if let codebasePath = codebasePath {
-            let resolvedPath = NSString(string: codebasePath).expandingTildeInPath
-            if resolvedPath.hasPrefix("/") {
-                absolutePath = resolvedPath
-            } else {
-                absolutePath = FileManager.default.currentDirectoryPath + "/" + resolvedPath
+        // Resolve path if provided. PathUtilities handles ~ expansion without
+        // the NSString bridge and produces a canonical absolute path so the
+        // CodebaseContext sandbox check has stable input.
+        let absolutePath: String? =
+            codebasePath.map { path in
+                PathUtilities.canonicalize(
+                    path,
+                    relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                )
             }
-        } else {
-            absolutePath = nil
-        }
 
         // Log to stderr (stdout is reserved for MCP protocol)
         if let path = absolutePath {
@@ -75,14 +74,23 @@ struct SWAMCPCommand {
 
             try await server.start(transport: transport)
 
-            // Keep running until terminated - use RunLoop to wait indefinitely
-            await withCheckedContinuation { (_: CheckedContinuation<Void, Never>) in
-                // Never resume - server runs until process is killed
-            }
+            // Park the main task indefinitely while letting Task cancellation
+            // propagate (SIGINT/SIGTERM via async signal handlers). The
+            // previous `withCheckedContinuation` form never resumed and so
+            // could not be cancelled from within Swift Concurrency.
+            try await Task.sleep(for: .seconds(.greatestFiniteMagnitude))
+        } catch is CancellationError {
+            await SWAMCPCommand.shutdown()
         } catch {
             fputs("swa-mcp: Error: \(error.localizedDescription)\n", stderr)
             exit(1)
         }
+    }
+
+    /// Graceful shutdown hook. No-op today; the MCP server's stdio transport
+    /// will be cleaned up by deinit when the process exits.
+    private static func shutdown() async {
+        fputs("swa-mcp: Shutting down...\n", stderr)
     }
 
     static func printUsage() {

@@ -56,6 +56,12 @@ public enum ParallelFrontierExpansion {
             var result: [Int] = []
             for await partial in group {
                 result.append(contentsOf: partial)
+                // Propagate cancellation to peer tasks once any worker
+                // observes it. Without this, sibling tasks keep running
+                // their full chunk before the group can return.
+                if Task.isCancelled {
+                    group.cancelAll()
+                }
             }
             return result
         }
@@ -101,6 +107,12 @@ public enum ParallelFrontierExpansion {
             var result: [Int] = []
             for await partial in group {
                 result.append(contentsOf: partial)
+                // Propagate cancellation to peer tasks once any worker
+                // observes it. Without this, sibling tasks keep running
+                // their full chunk before the group can return.
+                if Task.isCancelled {
+                    group.cancelAll()
+                }
             }
             return result
         }

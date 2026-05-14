@@ -8,14 +8,29 @@ import Foundation
 
 /// Creates `AsyncStream` values backed by a cancellable task.
 public enum TaskBackedAsyncStream {
+    /// Default in-flight buffer for `makeStream`. 256 elements caps memory
+    /// pressure for streaming analysis results without throttling typical
+    /// producers.
+    public static let defaultBufferSize = 256
+
     /// Create a stream whose producer task is cancelled when iteration terminates early.
+    ///
+    /// The default buffering policy is `.bufferingNewest(defaultBufferSize)`
+    /// rather than `.unbounded`: with a slow consumer, the producer would
+    /// otherwise keep buffering forever, defeating the "memory-bounded"
+    /// promise made by `ParallelMode.maximum`. Note that `.bufferingNewest`
+    /// is "buffer + drop oldest under overflow", not true backpressure —
+    /// callers needing the producer to *suspend* when the buffer is full
+    /// should use `AsyncChannel` from swift-async-algorithms.
     ///
     /// - Parameters:
     ///   - bufferingPolicy: Stream buffering policy.
-    ///   - operation: Async producer operation. The operation is responsible for finishing the continuation.
+    ///   - operation: Async producer operation. The operation is responsible
+    ///     for finishing the continuation.
     /// - Returns: An async stream backed by a cancellable task.
     public static func makeStream<Element>(
-        bufferingPolicy: AsyncStream<Element>.Continuation.BufferingPolicy = .unbounded,
+        bufferingPolicy: AsyncStream<Element>.Continuation.BufferingPolicy =
+            .bufferingNewest(TaskBackedAsyncStream.defaultBufferSize),
         operation: @escaping @Sendable (AsyncStream<Element>.Continuation) async -> Void
     ) -> AsyncStream<Element> {
         AsyncStream(bufferingPolicy: bufferingPolicy) { continuation in

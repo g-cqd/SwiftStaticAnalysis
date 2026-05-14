@@ -129,7 +129,10 @@ public struct BuildResult: Sendable {
 // MARK: - IndexStoreFallbackManager
 
 /// Manages index store availability and fallback strategies.
-public final class IndexStoreFallbackManager: @unchecked Sendable {
+///
+/// All stored state is `let` after init; the `@unchecked` annotation is no
+/// longer required.
+public final class IndexStoreFallbackManager: Sendable {
     // MARK: Lifecycle
 
     public init(configuration: FallbackConfiguration = .default, libIndexStorePath: String? = nil) {

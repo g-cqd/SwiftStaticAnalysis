@@ -113,16 +113,16 @@ struct ParallelProcessorPerformanceTests {
 
 @Suite("ConcurrencyConfiguration Tests")
 struct ConcurrencyConfigurationTests {
-    @Test("Default configuration has parallel enabled")
+    @Test("Default configuration scales with the host CPU count")
     func defaultConfiguration() {
         let config = ConcurrencyConfiguration.default
-        #expect(config.enableParallelProcessing == true)
+        #expect(config.maxConcurrentFiles >= 1)
+        #expect(config.maxConcurrentTasks >= config.maxConcurrentFiles)
     }
 
-    @Test("Serial preset has parallel disabled")
+    @Test("Serial preset forces a single-thread shape")
     func serialPreset() {
         let config = ConcurrencyConfiguration.serial
-        #expect(config.enableParallelProcessing == false)
         #expect(config.maxConcurrentFiles == 1)
         #expect(config.maxConcurrentTasks == 1)
     }
@@ -130,51 +130,40 @@ struct ConcurrencyConfigurationTests {
     @Test("HighThroughput preset has increased concurrency")
     func highThroughputPreset() {
         let config = ConcurrencyConfiguration.highThroughput
-        #expect(config.enableParallelProcessing == true)
-        #expect(config.batchSize == 200)
         #expect(config.maxConcurrentFiles >= ProcessInfo.processInfo.activeProcessorCount)
+        #expect(
+            config.maxConcurrentTasks
+                >= ConcurrencyConfiguration.default.maxConcurrentTasks
+        )
     }
 
-    @Test("Conservative preset has lower concurrency")
+    @Test("Conservative preset has lower concurrency than highThroughput")
     func conservativePreset() {
-        let config = ConcurrencyConfiguration.conservative
-        #expect(config.enableParallelProcessing == true)
-        // Conservative preset should have lower concurrency than highThroughput
-        #expect(config.batchSize < ConcurrencyConfiguration.highThroughput.batchSize)
+        let conservative = ConcurrencyConfiguration.conservative
+        let high = ConcurrencyConfiguration.highThroughput
+        #expect(conservative.maxConcurrentFiles <= high.maxConcurrentFiles)
+        #expect(conservative.maxConcurrentTasks <= high.maxConcurrentTasks)
     }
 
     @Test("Custom configuration respects provided values")
     func customConfiguration() {
         let config = ConcurrencyConfiguration(
             maxConcurrentFiles: 4,
-            maxConcurrentTasks: 8,
-            enableParallelProcessing: true,
-            batchSize: 50
+            maxConcurrentTasks: 8
         )
 
         #expect(config.maxConcurrentFiles == 4)
         #expect(config.maxConcurrentTasks == 8)
-        #expect(config.batchSize == 50)
-        #expect(config.enableParallelProcessing == true)
     }
 
-    @Test("Configuration respects parallel flag")
+    @Test("Custom serial configuration matches the serial preset shape")
     func configurationRespectsParallelFlag() {
-        let enabledConfig = ConcurrencyConfiguration(
-            maxConcurrentFiles: 8,
-            maxConcurrentTasks: 16,
-            enableParallelProcessing: true,
-            batchSize: 100
-        )
-        #expect(enabledConfig.maxConcurrentTasks == 16)
-
-        let disabledConfig = ConcurrencyConfiguration(
+        let serial = ConcurrencyConfiguration(
             maxConcurrentFiles: 1,
-            maxConcurrentTasks: 1,
-            enableParallelProcessing: false,
-            batchSize: 100
+            maxConcurrentTasks: 1
         )
-        #expect(disabledConfig.maxConcurrentTasks == 1)
+        #expect(serial.maxConcurrentFiles == 1)
+        #expect(serial.maxConcurrentTasks == 1)
     }
 }
 
