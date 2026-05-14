@@ -34,7 +34,7 @@ public struct ConfigurationLoader: Sendable {
     /// - Parameter directory: The directory to search for configuration files.
     /// - Returns: The parsed configuration, or `nil` if no config file exists.
     /// - Throws: `ConfigurationError` if the file exists but cannot be parsed.
-    public func load(from directory: URL) throws -> SWAConfiguration? {
+    public func load(from directory: URL) throws(ConfigurationError) -> SWAConfiguration? {
         guard let configPath = findConfigFile(in: directory) else {
             return nil
         }
@@ -46,7 +46,7 @@ public struct ConfigurationLoader: Sendable {
     /// - Parameter filePath: The path to the configuration file.
     /// - Returns: The parsed configuration.
     /// - Throws: `ConfigurationError` if the file cannot be read or parsed.
-    public func loadFromFile(_ filePath: URL) throws -> SWAConfiguration {
+    public func loadFromFile(_ filePath: URL) throws(ConfigurationError) -> SWAConfiguration {
         let data: Data
         do {
             data = try Data(contentsOf: filePath)

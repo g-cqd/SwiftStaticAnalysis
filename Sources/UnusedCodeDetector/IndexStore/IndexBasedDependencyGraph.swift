@@ -199,6 +199,7 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
             reverseEdges.removeAll()
             roots.removeAll()
             reachableCache = nil
+            denseGraphCache = nil
 
             collectDefinitions(from: db)
             buildEdges(from: db)
@@ -222,27 +223,35 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
             return cached
         }
 
-        var reachable = Set<String>()
-        var queue = Deque(roots)  // O(1) pop from front
-        var visited = Set<String>()
-
-        while let current = queue.popFirst() {  // O(1) instead of O(n)
-            if visited.contains(current) {
-                continue
-            }
-            visited.insert(current)
-            reachable.insert(current)
-
-            // Add all targets of outgoing edges
-            if let outgoing = edges[current] {
-                for edge in outgoing where !visited.contains(edge.toUSR) {
-                    queue.append(edge.toUSR)
-                }
-            }
-        }
+        // Project the string-keyed adjacency lists into a DenseGraph and
+        // run BFS over integer indices with a bit-packed visited set. This
+        // replaces the previous Set<String>/Deque<String> walk; the dense
+        // form is dominant for any non-trivial codebase because it removes
+        // per-step string hashing and improves cache locality.
+        let dense = denseGraph()
+        let reachableIndices = dense.computeReachableSequential()
+        let reachable = dense.toNodeIds(reachableIndices)
 
         reachableCache = reachable
         return reachable
+    }
+
+    /// Lazily build (and cache) the dense projection of the graph.
+    private func denseGraph() -> DenseGraph {
+        if let cached = denseGraphCache {
+            return cached
+        }
+        let nodeIds = Array(nodes.keys)
+        var flatEdges: [(from: String, to: String)] = []
+        flatEdges.reserveCapacity(edges.values.reduce(0) { $0 + $1.count })
+        for (from, outgoing) in edges {
+            for edge in outgoing {
+                flatEdges.append((from, edge.toUSR))
+            }
+        }
+        let dense = DenseGraph(nodeIds: nodeIds, edges: flatEdges, rootIds: roots)
+        denseGraphCache = dense
+        return dense
     }
 
     /// Get all unreachable nodes (excluding external symbols).
@@ -299,6 +308,11 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
 
     /// Cache of reachable nodes.
     private var reachableCache: Set<String>?
+
+    /// Cached `DenseGraph` projection. Built lazily on the first
+    /// `computeReachableLocked` call after a successful `build`. Reset to
+    /// `nil` whenever `nodes`/`edges`/`roots` mutate so it can't go stale.
+    private var denseGraphCache: DenseGraph?
 
     /// Files included in the analysis scope.
     private let analysisFiles: Set<String>
@@ -469,6 +483,7 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
         edges[from, default: []].insert(edge)
         reverseEdges[to, default: []].insert(edge)
         reachableCache = nil
+        denseGraphCache = nil
     }
 
     // MARK: - Root Detection
