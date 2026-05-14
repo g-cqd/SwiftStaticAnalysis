@@ -223,28 +223,35 @@ public final class IndexStoreReader: @unchecked Sendable {
 
     /// Initialize with the path to the index store directory.
     ///
+    /// Typed throws: every failure surface is collapsed into
+    /// ``IndexStoreError`` so callers don't have to inspect Foundation /
+    /// IndexStoreDB internals.
+    ///
     /// - Parameter indexStorePath: Path to the index store (e.g., .build/debug/index/store)
     /// - Parameter libIndexStorePath: Optional path to libIndexStore.dylib
-    public init(indexStorePath: String, libIndexStorePath: String? = nil) throws {
+    public init(
+        indexStorePath: String,
+        libIndexStorePath: String? = nil,
+    ) throws(IndexStoreError) {
         self.indexStorePath = indexStorePath
 
-        // Find libIndexStore.dylib
         let libPath: String =
             if let provided = libIndexStorePath {
                 provided
             } else {
-                // Try to find it in the Xcode toolchain
                 Self.findLibIndexStore()
             }
 
-        // Create the IndexStoreDB
+        let storePath = URL(fileURLWithPath: indexStorePath)
+        let databasePath = storePath.deletingLastPathComponent().appendingPathComponent("IndexDatabase")
+
         do {
-            let storePath = URL(fileURLWithPath: indexStorePath)
-            let databasePath = storePath.deletingLastPathComponent().appendingPathComponent("IndexDatabase")
-
-            // Create database directory if needed
             try FileManager.default.createDirectory(at: databasePath, withIntermediateDirectories: true)
+        } catch {
+            throw IndexStoreError.failedToOpenDatabase(underlying: error)
+        }
 
+        do {
             db = try IndexStoreDB(
                 storePath: storePath.path,
                 databasePath: databasePath.path,

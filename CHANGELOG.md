@@ -5,10 +5,84 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-05-15
 
-This release closes the audit (see `AUDIT.md`) findings most critical to
-correctness and safety. Eight commits land:
+This release closes the audit (see `AUDIT.md`) across two remediation
+sweeps. Sweep 1 (8 commits) fixed the critical-correctness/security
+findings; sweep 2 (twelve phases α-ν) extended the work with real
+SIMD MinHash, SoA token storage in the duplication hot path, Arena-backed
+SA-IS, DenseGraph + ParallelBFS as the reachability default,
+AsyncChannel-backed real backpressure, a `swa-bench` perf-regression
+gate, mutation testing + Linux CI gates, Span/RawSpan adoption with
+`@unchecked Sendable` removed from the memory types, and a Process
+environment-allowlist scrubber for IndexStoreDB invocations.
+
+### Breaking changes (since 0.1.x)
+
+- **Module structure**: `Bitmap` / `AtomicBitmap` moved from
+  `UnusedCodeDetector` to `SwiftStaticAnalysisCore`. Direct importers
+  must now `import SwiftStaticAnalysisCore` (the umbrella module
+  re-exports as before).
+- **Module carve**: `SwiftStaticAnalysis` no longer transitively pulls
+  in `SwiftStaticAnalysisMCP`. Consumers needing MCP must import
+  `SwiftStaticAnalysisAll` (umbrella) or `SwiftStaticAnalysisMCP`
+  directly. This drops the swift-sdk dependency for library-only users.
+- **`SWAConfiguration.format`** changed from `String?` to
+  `OutputFormat?`. Decoding rejects unknown strings.
+- **CLI enum mirrors removed**: 7 `*Arg` shadow enums in `swa/main.swift`
+  deleted. The domain enums (`CloneType`, `DetectionAlgorithm`,
+  `DetectionMode`, `Confidence`, `ParallelMode`, `DeclarationKind`,
+  `AccessLevel`, `OutputFormat`) now conform to `ExpressibleByArgument`
+  directly via `swa/CLIConformances.swift`.
+- **`IndexStoreReader.init`** uses typed throws: `throws(IndexStoreError)`.
+- **Streaming default**: `ParallelMode.maximum` now means
+  "AsyncChannel-backed real backpressure" for streaming verifiers, not
+  just "highThroughput preset".
+
+### Sweep 2 highlights
+
+- **Real SIMD MinHash**: `SIMD4<UInt64>` lanes per shingle with
+  Mersenne-prime `M_61 = (1<<61)-1` reduction and SplitMix64 coefficient
+  mixing. Replaces the scalar unrolled-loop "SIMD" that the previous
+  README claimed. Cache schema bumped; old on-disk caches invalidate
+  cleanly.
+- **SoA token storage**: `TokenSequence` migrated to `SoATokenStorage`.
+  Per-window `Array(...)` allocations eliminated from `ShingleGenerator`;
+  text-keyed maps replaced with byte-slice keys.
+- **Arena-backed SA-IS**: `[Bool] types` replaced with the now-Core
+  `Bitmap`. Scratch buffers allocate from `Arena`/`ThreadLocalArena`.
+- **DenseGraph + ParallelBFS**: `ReachabilityGraph` projects to
+  `DenseGraph` and caches the projection per actor. Auto-selects
+  parallel BFS for graphs ≥1000 nodes.
+- **AsyncChannel backpressure**: `BackpressuredChannelStream` replaces
+  `bufferingNewest(N)` in the streaming verifier path. Slow consumers
+  now suspend the producer rather than dropping pairs.
+- **swa-bench**: new executable with six scenarios (duplicates exact /
+  near / semantic, unused simple / reachability, symbol lookup). CI
+  workflow `benchmarks.yml` runs on PRs that touch the hot-path
+  modules.
+- **Linux CI + mutation testing**: `ci.yml` gains a `swift:6.0-noble`
+  matrix leg; `mutation-testing.yml` is now a soft PR gate keyed off
+  changed module paths.
+- **Process env allowlist**: `ProcessExecutor` scrubs
+  `DYLD_INSERT_LIBRARIES` / `SWIFTPM_HOOKS_DIR` etc. before spawning
+  indexstore-db invocations. `IndexStoreFallbackManager` and
+  `IndexStoreReader.findLibIndexStore` route through it.
+- **`MemoryMappedFile.withRawSpan`** + drop `@unchecked Sendable` on
+  `MemoryMappedFile`, `FileSlice`, `ArenaTokenStorage`, `AtomicBitmap`.
+- **MCP `ReadResource` hardening**: shares `validateForReadFile(...)`
+  with `handleReadFile` (extension allowlist + regular-file +
+  10 MiB cap).
+- **Regex single-match wedge mitigation**: bounded-quantifier
+  antipatterns rejected pre-flight; symbol-name lengths capped at
+  1024 bytes per occurrence.
+- **DocC overhaul**: new `Architecture`, `Performance`, `Security`
+  articles describe the actual post-audit codebase.
+- **Boundary validation**: `.swa.json` files with bogus enum strings
+  (`format: "telepathic"` etc.) are rejected by `ConfigurationLoader`
+  with a typed `ConfigurationError.invalidFieldValue`.
+
+### Sweep 1 (audit remediation iteration 1)
 
 ### Security (CRITICAL/HIGH)
 

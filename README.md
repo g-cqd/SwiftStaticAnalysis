@@ -629,16 +629,24 @@ The framework includes several performance optimizations:
   Direction-optimising parallel BFS (Beamer et al.) is available via
   `ParallelBFS.computeReachable` and is selected by
   `--parallel-mode safe|maximum` for large graphs.
-- **MinHash + LSH**: signature computation processes 4 hash lanes per
-  inner-loop iteration. *Note: the routine is named `computeSignatureSIMD`
-  but is currently scalar unrolled — a real `SIMD4<UInt64>` + Mersenne-prime
-  rewrite is on the roadmap.*
-- **Arena allocator**: provided in `SwiftStaticAnalysisCore.Memory` for
-  scratch-buffer-heavy callers. *Note: not yet adopted by `SA-IS`; the
-  duplication detector uses heap-backed `[Int]` arrays today.*
+- **MinHash + LSH**: `SIMD4<UInt64>` lanes process four hash universes
+  per shingle, reduced via Mersenne-prime modulus `M_61 = (1<<61)-1`
+  with SplitMix64 coefficient mixing. Default signature width is
+  `InlineArray<128, UInt64>`.
+- **Arena allocator**: `SA-IS` builds the suffix array entirely over
+  `Bitmap` typed and `Arena`-allocated scratch buffers — no
+  per-recursion `[Int]` allocations.
+- **SoA token storage**: duplication detectors operate on
+  `SoATokenStorage` columns (`[UInt8] kinds`, `[UInt32] offsets`,
+  `[UInt16] lengths`, `[UInt32] lines`) with `Span<UInt8>` /
+  `Span<UInt32>` accessors.
+- **AsyncChannel backpressure**: `ParallelMode.maximum` uses
+  `BackpressuredChannelStream` for streaming verifiers; slow consumers
+  suspend the producer instead of dropping candidate pairs.
 
-> Some of these optimisations were retroactively wired into hot paths in
-> 0.2.0; see `AUDIT.md` for the full performance-truthing record.
+The above is benchmarked in `swa-bench` and gated in CI via
+`.github/workflows/benchmarks.yml`. See <doc:Performance> for the full
+methodology.
 
 ## Testing
 
