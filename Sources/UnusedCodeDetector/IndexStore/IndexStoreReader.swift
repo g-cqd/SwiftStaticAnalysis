@@ -278,20 +278,17 @@ public final class IndexStoreReader: @unchecked Sendable {
             return path
         }
 
-        // Fallback to xcrun
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        process.arguments = ["--find", "swift"]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            if let swiftPath = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) {
+        // Fallback to xcrun. Routes through `ProcessExecutor` so the
+        // child does not inherit `DEVELOPER_DIR` from the parent — if
+        // the parent's `DEVELOPER_DIR` points at a hostile toolchain,
+        // that's a code-execution vector into the host process via
+        // `libIndexStore.dylib`.
+        if let result = try? ProcessExecutor.run(
+            executable: URL(fileURLWithPath: "/usr/bin/xcrun"),
+            arguments: ["--find", "swift"]
+        ), result.succeeded {
+            let swiftPath = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !swiftPath.isEmpty {
                 let toolchainPath = URL(fileURLWithPath: swiftPath)
                     .deletingLastPathComponent()  // bin
                     .deletingLastPathComponent()  // usr
@@ -299,8 +296,6 @@ public final class IndexStoreReader: @unchecked Sendable {
                     .appendingPathComponent("libIndexStore.dylib")
                 return toolchainPath.path
             }
-        } catch {
-            // Fall through to default
         }
 
         // Default fallback

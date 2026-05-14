@@ -398,33 +398,27 @@ public final class IndexStoreFallbackManager: Sendable {
         }
     }
 
-    /// Build an SPM project.
+    /// Build an SPM project. Routes through `ProcessExecutor` so the
+    /// child `swift build` does not inherit `DYLD_INSERT_LIBRARIES`,
+    /// `DEVELOPER_DIR`, `SWIFTPM_HOOKS_DIR`, etc. from the parent.
     private func buildSPMProject(at projectRoot: String, startTime: Date) async -> BuildResult {
-        let process = Process()
-        process.currentDirectoryURL = URL(fileURLWithPath: projectRoot)
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/swift")
-        process.arguments = ["build", "-Xswiftc", "-index-store-path", "-Xswiftc", ".build/index/store"]
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-
         do {
-            try process.run()
-            process.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8) ?? ""
-
-            let success = process.terminationStatus == 0
+            let result = try ProcessExecutor.run(
+                executable: URL(fileURLWithPath: "/usr/bin/swift"),
+                arguments: [
+                    "build", "-Xswiftc", "-index-store-path",
+                    "-Xswiftc", ".build/index/store",
+                ],
+                currentDirectory: URL(fileURLWithPath: projectRoot)
+            )
+            let combined = result.stdout + result.stderr
             let indexPath =
-                success
+                result.succeeded
                 ? URL(fileURLWithPath: projectRoot)
                     .appendingPathComponent(".build/index/store").path : nil
-
             return BuildResult(
-                success: success,
-                output: output,
+                success: result.succeeded,
+                output: combined,
                 duration: Date().timeIntervalSince(startTime),
                 indexStorePath: indexPath,
             )
@@ -472,33 +466,20 @@ public final class IndexStoreFallbackManager: Sendable {
             "INDEX_DATA_STORE_DIR=$(PROJECT_DIR)/.build/index/store",
         ]
 
-        let process = Process()
-        process.currentDirectoryURL = URL(fileURLWithPath: projectRoot)
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcodebuild")
-        process.arguments = arguments
-
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-
         do {
-            try process.run()
-            process.waitUntilExit()
-
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8) ?? ""
-
-            let success = process.terminationStatus == 0
-
-            // Try to find the index store path
+            let result = try ProcessExecutor.run(
+                executable: URL(fileURLWithPath: "/usr/bin/xcodebuild"),
+                arguments: arguments,
+                currentDirectory: URL(fileURLWithPath: projectRoot)
+            )
+            let combined = result.stdout + result.stderr
             var indexPath: String?
-            if success {
+            if result.succeeded {
                 indexPath = IndexStorePathFinder.findIndexStorePath(in: projectRoot)
             }
-
             return BuildResult(
-                success: success,
-                output: output,
+                success: result.succeeded,
+                output: combined,
                 duration: Date().timeIntervalSince(startTime),
                 indexStorePath: indexPath,
             )

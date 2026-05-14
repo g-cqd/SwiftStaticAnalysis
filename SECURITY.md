@@ -70,6 +70,25 @@ communicates over stdio only; it does not bind a network socket.
 No analytics, telemetry, or remote logging. All processing happens
 locally.
 
+### Subprocess Environment Scrubbing
+
+`swa unused --auto-build` (and the `xcrun --find swift` toolchain
+discovery) shells out via `ProcessExecutor`. The child receives **only**
+the following allowlisted environment variables:
+
+`PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_ALL`, `LC_CTYPE`,
+`LC_MESSAGES`, `TMPDIR`, `TERM`.
+
+Everything else — including `DYLD_INSERT_LIBRARIES`,
+`DYLD_LIBRARY_PATH`, `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DEVELOPER_DIR`,
+`SWIFTPM_HOOKS_DIR`, `BASH_ENV`, `SHELL` — is dropped before
+`Process.run()`. This prevents environment-based code injection into
+the toolchain.
+
+The SPM plugin host (`StaticAnalysisCommandPlugin`) is sandbox-locked
+to `PackagePlugin + Foundation` and cannot use `ProcessExecutor`; its
+two `Process` invocations remain in-place.
+
 ## Known Limitations
 
 - **`swa unused --auto-build` invokes `swift build`** in the analysed
@@ -78,10 +97,6 @@ locally.
   executing its `Package.swift`. The `auto_build` flag is NOT exposed
   via the MCP tool surface; CLI invocations against untrusted
   codebases should not pass `--auto-build`.
-- **`Process` invocations inherit the parent environment.** Variables
-  such as `DEVELOPER_DIR`, `DYLD_INSERT_LIBRARIES`, and
-  `SWIFTPM_HOOKS_DIR` are not currently scrubbed; treat this as a
-  caveat when running on shared machines.
 
 ## Best Practices
 
