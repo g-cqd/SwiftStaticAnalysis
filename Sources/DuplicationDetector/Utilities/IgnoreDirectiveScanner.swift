@@ -3,6 +3,7 @@
 //  MIT License
 
 import Foundation
+import SwiftStaticAnalysisCore
 
 // MARK: - IgnoreRegion
 
@@ -113,7 +114,7 @@ public struct IgnoreDirectiveScanner: Sendable {
         var result: [String: [IgnoreRegion]] = [:]
 
         for file in files {
-            let source = try String(contentsOfFile: file, encoding: .utf8)
+            let source = try SourceFileReader.readSource(at: file)
             let regions = scan(source: source, file: file)
             if !regions.isEmpty {
                 result[file] = regions

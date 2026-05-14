@@ -115,7 +115,7 @@ public actor IncrementalDuplicationDetector {
                 maxConcurrency: concurrency.maxConcurrentFiles,
             ) { [parser] file -> TokenSequence in
                 let tree = try await parser.parse(file)
-                let source = try String(contentsOfFile: file, encoding: .utf8)
+                let source = try SourceFileReader.readSource(at: file)
                 return extractor.extract(from: tree, file: file, source: source)
             }
 

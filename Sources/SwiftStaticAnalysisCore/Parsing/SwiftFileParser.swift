@@ -171,14 +171,12 @@ public actor SwiftFileParser {
     }
 
     private func readFile(_ path: String) throws -> String {
-        let url = URL(fileURLWithPath: path)
-
         guard FileManager.default.fileExists(atPath: path) else {
             throw AnalysisError.fileNotFound(path)
         }
 
         do {
-            return try String(contentsOf: url, encoding: .utf8)
+            return try SourceFileReader.readSource(at: path)
         } catch {
             throw AnalysisError.ioError("Failed to read \(path): \(error.localizedDescription)")
         }

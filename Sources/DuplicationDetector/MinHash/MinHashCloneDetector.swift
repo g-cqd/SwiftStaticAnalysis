@@ -176,7 +176,7 @@ public struct MinHashCloneDetector: Sendable {
 
         for file in files {
             let tree = try await parser.parse(file)
-            let source = try String(contentsOfFile: file, encoding: .utf8)
+            let source = try SourceFileReader.readSource(at: file)
             let sequence = extractor.extract(from: tree, file: file, source: source)
             sequences.append(sequence)
         }

@@ -65,13 +65,13 @@ struct DuplicationEngine: Sendable {
         // Collect unique files referenced in clones
         let referencedFiles = Set(groups.flatMap { $0.clones.map(\.file) })
 
-        // Load file contents in parallel
+        // Load file contents in parallel via mmap-backed reader.
         let fileContentPairs = try await ParallelProcessor.map(
             Array(referencedFiles),
             maxConcurrency: concurrency.maxConcurrentFiles,
         ) { file -> (String, [String]) in
-            let source = try String(contentsOfFile: file, encoding: .utf8)
-            return (file, source.components(separatedBy: .newlines))
+            let lines = try SourceFileReader.readLines(at: file)
+            return (file, lines)
         }
 
         // Build lookup dictionary
