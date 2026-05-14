@@ -4,6 +4,7 @@
 
 import Algorithms
 import Foundation
+import SwiftStaticAnalysisCore
 
 // MARK: - Shingle
 
@@ -243,19 +244,19 @@ public struct ShingleGenerator: Sendable {
     }
 
     /// Compute hash for a shingle using FNV-1a.
+    ///
+    /// Uses 0xFF as the inter-token separator so that two different token
+    /// splits with the same concatenated bytes still produce distinct hashes.
     private func computeShingleHash(_ tokens: [String]) -> UInt64 {
-        // FNV-1a 64-bit hash
-        var hash: UInt64 = 14_695_981_039_346_656_037  // FNV offset basis
-        let prime: UInt64 = 1_099_511_628_211  // FNV prime
+        var hash = FNV1a.offsetBasis
 
         for token in tokens {
             for byte in token.utf8 {
                 hash ^= UInt64(byte)
-                hash = hash &* prime
+                hash = hash &* FNV1a.prime
             }
-            // Separator between tokens
             hash ^= 0xFF
-            hash = hash &* prime
+            hash = hash &* FNV1a.prime
         }
 
         return hash
@@ -289,14 +290,6 @@ extension ShingleGenerator {
 
     /// Compute hash for a string.
     private func computeStringHash(_ string: String) -> UInt64 {
-        var hash: UInt64 = 14_695_981_039_346_656_037
-        let prime: UInt64 = 1_099_511_628_211
-
-        for byte in string.utf8 {
-            hash ^= UInt64(byte)
-            hash = hash &* prime
-        }
-
-        return hash
+        FNV1a.hash(string)
     }
 }

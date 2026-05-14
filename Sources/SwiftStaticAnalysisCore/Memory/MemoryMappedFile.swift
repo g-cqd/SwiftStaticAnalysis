@@ -404,16 +404,9 @@ public struct FileSlice: @unchecked Sendable {
         return str == string
     }
 
-    /// Hash the slice contents.
+    /// Hash the slice contents (FNV-1a, see `FNV1a` for details).
     public func hash() -> UInt64 {
-        // FNV-1a hash
-        var hash: UInt64 = 14_695_981_039_346_656_037
-        for i in 0..<length {
-            let byte = base.load(fromByteOffset: i, as: UInt8.self)
-            hash ^= UInt64(byte)
-            hash = hash &* 1_099_511_628_211
-        }
-        return hash
+        FNV1a.hash(UnsafeRawBufferPointer(start: base, count: length))
     }
 
     // MARK: Private

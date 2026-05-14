@@ -2,29 +2,40 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
-import Atomics
 import Foundation
+import Synchronization
+
+// MARK: - AtomicWord
+
+/// Heap-allocated wrapper around a single `Atomic<UInt64>`.
+///
+/// `Atomic` is `~Copyable`, so it can't sit directly in an Array. Wrapping it
+/// in a small reference type gives the storage equivalent of swift-atomics'
+/// `ManagedAtomic<UInt64>` while keeping the codebase on the stdlib
+/// `Synchronization` module.
+private final class AtomicWord: Sendable {
+    let value: Atomic<UInt64>
+
+    init(_ initial: UInt64 = 0) {
+        self.value = Atomic<UInt64>(initial)
+    }
+}
 
 // MARK: - AtomicBitmap
 
 /// Thread-safe bitmap for parallel BFS visited tracking.
 ///
-/// Uses `ManagedAtomic<UInt64>` from swift-atomics for true lock-free
-/// concurrent access, enabling multiple threads to safely mark nodes
-/// as visited without locks.
+/// Uses stdlib `Atomic<UInt64>` (via `AtomicWord`) for lock-free concurrent
+/// access. The `@unchecked Sendable` annotation reflects that the array of
+/// reference-typed `AtomicWord`s is read-only after init while the atomic
+/// fields are themselves `Sendable`.
 ///
 /// ## Performance Characteristics
 ///
 /// - `testAndSet`: O(1) with atomic fetch-or
 /// - `test`: O(1) atomic load
 /// - `popCount`: O(n/64) where n is bitmap size
-/// - Memory: ~n/8 bytes for n bits plus atomic overhead
-///
-/// ## Thread Safety
-///
-/// - All operations are fully thread-safe using atomic operations
-/// - `popCount` and `forEachSetBit` provide consistent snapshots
-///
+/// - Memory: ~n/8 bytes for n bits plus per-word reference overhead
 public final class AtomicBitmap: @unchecked Sendable {
     // MARK: Lifecycle
 
@@ -33,7 +44,7 @@ public final class AtomicBitmap: @unchecked Sendable {
         precondition(size >= 0, "Bitmap size must be non-negative")
         self.size = size
         self.wordCount = (size + 63) / 64
-        self.storage = (0..<wordCount).map { _ in ManagedAtomic<UInt64>(0) }
+        self.storage = (0..<wordCount).map { _ in AtomicWord() }
     }
 
     // MARK: Public
@@ -57,7 +68,7 @@ public final class AtomicBitmap: @unchecked Sendable {
         let mask: UInt64 = 1 << bitIndex
 
         // Atomic fetch-or: sets the bit and returns the OLD value
-        let oldValue = storage[wordIndex].loadThenBitwiseOr(with: mask, ordering: .relaxed)
+        let (oldValue, _) = storage[wordIndex].value.bitwiseOr(mask, ordering: .relaxed)
 
         // Return true if the bit was previously unset
         return (oldValue & mask) == 0
@@ -75,8 +86,7 @@ public final class AtomicBitmap: @unchecked Sendable {
         let bitIndex = index % 64
         let mask: UInt64 = 1 << bitIndex
 
-        // Use atomic OR to set the bit
-        _ = storage[wordIndex].loadThenBitwiseOr(with: mask, ordering: .relaxed)
+        _ = storage[wordIndex].value.bitwiseOr(mask, ordering: .relaxed)
     }
 
     /// Check if a bit is set (atomic read).
@@ -91,16 +101,18 @@ public final class AtomicBitmap: @unchecked Sendable {
         let bitIndex = index % 64
         let mask: UInt64 = 1 << bitIndex
 
-        return (storage[wordIndex].load(ordering: .relaxed) & mask) != 0
+        return (storage[wordIndex].value.load(ordering: .relaxed) & mask) != 0
     }
 
     /// Count of set bits (population count).
     ///
-    /// Thread-safe snapshot of the current state.
+    /// Provides a per-word relaxed-ordering snapshot. Concurrent writers
+    /// between words are not coordinated; the result is consistent only
+    /// within each word.
     public var popCount: Int {
         var count = 0
         for i in 0..<wordCount {
-            count += storage[i].load(ordering: .relaxed).nonzeroBitCount
+            count += storage[i].value.load(ordering: .relaxed).nonzeroBitCount
         }
         return count
     }
@@ -108,11 +120,9 @@ public final class AtomicBitmap: @unchecked Sendable {
     /// Iterate over all set bit indices.
     ///
     /// - Parameter body: Closure called for each set bit index.
-    ///
-    /// Thread-safe snapshot iteration.
     public func forEachSetBit(_ body: (Int) -> Void) {
         for wordIndex in 0..<wordCount {
-            var word = storage[wordIndex].load(ordering: .relaxed)
+            var word = storage[wordIndex].value.load(ordering: .relaxed)
             let baseIndex = wordIndex * 64
 
             while word != 0 {
@@ -127,8 +137,6 @@ public final class AtomicBitmap: @unchecked Sendable {
     }
 
     /// Get all set bit indices as an array.
-    ///
-    /// Thread-safe snapshot.
     public func allSetBits() -> [Int] {
         var result: [Int] = []
         result.reserveCapacity(min(popCount, size))
@@ -137,28 +145,24 @@ public final class AtomicBitmap: @unchecked Sendable {
     }
 
     /// Clear all bits.
-    ///
-    /// Thread-safe: each word is atomically set to zero.
     public func clear() {
         for i in 0..<wordCount {
-            storage[i].store(0, ordering: .relaxed)
+            storage[i].value.store(0, ordering: .relaxed)
         }
     }
 
     /// Copy contents from another bitmap.
-    ///
-    /// Thread-safe: reads source atomically and writes atomically.
     public func copy(from other: AtomicBitmap) {
         precondition(size == other.size, "Bitmap sizes must match for copy")
         for i in 0..<wordCount {
-            let value = other.storage[i].load(ordering: .relaxed)
-            storage[i].store(value, ordering: .relaxed)
+            let value = other.storage[i].value.load(ordering: .relaxed)
+            storage[i].value.store(value, ordering: .relaxed)
         }
     }
 
     // MARK: Private
 
-    private let storage: [ManagedAtomic<UInt64>]
+    private let storage: [AtomicWord]
     private let wordCount: Int
 }
 
@@ -180,9 +184,10 @@ public struct Bitmap: Sendable {
 
     /// Create a bitmap with the given number of bits, setting specified indices.
     ///
-    /// This is more efficient than creating an empty bitmap and calling `set` repeatedly
-    /// because it initializes all bits in a single pass and avoids the need for a mutable
-    /// variable (important for Sendable conformance when captured by closures).
+    /// This is more efficient than creating an empty bitmap and calling `set`
+    /// repeatedly because it initializes all bits in a single pass and avoids
+    /// the need for a mutable variable (important for Sendable conformance
+    /// when captured by closures).
     public init(size: Int, setting indices: some Sequence<Int>) {
         precondition(size >= 0, "Bitmap size must be non-negative")
         self.size = size

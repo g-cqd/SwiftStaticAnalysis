@@ -338,17 +338,18 @@ public struct LSHIndex: Sendable, LSHQueryable {
     // MARK: - Private Helpers
 
     /// Hash a band of the signature.
+    ///
+    /// Mixes the UInt64 values directly (no per-byte unpack) for speed; this
+    /// is intentional and differs from the `FNV1a.hash(_:Sequence<UInt64>)`
+    /// helper which mixes byte-by-byte for stability across architectures.
     private func hashBand(signature: MinHashSignature, band: Int) -> UInt64 {
         let start = band * rows
         let end = min(start + rows, signature.values.count)
 
-        // FNV-1a hash of the band values
-        var hash: UInt64 = 14_695_981_039_346_656_037
-        let prime: UInt64 = 1_099_511_628_211
-
+        var hash = FNV1a.offsetBasis
         for i in start..<end {
             hash ^= signature.values[i]
-            hash = hash &* prime
+            hash = hash &* FNV1a.prime
         }
 
         return hash

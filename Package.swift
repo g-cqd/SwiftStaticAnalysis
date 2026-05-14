@@ -79,7 +79,7 @@ let package = Package(
         .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.3"),
         .package(url: "https://github.com/apple/swift-async-algorithms.git", .upToNextMajor(from: "1.1.1")),
         .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.0"),
-        .package(url: "https://github.com/apple/swift-atomics.git", .upToNextMajor(from: "1.3.0")),
+        // swift-atomics dropped in 0.2.0 in favour of stdlib `Synchronization.Atomic`.
         .package(url: "https://github.com/apple/swift-collections.git", .upToNextMajor(from: "1.3.0")),
     ],
     targets: [
@@ -105,7 +105,6 @@ let package = Package(
                 "SwiftStaticAnalysisCore",
                 "UnusedCodeDetector",  // For AtomicBitmap, Bitmap
                 .product(name: "Collections", package: "swift-collections"),
-                .product(name: "Atomics", package: "swift-atomics"),
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
             ],
@@ -121,7 +120,6 @@ let package = Package(
             dependencies: [
                 "SwiftStaticAnalysisCore",
                 .product(name: "IndexStoreDB", package: "indexstore-db"),
-                .product(name: "Atomics", package: "swift-atomics"),
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
