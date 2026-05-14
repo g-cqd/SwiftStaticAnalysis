@@ -694,6 +694,6 @@ extension SymbolContextExtractor {
         if let cache = fileCache {
             return try await cache.content(for: path)
         }
-        return try String(contentsOfFile: path, encoding: .utf8)
+        return try SourceFileReader.readSource(at: path)
     }
 }

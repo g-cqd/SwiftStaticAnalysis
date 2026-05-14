@@ -2,6 +2,7 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
+import Collections
 import Foundation
 import SwiftParser
 import SwiftSyntax
@@ -155,11 +156,13 @@ public actor ZeroCopyParser {
     /// - Parameter path: Path to the Swift file.
     /// - Returns: Parsed file with tokens and optional syntax tree.
     public func parse(_ path: String) throws -> ZeroCopyParsedFile {
-        // Check cache
-        if let cached = cache[path] {
+        // Canonicalise the cache key so aliased paths share one entry.
+        let key = PathUtilities.canonicalize(path)
+
+        if let cached = cache[key] {
             let currentModDate = try fileModificationDate(path)
             if cached.modificationDate >= currentModDate {
-                touch(path)
+                touch(key)
                 return cached.parsedFile
             }
         }
@@ -180,7 +183,7 @@ public actor ZeroCopyParser {
         // Cache result
         let modDate = try fileModificationDate(path)
         insertIntoCache(
-            path,
+            key,
             CachedZeroCopyParse(
                 parsedFile: parsedFile,
                 modificationDate: modDate,
@@ -210,13 +213,11 @@ public actor ZeroCopyParser {
     /// Clear the parse cache.
     public func clearCache() {
         cache.removeAll()
-        accessOrder.removeAll()
     }
 
     /// Invalidate cache for a specific file.
     public func invalidateCache(for path: String) {
-        cache.removeValue(forKey: path)
-        accessOrder.removeAll(where: { $0 == path })
+        cache.removeValue(forKey: PathUtilities.canonicalize(path))
     }
 
     // MARK: Private
@@ -227,25 +228,21 @@ public actor ZeroCopyParser {
         let modificationDate: Date
     }
 
-    /// Cache of parsed files.
-    private var cache: [String: CachedZeroCopyParse] = [:]
-
-    /// Access order (front = most recently used).
-    private var accessOrder: [String] = []
+    /// Cache of parsed files. `OrderedDictionary` gives O(1) LRU eviction
+    /// and ordered insertion; the prior `[String: CachedZeroCopyParse]` +
+    /// parallel `[String]` access-order array paid O(n) on every touch.
+    private var cache: OrderedDictionary<String, CachedZeroCopyParse> = [:]
 
     private func touch(_ path: String) {
-        if let index = accessOrder.firstIndex(of: path) {
-            accessOrder.remove(at: index)
-        }
-        accessOrder.insert(path, at: 0)
+        guard let value = cache.removeValue(forKey: path) else { return }
+        cache[path] = value
     }
 
     private func insertIntoCache(_ path: String, _ entry: CachedZeroCopyParse) {
-        if cache[path] == nil, cache.count >= cacheLimit, let evicted = accessOrder.popLast() {
-            cache.removeValue(forKey: evicted)
+        if cache[path] == nil, cache.count >= cacheLimit {
+            cache.removeFirst()
         }
         cache[path] = entry
-        touch(path)
     }
 
     // MARK: - Private Implementation

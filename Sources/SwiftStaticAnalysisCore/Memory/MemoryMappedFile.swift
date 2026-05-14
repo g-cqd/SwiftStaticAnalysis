@@ -3,6 +3,7 @@
 //  MIT License
 
 import Foundation
+import Synchronization
 
 #if canImport(Darwin)
     import Darwin
@@ -220,14 +221,15 @@ public final class MemoryMappedFile: @unchecked Sendable {
     /// Find line boundaries in the file.
     ///
     /// The first call performs a full byte scan; subsequent calls reuse the
-    /// cached result. A serial dispatch queue serialises construction so that
-    /// concurrent callers see a consistent snapshot — the type itself is
-    /// `@unchecked Sendable` and the cache is the one mutable field.
+    /// cached result. A `Mutex` from `Synchronization` serialises lazy
+    /// construction without paying the cost of a `DispatchQueue`. The type
+    /// is `@unchecked Sendable` because of `UnsafeRawPointer`; the cache is
+    /// now the only mutable field and is compile-time protected.
     ///
     /// - Returns: Array of (offset, length) tuples for each line.
     public func findLineRanges() -> [(offset: Int, length: Int)] {
-        lineRangesQueue.sync {
-            if let cached = cachedLineRanges {
+        lineRangesLock.withLock { cache in
+            if let cached = cache {
                 return cached
             }
             var ranges: [(Int, Int)] = []
@@ -243,7 +245,7 @@ public final class MemoryMappedFile: @unchecked Sendable {
                 ranges.append((lineStart, size - lineStart))
             }
 
-            cachedLineRanges = ranges
+            cache = ranges
             return ranges
         }
     }
@@ -297,12 +299,10 @@ public final class MemoryMappedFile: @unchecked Sendable {
 
     // MARK: Private
 
-    /// Cached line ranges (lazily computed by `findLineRanges`).
-    private var cachedLineRanges: [(offset: Int, length: Int)]?
-
-    /// Serial queue guarding `cachedLineRanges` against concurrent
-    /// initialisation.
-    private let lineRangesQueue = DispatchQueue(label: "swa.MemoryMappedFile.lineRanges")
+    /// Cached line ranges, lazily computed by `findLineRanges` and guarded
+    /// by `Synchronization.Mutex`. The mutex is lighter than the previous
+    /// `DispatchQueue` and is the project's standard concurrency primitive.
+    private let lineRangesLock: Mutex<[(offset: Int, length: Int)]?> = Mutex(nil)
 
     /// Pointer to the mapped memory.
     private let data: UnsafeRawPointer

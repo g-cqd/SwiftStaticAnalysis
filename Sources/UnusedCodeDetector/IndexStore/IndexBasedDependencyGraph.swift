@@ -509,6 +509,13 @@ public final class IndexBasedDependencyGraph: @unchecked Sendable {
             nodes[usr] = node
             roots.insert(usr)
         }
+        // Defensive: `detectRoots` is currently only called from `build`,
+        // which has already cleared both caches. If anyone adds a second
+        // caller (e.g. for incremental re-analysis) the caches must be
+        // invalidated, or `computeReachable`/`generateReport` will return
+        // stale answers.
+        reachableCache = nil
+        denseGraphCache = nil
     }
 
     /// Determine if a node should be a root and why.

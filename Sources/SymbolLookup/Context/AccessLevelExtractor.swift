@@ -39,7 +39,7 @@ public struct AccessLevelExtractor: Sendable {
         line: Int,
         column: Int
     ) -> AccessLevel {
-        guard let content = try? String(contentsOfFile: file, encoding: .utf8) else {
+        guard let content = try? SourceFileReader.readSource(at: file) else {
             return .internal
         }
 
@@ -76,7 +76,7 @@ public struct AccessLevelExtractor: Sendable {
 
         // Process each file
         for (file, fileLocations) in byFile {
-            guard let content = try? String(contentsOfFile: file, encoding: .utf8) else {
+            guard let content = try? SourceFileReader.readSource(at: file) else {
                 // Default to internal for files we can't read
                 for loc in fileLocations {
                     resultsByIndex[loc.index] = .internal

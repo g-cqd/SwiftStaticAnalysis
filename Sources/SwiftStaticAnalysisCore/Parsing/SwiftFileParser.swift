@@ -2,6 +2,7 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
+import Collections
 import Foundation
 import SwiftParser
 import SwiftSyntax
@@ -47,11 +48,15 @@ public actor SwiftFileParser {
     /// - Returns: The parsed source file syntax tree.
     /// - Throws: `AnalysisError` if the file cannot be read or parsed.
     public func parse(_ filePath: String) throws -> SourceFileSyntax {
-        // Check if we have a valid cached version
-        if let cached = cache[filePath] {
+        // Canonicalise the cache key so two different spellings (e.g.
+        // /var/... vs /private/var/... on macOS) don't double-occupy the
+        // cache.
+        let key = PathUtilities.canonicalize(filePath)
+
+        if let cached = cache[key] {
             let currentModDate = try fileModificationDate(filePath)
             if cached.modificationDate >= currentModDate {
-                touch(filePath)
+                touch(key)
                 return cached.syntax
             }
         }
@@ -64,7 +69,7 @@ public actor SwiftFileParser {
         let modDate = try fileModificationDate(filePath)
         let lineCount = source.utf8.lazy.count(where: { $0 == 0x0A }) + 1
         insertIntoCache(
-            filePath,
+            key,
             CachedParse(
                 syntax: syntax,
                 modificationDate: modDate,
@@ -123,14 +128,12 @@ public actor SwiftFileParser {
 
     /// Invalidate the cache for a specific file.
     public func invalidateCache(for path: String) {
-        cache.removeValue(forKey: path)
-        accessOrder.removeAll(where: { $0 == path })
+        cache.removeValue(forKey: PathUtilities.canonicalize(path))
     }
 
     /// Clear the entire cache.
     public func clearCache() {
         cache.removeAll()
-        accessOrder.removeAll()
     }
 
     // MARK: Private
@@ -142,32 +145,26 @@ public actor SwiftFileParser {
         let lineCount: Int
     }
 
-    /// Cached parsed files.
-    private var cache: [String: CachedParse] = [:]
-
-    /// Access order (front = most recently used).
-    ///
-    /// Kept as a parallel array because we expect cacheLimit to be small
-    /// (default 256) — linear scans of an array fit comfortably in L1 and
-    /// avoid the overhead of a doubly-linked list at this scale. If
-    /// cacheLimit grows past a few thousand, switch to a real LRU.
-    private var accessOrder: [String] = []
+    /// Cached parsed files. `OrderedDictionary` from swift-collections gives
+    /// O(1) eviction (`removeFirst`) and O(1) ordered insertion, replacing
+    /// the prior `[String: CachedParse]` + parallel `[String]` access-order
+    /// array which had O(n) `firstIndex(of:)` on every cache touch.
+    private var cache: OrderedDictionary<String, CachedParse> = [:]
 
     // MARK: - Private Helpers
 
+    /// Move the entry for `path` to the most-recently-used position.
+    /// Caller has already confirmed the entry exists.
     private func touch(_ path: String) {
-        if let index = accessOrder.firstIndex(of: path) {
-            accessOrder.remove(at: index)
-        }
-        accessOrder.insert(path, at: 0)
+        guard let value = cache.removeValue(forKey: path) else { return }
+        cache[path] = value
     }
 
     private func insertIntoCache(_ path: String, _ entry: CachedParse) {
-        if cache[path] == nil, cache.count >= cacheLimit, let evicted = accessOrder.popLast() {
-            cache.removeValue(forKey: evicted)
+        if cache[path] == nil, cache.count >= cacheLimit {
+            cache.removeFirst()
         }
         cache[path] = entry
-        touch(path)
     }
 
     private func readFile(_ path: String) throws -> String {

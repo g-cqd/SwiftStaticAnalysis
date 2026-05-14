@@ -662,20 +662,86 @@ extension SWAMCPServer {
         return .init(content: [.text(output)], isError: false)
     }
 
-    /// Maximum file size accepted by `read_file` (10 MiB). Larger files would
-    /// either DoS the calling LLM or be a sign that the path leaked outside
-    /// the codebase.
+    /// Maximum file size accepted by `read_file` and the `ReadResource`
+    /// handler (10 MiB). Larger files would either DoS the calling LLM or
+    /// be a sign that the path leaked outside the codebase.
     static let readFileMaxBytes: Int = 10 * 1024 * 1024
 
     /// Maximum span of lines accepted by `read_file` (50,000 lines).
     static let readFileMaxLineSpan: Int = 50_000
 
-    /// File extensions that `read_file` will accept. Everything else is
-    /// rejected — the MCP tool exists to inspect source code, not binaries,
-    /// not character devices, not log files.
+    /// File extensions that `read_file` and the resource reader will accept.
+    /// Everything else is rejected — the MCP tool exists to inspect source
+    /// code, not binaries, not character devices, not log files.
     static let readFileAllowedExtensions: Set<String> = [
         "swift", "md", "json", "yml", "yaml", "txt", "toml", "plist",
     ]
+
+    /// Result of validating a file path for MCP read operations.
+    struct ReadFileValidation: Sendable {
+        let validatedPath: String
+        let size: Int
+    }
+
+    /// Reasons a validation can fail. Each case carries a human-readable
+    /// description so both `handleReadFile` (`CallTool.Result`) and the
+    /// `ReadResource` handler (`MCPError`) can produce consistent messages.
+    enum ReadFileValidationError: Error {
+        case extensionNotAllowed(path: String, ext: String)
+        case statFailed(path: String, underlying: any Error)
+        case notRegularFile(path: String)
+        case fileTooLarge(path: String, size: Int, limit: Int)
+
+        var message: String {
+            switch self {
+            case .extensionNotAllowed(let path, let ext):
+                let allowed = SWAMCPServer.readFileAllowedExtensions.sorted().joined(separator: ", ")
+                return "Refusing to read '\(path)': extension '.\(ext)' is not in the allowlist (\(allowed))."
+            case .statFailed(let path, let underlying):
+                return "Cannot stat '\(path)': \(underlying.localizedDescription)"
+            case .notRegularFile(let path):
+                return "Refusing to read '\(path)': not a regular file."
+            case .fileTooLarge(let path, let size, let limit):
+                return "Refusing to read '\(path)': file is \(size) bytes; limit is \(limit) bytes (\(limit / 1024 / 1024) MiB)."
+            }
+        }
+    }
+
+    /// Shared read-file guard used by `handleReadFile` and the `ReadResource`
+    /// handler. Centralising the trio (extension allowlist, regular-file
+    /// check, size cap) prevents the two surfaces from drifting.
+    ///
+    /// The caller is responsible for having already passed `path` through
+    /// `CodebaseContext.validatePath` — this guard only checks what
+    /// `validatePath` cannot (the on-disk attributes of the resolved file).
+    static func validateForReadFile(
+        path: String,
+        validatedPath: String
+    ) throws(ReadFileValidationError) -> ReadFileValidation {
+        let url = URL(fileURLWithPath: validatedPath)
+        let ext = url.pathExtension.lowercased()
+        guard readFileAllowedExtensions.contains(ext) else {
+            throw .extensionNotAllowed(path: path, ext: ext)
+        }
+
+        let attributes: [FileAttributeKey: Any]
+        do {
+            attributes = try FileManager.default.attributesOfItem(atPath: validatedPath)
+        } catch {
+            throw .statFailed(path: path, underlying: error)
+        }
+
+        guard let fileType = attributes[.type] as? FileAttributeType, fileType == .typeRegular else {
+            throw .notRegularFile(path: path)
+        }
+
+        let size = (attributes[.size] as? Int) ?? 0
+        guard size <= readFileMaxBytes else {
+            throw .fileTooLarge(path: path, size: size, limit: readFileMaxBytes)
+        }
+
+        return ReadFileValidation(validatedPath: validatedPath, size: size)
+    }
 
     private func handleReadFile(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         guard let args = arguments, let path = args["path"]?.stringValue else {
@@ -687,52 +753,14 @@ extension SWAMCPServer {
 
         let validatedPath = try context.validatePath(path)
 
-        let url = URL(fileURLWithPath: validatedPath)
-        let ext = url.pathExtension.lowercased()
-        guard Self.readFileAllowedExtensions.contains(ext) else {
-            return .init(
-                content: [
-                    .text(
-                        "Refusing to read '\(path)': extension '.\(ext)' is not in the allowlist (\(Self.readFileAllowedExtensions.sorted().joined(separator: ", ")))."
-                    )
-                ],
-                isError: true
-            )
-        }
-
-        // Reject anything that isn't a regular file. This blocks FIFOs,
-        // character/block devices (/dev/zero, /dev/random), sockets, and
-        // directories — all of which would either DoS the server (FIFO,
-        // /dev/zero) or produce garbage output.
-        let attributes: [FileAttributeKey: Any]
+        let validation: ReadFileValidation
         do {
-            attributes = try FileManager.default.attributesOfItem(atPath: validatedPath)
+            validation = try Self.validateForReadFile(path: path, validatedPath: validatedPath)
         } catch {
-            return .init(
-                content: [.text("Cannot stat '\(path)': \(error.localizedDescription)")],
-                isError: true
-            )
-        }
-        guard let fileType = attributes[.type] as? FileAttributeType, fileType == .typeRegular else {
-            return .init(
-                content: [.text("Refusing to read '\(path)': not a regular file.")],
-                isError: true
-            )
+            return .init(content: [.text(error.message)], isError: true)
         }
 
-        let size = (attributes[.size] as? Int) ?? 0
-        guard size <= Self.readFileMaxBytes else {
-            return .init(
-                content: [
-                    .text(
-                        "Refusing to read '\(path)': file is \(size) bytes; limit is \(Self.readFileMaxBytes) bytes (10 MiB)."
-                    )
-                ],
-                isError: true
-            )
-        }
-
-        let content = try String(contentsOfFile: validatedPath, encoding: .utf8)
+        let content = try String(contentsOfFile: validation.validatedPath, encoding: .utf8)
         var lines = content.components(separatedBy: .newlines)
         let totalLines = lines.count
 
@@ -787,6 +815,13 @@ extension SWAMCPServer {
     /// `search_symbols` call. Once exceeded, regex evaluation stops and only
     /// the partial result set is returned with a warning.
     static let searchSymbolsRegexBudget: Duration = .milliseconds(2500)
+
+    /// Maximum symbol-name length the regex is allowed to scan. Catastrophic
+    /// backtracking is roughly polynomial in the input length, so capping at
+    /// 1 KiB keeps the per-match cost bounded even when an antipattern
+    /// slipped past the static prefilter. Symbol names longer than this in
+    /// real Swift code are essentially nonexistent.
+    static let searchSymbolsMaxNameLength = 1024
 
     /// Patterns containing nested quantifiers that are notorious for
     /// catastrophic backtracking. These are pre-emptively rejected.
@@ -862,15 +897,24 @@ extension SWAMCPServer {
         let deadline = ContinuousClock.now.advanced(by: Self.searchSymbolsRegexBudget)
         var regexBudgetExhausted = false
 
-        var matches = result.declarations.declarations.filter { decl in
+        var matches: [Declaration] = []
+        for decl in result.declarations.declarations {
             if let regex = compiledRegex {
                 if ContinuousClock.now >= deadline {
                     regexBudgetExhausted = true
-                    return false
+                    break
                 }
-                return decl.name.contains(regex)
-            } else {
-                return decl.name.localizedCaseInsensitiveContains(query)
+                // Cap the input length: catastrophic backtracking is
+                // roughly polynomial in input size, so 1 KiB keeps the
+                // per-match cost bounded even if a pathological pattern
+                // slipped past the static antipattern prefilter. Real
+                // Swift symbol names never exceed this.
+                guard decl.name.utf8.count <= Self.searchSymbolsMaxNameLength else { continue }
+                if decl.name.contains(regex) {
+                    matches.append(decl)
+                }
+            } else if decl.name.localizedCaseInsensitiveContains(query) {
+                matches.append(decl)
             }
         }
 
@@ -1076,15 +1120,28 @@ extension SWAMCPServer {
                 }
 
                 if isDirectory.boolValue {
-                    // Return directory listing
+                    // Directory listings skip the file-attribute guards
+                    // (those target regular files) but the sandbox check
+                    // has already canonicalised the path.
                     let contents = try FileManager.default.contentsOfDirectory(atPath: validatedPath)
                         .filter { !$0.hasPrefix(".") }
                         .sorted()
                         .joined(separator: "\n")
                     return .init(contents: [.text(contents, uri: uri)])
                 } else {
-                    // Return file contents
-                    let content = try String(contentsOfFile: validatedPath, encoding: .utf8)
+                    // Apply the same extension/size/regular-file guard that
+                    // `handleReadFile` uses, so the resource surface is
+                    // hardened identically.
+                    let validation: ReadFileValidation
+                    do {
+                        validation = try SWAMCPServer.validateForReadFile(
+                            path: path,
+                            validatedPath: validatedPath
+                        )
+                    } catch let validationError as ReadFileValidationError {
+                        throw MCPError.invalidRequest(validationError.message)
+                    }
+                    let content = try String(contentsOfFile: validation.validatedPath, encoding: .utf8)
                     return .init(contents: [.text(content, uri: uri)])
                 }
             } catch let error as CodebaseContextError {

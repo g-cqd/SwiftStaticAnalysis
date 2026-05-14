@@ -3,6 +3,7 @@
 //  MIT License
 
 import Foundation
+import SwiftStaticAnalysisCore
 
 /// An actor that caches file contents with LRU eviction.
 ///
@@ -67,8 +68,10 @@ public actor FileContentCache {
             accessOrder.removeAll { $0 == path }
         }
 
-        // Read file and cache it
-        let content = try String(contentsOfFile: path, encoding: .utf8)
+        // Read file and cache it. Route through SourceFileReader so the
+        // mmap path is taken for large files, matching the rest of the
+        // analyzer pipeline.
+        let content = try SourceFileReader.readSource(at: path)
         let modDate = try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate] as? Date
 
         // Evict if at capacity
