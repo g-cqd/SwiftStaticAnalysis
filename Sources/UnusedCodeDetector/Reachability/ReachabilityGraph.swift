@@ -213,8 +213,10 @@ public actor ReachabilityGraph {
             roots.insert(node.id)
         }
 
-        // Invalidate cache
+        // Invalidate both caches; the dense projection is rebuilt lazily on
+        // the next reachability query.
         reachableCache = nil
+        denseGraphCache = nil
 
         return node
     }
@@ -225,8 +227,10 @@ public actor ReachabilityGraph {
         edges[from, default: []].insert(edge)
         reverseEdges[to, default: []].insert(edge)
 
-        // Invalidate cache
+        // Invalidate both caches; the dense projection is rebuilt lazily on
+        // the next reachability query.
         reachableCache = nil
+        denseGraphCache = nil
     }
 
     /// Add an edge between two declarations.
@@ -290,32 +294,40 @@ public actor ReachabilityGraph {
     /// The parallelization benefit in reachability analysis comes from the *edge computation*
     /// phase in `DependencyExtractor`, not the BFS traversal itself.
     public func computeReachable() -> Set<String> {
-        // Return cached result if available
         if let cached = reachableCache {
             return cached
         }
 
-        var reachable = Set<String>()
-        var queue = Deque(roots)  // O(1) pop from front
-        var visited = Set<String>()
-
-        while let current = queue.popFirst() {  // O(1) instead of O(n)
-            if visited.contains(current) {
-                continue
-            }
-            visited.insert(current)
-            reachable.insert(current)
-
-            // Add all targets of outgoing edges
-            if let outgoing = edges[current] {
-                for edge in outgoing where !visited.contains(edge.to) {
-                    queue.append(edge.to)
-                }
-            }
-        }
+        // Project the string-keyed adjacency lists into a DenseGraph and run
+        // BFS over integer indices with a bit-packed visited set. This
+        // replaces the previous `Set<String>/Deque<String>` walk; for any
+        // non-trivial graph the dense form dominates because string hashing
+        // disappears from the inner loop and the cache line locality
+        // improves.
+        let dense = denseGraph()
+        let reachable = dense.toNodeIds(dense.computeReachableSequential())
 
         reachableCache = reachable
         return reachable
+    }
+
+    /// Lazily build (and cache) the dense projection of the graph.
+    /// Invalidated alongside `reachableCache` on every mutation.
+    private func denseGraph() -> DenseGraph {
+        if let cached = denseGraphCache {
+            return cached
+        }
+        let nodeIds = Array(nodes.keys)
+        var flatEdges: [(from: String, to: String)] = []
+        flatEdges.reserveCapacity(edges.values.reduce(0) { $0 + $1.count })
+        for (from, outgoing) in edges {
+            for edge in outgoing {
+                flatEdges.append((from, edge.to))
+            }
+        }
+        let dense = DenseGraph(nodeIds: nodeIds, edges: flatEdges, rootIds: roots)
+        denseGraphCache = dense
+        return dense
     }
 
     /// Get all unreachable nodes.
@@ -394,6 +406,10 @@ public actor ReachabilityGraph {
 
     /// Cache of reachable nodes.
     private var reachableCache: Set<String>?
+
+    /// Cached `DenseGraph` projection. Built lazily on first reachability
+    /// query and invalidated on every mutator (alongside `reachableCache`).
+    private var denseGraphCache: DenseGraph?
 
     /// Determine if a declaration should be a root and why.
     private func determineRootReason(  // swiftlint:disable:this cyclomatic_complexity function_body_length
