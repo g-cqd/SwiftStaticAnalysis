@@ -1100,13 +1100,22 @@ func runUmbrellaEmbeddingDiscovery(
 
     guard !groups.isEmpty else { return groups }
 
-    // Late-interaction reranks. Both MaxSim (token-level alignment) and
-    // AST shape (structural trigram Jaccard) are applied when the
-    // preset / overrides enable them. A group must pass EVERY enabled
-    // rerank to survive — they catch complementary false-positive classes.
+    // Late-interaction reranks. Three optional gates can be layered on
+    // top of cosine + token-Jaccard, each catching a different
+    // false-positive class:
+    //   * MaxSim    — token-level alignment in embedding space
+    //   * AST shape — trigram Jaccard on linearized SwiftSyntax types
+    //                 (fast structural approximation)
+    //   * APTED     — full tree edit distance (Pawlik-Augsten /
+    //                 Zhang-Shasha gold standard; replaces astShape in
+    //                 the `strict` preset)
+    // A group must pass EVERY enabled rerank to survive.
     let maxSimVerifier = thresholds.maxsim != nil ? MaxSimVerifier() : nil
     let shapeReranker = thresholds.astShape != nil ? ASTShapeReranker() : nil
-    guard maxSimVerifier != nil || shapeReranker != nil else { return groups }
+    let aptedReranker = thresholds.apted != nil ? APTEDReranker() : nil
+    guard maxSimVerifier != nil || shapeReranker != nil || aptedReranker != nil else {
+        return groups
+    }
 
     var kept: [CloneGroup] = []
     kept.reserveCapacity(groups.count)
@@ -1128,6 +1137,12 @@ func runUmbrellaEmbeddingDiscovery(
 
         if let shapeReranker, let shapeThreshold = thresholds.astShape {
             if shapeReranker.score(aCode, bCode) < shapeThreshold {
+                continue outer
+            }
+        }
+
+        if let aptedReranker, let aptedThreshold = thresholds.apted {
+            if aptedReranker.score(aCode, bCode) < aptedThreshold {
                 continue outer
             }
         }

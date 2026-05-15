@@ -31,14 +31,21 @@ public enum SemanticPreset: String, ExpressibleByArgument, CaseIterable, Sendabl
     public var thresholds: SemanticThresholds {
         switch self {
         case .balanced:
-            return SemanticThresholds(cosine: 0.85, jaccard: 0.20, maxsim: nil, astShape: nil)
+            return SemanticThresholds(
+                cosine: 0.85, jaccard: 0.20, maxsim: nil, astShape: nil, apted: nil)
         case .strict:
-            // Strict = cosine + jaccard + MaxSim (token-level alignment) +
-            // AST trigram Jaccard (structural alignment). Either rerank
-            // alone catches a different false-positive class.
-            return SemanticThresholds(cosine: 0.90, jaccard: 0.30, maxsim: 0.85, astShape: 0.25)
+            // Strict layers four signals — cosine + token Jaccard +
+            // MaxSim (token-level alignment) + APTED (full tree edit
+            // distance, the gold-standard structural metric). β.22's
+            // trigram approximation (`astShape`) is still selectable
+            // via the hidden `--embedding-rerank-shape` flag for users
+            // who want the faster but coarser variant; `strict` uses
+            // APTED proper.
+            return SemanticThresholds(
+                cosine: 0.90, jaccard: 0.30, maxsim: 0.85, astShape: nil, apted: 0.70)
         case .loose:
-            return SemanticThresholds(cosine: 0.80, jaccard: 0.10, maxsim: nil, astShape: nil)
+            return SemanticThresholds(
+                cosine: 0.80, jaccard: 0.10, maxsim: nil, astShape: nil, apted: nil)
         }
     }
 }
@@ -51,8 +58,13 @@ public struct SemanticThresholds: Sendable {
     /// MaxSim rerank threshold. `nil` disables late-interaction rerank.
     public var maxsim: Double?
     /// AST shape (trigram Jaccard over linearized SwiftSyntax node types)
-    /// rerank threshold. `nil` disables structural rerank.
+    /// rerank threshold. `nil` disables the trigram rerank.
     public var astShape: Double?
+    /// APTED (Pawlik-Augsten tree edit distance, Zhang-Shasha core)
+    /// normalized similarity threshold. `nil` disables the APTED rerank.
+    /// Score = 1 - (TED / max(treeSize)). Higher = more structurally
+    /// similar. Strict preset uses 0.70.
+    public var apted: Double?
 }
 
 // MARK: - EmbeddingOptions
@@ -139,6 +151,18 @@ public struct EmbeddingOptions: ParsableArguments {
     )
     public var astShapeThresholdOverride: Double?
 
+    @Flag(
+        name: .customLong("embedding-rerank-apted"),
+        help: ArgumentHelp(visibility: .hidden),
+    )
+    public var rerankApted: Bool = false
+
+    @Option(
+        name: .customLong("embedding-apted-threshold"),
+        help: ArgumentHelp(visibility: .hidden),
+    )
+    public var aptedThresholdOverride: Double?
+
     // ---- Resolution helpers ----
 
     /// Default top-k for HNSW / search / anomaly etc. Overridden by
@@ -156,6 +180,9 @@ public struct EmbeddingOptions: ParsableArguments {
         }
         if rerankShape || astShapeThresholdOverride != nil {
             t.astShape = astShapeThresholdOverride ?? t.astShape ?? 0.25
+        }
+        if rerankApted || aptedThresholdOverride != nil {
+            t.apted = aptedThresholdOverride ?? t.apted ?? 0.70
         }
         return t
     }
