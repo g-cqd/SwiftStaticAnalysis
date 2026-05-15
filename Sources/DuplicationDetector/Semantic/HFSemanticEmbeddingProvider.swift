@@ -143,9 +143,25 @@
             }
 
             // Resolve which optional inputs the model actually accepts.
-            let declaredInputs = Set(model.modelDescription.inputDescriptionsByName.keys)
+            let inputDescriptions = model.modelDescription.inputDescriptionsByName
+            let declaredInputs = Set(inputDescriptions.keys)
             self.acceptsTokenTypeIDs = tokenTypeIDsName.flatMap { declaredInputs.contains($0) } ?? false
             self.acceptsPositionIDs = positionIDsName.flatMap { declaredInputs.contains($0) } ?? false
+
+            // Detect fixed input shape. EmbeddingGemma and other fully-baked
+            // exports declare `input_ids` as e.g. [1, 128] rather than the
+            // dynamic [1, 1]. When fixed, every inference call must pad up
+            // to that length; when dynamic (shape[1] <= 1 or unconstrained),
+            // we use the snippet's actual token count.
+            if let inputDesc = inputDescriptions[inputIDsName],
+                let shape = inputDesc.multiArrayConstraint?.shape,
+                shape.count == 2,
+                shape[1].intValue > 1
+            {
+                self.fixedSequenceLength = shape[1].intValue
+            } else {
+                self.fixedSequenceLength = nil
+            }
 
             // Resolve embedding dimension. Try, in order:
             // 1. HF `config.json` `hidden_size` in the bundle (canonical).
@@ -175,19 +191,25 @@
             //    The tokenizer appends model-specific special tokens
             //    (CLS/SEP for BERT, <s>/</s> for RoBERTa).
             var ids = tokenizer.encode(text: snippet)
-            if ids.count > maxLength {
-                // Reserve the model's trailing-special token (if any) when
-                // truncating — keep the first maxLength tokens.
-                ids = Array(ids.prefix(maxLength))
+            // Truncation policy. Fixed-shape models cap to their declared
+            // sequence length; dynamic models cap to `maxLength`.
+            let effectiveMax = fixedSequenceLength ?? maxLength
+            if ids.count > effectiveMax {
+                ids = Array(ids.prefix(effectiveMax))
             }
-            let sequenceLength = ids.count
-            guard sequenceLength > 0 else {
+            let realTokenCount = ids.count
+            guard realTokenCount > 0 else {
                 throw SemanticEmbeddingError.inferenceFailed(
                     reason: "Tokenizer produced an empty sequence"
                 )
             }
+            // Padded length is fixed when the model demands it, otherwise
+            // matches the real token count.
+            let sequenceLength = fixedSequenceLength ?? realTokenCount
 
             // 2. Build Int32 multi-arrays for every input the model needs.
+            //    Pad to sequenceLength; attention_mask is 1 for real tokens,
+            //    0 for padding.
             guard
                 let inputIDs = try? MLMultiArray(
                     shape: [1, NSNumber(value: sequenceLength)], dataType: .int32
@@ -201,8 +223,13 @@
                 )
             }
             for i in 0..<sequenceLength {
-                inputIDs[[0, NSNumber(value: i)]] = NSNumber(value: Int32(ids[i]))
-                attentionMask[[0, NSNumber(value: i)]] = 1
+                if i < realTokenCount {
+                    inputIDs[[0, NSNumber(value: i)]] = NSNumber(value: Int32(ids[i]))
+                    attentionMask[[0, NSNumber(value: i)]] = 1
+                } else {
+                    inputIDs[[0, NSNumber(value: i)]] = 0
+                    attentionMask[[0, NSNumber(value: i)]] = 0
+                }
             }
 
             var features: [String: MLFeatureValue] = [
@@ -250,8 +277,11 @@
                 )
             }
 
-            // 4. Mean-pool last_hidden_state over the (full, unpadded)
-            //    sequence. Output shape is (1, T, D).
+            // 4. Pool the output. Two shapes are accepted:
+            //    - (1, T, D) per-token  → mean-pool over T.
+            //    - (1, D)    pre-pooled → use directly. EmbeddingGemma /
+            //      sentence-transformer exports already do the pooling
+            //      inside the model graph and emit a 2D tensor.
             guard let lastHidden = output.featureValue(for: lastHiddenStateName)?.multiArrayValue
             else {
                 throw SemanticEmbeddingError.inferenceFailed(
@@ -259,22 +289,34 @@
                 )
             }
             let shape = lastHidden.shape.map { $0.intValue }
+            let pointer = lastHidden.dataPointer.assumingMemoryBound(to: Float.self)
+
+            if shape.count == 2, shape[0] == 1, shape[1] > 0 {
+                // Pre-pooled output: copy directly.
+                let dimension = shape[1]
+                var pooled = [Float](repeating: 0, count: dimension)
+                for d in 0..<dimension {
+                    pooled[d] = pointer[d]
+                }
+                return pooled
+            }
             guard shape.count == 3, shape[0] == 1, shape[1] == sequenceLength else {
                 throw SemanticEmbeddingError.inferenceFailed(
                     reason:
                         "Unexpected \(lastHiddenStateName) shape: \(shape) for seqLen=\(sequenceLength)"
                 )
             }
+            // Mean-pool over REAL tokens only (skip padding) so the pooled
+            // vector reflects the snippet, not the pad zeros.
             let dimension = shape[2]
             var pooled = [Float](repeating: 0, count: dimension)
-            let pointer = lastHidden.dataPointer.assumingMemoryBound(to: Float.self)
-            for t in 0..<sequenceLength {
+            for t in 0..<realTokenCount {
                 let base = t * dimension
                 for d in 0..<dimension {
                     pooled[d] += pointer[base + d]
                 }
             }
-            let scale = 1.0 / Float(sequenceLength)
+            let scale = 1.0 / Float(realTokenCount)
             for d in 0..<dimension {
                 pooled[d] *= scale
             }
@@ -293,6 +335,7 @@
         private let lastHiddenStateName: String
         private let acceptsTokenTypeIDs: Bool
         private let acceptsPositionIDs: Bool
+        private let fixedSequenceLength: Int?
 
         /// Probe for `.mlpackage` first, then `.mlmodelc`, anywhere in
         /// `dir` (one level deep).
