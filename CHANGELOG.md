@@ -5,6 +5,85 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.13] - Unreleased
+
+**`swa-lsp` Language Server.** A new executable target surfaces
+`DuplicationDetector` and `UnusedCodeDetector` results as editor diagnostics
+over JSON-RPC 2.0, the inverse direction of the β.9 `SourceKitLSPClient`
+(which *consumes* sourcekit-lsp; `swa-lsp` *is* an LSP server).
+
+### New surfaces
+
+- **`SwiftStaticAnalysisLSPServer`** library target — three files:
+  - `LSPProtocol.swift` — JSON-RPC envelope + LSP message types
+    (`InitializeRequest`/`Response`, `TextDocumentItem`,
+    `DidOpenTextDocumentParams`, `Diagnostic`, `PublishDiagnosticsParams`,
+    `Range`, `Position`, `DiagnosticSeverity`, `JSONRPCError`).
+  - `LSPServer.swift` — the LSP message loop. `LSPServer` is an `actor` so
+    dispatch serializes without ad-hoc locks. `StdioLSPTransport` uses the
+    cage pattern: a private `final class Storage: @unchecked Sendable` holds
+    mutable buffers; the outer type is plain `Sendable` and exposes only
+    async methods. Locking uses `Synchronization.Mutex` (Swift 6
+    async-safe), not `NSLock`.
+  - `DiagnosticProducer.swift` — runs the analysis pipelines per-document
+    against a temp scratch file and maps results into LSP `Diagnostic`s.
+- **`swa-lsp`** executable — `@main` `AsyncParsableCommand` reads JSON-RPC
+  from stdin and writes responses to stdout. Stderr is reserved for logs so
+  it doesn't interleave with the LSP framing.
+
+### LSP coverage
+
+Implemented methods: `initialize`, `initialized`, `textDocument/didOpen`,
+`textDocument/didChange` (full sync), `textDocument/didClose`,
+`textDocument/diagnostic`, `shutdown`, `exit`. Push notifications via
+`textDocument/publishDiagnostics` on open and change. Unknown methods
+return JSON-RPC `-32601 methodNotFound`.
+
+### Diagnostic mapping
+
+- `UnusedCode` → severity by confidence (`high` → warning,
+  `medium` → information, `low` → hint). Range narrows to the identifier
+  (1-based `SourceLocation` → 0-based LSP); code is `unused.<reason>`.
+- `Clone` → information level. Range spans the whole block; end is the
+  start of the line *after* the block so editors highlight the whole
+  region. Code is `duplicate.<type>`.
+
+### Editor wiring
+
+Typical client config:
+
+```jsonc
+{
+  "command": "swa-lsp",
+  "args": [],
+  "filetypes": ["swift"]
+}
+```
+
+The binary builds in release via `swift build -c release --product swa-lsp`.
+Smoke test:
+
+```bash
+.build/release/swa-lsp < /tmp/initialize-req.txt > /tmp/init-resp.txt
+```
+
+### Test coverage
+
+`Tests/SwiftStaticAnalysisLSPServerTests/` (new, 15 tests across 3 suites):
+
+- **`LSPFramingTests`** — Content-Length encode/decode round-trip, incomplete
+  header handling, short-payload handling, back-to-back messages,
+  `URIPathConverter` round-trip + non-file-URI rejection.
+- **`LSPServerTests`** — `initialize` returns the right capabilities
+  (`textDocumentSync.full`, `diagnosticProvider`), `didOpen` triggers
+  `publishDiagnostics`, `didChange` updates and re-publishes, unknown method
+  returns `-32601`, `shutdown` returns `null` result and `exit` triggers
+  clean termination. Tests use a `StubTransport` to capture publishes.
+- **`DiagnosticProducerTests`** — `mapUnused` 1-based → 0-based conversion
+  + confidence-to-severity mapping; `mapClone` block-range mapping.
+
+All 15 tests pass. Full suite: 1184 tests.
+
 ## [0.3.0-beta.12] - Unreleased
 
 Two independent landings: embedding-based clone *discovery* (the recall-recovery
