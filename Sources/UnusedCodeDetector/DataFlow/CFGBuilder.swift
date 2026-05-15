@@ -113,6 +113,16 @@ internal struct CFGStatement: Sendable {
 
     /// Extracted variable definitions (variables written) with scope context.
     internal let defs: Set<VariableID>
+
+    /// Return the trimmed source description when it fits within
+    /// `maxLength` characters; otherwise `nil`. Used by the data-flow
+    /// passes to capture the RHS of small assignments as an opaque
+    /// string (longer expressions are dropped to avoid blowing up the
+    /// abstract domain).
+    internal func shortDescription(maxLength: Int) -> String? {
+        let desc = syntax.description.trimmingCharacters(in: .whitespacesAndNewlines)
+        return desc.count < maxLength ? desc : nil
+    }
 }
 
 // MARK: - Terminator

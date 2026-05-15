@@ -288,11 +288,7 @@ internal struct ReachingDefinitionsAnalysis: Sendable {
 
     /// Extract the assigned value from a statement.
     private func extractValue(from statement: CFGStatement) -> String? {
-        let desc = statement.syntax.description.trimmingCharacters(in: .whitespacesAndNewlines)
-        if desc.count < 50 {
-            return desc
-        }
-        return nil
+        statement.shortDescription(maxLength: 50)
     }
 
     // MARK: - GEN/KILL Sets

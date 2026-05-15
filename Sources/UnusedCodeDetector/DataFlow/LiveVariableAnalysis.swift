@@ -345,11 +345,7 @@ internal struct LiveVariableAnalysis: Sendable {
 
     /// Extract the assigned value from a statement (if simple).
     private func extractAssignedValue(_ statement: CFGStatement) -> String? {
-        let desc = statement.syntax.description.trimmingCharacters(in: .whitespacesAndNewlines)
-        if desc.count < 100 {
-            return desc
-        }
-        return nil
+        statement.shortDescription(maxLength: 100)
     }
 
     // MARK: - Unused Variable Detection

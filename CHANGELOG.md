@@ -5,6 +5,53 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.18] - Unreleased
+
+**Consolidate `CFGStatement.shortDescription(maxLength:)` — model-discovered.**
+`swa duplicates Sources --embedding-bundle Models/MiniLM --embedding-similarity 0.88`
+surfaced `LiveVariableAnalysis.extractAssignedValue` and
+`ReachingDefinitions.extractValue` at 98% cosine — same trim-and-cap logic with
+different magic-number thresholds (100 vs 50). NL self-scan in β.15 had flagged
+the same pair at 0.998. β.18 actions it.
+
+New `CFGStatement.shortDescription(maxLength:)` helper in `CFGBuilder.swift`
+(internal, on the existing type). Both call sites collapse from 7 lines each
+to a one-liner that preserves the per-caller threshold:
+
+```swift
+// LiveVariableAnalysis: was 7 lines, now:
+private func extractAssignedValue(_ statement: CFGStatement) -> String? {
+    statement.shortDescription(maxLength: 100)
+}
+
+// ReachingDefinitions: was 7 lines, now:
+private func extractValue(from statement: CFGStatement) -> String? {
+    statement.shortDescription(maxLength: 50)
+}
+```
+
+The thresholds intentionally differ — LiveVariableAnalysis tolerates longer
+RHS captures, ReachingDefinitions is stricter — so the helper takes
+`maxLength:` as a parameter rather than baking in a single value.
+
+### Notes on findings not actioned
+
+The β.17 → β.18 self-scan also surfaced two findings that **shouldn't** be
+consolidated, recorded here for the next reviewer:
+
+- **`DeclarationKindConverter.shouldReport` vs 3 callers** (93% cosine) —
+  not a duplicate. The 4 sites have intentionally different default-case
+  policies (true / false / true-but-imports-false) and different exhaustive
+  coverage. Consolidation requires policy negotiation, not extract-method.
+- **`TokenSequenceVisitor.classifyToken` ↔ `ZeroCopyParser.classifyToken`**
+  (91% cosine) — already audited; both sites carry `swa:ignore-duplicates`
+  directives because the parsers return different types (`TokenKind` vs
+  `TokenKindByte`). Unifying would require generic types or codegen.
+
+The fact that both findings are real-looking but rejected demonstrates the
+importance of model + reviewer in the loop — not every clone-by-cosine is
+a clone-by-intent.
+
 ## [0.3.0-beta.17] - Unreleased
 
 **Drop `BertSemanticEmbeddingProvider` — fully superseded by
