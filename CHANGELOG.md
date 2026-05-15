@@ -5,6 +5,133 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.12] - Unreleased
+
+Two independent landings: embedding-based clone *discovery* (the recall-recovery
+counterpart to β.8's precision-tightening verification pass) and a complete CI
+integration surface (composite GitHub Action, pre-commit hooks, integration guide).
+
+### Embedding-based clone discovery (HNSW)
+
+β.8 wired Core ML embeddings into the duplication detector as a *verification*
+pass — re-score structural candidates and drop token-level false positives.
+That path is **precision tightening** by design: it cannot recover clones the
+structural detector missed in the first place.
+
+β.12 ships the recall-recovery counterpart: a hand-rolled HNSW (Hierarchical
+Navigable Small World) index over snippet embeddings, plus a driver that
+embeds → inserts → top-k queries → union-find groups → emits `CloneGroup`s
+with `type == .semantic`. This is the "embed every snippet → ANN search →
+threshold + group" pipeline `SemanticDeepClones.md` flagged as a future
+direction; it's no longer future.
+
+#### New public API
+
+- **`HNSWIndex<Identifier: Hashable & Sendable>`** — the index itself. Methods:
+  `init(dimension:configuration:)`, `mutating func insert(id:vector:)`,
+  `func search(query:k:ef:) -> [HNSWSearchResult<Identifier>]`. Cosine
+  distance with vectors L2-normalized at insert time. Value-type storage; once
+  built, `search` is safe to call concurrently from multiple isolation domains.
+- **`HNSWConfiguration`** — tunable parameters. Defaults follow Malkov &
+  Yashunin (2016): `M = 16`, `efConstruction = 200`, `efSearch = 50`. Layer
+  assignment uses splitmix64-seeded PRNG (`SeededPRNG`) so identical seeds
+  produce identical graphs.
+- **`HNSWSearchResult<Identifier>`** — `(id, similarity)` pair, similarity
+  bounded to `[0, 1]` for normalized non-negative vectors.
+- **`EmbeddingCloneDiscovery`** — the discovery driver.
+  `init(hnswConfiguration:)`,
+  `func discover(snippets:provider:k:similarityThreshold:) async throws -> [CloneGroup]`.
+  Filters same-file overlapping snippets so a single snippet doesn't self-pair
+  across the structural detector's overlapping windows.
+- **`EmbeddingSnippet`** — input shape: `(file, startLine, endLine, tokenCount, code)`.
+- **`DeterministicEmbeddingProvider`** — character n-gram FNV-1a hash bucket
+  embedding. Dependency-free, stable across runs. NOT semantically meaningful
+  — for smoke-tests, CI without model bundles, and self-contained discovery
+  drives before a real Core ML model is wired in.
+
+#### Algorithm
+
+1. Embed every snippet via the `SemanticEmbeddingProvider`.
+2. Insert each vector into `HNSWIndex<Int>` keyed by snippet index.
+3. For each snippet, query top-`k` neighbors; pairs whose cosine similarity is
+   at least `similarityThreshold` form edges in a similarity graph.
+4. Compute connected components via union-find (path compression + rank).
+5. Drop singletons; emit one `CloneGroup` per component with averaged pairwise
+   cosine as `similarity` and `fingerprint = "embedding-<idx1>-<idx2>-..."`.
+
+Brute force is O(n²) on snippet count; HNSW averages O(n log n). For 10k
+snippets at 768 dim, brute force is ~10⁸ inner products. HNSW pays a one-time
+build cost (~n log n) and supports fast queries afterwards.
+
+#### Implementation notes
+
+- HNSW internals (`MinPriorityQueue`, `BoundedMaxHeap`) are package-private,
+  hand-rolled, and dependency-free aside from `Foundation`.
+- The detector uses simple closest-`m` neighbor selection rather than the
+  heuristic variant — auditable and adequate for the corpus sizes the
+  duplication detector is exercised at.
+- Same-file pair filtering uses interval overlap on line ranges, preventing
+  the shingling window from self-pairing within a single function.
+- Deterministic given a fixed `seed` in `HNSWConfiguration`; identical runs
+  produce identical results.
+
+#### Test coverage
+
+`Tests/DuplicationDetectorTests/HNSWIndexTests.swift` (new, 6 tests):
+
+- Exact-vector query returns the inserted point as the nearest neighbor.
+- HNSW top-k recovers ≥ 60% recall against brute-force baseline on a 50-point
+  16-dim random dataset (`recall@5 >= 0.6`).
+- Insertion normalizes non-unit-length vectors (cosine-similarity invariant
+  under scaling).
+- Empty index returns no results.
+- `count` reflects the number of insertions.
+- Deterministic with fixed seed across runs.
+
+`Tests/DuplicationDetectorTests/EmbeddingCloneDiscoveryTests.swift` (new, 6 tests):
+
+- Identical-embedding snippets across three files form one merged clone group.
+- Below-threshold pairs (orthogonal vectors) do not group.
+- Same-file overlapping snippets are filtered out.
+- Two distinct clusters yield two distinct clone groups.
+- Empty / single-snippet input returns no groups.
+- `DeterministicEmbeddingProvider` produces identical vectors across calls.
+
+All 12 new tests pass. Full suite: 1169 tests.
+
+### CI integration glue
+
+Three drop-in surfaces so consumers can run `swa` in CI / pre-commit hooks /
+custom workflows without writing wiring code:
+
+- **`action.yml`** at repo root — composite GitHub Action wrapping
+  `swift build -c release --product swa` + `swa duplicates` + `swa unused`.
+  Inputs: `path`, `mode` (reachability/simple/indexStore), `clone-types`,
+  `min-tokens`, `format` (sarif/text/json/xcode), `fail-on`,
+  `swa-version`, `working-directory`. Outputs: `unused-count`,
+  `duplicates-count`, `sarif-path`. SARIF is post-processed from JSON output
+  (`swa` itself emits text/json/xcode); the action emits a SARIF v2.1.0 file
+  suitable for GitHub Code Scanning ingest.
+- **`.pre-commit-hooks.yaml`** at repo root — pre-commit-framework manifest
+  exposing three hooks: `swa-analyze` (per-file on staged Swift files),
+  `swa-duplicates` (cross-file on `Sources`), `swa-unused` (cross-file
+  reachability mode on `Sources`). Uses `language: system` — consumers
+  install the `swa` binary once and reference it on `$PATH`.
+- **`INTEGRATION.md`** at repo root — quickstart guide for all three
+  integration paths: GitHub Actions, pre-commit, local install, custom CI.
+- **`.github/workflows/example-self-scan.yml`** — self-scan workflow that
+  exercises the composite action against this repo's own `Sources/`. Acts as
+  the canonical smoke test for `action.yml` — if it goes red, the action is
+  broken.
+
+#### CLI surface verification
+
+All flags referenced by `action.yml` and `.pre-commit-hooks.yaml` were
+verified against the current `swa` CLI (`SWA.swift`): `duplicates --types
+--min-tokens -f`, `unused --mode --sensible-defaults -f`. The `fail-on`
+input is implemented in the action itself (translating finding counts to
+exit codes) since `swa` has no such flag.
+
 ## [0.3.0-beta.11] - Unreleased
 
 **Semantic-deep clone detection user guide.** New DocC article
