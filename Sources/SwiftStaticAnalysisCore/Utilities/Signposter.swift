@@ -2,11 +2,11 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
+import Foundation
+
 #if canImport(os.signpost)
     @preconcurrency import os.signpost
 #endif
-
-import Foundation
 
 // MARK: - Signposter
 

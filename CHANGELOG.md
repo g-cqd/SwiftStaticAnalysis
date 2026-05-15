@@ -5,6 +5,42 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.3] - Unreleased
+
+Batch 4 of the 0.2.0 audit remediation
+([`audit/REMEDIATION-PLAN.md`](audit/REMEDIATION-PLAN.md)). Closes audit
+F-15 ("benchmarks gated in CI" claim). 1135 tests green; six benchmark
+baselines committed under `bench/baselines/`.
+
+### Truth-up: benchmarks are now an actual CI gate
+
+- **B4-1 — `swa-bench` JSON schema extended.** Reports now carry
+  `wallSecondsMedian`, `wallSecondsP99`, `peakRSSBytesP99`, plus an
+  `environment { gitSha, swiftVersion, host, platform }` block for
+  cross-machine baseline traceability. `--statistical` flag prints
+  median + p99 to stderr alongside the human-readable mean. **Add
+  fields; never rename** — `bench/compare.sh` consumes
+  `wallSecondsMean` / `wallSecondsP99` directly.
+- **B4-2 — Persisted baselines.** `bench/baselines/*.json` for every
+  scenario committed. `bench/refresh-baselines.sh` regenerates them
+  locally or from CI; tune via `SWA_BENCH_WARMUP` /
+  `SWA_BENCH_ITERATIONS` env vars.
+- **B4-3 — `bench/compare.sh` is the gate.** Compares fresh results
+  to baselines; fails (exit 1) when any scenario exceeds **+10 % mean
+  OR +25 % p99** over its baseline. Per-scenario overrides via
+  `bench/baselines/<scenario>.thresholds.json`. Emits a Markdown table
+  suitable for the PR comment.
+- **B4-4 — `duplicates-semantic` scenario added.** The CI loop pre-0.3
+  ran 5 of 6 scenarios. Now runs all 6 (audit F-15).
+- **B4-5 — `refresh-baselines.yml` workflow.** `workflow_dispatch`
+  triggered; requires a `reason` input; opens a PR with the
+  regenerated baselines so the change is reviewable.
+
+The README's pre-0.3 "gated in CI via `.github/workflows/benchmarks.yml`"
+claim is finally accurate. PRs that touch the analyzer source paths
+now trigger the workflow, run the six scenarios, compare against the
+committed baselines, and **fail the build** on regression.
+
 ## [0.3.0-alpha.2] - Unreleased
 
 Partial Batch 3 of the 0.2.0 audit remediation

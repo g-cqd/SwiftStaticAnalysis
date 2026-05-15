@@ -51,6 +51,12 @@ struct SwaBench: AsyncParsableCommand {
     @Option(name: .long, help: "Optional output path for the JSON report. Defaults to stdout.")
     var output: String?
 
+    @Flag(
+        name: .long,
+        help: "Print median and p99 alongside mean to stderr for human reading. The JSON report always carries the full statistical envelope."
+    )
+    var statistical: Bool = false
+
     func run() async throws {
         let files = try findSwiftFiles(in: fixture)
         guard !files.isEmpty else {
@@ -72,17 +78,34 @@ struct SwaBench: AsyncParsableCommand {
             )
         }
 
+        let walls = samples.map(\.wallSeconds)
+        let rss = samples.map(\.peakRSSBytes)
         let report = Report(
             scenario: scenario.rawValue,
             fixture: fixture,
             fileCount: files.count,
             iterations: iterations,
-            wallSecondsMean: mean(samples.map(\.wallSeconds)),
-            wallSecondsMin: samples.map(\.wallSeconds).min() ?? 0,
-            wallSecondsMax: samples.map(\.wallSeconds).max() ?? 0,
-            peakRSSBytesMean: meanInt(samples.map(\.peakRSSBytes)),
-            samples: samples
+            wallSecondsMean: mean(walls),
+            wallSecondsMedian: median(walls),
+            wallSecondsP99: percentile(walls, p: 0.99),
+            wallSecondsMin: walls.min() ?? 0,
+            wallSecondsMax: walls.max() ?? 0,
+            peakRSSBytesMean: meanInt(rss),
+            peakRSSBytesP99: percentileInt(rss, p: 0.99),
+            samples: samples,
+            environment: BenchEnvironment.snapshot()
         )
+
+        if statistical {
+            fputs(
+                """
+                  stat: mean=\(String(format: "%.4f", report.wallSecondsMean))s \
+                median=\(String(format: "%.4f", report.wallSecondsMedian))s \
+                p99=\(String(format: "%.4f", report.wallSecondsP99))s\n
+                """,
+                stderr
+            )
+        }
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -172,17 +195,70 @@ struct Sample: Codable, Sendable {
     let peakRSSBytes: Int
 }
 
+/// Stable JSON schema as of `swaVersion` 0.3.0-alpha.2:
+///
+/// ```
+/// {
+///   "scenario": "duplicates-near",
+///   "fixture": "Sources",
+///   "fileCount": 121,
+///   "iterations": 3,
+///   "wallSecondsMean": ...,
+///   "wallSecondsMedian": ...,
+///   "wallSecondsP99": ...,
+///   "wallSecondsMin": ...,
+///   "wallSecondsMax": ...,
+///   "peakRSSBytesMean": ...,
+///   "peakRSSBytesP99": ...,
+///   "samples": [...],
+///   "environment": {
+///     "gitSha": "abc1234",
+///     "swiftVersion": "Apple Swift version 6.2 (...)",
+///     "host": "Mac-mini.local",
+///     "platform": "macOS 26.0 (Darwin 25.4.0)"
+///   }
+/// }
+/// ```
+///
+/// The CI baseline-compare script (`bench/compare.sh`) reads `wallSecondsMean`
+/// and `wallSecondsP99` and compares to the committed baseline under
+/// `bench/baselines/<scenario>.json`. Add fields, never rename.
 struct Report: Codable, Sendable {
     let scenario: String
     let fixture: String
     let fileCount: Int
     let iterations: Int
     let wallSecondsMean: Double
+    let wallSecondsMedian: Double
+    let wallSecondsP99: Double
     let wallSecondsMin: Double
     let wallSecondsMax: Double
     let peakRSSBytesMean: Int
+    let peakRSSBytesP99: Int
     let samples: [Sample]
+    let environment: BenchEnvironment
 }
+
+/// Provenance metadata so a baseline can be matched against a host and a
+/// toolchain rather than blindly compared across machines.
+struct BenchEnvironment: Codable, Sendable {
+    let gitSha: String
+    let swiftVersion: String
+    let host: String
+    let platform: String
+
+    static func snapshot() -> BenchEnvironment {
+        BenchEnvironment(
+            gitSha: captureCommand("git", ["rev-parse", "--short", "HEAD"]) ?? "unknown",
+            swiftVersion: captureCommand("swift", ["--version"])?
+                .split(separator: "\n").first.map(String.init) ?? "unknown",
+            host: ProcessInfo.processInfo.hostName,
+            platform: ProcessInfo.processInfo.operatingSystemVersionString
+        )
+    }
+}
+
+// MARK: - Stats helpers
 
 private func mean(_ values: [Double]) -> Double {
     guard !values.isEmpty else { return 0 }
@@ -194,9 +270,57 @@ private func meanInt(_ values: [Int]) -> Int {
     return values.reduce(0, +) / values.count
 }
 
+private func median(_ values: [Double]) -> Double {
+    guard !values.isEmpty else { return 0 }
+    let sorted = values.sorted()
+    let mid = sorted.count / 2
+    if sorted.count.isMultiple(of: 2) {
+        return (sorted[mid - 1] + sorted[mid]) / 2
+    }
+    return sorted[mid]
+}
+
+/// Linear-interpolated percentile. p in [0, 1].
+private func percentile(_ values: [Double], p: Double) -> Double {
+    guard !values.isEmpty else { return 0 }
+    let sorted = values.sorted()
+    let clamped = min(max(p, 0), 1)
+    let rank = clamped * Double(sorted.count - 1)
+    let lo = Int(rank.rounded(.down))
+    let hi = Int(rank.rounded(.up))
+    if lo == hi { return sorted[lo] }
+    let frac = rank - Double(lo)
+    return sorted[lo] * (1 - frac) + sorted[hi] * frac
+}
+
+private func percentileInt(_ values: [Int], p: Double) -> Int {
+    Int(percentile(values.map(Double.init), p: p))
+}
+
 private func durationInSeconds(_ duration: Duration) -> Double {
     let components = duration.components
     return Double(components.seconds) + Double(components.attoseconds) / 1e18
+}
+
+/// Run a command and return its trimmed stdout, or nil on failure. Used
+/// only at report-construction time, so failures degrade gracefully into
+/// an "unknown" string rather than crashing the benchmark.
+private func captureCommand(_ executable: String, _ arguments: [String]) -> String? {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = [executable] + arguments
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    process.standardError = FileHandle(forWritingAtPath: "/dev/null")
+    do {
+        try process.run()
+        process.waitUntilExit()
+    } catch {
+        return nil
+    }
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    return String(data: data, encoding: .utf8)?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
 // MARK: - RSS reading

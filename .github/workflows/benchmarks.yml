@@ -8,6 +8,7 @@ on:
       - 'Sources/SwiftStaticAnalysisCore/**'
       - 'Sources/SymbolLookup/**'
       - 'Sources/swa-bench/**'
+      - 'bench/**'
       - 'Package.swift'
       - '.github/workflows/benchmarks.yml'
 
@@ -28,20 +29,22 @@ jobs:
       - name: Build release
         run: swift build -c release --product swa-bench
 
+      # Six scenarios run end-to-end (incl. duplicates-semantic, which
+      # was missing pre-0.3.0-α.3 per audit F-15). The committed
+      # baselines under bench/baselines/<scenario>.json gate the
+      # comparison step below.
       - name: Run benchmark scenarios
         run: |
           set -euo pipefail
           mkdir -p .bench
-          # The Sources directory is a stable, repo-local fixture: it exercises
-          # the analyzers on real Swift code rather than synthetic input, which
-          # makes regressions reproducible across runs.
           FIXTURE=Sources
-          for scenario in duplicates-exact duplicates-near unused-simple unused-reachability symbol-lookup; do
+          for scenario in duplicates-exact duplicates-near duplicates-semantic unused-simple unused-reachability symbol-lookup; do
             echo "::group::$scenario"
             swift run -c release swa-bench "$scenario" "$FIXTURE" \
               --warmup 1 --iterations 3 \
+              --statistical \
               --output ".bench/${scenario}.json"
-            cat ".bench/${scenario}.json"
+            jq '{scenario, wallSecondsMean, wallSecondsP99, peakRSSBytesMean}' ".bench/${scenario}.json"
             echo "::endgroup::"
           done
 
@@ -51,8 +54,21 @@ jobs:
           name: benchmarks-${{ github.sha }}
           path: .bench/
 
+      # The actual gate. `compare.sh` exits non-zero when any scenario
+      # exceeds its regression thresholds (mean +10% by default, p99
+      # +25%). Per-scenario overrides live in
+      # bench/baselines/<scenario>.thresholds.json.
+      - name: Compare to baselines and gate
+        id: compare
+        run: |
+          set -euo pipefail
+          ./bench/compare.sh .bench bench/baselines | tee .bench/summary.md
+          status=${PIPESTATUS[0]}
+          echo "compare_exit=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
       - name: Summarise into PR comment
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -60,17 +76,14 @@ jobs:
           {
             echo "### Benchmark Results"
             echo ""
-            echo "| Scenario | Wall (mean) | Peak RSS (mean) |"
-            echo "|---|---:|---:|"
-            for f in .bench/*.json; do
-              scenario=$(jq -r '.scenario' "$f")
-              wall=$(jq -r '.wallSecondsMean' "$f")
-              rss=$(jq -r '.peakRSSBytesMean' "$f")
-              wall_fmt=$(printf "%.3fs" "$wall")
-              rss_fmt=$(printf "%d MiB" "$((rss / 1024 / 1024))")
-              echo "| $scenario | $wall_fmt | $rss_fmt |"
-            done
+            if [[ -f .bench/summary.md ]]; then
+              cat .bench/summary.md
+            else
+              echo "_compare.sh produced no summary; check the workflow log._"
+            fi
             echo ""
             echo "_Fixture: \`Sources/\` of this PR. 1 warm-up, 3 iterations._"
-          } > .bench/summary.md
-          gh pr comment "${{ github.event.pull_request.number }}" --body-file .bench/summary.md
+            echo "_Baselines under \`bench/baselines/\`; refresh via the_"
+            echo "_\`refresh-baselines\` workflow when an intentional perf shift lands._"
+          } > .bench/pr-comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file .bench/pr-comment.md

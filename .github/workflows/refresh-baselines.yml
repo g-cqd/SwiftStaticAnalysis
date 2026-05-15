@@ -1,0 +1,80 @@
+name: Refresh Benchmark Baselines
+
+# Trigger manually from the Actions tab when a deliberate perf change
+# lands (e.g. arena-backed SA-IS, BitArray migration, MinHash InlineArray
+# adoption). The job:
+#
+#   1. Builds swa-bench on the same runner shape that gates PRs.
+#   2. Runs every scenario at a higher iteration count (5) for stable
+#      baseline numbers.
+#   3. Opens a PR with the refreshed bench/baselines/*.json so the
+#      change is reviewable and CI runs against the new numbers
+#      automatically.
+#
+# Avoid running this manually right before a release without commenting
+# the rationale on the resulting PR — baselines that move without a
+# code change usually indicate runner variance, not a real shift.
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for refreshing (recorded in the PR body)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    name: Refresh baselines
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode toolchain
+        run: sudo xcode-select -s /Applications/Xcode_16.app || true
+
+      - name: Refresh baselines
+        env:
+          SWA_BENCH_WARMUP: '2'
+          SWA_BENCH_ITERATIONS: '5'
+        run: ./bench/refresh-baselines.sh
+
+      - name: Show resulting baselines
+        run: jq '{scenario, wallSecondsMean, wallSecondsP99, peakRSSBytesMean}' bench/baselines/*.json
+
+      - name: Create or update PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BRANCH="bench/refresh-baselines-$(date -u +%Y%m%d-%H%M%S)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add bench/baselines/
+          if git diff --cached --quiet; then
+            echo "No baseline changes — nothing to PR."
+            exit 0
+          fi
+          git commit -m "chore(bench): refresh baselines
+
+          Reason: ${{ github.event.inputs.reason }}
+
+          Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          git push origin "$BRANCH"
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "chore(bench): refresh baselines" \
+            --body "$(cat <<EOF
+          Refreshed by [\`refresh-baselines\` workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+
+          **Reason given:** ${{ github.event.inputs.reason }}
+
+          Review the diff carefully. Baselines that move without a code change usually mean runner variance, not a real perf shift.
+          EOF
+          )"
