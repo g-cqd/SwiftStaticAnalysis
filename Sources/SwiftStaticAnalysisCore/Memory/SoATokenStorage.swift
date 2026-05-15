@@ -7,14 +7,10 @@ import Foundation
 // MARK: - SoAStorageError
 
 /// Failures produced when feeding `Int`-typed token attributes into the
-/// `UInt16`-typed SoA columns.
-///
-/// Pre-0.2.1 the convenience `append(...:Int,...:Int,...:Int,...:Int,...:Int)`
-/// overload **silently truncated** lengths and columns above `UInt16.max`,
-/// producing corrupted token records with no diagnostic. The audit flagged
-/// this as a correctness footgun. The convenience overload now surfaces
-/// overflow as a typed error so the parser can decide whether to skip the
-/// token, log a warning, or bail.
+/// `UInt16`-typed SoA columns. The convenience overload surfaces overflow
+/// as a typed error so the parser can decide whether to skip the token,
+/// log a warning, or bail — silently truncating would corrupt token
+/// records with no diagnostic.
 public enum SoAStorageError: Error, Sendable, CustomStringConvertible {
     /// `length` does not fit in `UInt16`. Token text that long is
     /// essentially impossible in real Swift code (single keywords and
@@ -187,8 +183,7 @@ public struct SoATokenStorage: Sendable {
     /// Append a token using `Int` parameters (convenience).
     ///
     /// Throws ``SoAStorageError`` if `length` or `column` exceed
-    /// `UInt16.max`. Pre-0.2.1 this overload silently clamped both values
-    /// to `UInt16.max`, producing corrupted token records.
+    /// `UInt16.max` — silently clamping would corrupt token records.
     public mutating func append(
         kind: TokenKindByte,
         offset: Int,
@@ -312,12 +307,11 @@ public struct SoATokenStorage: Sendable {
 /// providing even better cache performance and eliminating Swift
 /// array overhead.
 ///
-/// 0.3.0-α.5: `ArenaTokenStorage` is now plain `Sendable`. The four
+/// `ArenaTokenStorage` is plain `Sendable`. The four
 /// `UnsafeBufferPointer` fields are owned by a private
 /// `ArenaTokenStorageBuffers` class that internally carries
-/// `@unchecked Sendable` — the standard cage pattern Swift 6 uses for
-/// type-system-opaque shared pointers. The runtime safety story is
-/// unchanged:
+/// `@unchecked Sendable` — the standard cage pattern for
+/// type-system-opaque shared pointers. The runtime safety story:
 ///
 /// - All properties are immutable after init.
 /// - Underlying arena memory remains valid for the arena's lifetime.
@@ -581,9 +575,8 @@ extension SoATokenStorage {
 
 extension SoATokenStorage {
     /// Create from an array of `SoATokenInfo`. Propagates
-    /// ``SoAStorageError`` if any record contains a length or column that
-    /// does not fit in `UInt16`. Pre-0.2.1 such overflows were silently
-    /// truncated and produced corrupted storage records.
+    /// ``SoAStorageError`` if any record contains a length or column
+    /// that does not fit in `UInt16`.
     public static func from(_ tokens: [SoATokenInfo]) throws(SoAStorageError) -> SoATokenStorage {
         var storage = SoATokenStorage(capacity: tokens.count)
         for token in tokens {

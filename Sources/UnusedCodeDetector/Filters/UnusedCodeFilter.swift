@@ -115,14 +115,9 @@ public struct UnusedCodeFilter: Sendable {
     ///
     /// Uses hand-tuned fast paths for the three most common project-level
     /// globs (avoiding regex compilation altogether) and falls back to the
-    /// canonical ``GlobMatcher`` for anything else.
-    ///
-    /// Pre-0.2.1 this function used `String.contains(regex)` — a partial
-    /// match — while the sibling implementation in
-    /// `SwiftStaticAnalysisMCP.CodebaseContext` used `wholeMatch(of:)`. A
-    /// single MCP `detect_unused_code` call routed `excludePaths` through
-    /// both with opposite semantics. Both now share `GlobMatcher`'s
-    /// anchored `wholeMatch` semantics.
+    /// canonical ``GlobMatcher`` for anything else. Both the CLI and the
+    /// MCP `CodebaseContext` route through `GlobMatcher`'s anchored
+    /// `wholeMatch` semantics.
     public static func matchesGlobPattern(_ path: String, pattern: String) -> Bool {
         switch pattern {
         case "**/Tests/**":

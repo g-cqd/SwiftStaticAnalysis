@@ -304,14 +304,12 @@ struct FingerprintHasher {
 
     // MARK: Private
 
-    // 0.3.0-α: AST fingerprint switches from `% 1_000_000_007` (30-bit
-    // prime, ~50% collision rate at N≈50 000 snippets) to the
-    // Mersenne-61 prime already used by MinHash. The reduction is
-    // branch-free `(r & M) + (r >> 61)` with one conditional subtract
-    // — see `mersenne61Reduce` in `MinHash.swift`. Inputs stay
-    // < 2^61 throughout (hash * 31 is < 2^66, the `+ strHash` keeps
-    // it well below 2^122 which `mersenne61Reduce` is documented to
-    // accept).
+    // AST fingerprint uses Mersenne-61 to keep collisions negligible
+    // at N≈50 000 snippets (a 30-bit modulus would collide ~50% there).
+    // Branch-free `(r & M) + (r >> 61)` with one conditional subtract
+    // — see `mersenne61Reduce` in `MinHash.swift`. Inputs stay < 2^61
+    // throughout (hash * 31 is < 2^66, the `+ strHash` keeps it well
+    // below the 2^122 that `mersenne61Reduce` accepts).
 
     private var hash: UInt64 = 0
 

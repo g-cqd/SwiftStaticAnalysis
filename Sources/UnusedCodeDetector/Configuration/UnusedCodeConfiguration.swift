@@ -188,17 +188,9 @@ public struct UnusedCodeConfiguration: Sendable {
     ///
     /// - `nil` (default) — auto-select based on `parallelBFSThreshold`:
     ///   graphs with `>= threshold` nodes use `computeUnreachableParallel`,
-    ///   smaller graphs stay sequential. This is the post-0.3.0-α
-    ///   default and matches the README/CHANGELOG claim that parallel
-    ///   BFS engages "for large graphs" without the user having to flip
-    ///   a flag.
+    ///   smaller graphs stay sequential.
     /// - `true` — force parallel BFS regardless of size.
     /// - `false` — force sequential BFS regardless of size.
-    ///
-    /// Pre-0.3 this field was `Bool = false`: parallel BFS was opt-in
-    /// only via the `--parallel` CLI flag and never auto-selected,
-    /// contradicting the CHANGELOG's "auto-selects parallel BFS for
-    /// graphs ≥ 1000 nodes" claim.
     public var useParallelBFS: Bool?
 
     /// Node-count threshold above which the auto-select path uses

@@ -193,8 +193,8 @@ public struct CodebaseContext: Sendable {
             // Use memory-mapped I/O + raw-span byte scan rather than
             // `String(contentsOfFile:)` so a 116-file codebase doesn't
             // allocate 116 fresh UTF-8 strings just to count newlines.
-            // Pre-0.2.1 the heap allocation showed up in MCP latency
-            // profiles for large fixtures.
+            // The heap allocation shows up in MCP latency profiles for
+            // large fixtures.
             guard let mapped = try? MemoryMappedFile(path: file) else { continue }
             let newlines = mapped.withRawSpan { span -> Int in
                 var count = 0

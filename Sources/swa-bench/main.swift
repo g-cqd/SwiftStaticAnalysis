@@ -196,7 +196,7 @@ struct Sample: Codable, Sendable {
     let peakRSSBytes: Int
 }
 
-/// Stable JSON schema as of `swaVersion` 0.3.0-alpha.2:
+/// Stable JSON schema:
 ///
 /// ```
 /// {

@@ -56,12 +56,10 @@ struct GlobPatternMatchingTests {
 
     @Test("Escapes dots in patterns")
     func escapesDotsInPatterns() {
-        // 0.2.1: `*` is a single-segment wildcard that does not cross
-        // `/`. `*.swift` therefore matches only path-leaf-only inputs;
-        // a leading `/src/` requires the pattern to declare structure
-        // (`**/*.swift` or `/src/*.swift`). Pre-0.2.1 partial-match
-        // semantics happily found `file.swift` as a substring of
-        // `/src/file.swift`; the audit flagged that as misleading.
+        // `*` is a single-segment wildcard that does not cross `/`.
+        // `*.swift` therefore matches only path-leaf-only inputs; a
+        // leading `/src/` requires the pattern to declare structure
+        // (`**/*.swift` or `/src/*.swift`).
         #expect(UnusedCodeFilter.matchesGlobPattern("file.swift", pattern: "*.swift") == true)
         #expect(UnusedCodeFilter.matchesGlobPattern("/src/file.swift", pattern: "*.swift") == false)
         #expect(UnusedCodeFilter.matchesGlobPattern("/src/file.swift", pattern: "**/*.swift") == true)

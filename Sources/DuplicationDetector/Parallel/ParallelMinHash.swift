@@ -51,12 +51,9 @@ public struct ParallelMinHashGenerator: Sendable {
 
     /// Compute signatures in parallel for multiple documents.
     ///
-    /// 0.3.0-α: switched from "add all tasks then drain" to the
-    /// streaming-bounded pattern (start `maxConcurrency` tasks, add a
-    /// new one on each completion). Pre-0.3 the implementation added a
-    /// task per document up front — so a 100 000-document batch
-    /// created 100 000 tasks even with `maxConcurrency = 8`, ignoring
-    /// the cap.
+    /// Streaming-bounded pattern: start `maxConcurrency` tasks, add a
+    /// new one on each completion. A naive "add all tasks then drain"
+    /// shape would create one task per document, ignoring the cap.
     ///
     /// - Parameter documents: Documents to compute signatures for.
     /// - Returns: Array of signatures in the same order as input documents.

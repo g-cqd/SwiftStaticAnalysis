@@ -148,7 +148,7 @@ struct CodebaseContextTests {
         #expect(info.totalBytes > 0)
     }
 
-    // MARK: - Security regressions (Phase 1 of AUDIT.md remediation)
+    // MARK: - Security regressions
 
     /// Regression test for the CRITICAL sibling-path bypass.
     ///

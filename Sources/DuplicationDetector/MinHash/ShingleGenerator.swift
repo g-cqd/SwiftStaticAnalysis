@@ -165,11 +165,9 @@ public struct ShingleGenerator: Sendable {
     ///
     /// This breaks the file into logical blocks (functions, classes) for comparison.
     ///
-    /// 0.3.0-α.3: rewritten to iterate `ArraySlice<TokenInfo>` directly.
-    /// Pre-0.3 the hot path materialised `[String]` and `[TokenKind]`
-    /// arrays via `sequence.tokens.map(\.text)` /
-    /// `sequence.tokens.map(\.kind)` once per file — two N-element
-    /// allocations on the hottest duplication code path. Now the
+    /// Iterates `ArraySlice<TokenInfo>` directly to avoid two N-element
+    /// allocations (`[String]` of texts + `[TokenKind]` of kinds) per
+    /// file on the hottest duplication code path. Now the
     /// per-window iterator operates on `sequence.tokens[i..<j]` and
     /// the shared shingle/normalize pipeline derives strings and
     /// kinds on demand from the same `TokenInfo` slice.
@@ -231,8 +229,8 @@ public struct ShingleGenerator: Sendable {
         guard tokenInfos.count >= shingleSize else { return [] }
 
         // Normalised text per position. Reuses one growing dictionary
-        // per call instead of the pre-0.3 path's helper-allocated
-        // `[String]` return value.
+        // per call instead of allocating a helper `[String]` return
+        // value.
         let normalised: [String]
         if normalize {
             normalised = normalizeTokenInfos(tokenInfos)

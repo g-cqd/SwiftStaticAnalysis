@@ -9,11 +9,6 @@ import SwiftStaticAnalysisCore
 import SwiftStaticAnalysisMCP
 
 /// MCP server entry point.
-///
-/// Pre-0.3.0-α this binary parsed its own argv. ArgumentParser handles
-/// `--path=…` (attached value), short-option aggregation, and `--`
-/// separators correctly; the hand-rolled parser silently mis-handled
-/// `--path=/some/path` as a no-op.
 @main
 struct SWAMCPCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(

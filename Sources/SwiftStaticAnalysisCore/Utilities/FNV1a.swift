@@ -9,10 +9,6 @@ import Foundation
 /// FNV-1a 64-bit hash. Non-cryptographic; suitable for content
 /// fingerprints (change detection), bucket selection (LSH), and stable
 /// document identifiers.
-///
-/// Centralised in 0.2.0; previous releases inlined the same constants
-/// across `ChangeDetector`, `ShingleGenerator`, `LSH`, and
-/// `MemoryMappedFile.FileSlice.hash()`.
 public enum FNV1a {
     /// FNV-1a 64-bit offset basis.
     public static let offsetBasis: UInt64 = 14_695_981_039_346_656_037

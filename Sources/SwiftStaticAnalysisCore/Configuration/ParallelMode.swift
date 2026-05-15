@@ -18,9 +18,7 @@ import Foundation
 ///   pipeline. Use this when memory headroom is the bottleneck on
 ///   large codebases (millions of token pairs) — the streaming
 ///   verifier suspends the producer if a slow consumer would otherwise
-///   queue an unbounded result buffer. The 0.2.x README claimed this
-///   behaviour but routed `.maximum` through the same plumbing as
-///   `.safe`; the 0.3.0-α release actually wires the streaming path.
+///   queue an unbounded result buffer.
 ///
 /// Example usage in `.swa.json`:
 /// ```json

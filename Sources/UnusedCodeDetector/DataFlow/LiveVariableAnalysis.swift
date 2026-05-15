@@ -181,13 +181,11 @@ internal struct LiveVariableAnalysis: Sendable {
 
     /// Compute live variables using iterative worklist algorithm.
     ///
-    /// 0.3.0-α.6: backward analysis worklist is a `Heap<Int>` keyed on
-    /// *negated* RPO index (= postorder), with a parallel
-    /// `inWorklist: Set<Int>` for dedup. Heap.popMin returns the
-    /// largest RPO index, i.e. the deepest block in the forward
-    /// traversal, which is the correct frontier for liveness's
-    /// backward sweep. Same O(B log B × maxIterations) bound as
-    /// `ReachingDefinitions` (audit B3-7).
+    /// Backward analysis worklist is a `Heap<Int>` keyed on *negated*
+    /// RPO index (= postorder), with a parallel `inWorklist: Set<Int>`
+    /// for dedup. `Heap.popMin` returns the largest RPO index, i.e.
+    /// the deepest block in the forward traversal, which is the correct
+    /// frontier for liveness's backward sweep. `O(B log B × maxIterations)`.
     private func computeLiveVariables(
         _ cfg: inout ControlFlowGraph
     ) -> (liveIn: [BlockID: Set<VariableID>], liveOut: [BlockID: Set<VariableID>]) {

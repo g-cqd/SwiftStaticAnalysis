@@ -69,7 +69,7 @@ public enum TaskBackedAsyncStream {
 public enum BackpressuredChannelStream {
     /// Create an `AsyncChannel` plus a producer `Task` that fills it.
     ///
-    /// Cancellation propagation (post 0.3.0-α):
+    /// Cancellation propagation:
     ///
     /// - The producer is spawned as a structured `Task` from the caller's
     ///   context, so **parent-task cancellation** propagates via

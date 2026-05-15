@@ -90,10 +90,10 @@ public struct UnusedCode: Sendable, Codable {
 
 // MARK: - DetectionMode
 
-// 0.3.0-α: `DetectionMode` lives in `SwiftStaticAnalysisCore.Configuration`
+// `DetectionMode` lives in `SwiftStaticAnalysisCore.Configuration`
 // because `IndexStoreFallback` (also in Core) consumes it for the
-// preferred-mode parameter on `determineAnalysisMode`. Re-exported here so
-// existing `import UnusedCodeDetector` callers keep working.
+// preferred-mode parameter on `determineAnalysisMode`. Re-exported here
+// so existing `import UnusedCodeDetector` callers keep working.
 
 // MARK: - UnusedCodeReport
 

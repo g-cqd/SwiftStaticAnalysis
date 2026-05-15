@@ -94,12 +94,11 @@ enum SuffixArrayBuilder {
         // Build suffix array using SA-IS
         var sa = SAIS.build(text, alphabetSize: alphabetSize)
 
-        // 0.3.0-α: skip the `sa.filter { $0 < n }` postpass that
-        // pre-0.3 allocated a fresh `[Int]`. The sentinel was appended
-        // at position `n` and 0 is the smallest character — SA-IS
-        // sorts that suffix to position 0 in `sa`. Drop it via
-        // `removeFirst()`, which is an O(n) memmove in place, no
-        // allocation.
+        // Skip the `sa.filter { $0 < n }` postpass that would allocate
+        // a fresh `[Int]`. The sentinel is appended at position `n`
+        // and 0 is the smallest character — SA-IS sorts that suffix to
+        // position 0. Drop it via `removeFirst()`, an in-place O(n)
+        // memmove.
         if !sa.isEmpty, sa[0] == n {
             sa.removeFirst()
         } else if let sentinelIndex = sa.firstIndex(of: n) {
@@ -116,12 +115,10 @@ enum SuffixArrayBuilder {
 /// Implementation of the SA-IS (Suffix Array Induced Sorting) algorithm.
 /// Achieves O(n) time complexity for suffix array construction.
 ///
-/// 0.3.0-α: the working `sa` buffer is **arena-allocated** rather than
-/// fresh `[Int]` per recursion. A single `Arena` is created at the top
-/// of the entry point and grows as recursion deepens. The second
-/// `placeLMSSuffixesOrdered` pass mutates the same buffer in place
-/// rather than allocating a new `[Int]`. The pre-0.3 README's
-/// "Arena-backed scratch buffers" claim is now backed by code.
+/// The working `sa` buffer is arena-allocated rather than a fresh
+/// `[Int]` per recursion. A single `Arena` is created at the top of
+/// the entry point and grows as recursion deepens. The second
+/// `placeLMSSuffixesOrdered` pass mutates the same buffer in place.
 enum SAIS {
     // MARK: Internal
 

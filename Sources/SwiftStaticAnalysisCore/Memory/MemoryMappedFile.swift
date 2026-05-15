@@ -33,14 +33,14 @@ public enum MemoryMappedFileError: Error, Sendable {
 
 /// Owns the raw mmap pointer and the swift-system `FileDescriptor`.
 ///
-/// This is the **only** type in the memory layer that carries
-/// `@unchecked Sendable` after 0.3.0-α.5. The compiler can't prove a
-/// `UnsafeRawPointer` is safe to share across threads, but the mmap'd
-/// region is read-only (`PROT_READ`), immutable after init, and lives
-/// for the storage's lifetime — so the guarantee is real, just not
-/// statically checkable. We cage it inside a `private final class`
-/// rather than exposing the unchecked attribute on the public
-/// `MemoryMappedFile` / `FileSlice` types.
+/// This is the only type in the memory layer that carries
+/// `@unchecked Sendable`. The compiler can't prove a `UnsafeRawPointer`
+/// is safe to share across threads, but the mmap'd region is read-only
+/// (`PROT_READ`), immutable after init, and lives for the storage's
+/// lifetime — so the guarantee is real, just not statically checkable.
+/// We cage it inside a `private final class` rather than exposing the
+/// unchecked attribute on the public `MemoryMappedFile` / `FileSlice`
+/// types.
 private final class MappingStorage: @unchecked Sendable {
     let path: String
     let size: Int
@@ -68,13 +68,11 @@ private final class MappingStorage: @unchecked Sendable {
 /// the process's address space. Reads are performed directly from the
 /// kernel's page cache without additional copying.
 ///
-/// 0.3.0-α.5: `MemoryMappedFile` is now plain `Sendable` (no
-/// `@unchecked`). The `UnsafeRawPointer` to the mmap region is held by
-/// a private `MappingStorage` class that internally carries the
-/// `@unchecked` attribute — the standard Swift 6 pattern for a
-/// type-system-opaque pointer that is *practically* safe to share. The
-/// file descriptor is now a `SystemPackage.FileDescriptor` rather than
-/// a raw `Int32`, so open/close use typed errors.
+/// `MemoryMappedFile` is plain `Sendable`. The `UnsafeRawPointer` to the
+/// mmap region is held by a private `MappingStorage` class that internally
+/// carries `@unchecked Sendable` — the standard cage pattern. The file
+/// descriptor is a `SystemPackage.FileDescriptor`, so open/close use typed
+/// errors.
 ///
 /// All public access goes through `RawSpan` (via `withRawSpan`) or
 /// `FileSlice`, both of which are read-only.
@@ -272,10 +270,9 @@ public final class MemoryMappedFile: Sendable {
     /// cached result. A `Mutex` from `Synchronization` serialises lazy
     /// construction without paying the cost of a `DispatchQueue`. The
     /// pointer and size are snapshotted to local `let`s at the top of the
-    /// closure so the per-byte loop body doesn't traverse the
-    /// `storage` class indirection on every load (post-0.3.0-α.5 the
-    /// pointer lives on a private storage class; without the snapshot
-    /// the compiler can't elide the per-iteration class-field reload).
+    /// closure so the per-byte loop body doesn't traverse the `storage`
+    /// class indirection on every load — without the snapshot the compiler
+    /// can't elide the per-iteration class-field reload.
     ///
     /// - Returns: Array of (offset, length) tuples for each line.
     public func findLineRanges() -> [(offset: Int, length: Int)] {
@@ -389,12 +386,11 @@ private final class FileSliceStorage: @unchecked Sendable {
 /// Slices reference the underlying mapped memory without copying.
 /// They are lightweight and can be created freely.
 ///
-/// 0.3.0-α.5: `FileSlice` is now plain `Sendable`. The
-/// `UnsafeRawPointer` + parent reference live inside a private
-/// `FileSliceStorage` class that internally carries `@unchecked
-/// Sendable` — the standard cage pattern. The slice itself behaves
-/// like a value (and is still `borrowing` at the API boundary for the
-/// read-mostly methods).
+/// `FileSlice` is plain `Sendable`. The `UnsafeRawPointer` + parent
+/// reference live inside a private `FileSliceStorage` class that
+/// internally carries `@unchecked Sendable` — the standard cage
+/// pattern. The slice itself behaves like a value (and is still
+/// `borrowing` at the API boundary for the read-mostly methods).
 public struct FileSlice: Sendable {
     // MARK: Lifecycle
 

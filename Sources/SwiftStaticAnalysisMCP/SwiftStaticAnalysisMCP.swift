@@ -46,8 +46,7 @@
 import MCP
 
 /// Re-export the one MCP type that appears in `SWAMCPServer`'s public
-/// interface. Pre-0.3.0-α this module did a full `@_exported import MCP`,
-/// which silently coupled every consumer to whatever version of
-/// `modelcontextprotocol/swift-sdk` we tracked. Narrowing the re-export
-/// keeps the public surface honest.
+/// interface. A full `@_exported import MCP` would silently couple
+/// every consumer to whatever version of `modelcontextprotocol/swift-sdk`
+/// we track; narrowing the re-export keeps the public surface honest.
 public typealias Transport = MCP.Transport

@@ -9,11 +9,9 @@ import Foundation
 
 /// Configuration for parallel processing in analysis operations.
 ///
-/// Setting `maxConcurrentFiles == 1` (and `maxConcurrentTasks == 1`) forces
-/// serial execution. The previous `enableParallelProcessing` flag and the
-/// unused `batchSize` field were removed in 0.2.0 — they had no effect on
-/// the actual `ParallelProcessor` codepaths, which key off `maxConcurrency`
-/// alone.
+/// Setting `maxConcurrentFiles == 1` (and `maxConcurrentTasks == 1`)
+/// forces serial execution. `ParallelProcessor` codepaths key off
+/// `maxConcurrency` alone.
 public struct ConcurrencyConfiguration: Sendable {
     // MARK: Lifecycle
 

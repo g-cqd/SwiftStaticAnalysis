@@ -77,11 +77,11 @@ public final class IndexStoreAnalyzer: Sendable {
 
     /// Analyze all symbols and return their usage information.
     ///
-    /// Before 0.2.0 this method was O(definitions × total_occurrences):
-    /// each definition triggered a separate `findOccurrences(ofUSR:)` index
-    /// query. We now sweep every analysed file once via
-    /// `reader.allOccurrencesByUSR(in:)` and look up locally, dropping the
-    /// cost to O(total_occurrences) regardless of how many definitions exist.
+    /// Single sweep over every analysed file via
+    /// `reader.allOccurrencesByUSR(in:)`, then local lookup. Per-symbol
+    /// `findOccurrences(ofUSR:)` would be O(definitions × total_occurrences);
+    /// this is O(total_occurrences) regardless of how many definitions
+    /// exist.
     public func analyzeUsage() -> [SymbolUsage] {
         let occurrencesByUSR = reader.allOccurrencesByUSR(in: files)
 

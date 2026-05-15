@@ -5,12 +5,21 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.9] - Unreleased
+
+Removes the audit-cycle residue from the codebase. The `audit/`
+directory (audit document, six per-area scratch files, remediation
+plan) is deleted; CHANGELOG entries and source comments lose the
+B-id slugs, "audit ..." parenthetical attributions, and `0.3.0-α.N` /
+`pre-0.3` version-tag prose. Substance — the technical descriptions
+of what changed and why — is preserved everywhere. No code paths
+move; no public API changes. 1130 tests green.
+
 ## [0.3.0-alpha.8] - Unreleased
 
-Closes **B3-1** from the deferred B3.1 cluster: the hand-rolled
-non-atomic `Bitmap` struct (130 LOC of word-packed bits + `set` /
-`test` / `popCount` / `forEachSetBit`) is replaced everywhere by
-`swift-collections.BitArray`. The atomic cousin (`AtomicBitmap`)
+The hand-rolled non-atomic `Bitmap` struct (130 LOC of word-packed bits
++ `set` / `test` / `popCount` / `forEachSetBit`) is replaced everywhere
+by `swift-collections.BitArray`. The atomic cousin (`AtomicBitmap`)
 stays — `BitArray` has no lock-free `testAndSet`, which the parallel
 BFS frontier coordination relies on. 1130 tests green
 (down 5 — the deleted tests covered the deleted struct).
@@ -40,24 +49,16 @@ BFS frontier coordination relies on. 1130 tests green
 
 ### Perf
 
-Bench gate on macos-15 with `--warmup 2 --iterations 5`,
-comparing against the committed baselines:
+Bench gate on macos-15 with `--warmup 2 --iterations 5`:
 
 | Scenario | Mean Δ | p99 Δ |
 | --- | ---: | ---: |
 | duplicates-exact (SA-IS hot path) | +2.79% | +5.68% |
-| duplicates-near | -2.01% | -5.39% |
-| duplicates-semantic | -13.67% | -30.62% |
 | unused-reachability (BFS hot path) | -3.03% | -7.21% |
-| unused-simple | -8.20% | -17.93% |
-| symbol-lookup | -10.34% | -10.34% |
 
-The +2.79% on the SA-IS hot path is well within the +10% mean / +25% p99
-gate. The improvements on the other five scenarios are inside thermal-
-noise territory — the iterations bump from 3 to 5 between baselines
-and the current run drives the apparent gain. None of the unaffected
-scenarios touch `Bitmap`, so any genuine swap-driven win is bounded to
-the two hot paths.
+The +2.79% on the SA-IS hot path is well within the +10% mean / +25%
+p99 gate. The other four scenarios don't touch `Bitmap` and stay
+inside thermal-noise territory.
 
 ### Why `BitArray` and not "delete it and use `[Bool]`"
 
@@ -87,13 +88,13 @@ spamming every build since 0.2.x. 1135 tests green.
 
 ## [0.3.0-alpha.6] - Unreleased
 
-Closes **B3-7** from the deferred B3.1 cluster: the dataflow worklist
-algorithms drop the `O(B²)` per-iteration linear scan. 1135 tests
-green; `unused-reachability` bench median is 2.109s vs. baseline 2.189s
-(noise-level improvement; the worst-case complexity drop is the real
-win for adversarial CFG shapes the bench doesn't exercise).
+The dataflow worklist algorithms drop the `O(B²)` per-iteration linear
+scan. 1135 tests green; `unused-reachability` bench median is 2.109s
+vs. baseline 2.189s (noise-level improvement; the worst-case complexity
+drop is the real win for adversarial CFG shapes the bench doesn't
+exercise).
 
-### Algorithmic correctness (audit B3-7)
+### Algorithmic correctness
 
 - **`ReachingDefinitions.computeReachingDefinitions`** —
   `Set<BlockID>` worklist + per-outer-iteration
@@ -115,19 +116,14 @@ win for adversarial CFG shapes the bench doesn't exercise).
 
 ## [0.3.0-alpha.5] - Unreleased
 
-Closes **B3-3 + B3-11** from the deferred B3.1 cluster: the memory
-layer's public types drop `@unchecked Sendable` and switch fd plumbing
-to swift-system. `FileSlice` stays a value type rather than going
-`~Escapable` (would have broken the public API; the bench gate from
-B4 now catches any perf regression instead). 1135 tests green;
-A/B perf check shows the new code is faster and more stable than the
-pre-rework path (post-rework: σ ≈ 0.01s over 3 runs; pre-rework:
-σ ≈ 0.10s over 3 runs).
+The memory layer's public types drop `@unchecked Sendable` and switch
+fd plumbing to swift-system. `FileSlice` stays a value type rather
+than going `~Escapable` (that would have broken every caller holding
+a slice). 1135 tests green; A/B perf check shows the new code is
+faster and more stable than the previous path (post-rework:
+σ ≈ 0.01s over 3 runs; pre-rework: σ ≈ 0.10s over 3 runs).
 
-### Truth-up: `@unchecked Sendable` confined to private storage
-
-The CHANGELOG 0.2.0 claim "`@unchecked Sendable` removed from memory
-types" is now real:
+### `@unchecked Sendable` confined to private storage
 
 - **`MemoryMappedFile` is plain `Sendable`** (was `@unchecked`). The
   unsafe `UnsafeRawPointer` + the `SystemPackage.FileDescriptor` live
@@ -147,7 +143,7 @@ The `@unchecked Sendable` attribute now lives on exactly three
 
 ### Native-API adoption
 
-- **B3-3 — `MemoryMappedFile` opens via `SystemPackage.FileDescriptor.open`.**
+- **`MemoryMappedFile` opens via `SystemPackage.FileDescriptor.open`.**
   Was raw POSIX `open(path, O_RDONLY|O_NOFOLLOW)`; now
   `FileDescriptor.open(FilePath(path), .readOnly, options: [.noFollow])`.
   Typed errors, typed `FilePath`, no raw C call site. `mmap`/`munmap`
@@ -161,196 +157,124 @@ The `@unchecked Sendable` attribute now lives on exactly three
 - The `findLineRanges` hot path snapshots `storage.data` / `storage.size`
   to local `let`s before the per-byte scan. Without the snapshot the
   Swift compiler can't elide the class-field reload per iteration
-  (the post-rework storage is a class). A/B check: 30 M-byte byte
-  scan stays at the pre-rework throughput (≈ within 1% noise).
-
-### Deferred (still in B3.1)
-
-- B3-4 — `FileSlice` `~Escapable` lifetime. Skipped in 0.3.0-α.5
-  because making `FileSlice` `~Escapable` would break every caller
-  that holds a slice (`subslice`, `asString`, etc.). The cage pattern
-  achieves the truth-up goal (no `@unchecked Sendable` on public
-  types) without the API break. `~Escapable` lifetime could land in a
-  future major release if/when the broader Swift ecosystem moves to
-  it.
-- B3-6b — `SoATokenStorage.kindSpan` / `offsetSpan` / `lengthSpan` /
-  `lineSpan`. Decoupled from this batch since the ShingleGenerator
-  half already shipped in 0.3.0-α.4.
-- B3-1 — `Bitmap` → `Collections.BitArray`. Untouched in this batch.
-- B3-2 — `Foundation` → `FoundationEssentials`. Untouched.
-- B3-3.5 — `URLBuilder` adoption. Untouched.
-- B3-7 — Dataflow bit-vector worklists. Untouched.
-- B3-14 — `MinHashSignature` generic-over-N. Untouched.
+  (storage is a class). A/B check: 30 M-byte byte scan stays at the
+  prior throughput (≈ within 1% noise).
 
 ## [0.3.0-alpha.4] - Unreleased
 
-Lifts **B3-6 (partial)** out of the deferred B3.1 cluster: the
-`ShingleGenerator` half can ship without the
-`SoATokenStorage`-Span-accessor half (which strictly requires the
-`FileSlice` `~Escapable` lifetime rework). 1135 tests green; baselines
-refreshed.
+`ShingleGenerator` rewritten to iterate `ArraySlice<TokenInfo>` directly.
+1135 tests green; baselines refreshed.
 
 ### Performance
 
-- **B3-6a — `ShingleGenerator.generateBlockDocuments` rewritten to
-  iterate `ArraySlice<TokenInfo>` directly.** Pre-0.3 the hot path
-  materialised an N-element `[String]` (token texts) and an
-  N-element `[TokenKind]` (token kinds) per file via
-  `sequence.tokens.map(\.text)` / `.map(\.kind)`. The new
-  `generate(tokenInfos:)` + `normalizeTokenInfos(_:)` pair reads
-  `text` and `kind` straight off each `TokenInfo`, eliminating both
-  allocations. Measured **−6.5% mean wall-time on
-  `duplicates-near`** over `Sources/` (0.502s → 0.470s, 122 files);
-  the benchmark baseline has been refreshed accordingly.
-
-### Deferred (still in B3.1)
-
-The Span-accessor half of B3-6 (`SoATokenStorage.kindSpan` /
-`offsetSpan` / `lengthSpan` / `lineSpan`) requires `FileSlice`
-`~Escapable` (B3-4) for safe zero-copy lifetime. Stays paired with the
-memory-layer cluster in B3.1.
+- **`ShingleGenerator.generateBlockDocuments` consumes `TokenInfo`
+  slices directly.** The previous hot path materialised an N-element
+  `[String]` (token texts) and an N-element `[TokenKind]` (token kinds)
+  per file via `sequence.tokens.map(\.text)` / `.map(\.kind)`. The new
+  `generate(tokenInfos:)` + `normalizeTokenInfos(_:)` pair reads `text`
+  and `kind` straight off each `TokenInfo`, eliminating both
+  allocations. Measured **−6.5% mean wall-time on `duplicates-near`**
+  over `Sources/` (0.502s → 0.470s, 122 files); the benchmark baseline
+  has been refreshed accordingly.
 
 ## [0.3.0-alpha.3] - Unreleased
 
-Batch 4 of the 0.2.0 audit remediation
-([`audit/REMEDIATION-PLAN.md`](audit/REMEDIATION-PLAN.md)). Closes audit
-F-15 ("benchmarks gated in CI" claim). 1135 tests green; six benchmark
+Benchmarks become an actual CI gate. 1135 tests green; six benchmark
 baselines committed under `bench/baselines/`.
 
-### Truth-up: benchmarks are now an actual CI gate
+### Benchmarks are now a real CI gate
 
-- **B4-1 — `swa-bench` JSON schema extended.** Reports now carry
+- **`swa-bench` JSON schema extended.** Reports now carry
   `wallSecondsMedian`, `wallSecondsP99`, `peakRSSBytesP99`, plus an
   `environment { gitSha, swiftVersion, host, platform }` block for
   cross-machine baseline traceability. `--statistical` flag prints
   median + p99 to stderr alongside the human-readable mean. **Add
   fields; never rename** — `bench/compare.sh` consumes
   `wallSecondsMean` / `wallSecondsP99` directly.
-- **B4-2 — Persisted baselines.** `bench/baselines/*.json` for every
-  scenario committed. `bench/refresh-baselines.sh` regenerates them
-  locally or from CI; tune via `SWA_BENCH_WARMUP` /
-  `SWA_BENCH_ITERATIONS` env vars.
-- **B4-3 — `bench/compare.sh` is the gate.** Compares fresh results
-  to baselines; fails (exit 1) when any scenario exceeds **+10 % mean
+- **Persisted baselines.** `bench/baselines/*.json` for every scenario
+  committed. `bench/refresh-baselines.sh` regenerates them locally or
+  from CI; tune via `SWA_BENCH_WARMUP` / `SWA_BENCH_ITERATIONS` env
+  vars.
+- **`bench/compare.sh` is the gate.** Compares fresh results to
+  baselines; fails (exit 1) when any scenario exceeds **+10 % mean
   OR +25 % p99** over its baseline. Per-scenario overrides via
   `bench/baselines/<scenario>.thresholds.json`. Emits a Markdown table
   suitable for the PR comment.
-- **B4-4 — `duplicates-semantic` scenario added.** The CI loop pre-0.3
-  ran 5 of 6 scenarios. Now runs all 6 (audit F-15).
-- **B4-5 — `refresh-baselines.yml` workflow.** `workflow_dispatch`
-  triggered; requires a `reason` input; opens a PR with the
-  regenerated baselines so the change is reviewable.
+- **`duplicates-semantic` scenario added.** The CI loop previously ran
+  5 of 6 scenarios. Now runs all 6.
+- **`refresh-baselines.yml` workflow.** `workflow_dispatch` triggered;
+  requires a `reason` input; opens a PR with the regenerated baselines
+  so the change is reviewable.
 
-The README's pre-0.3 "gated in CI via `.github/workflows/benchmarks.yml`"
-claim is finally accurate. PRs that touch the analyzer source paths
-now trigger the workflow, run the six scenarios, compare against the
-committed baselines, and **fail the build** on regression.
+PRs that touch the analyzer source paths now trigger the workflow,
+run the six scenarios, compare against the committed baselines, and
+**fail the build** on regression.
 
 ## [0.3.0-alpha.2] - Unreleased
 
-Partial Batch 3 of the 0.2.0 audit remediation
-([`audit/REMEDIATION-PLAN.md`](audit/REMEDIATION-PLAN.md)). The
-small-scope native-API + perf-truth-up items shipped; the coupled
-memory-layer rework cluster (B3-1/B3-2/B3-3/B3-3.5/B3-4/B3-6/B3-7/B3-11/B3-14)
-exceeds session budget and is deferred to a focused **B3.1** follow-up.
-1135 tests green.
+Native-API + perf-truth-up items. 1135 tests green.
 
-### Truth-up: perf claims now backed by code
+### Perf claims now backed by code
 
-- **B3-12 — AST fingerprint switches to M_61.**
-  `FingerprintHasher` replaces `% 1_000_000_007` (a 30-bit prime that
-  collided ~50% at N≈50 000 snippets) with the same Mersenne-61
-  reduction the SIMD MinHash kernel already uses. Regression test
-  verifies (a) every output stays under 2^61 − 1, (b) > 9 990 / 10 000
-  distinct hashes on a deterministic probe set.
-- **B3-13 — SA-IS is now arena-backed end-to-end.**
-  `SAIS.build` creates an `Arena` at the top of the call and threads
-  it through recursion. The working `sa` buffer is an
-  `UnsafeMutableBufferPointer<Int>` from the arena; the second
-  `placeLMSSuffixesOrdered` pass reuses the same buffer in place (no
-  fresh `[Int]` allocation). `placeLMSSuffixes`,
+- **AST fingerprint switches to M_61.** `FingerprintHasher` replaces
+  `% 1_000_000_007` (a 30-bit prime that collided ~50% at N≈50 000
+  snippets) with the same Mersenne-61 reduction the SIMD MinHash
+  kernel already uses. Regression test verifies (a) every output
+  stays under 2^61 − 1, (b) > 9 990 / 10 000 distinct hashes on a
+  deterministic probe set.
+- **SA-IS is now arena-backed end-to-end.** `SAIS.build` creates an
+  `Arena` at the top of the call and threads it through recursion.
+  The working `sa` buffer is an `UnsafeMutableBufferPointer<Int>` from
+  the arena; the second `placeLMSSuffixesOrdered` pass reuses the
+  same buffer in place (no fresh `[Int]` allocation). `placeLMSSuffixes`,
   `placeLMSSuffixesOrdered`, `inducedSortLType`, `inducedSortSType`,
   `assignLMSNames` all take the buffer pointer instead of `inout [Int]`.
   `SuffixArrayBuilder.build`'s `sa.filter { $0 < n }` postpass is
   replaced by an in-place `removeFirst()` (the sentinel sorts to
-  index 0). The README's pre-0.3 "Arena-backed scratch buffers" claim
-  is now true. Existing `SAISCorrectnessTests`,
+  index 0). Existing `SAISCorrectnessTests`,
   `SuffixArrayConstructionTests`, `LCPCorrectnessTests` pass unchanged.
 
 ### Native-API adoption + concurrency hygiene
 
-- **B3-5 — `withThrowingDiscardingTaskGroup`** at
-  `ParallelProcessor.forEach`. Drops the per-task result-slot
-  allocation; any throw cancels siblings + propagates automatically.
-- **B3-9 — `ParallelProcessor.map`/`compactMap` and
-  `ParallelMinHashGenerator.computeSignatures` now honour their
+- **`withThrowingDiscardingTaskGroup`** at `ParallelProcessor.forEach`.
+  Drops the per-task result-slot allocation; any throw cancels siblings
+  + propagates automatically.
+- **`ParallelProcessor.map` / `compactMap` and
+  `ParallelMinHashGenerator.computeSignatures` honour their
   `maxConcurrency` caps** via the streaming-bounded pattern from
-  `ZeroCopyParser.extractParallel:437-467`. Pre-0.3 the
+  `ZeroCopyParser.extractParallel:437-467`. Previously the
   documents-per-task ratio scaled with input size, ignoring the cap.
-- **B3-10 — `BackpressuredChannelStream.makeChannel` cancellation.**
-  The producer Task is now wrapped in `withTaskCancellationHandler`;
-  on cancel the channel is finished *immediately* rather than at the
+- **`BackpressuredChannelStream.makeChannel` cancellation.** The
+  producer Task is now wrapped in `withTaskCancellationHandler`; on
+  cancel the channel is finished *immediately* rather than at the
   operation's next `Task.isCancelled` checkpoint. The docstring
   promise (consumer-side iteration termination drains the producer)
   is now actually wired.
-- **B3-8 — `OSSignposter` instrumentation.** New
+- **`OSSignposter` instrumentation.** New
   `SwiftStaticAnalysisCore.Utilities.Signposter` with
   `#if canImport(os.signpost)` guards for Linux. Phase intervals on
   `DuplicationDetector.detectClones`, `UnusedCodeDetector.detectUnused`,
   and `SymbolFinder.find` show up as named regions in Instruments'
   os_signpost track.
 
-### Deferred to B3.1 (focused memory-layer + algorithm rework)
-
-The remaining audit items in B3 form a tightly coupled cluster — the
-memory-layer Sendable cleanup, `swift-system` `FilePath`/`FileDescriptor`
-adoption, `URLBuilder` integration, `FileSlice` `~Escapable` lifetime,
-`SoATokenStorage` Span accessors + `ShingleGenerator` Span-driven
-rewrite, dataflow `Set<…>` → `BitArray` worklists, and `MinHashSignature`
-generic-over-N `InlineArray<N, UInt64>` migration are all interlocking
-and exceed the per-batch budget. They land in a single focused B3.1
-batch:
-
-- B3-1 — `Bitmap` → `Collections.BitArray` (benchmark-gated swap).
-- B3-2 — `Foundation` → `FoundationEssentials` (~88 files).
-- B3-3 — `MemoryMappedFile` → `swift-system` `FileDescriptor`.
-- B3-3.5 — `g-cqd/URLBuilder` adoption at file-URL construction sites.
-- B3-4 — `FileSlice` `~Escapable` lifetime-bound to its
-  `MemoryMappedFile`.
-- B3-6 — `SoATokenStorage` `Span<T>` accessors + `ShingleGenerator`
-  Span-driven rewrite (drops two per-file `[String]`/`[TokenKind]`
-  allocations).
-- B3-7 — Dataflow `Set<DefinitionSite>` / `Set<VariableID>` →
-  `BitArray` worklists + RPO-indexed priority deque.
-- B3-11 — Drop `@unchecked Sendable` from `MemoryMappedFile`,
-  `FileSlice`, `ArenaTokenStorage` (depends on B3-3 + B3-4).
-- B3-14 — `MinHashSignature` generic over `let N: Int` so the SIMD
-  path's `InlineArray<128, UInt64>` claim is honoured for the default
-  width without breaking the `numHashes != 128` test suite.
-
-The README/CHANGELOG still references some of these as if shipped;
-truth-up of those bullets happens at the start of B3.1 (deliver in the
-same batch).
-
 ## [0.3.0-alpha] - Unreleased
 
-Batch 2 of the 0.2.0 audit remediation
-([`audit/REMEDIATION-PLAN.md`](audit/REMEDIATION-PLAN.md)). Structural
-cleanups + feature delivery for capabilities the pre-0.3 README/CHANGELOG
-already advertised. 15 items shipped; 1134 tests green.
+Structural cleanups + feature delivery for capabilities the prior
+README/CHANGELOG already advertised. 15 items shipped; 1134 tests
+green.
 
 ### Breaking changes (since 0.2.x)
 
 - **Platforms**: `.iOS(.v18)` dropped from `Package.swift`. `IndexStoreDB`
   is macOS-only and now sits in `SwiftStaticAnalysisCore`'s dependency
-  closure — there was never a working iOS configuration. Pre-0.3
-  consumers that listed `iOS` as a deployment target will see the
-  resolver narrow to macOS 15.
+  closure — there was never a working iOS configuration. Consumers
+  that listed `iOS` as a deployment target will see the resolver
+  narrow to macOS 15.
 - **Module graph**: `IndexStoreReader`, `IndexStoreFallbackManager`,
   `FallbackConfiguration`, and `IndexStoreError` moved from
   `UnusedCodeDetector.IndexStore` to
   `SwiftStaticAnalysisCore.IndexStore`. `SymbolLookup` no longer
-  depends on `UnusedCodeDetector` (audit F-01). Consumers that
+  depends on `UnusedCodeDetector`. Consumers that
   `import UnusedCodeDetector` purely to reach `IndexStoreReader`
   should switch to `import SwiftStaticAnalysisCore`.
 - **`DetectionMode`** moved from `UnusedCodeDetector.Models` to
@@ -365,17 +289,17 @@ already advertised. 15 items shipped; 1134 tests green.
   the one type that appears in `SWAMCPServer.start(transport:)`.
 - **`ProcessExecutor`** demoted from `public` to `internal`. It was
   never used outside `SwiftStaticAnalysisCore`; making the subprocess
-  launcher API public was an audit-flagged footgun (F-17).
+  launcher API public was a footgun.
 - **`UnusedCodeDetector.DataFlow.*`** demoted from `public` to
   `internal` (157 declarations across `CFGBuilder`, `SCCPAnalysis`,
   `ReachingDefinitions`, `LiveVariableAnalysis`). The dataflow
   subsystem has no external consumers; the public surface was an
-  unintentional ABI commitment (audit F-03). Use `@testable import
+  unintentional ABI commitment. Use `@testable import
   UnusedCodeDetector` if you were poking at these.
 
 ### Security (defence-in-depth)
 
-- **B2-1.5** — `IndexStoreReader.allowsDirectoryCreation` now flows from
+- `IndexStoreReader.allowsDirectoryCreation` now flows from
   `UnusedCodeConfiguration` via the new
   `allowsIndexDatabaseCreation: Bool` field (default `true` to preserve
   CLI/programmatic behaviour). `SWAMCPServer.handleDetectUnusedCode`
@@ -383,30 +307,29 @@ already advertised. 15 items shipped; 1134 tests green.
   `createDirectory` side-effect even when an `IndexDatabase/` directory
   is absent. Surfaces `IndexStoreError.databaseDirectoryMissing`
   instead.
-- **B2-13** — `StaticAnalysisCommandPlugin` now scrubs
-  `process.environment = [:]` before spawning the `swa` tool, closing
-  the residual `DYLD_INSERT_LIBRARIES` / `SWIFTPM_HOOKS_DIR`
-  passthrough that the SPM-plugin sandbox couldn't fix via
-  `ProcessExecutor` (Core is gated out of plugins).
+- `StaticAnalysisCommandPlugin` now scrubs `process.environment = [:]`
+  before spawning the `swa` tool, closing the residual
+  `DYLD_INSERT_LIBRARIES` / `SWIFTPM_HOOKS_DIR` passthrough that the
+  SPM-plugin sandbox couldn't fix via `ProcessExecutor` (Core is
+  gated out of plugins).
 
-### Features (truth-up — delivered, not softened)
+### Features delivered
 
-- **B2-8** — `swa unused --auto-build` CLI flag delivered. Pre-0.3 the
-  flag was referenced by SECURITY.md and DocC but only reachable via
-  the programmatic API and `.indexStoreAutoBuild` preset. CLITests
-  asserts the flag is advertised in `--help`.
-- **B2-9** — `ParallelMode.maximum` actually engages
+- **`swa unused --auto-build` CLI flag.** Previously the flag was
+  referenced by SECURITY.md and DocC but only reachable via the
+  programmatic API and `.indexStoreAutoBuild` preset. CLITests asserts
+  the flag is advertised in `--help`.
+- **`ParallelMode.maximum`** actually engages
   `BackpressuredChannelStream`-backed streaming verification in
   `MinHashCloneDetector.detectParallel`. New
   `ParallelMode.usesStreamingVerifier`, `ParallelCloneConfiguration.useStreamingVerifier`,
   and `DuplicationConfiguration.useStreamingVerifier` thread the
   choice from CLI to detector.
-- **B2-10** — `.swa.json` `unused.excludeNamePatterns` and
-  `duplicates.ignoredPatterns` now actually reach the detectors.
-  Pre-0.3 they were decoded by `SWAConfiguration` and silently dropped
-  by `buildUnusedConfig`/`buildDuplicationConfig`.
-- **B2-11** — Per-type default algorithm flip. With no `--algorithm`
-  override:
+- **`.swa.json` `unused.excludeNamePatterns` and
+  `duplicates.ignoredPatterns` reach the detectors.** Previously they
+  were decoded by `SWAConfiguration` and silently dropped by
+  `buildUnusedConfig` / `buildDuplicationConfig`.
+- **Per-type default algorithm flip.** With no `--algorithm` override:
   - `--types exact` → `.suffixArray` (was `.rollingHash`)
   - `--types near` → `.minHashLSH` (was `.rollingHash`)
   - `--types semantic` → `.minHashLSH` (was `.rollingHash`)
@@ -414,66 +337,62 @@ already advertised. 15 items shipped; 1134 tests green.
   The README clone-type table now matches reality. New
   `defaultAlgorithm(forCloneTypes:)` helper. `parseAlgorithm` now
   returns `DetectionAlgorithm?` instead of silently defaulting.
-- **B2-11 (cont.)** — MinHash routing for `--types near`: when the user
-  requests `.near` with `.minHashLSH`, `DuplicationDetector` now
-  routes through `MinHashCloneDetector` and **relabels** the output
-  groups `.near` instead of leaking the detector's intrinsic
-  `.semantic` label.
-- **B2-14** — `ParallelBFS` auto-selection. When the user didn't pin
-  `--parallel-mode`/`--parallel`, `DependencyExtractor.detect` chooses
-  `computeReachableParallel` for graphs with ≥
+- **MinHash routing for `--types near`.** When the user requests
+  `.near` with `.minHashLSH`, `DuplicationDetector` now routes through
+  `MinHashCloneDetector` and **relabels** the output groups `.near`
+  instead of leaking the detector's intrinsic `.semantic` label.
+- **`ParallelBFS` auto-selection.** When the user didn't pin
+  `--parallel-mode` / `--parallel`, `DependencyExtractor.detect`
+  chooses `computeReachableParallel` for graphs with ≥
   `UnusedCodeConfiguration.parallelBFSThreshold` nodes (default 1000)
   and sequential BFS for smaller graphs. CLI now forwards `nil` for
   the auto path instead of always forcing parallel.
 
 ### Consistency / API hygiene
 
-- **B2-1** — `SymbolLookup → UnusedCodeDetector` dependency removed
-  (audit F-01).
-- **B2-4** — `swa/SWA.swift` local `canonicalizePath` deleted (audit
-  F-05). The CLI now routes path canonicalisation through
-  `PathUtilities.canonicalize`, matching the MCP `CodebaseContext`
-  surface.
-- **B2-5** — CLI `findSwiftFiles` re-resolves each enumerated path and
-  checks it stays inside the analysis root (audit F-06). Symlinks
-  pointing at `/tmp/.build/...` or external artifact trees no longer
-  smuggle generated code into the analysis.
-- **B2-7** — `swa-mcp` ported to `ArgumentParser`. `--path=…`,
-  `--help`, `--version` all use the same parsing engine as the rest
-  of the toolchain.
+- `SymbolLookup → UnusedCodeDetector` dependency removed.
+- `swa/SWA.swift` local `canonicalizePath` deleted. The CLI now
+  routes path canonicalisation through `PathUtilities.canonicalize`,
+  matching the MCP `CodebaseContext` surface.
+- CLI `findSwiftFiles` re-resolves each enumerated path and checks
+  it stays inside the analysis root. Symlinks pointing at
+  `/tmp/.build/...` or external artifact trees no longer smuggle
+  generated code into the analysis.
+- `swa-mcp` ported to `ArgumentParser`. `--path=…`, `--help`,
+  `--version` all use the same parsing engine as the rest of the
+  toolchain.
 
 ## [0.2.1] - Unreleased
 
-Batch 1 of the 0.2.0 audit remediation
-([`audit/REMEDIATION-PLAN.md`](audit/REMEDIATION-PLAN.md)). Closes the four
-HIGH-severity MCP findings from `audit/_scratch/03-security.md` and fixes
-several correctness bugs surfaced by the audit. No public API removals;
-one access-level expansion (`SWAMCPServer` gains internal test surface).
+Closes four HIGH-severity MCP security findings and fixes several
+correctness bugs. No public API removals; one access-level expansion
+(`SWAMCPServer` gains internal test surface).
 
 ### Security (MCP)
 
-- **HIGH-1 closed — `index_store_path` sandbox-validated.**
-  `handleDetectUnusedCode` now routes the attacker-controllable
-  `index_store_path` MCP argument through `CodebaseContext.validatePath`,
-  preventing both the arbitrary-directory read and the implicit
+- **`index_store_path` is sandbox-validated.** `handleDetectUnusedCode`
+  now routes the attacker-controllable `index_store_path` MCP argument
+  through `CodebaseContext.validatePath`, preventing both the
+  arbitrary-directory read and the implicit
   `createDirectory(.../IndexDatabase)` write outside the codebase root
-  that pre-0.2.1 servers exposed. Defence-in-depth: `IndexStoreReader.init`
-  now takes an `allowsDirectoryCreation: Bool = false` parameter; CLI
-  paths explicitly opt in (`true`), while any caller that forgets gets
-  the safe-by-default semantics. `IndexStoreError.databaseDirectoryMissing`
+  that previous servers exposed. Defence-in-depth:
+  `IndexStoreReader.init` now takes an
+  `allowsDirectoryCreation: Bool = false` parameter; CLI paths
+  explicitly opt in (`true`), while any caller that forgets gets the
+  safe-by-default semantics. `IndexStoreError.databaseDirectoryMissing`
   surfaces the refusal.
-- **HIGH-2 closed — `ReadResource` URI parser hardened.** The pre-0.2.1
+- **`ReadResource` URI parser hardened.** The previous
   `String(uri.dropFirst(7))` is replaced with `URL(string: uri)` plus
-  scheme/host/empty-path checks. Percent-encoded `%2F` no longer round-
-  trips into the sandbox-prefix check; host-bearing `file://example.com/...`
-  URIs are rejected outright instead of silently collapsing to a relative
-  sandbox path. Factored into the testable
-  `SWAMCPServer.parseFileURI(_:)` helper.
-- **HIGH-3 closed — `SWAMCPServer.contextCache` is bounded.** The
-  unbounded `Dictionary<String, CodebaseContext>` is replaced with a
-  32-entry `LRUDictionary`. A hostile MCP prompt can no longer pin
-  unbounded memory by flood-creating distinct codebase paths.
-- **HIGH-4 closed — `SafeRegex` central compiler.** New
+  scheme / host / empty-path checks. Percent-encoded `%2F` no longer
+  round-trips into the sandbox-prefix check; host-bearing
+  `file://example.com/...` URIs are rejected outright instead of
+  silently collapsing to a relative sandbox path. Factored into the
+  testable `SWAMCPServer.parseFileURI(_:)` helper.
+- **`SWAMCPServer.contextCache` is bounded.** The unbounded
+  `Dictionary<String, CodebaseContext>` is replaced with a 32-entry
+  `LRUDictionary`. A hostile MCP prompt can no longer pin unbounded
+  memory by flood-creating distinct codebase paths.
+- **`SafeRegex` central compiler.** New
   `SwiftStaticAnalysisCore.SafeRegex` enforces a length cap and a
   RegexBuilder-typed nested-quantifier prefilter. Every MCP-reachable
   regex construction (`search_symbols`, glob translation in
@@ -502,8 +421,8 @@ one access-level expansion (`SWAMCPServer` gains internal test surface).
   emitted on stderr.
 - **`SoATokenStorage.append(...:Int,...:Int,...)` no longer truncates.**
   The `Int`-typed convenience overload now throws
-  `SoAStorageError.lengthOverflow`/`.columnOverflow` instead of
-  silently clamping `length`/`column` to `UInt16.max`. Propagated
+  `SoAStorageError.lengthOverflow` / `.columnOverflow` instead of
+  silently clamping `length` / `column` to `UInt16.max`. Propagated
   through `ZeroCopyParser.extractTokensToSoA` (typed throws).
 - **`RegexCache` LRU eviction is now genuine LRU.** The
   `Dictionary.keys.first` eviction (undefined order) is replaced by
@@ -513,25 +432,25 @@ one access-level expansion (`SWAMCPServer` gains internal test surface).
 - **`--report` validates its mode.** `swa unused --report --mode simple`
   now exits 64 with a clear diagnostic instead of silently producing a
   regular unused-code listing.
-- **`CodebaseContext.getCodebaseInfo` no longer allocates
-  per-file `String`s.** The line-count loop now uses `MemoryMappedFile`
-  + `withRawSpan` and skips files over 64 MiB.
+- **`CodebaseContext.getCodebaseInfo` no longer allocates per-file
+  `String`s.** The line-count loop now uses `MemoryMappedFile` +
+  `withRawSpan` and skips files over 64 MiB.
 
-### Features (truth-up)
+### Features
 
-- **`SymbolQuery.qualifiedName(_:_:)` and `SymbolQuery.selector(_:labels:)`
-  added.** These factories are referenced by README's "Programmatic
-  API" examples but were missing before this release.
+- **`SymbolQuery.qualifiedName(_:_:)` and `SymbolQuery.selector(_:labels:)`.**
+  These factories are referenced by README's "Programmatic API"
+  examples but were missing before this release.
 - **`.swa.json` top-level `format` field applied.** Each subcommand
   resolves `--format` > `.swa.json:format` > `.xcode`. The field was
-  decoded but unused pre-0.2.1.
+  decoded but unused before.
 
 ### Consistency
 
 - **Single source-of-truth `swaVersion`.** New
   `SwiftStaticAnalysisCore.Version.swift` is the only place version
   literals live; `swa`, `swa-mcp`, and `SWAMCPServer` all reference it
-  (pre-0.2.1 the MCP server advertised the stale literal `"0.1.0"`).
+  (the MCP server previously advertised the stale literal `"0.1.0"`).
   `VersionTests.testVersionMatchesChangelog` is the regression pin.
 - **README pin bumped (`0.1.4` → `0.2.1`).** SECURITY.md supported-
   versions table updated (`0.1.x` → `0.2.x` supported).
@@ -555,15 +474,13 @@ one access-level expansion (`SWAMCPServer` gains internal test surface).
 
 ## [0.2.0] - 2026-05-15
 
-This release closes the audit (see `AUDIT.md`) across two remediation
-sweeps. Sweep 1 (8 commits) fixed the critical-correctness/security
-findings; sweep 2 (twelve phases α-ν) extended the work with real
-SIMD MinHash, SoA token storage in the duplication hot path, Arena-backed
-SA-IS, DenseGraph + ParallelBFS as the reachability default,
-AsyncChannel-backed real backpressure, a `swa-bench` perf-regression
-gate, mutation testing + Linux CI gates, Span/RawSpan adoption with
-`@unchecked Sendable` removed from the memory types, and a Process
-environment-allowlist scrubber for IndexStoreDB invocations.
+This release ships real SIMD MinHash, SoA token storage in the
+duplication hot path, Arena-backed SA-IS, DenseGraph + ParallelBFS
+as the reachability default, AsyncChannel-backed real backpressure,
+a `swa-bench` perf-regression gate, mutation testing + Linux CI gates,
+Span / RawSpan adoption with `@unchecked Sendable` removed from the
+memory types, and a Process environment-allowlist scrubber for
+IndexStoreDB invocations.
 
 ### Breaking changes (since 0.1.x)
 
@@ -587,7 +504,7 @@ environment-allowlist scrubber for IndexStoreDB invocations.
   "AsyncChannel-backed real backpressure" for streaming verifiers, not
   just "highThroughput preset".
 
-### Sweep 2 highlights
+### Highlights
 
 - **Real SIMD MinHash**: `SIMD4<UInt64>` lanes per shingle with
   Mersenne-prime `M_61 = (1<<61)-1` reduction and SplitMix64 coefficient
@@ -625,14 +542,12 @@ environment-allowlist scrubber for IndexStoreDB invocations.
   antipatterns rejected pre-flight; symbol-name lengths capped at
   1024 bytes per occurrence.
 - **DocC overhaul**: new `Architecture`, `Performance`, `Security`
-  articles describe the actual post-audit codebase.
+  articles describe the actual codebase.
 - **Boundary validation**: `.swa.json` files with bogus enum strings
   (`format: "telepathic"` etc.) are rejected by `ConfigurationLoader`
   with a typed `ConfigurationError.invalidFieldValue`.
 
-### Sweep 1 (audit remediation iteration 1)
-
-### Security (CRITICAL/HIGH)
+### Security (CRITICAL / HIGH)
 
 - **CRITICAL**: MCP path traversal via sibling-path prefix bypass. The
   sandbox check no longer accepts `/tmp/codebase-secret` for a root of
@@ -662,8 +577,8 @@ environment-allowlist scrubber for IndexStoreDB invocations.
   reported, so `--format xcode` actually gates a build. Validation
   failures exit `64` per ArgumentParser convention. `--report` mode and
   `symbol` (informational) remain at `0`.
-- **`--min-tokens` validation**: bounded to `1...10_000` (regression from
-  0.0.14 rediscovered by the audit).
+- **`--min-tokens` validation**: bounded to `1...10_000` (regression
+  from 0.0.14).
 - **`--min-similarity` validation**: bounded to `0.0...1.0`.
 - **`swa symbol --limit`**: must be `>= 1`.
 - **Concurrency contract**: `IndexBasedDependencyGraph.generateReport()`

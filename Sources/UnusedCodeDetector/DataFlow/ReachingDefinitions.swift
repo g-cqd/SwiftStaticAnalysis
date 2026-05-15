@@ -352,13 +352,9 @@ internal struct ReachingDefinitionsAnalysis: Sendable {
             reachOut[id] = genSets[id] ?? []
         }
 
-        // 0.3.0-α.6: replace `Set<BlockID>` worklist + per-iteration
-        // O(B) `reversePostOrder.first(where: worklist.contains)` scan
-        // (audit B3-7) with a `Collections.Heap<Int>` keyed on the
-        // block's reverse-postorder index, plus a parallel
-        // `inWorklist` Set<Int> for de-duplication. Each pop is now
-        // O(log B); each push is O(log B). Total complexity drops
-        // from O(B² × maxIterations) (worst case) to
+        // Worklist is a `Collections.Heap<Int>` keyed on the block's
+        // reverse-postorder index, plus a parallel `inWorklist: Set<Int>`
+        // for de-duplication. Each pop / push is O(log B). Total bound:
         // O(B × maxIterations × log B).
         var rpoIndex: [BlockID: Int] = [:]
         rpoIndex.reserveCapacity(cfg.reversePostOrder.count)

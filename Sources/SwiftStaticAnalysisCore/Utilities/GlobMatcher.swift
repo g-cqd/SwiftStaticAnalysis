@@ -8,20 +8,10 @@ import Foundation
 
 /// Single canonical glob → regex translation used everywhere in the package.
 ///
-/// Pre-0.2.1 the codebase had two divergent glob implementations:
-///
-/// - `UnusedCodeDetector.UnusedCodeFilter.matchesGlobPattern` did a
-///   *partial* match (`String.contains(regex)`).
-/// - `SwiftStaticAnalysisMCP.CodebaseContext.matchesGlobPattern` did a
-///   *whole* match (`String.wholeMatch(of: regex)`).
-///
-/// A single `.swa.json` exclusion entry like `Tests` therefore produced
-/// different exclusion results depending on which call site evaluated it —
-/// and worse, both call sites are reachable from a single MCP tool
-/// invocation (`detect_unused_code` collects through `CodebaseContext` and
-/// post-filters through `UnusedCodeFilter`). `GlobMatcher` consolidates
-/// both into anchored `wholeMatch` semantics so the same pattern behaves
-/// identically everywhere.
+/// Anchored `wholeMatch` semantics: a single `.swa.json` exclusion
+/// entry like `Tests` matches only the literal filename, not any path
+/// containing the segment. The MCP and CLI surfaces both route through
+/// here so the same pattern behaves identically everywhere.
 ///
 /// Supported glob tokens:
 ///

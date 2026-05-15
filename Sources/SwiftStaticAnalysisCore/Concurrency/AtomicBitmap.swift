@@ -32,11 +32,11 @@ private final class AtomicWord: Sendable {
 ///
 /// ## Why not `BitArray`?
 ///
-/// The non-atomic frontier bits use `swift-collections.BitArray` as of
-/// 0.3.0-α.8. `BitArray` provides no atomic update primitive — its
-/// subscript writes go through standard COW, which is not safe under
-/// concurrent mutation. `AtomicBitmap` is kept as a separate type because
-/// it owns the lock-free fetch-or that parallel BFS relies on.
+/// The non-atomic frontier bits use `swift-collections.BitArray`.
+/// `BitArray` provides no atomic update primitive — its subscript
+/// writes go through standard COW, which is not safe under concurrent
+/// mutation. `AtomicBitmap` is kept as a separate type because it owns
+/// the lock-free fetch-or that parallel BFS relies on.
 ///
 /// ## Performance Characteristics
 ///

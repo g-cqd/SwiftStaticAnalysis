@@ -247,13 +247,11 @@ public struct DuplicationDetector: Sendable {
 
         var cloneGroups: [CloneGroup] = []
 
-        // 0.3.0-α: when the user requests `--types near --algorithm minHashLSH`
-        // (the per-type default after the B2-11 algorithm flip), route through
-        // `MinHashCloneDetector` rather than the rolling-hash engine — and
-        // relabel its inherently Type-3 output as `.near` to match the
-        // requested clone type. Pre-0.3 the algorithm flag was ignored for
-        // `.near` and MinHash output always read `.semantic` regardless of
-        // the user's `--types`.
+        // When the user requests `--types near --algorithm minHashLSH`
+        // (the per-type default for `.near`), route through
+        // `MinHashCloneDetector` rather than the rolling-hash engine —
+        // and relabel its inherently Type-3 output as `.near` to match
+        // the requested clone type.
         let routeNearThroughMinHash =
             configuration.cloneTypes.contains(.near)
             && configuration.algorithm == .minHashLSH

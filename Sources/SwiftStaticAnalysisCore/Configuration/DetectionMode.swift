@@ -8,7 +8,7 @@
 ///
 /// Lives in Core (not in `UnusedCodeDetector`) because
 /// `IndexStoreFallback.determineAnalysisMode(...preferredMode:)`, which is
-/// also in Core after 0.3.0-α, must accept this type as a parameter.
+/// also in Core, must accept this type as a parameter.
 public enum DetectionMode: String, Sendable, Codable, CaseIterable {
     /// Simple reference counting (fast, approximate).
     case simple

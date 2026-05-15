@@ -31,7 +31,7 @@ public actor SWAMCPServer {
 
     /// Maximum number of `CodebaseContext` entries retained simultaneously.
     /// Exposed `internal` for regression tests against the unbounded-cache
-    /// memory-DoS that pre-0.2.1 servers were vulnerable to.
+    /// memory-DoS shape.
     internal static let contextCacheCapacity = 32
 
     /// Test-only introspection. Reports the current count of cached
@@ -725,7 +725,7 @@ extension SWAMCPServer {
     /// Everything else is rejected — the MCP tool exists to inspect source
     /// code, not binaries, not character devices, not log files.
     ///
-    /// 0.2.1 dropped `.plist`, `.json`, `.yml`, `.yaml`: those extensions
+    /// `.plist`, `.json`, `.yml`, `.yaml` are excluded: those extensions
     /// commonly host secrets in real-world Swift projects (`fastlane/Appfile`,
     /// `.env.json`, generated GoogleService-Info.plist, CI workflow secrets).
     /// A hostile LLM prompt that drives the MCP `read_file` tool would
@@ -1307,12 +1307,12 @@ extension SWAMCPServer {
     ///
     /// - `URL.path` returns the percent-decoded filesystem path, so callers
     ///   that subsequently feed the result into `CodebaseContext.validatePath`
-    ///   see the real filename rather than a URI-encoded shadow string. The
-    ///   pre-0.2.1 implementation used `String(uri.dropFirst(7))` which
-    ///   never decoded `%2F`/`%2E` — a latent traversal that turned into a
-    ///   sandbox escape the moment anything downstream decoded the path.
+    ///   see the real filename rather than a URI-encoded shadow string. A
+    ///   naive `String(uri.dropFirst(7))` would never decode `%2F` / `%2E`
+    ///   — a latent traversal that turns into a sandbox escape the moment
+    ///   anything downstream decodes the path.
     /// - Host components are rejected (except an empty host or
-    ///   `localhost`). The pre-0.2.1 implementation silently treated
+    ///   `localhost`). A naive parse would silently treat
     ///   `file://example.com/etc/passwd` as the relative path
     ///   `example.com/etc/passwd` inside the sandbox, producing surprise
     ///   matches against any sandbox-internal file with that suffix.

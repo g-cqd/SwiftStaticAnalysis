@@ -95,8 +95,6 @@ struct Analyze: AsyncParsableCommand {
         let swaConfig = try loadConfiguration(configPath: config, analysisPath: primaryPath)
 
         // Resolve format: CLI --format > .swa.json top-level format > .xcode.
-        // Pre-0.2.1 the config-file format field was decoded but never
-        // applied here, defeating users who set it once globally.
         let outputFormat = format ?? swaConfig?.format ?? .xcode
 
         let files = try findSwiftFiles(in: paths, excludePaths: swaConfig?.excludePaths)
@@ -229,11 +227,9 @@ struct Duplicates: AsyncParsableCommand {
         let effectiveMinTokens = minTokens ?? dupConfig?.minTokens ?? 50
         let effectiveMinSimilarity = minSimilarity ?? dupConfig?.minSimilarity ?? 0.8
         let effectiveTypes = types.isEmpty ? parseCloneTypes(dupConfig?.types) : Set(types)
-        // 0.3.0-α: per-type algorithm defaults. The README clone-type table
-        // promised SA-IS for exact and MinHash+LSH for near; pre-0.3 the
-        // uniform `.rollingHash` default routed both through Rabin-Karp,
-        // so the documented algorithm mapping was a lie. The CLI flag
-        // and `.swa.json` override still win when set.
+        // Per-type algorithm defaults: SA-IS for exact, MinHash+LSH for
+        // near and semantic. CLI `--algorithm` and `.swa.json` override
+        // still win when set.
         let effectiveAlgorithm =
             algorithm
             ?? parseAlgorithm(dupConfig?.algorithm)
@@ -241,11 +237,9 @@ struct Duplicates: AsyncParsableCommand {
         let effectiveExcludePaths = excludePaths.isEmpty ? (dupConfig?.excludePaths ?? []) : excludePaths
 
         // Resolve parallel mode: CLI --parallel-mode > CLI --parallel > config.
-        // Pre-0.2.1 the deprecated `--parallel` flag mapped to `.maximum`
-        // here while `ParallelMode.from(legacyParallel:)`, the canonical
-        // mapping used by config-file decoding, mapped to `.safe`. README
-        // also documented `--parallel == .safe`. Aligning on the canonical
-        // mapping closes the drift.
+        // The deprecated `--parallel` flag maps to `.safe` through the
+        // canonical `ParallelMode.from(legacyParallel:)`, matching the
+        // `.swa.json` decoder and the README contract.
         let effectiveParallelMode: ParallelMode
         if let mode = parallelMode {
             effectiveParallelMode = mode
@@ -477,8 +471,7 @@ struct Unused: AsyncParsableCommand {
 
         // `--report` is only meaningful in reachability mode (it walks the
         // reachability graph). Surface the misuse instead of silently
-        // ignoring it, which pre-0.2.1 produced an unused-code listing
-        // with no warning.
+        // producing a regular unused-code listing.
         if report, effectiveMode != .reachability {
             throw ValidationError(
                 "--report requires --mode reachability (current mode: \(effectiveMode.rawValue))"
@@ -812,9 +805,7 @@ func loadConfiguration(configPath: String?, analysisPath: String) throws -> SWAC
 }
 
 func buildDuplicationConfig(from config: DuplicatesConfiguration?) -> DuplicationConfiguration {
-    // 0.3.0-α: `ignoredPatterns` from `.swa.json` is now forwarded into
-    // the detector (pre-0.3 it was decoded and silently dropped — the
-    // schema advertised a regex-name-exclusion knob that did nothing).
+    // `ignoredPatterns` from `.swa.json` is forwarded into the detector.
     let cloneTypes = parseCloneTypes(config?.types)
     return DuplicationConfiguration(
         minimumTokens: config?.minTokens ?? 50,
@@ -829,20 +820,12 @@ func buildDuplicationConfig(from config: DuplicatesConfiguration?) -> Duplicatio
 ///
 /// Defaults match `Unused.run()` *and* `UnusedCodeConfiguration.init`
 /// (treat-roots default to `true`, SwiftUI ignores default to `false`).
-/// Before this commit `buildUnusedConfig` (used by `swa analyze`) defaulted
-/// the treat-roots flags to `false`, so `swa analyze .` and `swa unused .`
-/// produced different findings on the same project.
-///
 /// Parallel-mode resolution honours `config.resolvedParallelMode` (the
 /// `--parallel-mode safe|maximum` form), with a fallback to the legacy
-/// `config.parallel` bool. The previous implementation read `config.parallel`
-/// directly, silently ignoring `parallelMode` from `.swa.json` in
-/// `swa analyze`.
+/// `config.parallel` bool.
 func buildUnusedConfig(from config: UnusedConfiguration?) -> UnusedCodeConfiguration {
-    // 0.3.0-α: `excludeNamePatterns` from `.swa.json` is now forwarded
-    // into `UnusedCodeConfiguration.ignoredPatterns`. Pre-0.3 the field
-    // was decoded by `SWAConfiguration` but silently dropped here, so a
-    // user with `excludeNamePatterns: ["_legacy.*"]` saw no effect.
+    // `excludeNamePatterns` from `.swa.json` is forwarded into
+    // `UnusedCodeConfiguration.ignoredPatterns`.
     UnusedCodeConfiguration(
         ignorePublicAPI: config?.ignorePublicAPI ?? false,
         mode: parseDetectionMode(config?.mode),
@@ -914,12 +897,12 @@ func parseAlgorithm(_ algorithm: String?) -> DetectionAlgorithm? {
 /// - `.exact` alone → `.suffixArray` (true Type-1 with SA-IS).
 /// - `.near` and/or `.semantic` (single type) → `.minHashLSH`
 ///   (MinHash + LSH with SIMD4 Mersenne-61).
-/// - Mixed sets → `.rollingHash` (the pre-0.3 catch-all; Rabin-Karp can
-///   service every clone type and avoids paying the SA / MinHash setup
-///   cost when the user wants a heterogeneous report).
+/// - Mixed sets → `.rollingHash` (Rabin-Karp services every clone type
+///   and avoids paying the SA / MinHash setup cost when the user wants
+///   a heterogeneous report).
 ///
-/// Empty sets default to `.rollingHash` for parity with the pre-0.3
-/// behaviour; callers should already have populated `effectiveTypes`.
+/// Empty sets default to `.rollingHash`; callers should already have
+/// populated `effectiveTypes`.
 func defaultAlgorithm(forCloneTypes types: Set<CloneType>) -> DetectionAlgorithm {
     guard types.count == 1, let only = types.first else { return .rollingHash }
     switch only {
@@ -1198,18 +1181,7 @@ private let defaultExcludedDirectories: Set<String> = [
     ".git",  // Git metadata
 ]
 
-// MARK: - Path Canonicalization
-
-/// Canonicalizes a file path to prevent path traversal attacks.
-///
-/// This function:
-// `canonicalizePath` was removed in 0.3.0-α. The CLI now uses the
-// canonical `PathUtilities.canonicalize(_:relativeTo:)` from Core (the
-// same routine MCP's `CodebaseContext.validatePath` uses), so symlink
-// resolution semantics are identical on both surfaces. The old CLI
-// implementation used `URL.resolvingAliasFileAt`, which had subtly
-// different macOS-alias-resolution behaviour and was a maintenance
-// footgun (audit F-05).
+// MARK: - File Discovery
 
 func findSwiftFiles(in paths: [String], excludePaths: [String]? = nil) throws -> [String] {
     let fileManager = FileManager.default
@@ -1253,9 +1225,9 @@ func findSwiftFiles(in paths: [String], excludePaths: [String]? = nil) throws ->
         // The enumerator follows symlinks by default. We re-resolve each
         // discovered file's canonical path and verify it stays underneath
         // the original directory root, matching the hygiene that
-        // `CodebaseContext.findSwiftFiles` already applies on the MCP side
-        // (audit F-06). A symlink pointing at `/tmp/.build/...` would
-        // otherwise sneak generated artifacts into the analysis.
+        // `CodebaseContext.findSwiftFiles` applies on the MCP side. A
+        // symlink pointing at `/tmp/.build/...` would otherwise sneak
+        // generated artifacts into the analysis.
         if let enumerator = fileManager.enumerator(
             at: url,
             includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
