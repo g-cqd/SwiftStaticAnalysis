@@ -5,6 +5,194 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.1] - Unreleased
+
+Cuts the 0.3.0 beta from the eighteen-alpha cluster. 1137 tests
+green; bench gate operational; CLI / MCP / plugin smoke clean (one
+`swa-mcp` regression caught and fixed during the cut — `Task.sleep`
+with `Double.greatestFiniteMagnitude` traps on Swift 6.x via an
+overflow into `_Int128`, replaced with a bounded-interval park
+loop).
+
+This entry summarises the user-visible changes accumulated across
+`0.3.0-alpha` through `0.3.0-alpha.18` for downstream consumers
+migrating from `0.2.x`. The per-alpha entries below remain as
+historical detail.
+
+### Breaking changes (since 0.2.x)
+
+- **`.iOS(.v18)` dropped from `Package.swift`** — IndexStoreDB is
+  macOS-only and there was never a working iOS configuration.
+- **`IndexStoreReader` / `IndexStoreFallback` / `DetectionMode` moved
+  from `UnusedCodeDetector` to `SwiftStaticAnalysisCore`.**
+  `SymbolLookup` no longer depends on `UnusedCodeDetector`. Direct
+  importers should switch to `import SwiftStaticAnalysisCore`.
+- **`UnusedCodeConfiguration.default.mode` flipped `.simple` →
+  `.reachability`** (α.16). README/DocC always claimed reachability;
+  the struct disagreed. Downstream consumers passing
+  `UnusedCodeConfiguration()` now get graph-based detection by
+  default.
+- **`DuplicationConfiguration.default.cloneTypes` flipped `[.exact]`
+  → `[.exact, .near, .semantic]`** (α.16). `swa duplicates .` with
+  no `--types` flag now detects all three.
+- **`ProcessExecutor` demoted to `internal`** (was `public`). It
+  was never meant to be a public subprocess launcher.
+- **`UnusedCodeDetector.DataFlow.*` demoted to `internal`**
+  (157 declarations across CFGBuilder, SCCPAnalysis,
+  ReachingDefinitions, LiveVariableAnalysis).
+- **`UnusedCodeConfiguration.useParallelBFS`** is now `Bool?`
+  (`nil` = auto-select against `parallelBFSThreshold`).
+- **`SyntaxResolver` USR queries throw**
+  `SyntaxResolverError.usrResolutionRequiresIndexStore` instead of
+  silently returning `[]` (α.17).
+- **`FallbackConfiguration.init` and `UnusedCodeConfiguration.init`**
+  each gain a `sandboxRootPath: String? = nil` parameter (α.12).
+- **MinHash default `numHashes` raised 128 → 256** (α.17).
+  Theoretically grounded recall improvement (~8-12% on real corpora
+  at J≥0.85); signature storage doubles per document.
+- **`@_exported import` scope narrowed** in Core and MCP.
+
+### Security
+
+The post-α.11 re-audit (parallel `apple-security-analyst` +
+`quality-reviewer` agents) surfaced and closed:
+
+- **Two HIGH-severity findings** (α.12):
+  `IndexStoreFallbackManager.createDirectory` now gates on
+  `allowsIndexDatabaseCreation` (previously bypassed the MCP-set
+  flag); `FallbackConfiguration.sandboxRootPath` re-validates
+  derived `IndexDatabase/` paths against the sandbox root
+  (TOCTOU window between `validatePath` and the fallback's open).
+- **Six defence-in-depth hardening items** (α.13):
+  `handleReadFile` + `ReadResource` open via `.noFollow`
+  `MemoryMappedFile`; `findLibIndexStore` verifies dylib trust
+  (regular file owned by uid 0); `parseFileURI` rejects user /
+  password / port; `MappingStorage.deinit` logs close failures via
+  `AnalysisLogger`; `PathUtilities.sanitizedForDiagnostic`
+  sanitises C0 control bytes from path-bearing error strings
+  (CWE-117 log injection); `SafeRegex` docstring narrowed to the
+  actual probe scope.
+- **Four lower-priority items** (α.15): `SWAMCPServer.resolutionBaseURL`
+  pinned at server init; `getCodebaseInfo` cumulative 4 GiB scan
+  ceiling; `swaText` access tightened to `fileprivate`;
+  `MemoryMappedFile.init` Linux `.noFollow` support documented.
+
+The previous audit cycle's HIGH findings (0.2.1) remain closed.
+
+### Correctness
+
+- **Dataflow worklist decoherence** (α.12): both
+  `LiveVariableAnalysis.computeLiveVariables` and
+  `ReachingDefinitions.computeReachingDefinitions` worklists
+  rewritten to use a unique workIndex per block with a 1-to-1
+  `blockByWorkIndex` inverse — eliminates the silent-block-drop
+  bug that arose when unreachable blocks shared a sentinel key.
+- **`detectUnusedImports`** no longer a no-op (α.16). Previous
+  shape was "any reference of any kind exists → all imports
+  marked used", recall 0%. Replaced with module-qualified
+  reference scanning at `.low` confidence.
+- **Four new `RootReason` cases** for FFI / runtime attributes
+  (α.16): `.silgenName`, `.cdecl`, `.dynamicReplacement`,
+  `.objcRuntimeName`. Codebases using Swift-C interop no longer
+  see 100% FPR on these.
+- **`MultiProbeLSH` docstring** acknowledges its theoretical
+  limitations (α.18): the perturbation strategy is not Lv et al.
+  2007's E2LSH algorithm and has no guaranteed recall bound for
+  MinHash LSH. Users wanting more recall raise `numHashes`.
+
+### Symbol lookup precision (α.17)
+
+- `IndexStoreResolver.matchesSelectorFromUSR` no longer accepts
+  mid-identifier substring matches; new
+  `usrHasLengthPrefixedSegment` verifies match position is at a
+  length-prefix boundary.
+- `SyntaxResolver.resolveQualifiedName` walks the full container
+  chain (was checking only the immediate parent).
+- `SyntaxResolver.resolveByRegex` defaults to whole-identifier
+  match (`.wholeMatch(of:)`) instead of substring; callers wanting
+  substring use `.*pattern.*`.
+
+### Algorithm + perf
+
+- **SA-IS arena-backed end-to-end** (α.2): working buffer is
+  `UnsafeMutableBufferPointer<Int>` from a single recursion-wide
+  `Arena`; no per-recursion `[Int]` allocation.
+- **AST fingerprint hash switches to Mersenne-61** (α.2): the
+  prior `% 1_000_000_007` (30-bit prime) collided ~50% at
+  N≈50 000 snippets. M_61 keeps collision rate negligible at
+  realistic codebase scale.
+- **`ShingleGenerator` iterates `ArraySlice<TokenInfo>` directly**
+  (α.4): drops two per-file `[String]` / `[TokenKind]`
+  allocations on the duplication hot path (−6.5% mean wall-time
+  on `duplicates-near`).
+- **`Bitmap` struct retired in favour of
+  `swift-collections.BitArray`** (α.8). `AtomicBitmap` stays —
+  `BitArray` has no lock-free `testAndSet`.
+- **Dataflow worklists use `Collections.Heap<Int>` keyed on
+  reverse-postorder index** (α.6). Complexity drops from
+  `O(B² × maxIterations)` to `O(B × maxIterations × log B)`.
+- **`MemoryMappedFile` opens via swift-system
+  `FileDescriptor.open(FilePath, .readOnly, [.noFollow])`** (α.5).
+  Typed errors, typed paths.
+- **Memory-layer `@unchecked Sendable` confined to private
+  storage classes** (α.5). `MemoryMappedFile`, `FileSlice`, and
+  `ArenaTokenStorage` are all plain `Sendable` on their public
+  surface.
+
+### MCP API surface
+
+- **MCP SDK `.text(_:metadata:)` deprecation closed** (α.7).
+  Single `Tool.Content.swaText` helper at the bottom of
+  `SWAMCPServer.swift` routes all 18 call sites through the
+  non-deprecated `.text(text:annotations:_meta:)` factory.
+- **`get_codebase_info` cumulative scan ceiling** (α.15): 4 GiB
+  hard cap across the line-counting pass.
+
+### Tooling
+
+- **Bench gate operational** (α.3, baselines refreshed α.12).
+  Six scenarios (`duplicates-exact`, `duplicates-near`,
+  `duplicates-semantic`, `unused-simple`, `unused-reachability`,
+  `symbol-lookup`); `bench/compare.sh` gates at +10% mean / +25%
+  p99 with per-scenario overrides; `refresh-baselines.yml`
+  workflow opens a PR with regenerated baselines.
+- **Cross-actor `Sendable` regression tests** (α.12) for the
+  three memory-layer cage types pin the contract at runtime.
+- **Differential `ParallelBFS` vs. sequential test** (α.14)
+  prevents drift between the two BFS implementations.
+- **Worklist convergence tests** (α.14) on back-edge CFGs with
+  unreachable blocks pin the post-α.12 fix.
+
+### Documentation
+
+- **`audit/` directory removed** (α.9). The audit and remediation
+  plan were process artifacts; technical content survived in
+  CHANGELOG entries and code WHY comments.
+- **README, SECURITY, and the 13 DocC articles** verified
+  directly against the code surface (α.10). InlineArray claim,
+  `Bitmap`-typed claim, version pins, and the
+  `StaticAnalysisCommandPlugin` env-scrub footnote all corrected.
+- **Semantic clone recall ceiling documented** (α.18): the
+  ~20-30% recall for cross-idiom equivalents (for-loop vs
+  `reduce`, recursion vs iteration) is now stated directly in
+  README and `CloneDetection.md` rather than implied to be full
+  Type-3/4 coverage.
+
+### Migration notes
+
+- Direct `UnusedCodeConfiguration()` consumers now run in
+  `.reachability` mode. To preserve simple-mode behaviour,
+  explicitly set `config.mode = .simple`.
+- Direct `DuplicationConfiguration()` consumers now detect all
+  three clone types. To preserve exact-only, set
+  `config.cloneTypes = [.exact]`.
+- `SyntaxResolver` USR queries throw — `try? resolver.resolve(.usr(...))`
+  is the migration shape if the caller wants the previous
+  silent-empty contract.
+- The new `FallbackConfiguration.sandboxRootPath` and
+  `UnusedCodeConfiguration.sandboxRootPath` parameters default
+  to `nil`; only sandboxed callers (the MCP server) set them.
+
 ## [0.3.0-alpha.18] - Unreleased
 
 Docs truth-up for two algorithm claims the post-α.15 audit flagged

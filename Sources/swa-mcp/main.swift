@@ -71,10 +71,17 @@ struct SWAMCPCommand: AsyncParsableCommand {
             try await server.start(transport: transport)
 
             // Park the main task indefinitely; let Task cancellation
-            // propagate (SIGINT/SIGTERM via async signal handlers). The
-            // previous `withCheckedContinuation` form never resumed and so
-            // could not be cancelled from within Swift Concurrency.
-            try await Task.sleep(for: .seconds(.greatestFiniteMagnitude))
+            // propagate (SIGINT/SIGTERM via async signal handlers).
+            // `Task.sleep(for: .seconds(.greatestFiniteMagnitude))`
+            // traps on Swift 6.x because the `Double` → nanosecond
+            // conversion overflows `_Int128`. Loop on bounded sleeps
+            // instead — each iteration checks cancellation, the body
+            // is still effectively a forever-park for cooperative
+            // termination via SIGINT.
+            let parkInterval: Duration = .seconds(3600)  // 1 hour
+            while !Task.isCancelled {
+                try await Task.sleep(for: parkInterval)
+            }
         } catch is CancellationError {
             fputs("swa-mcp: Shutting down...\n", stderr)
         } catch {
