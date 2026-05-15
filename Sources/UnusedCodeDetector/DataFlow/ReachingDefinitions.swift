@@ -2,6 +2,7 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
+import Collections
 import Foundation
 import SwiftStaticAnalysisCore
 import SwiftSyntax
@@ -351,22 +352,41 @@ internal struct ReachingDefinitionsAnalysis: Sendable {
             reachOut[id] = genSets[id] ?? []
         }
 
-        // Worklist (use reverse postorder for forward analysis)
-        var worklist = Set(cfg.blockOrder)
+        // 0.3.0-α.6: replace `Set<BlockID>` worklist + per-iteration
+        // O(B) `reversePostOrder.first(where: worklist.contains)` scan
+        // (audit B3-7) with a `Collections.Heap<Int>` keyed on the
+        // block's reverse-postorder index, plus a parallel
+        // `inWorklist` Set<Int> for de-duplication. Each pop is now
+        // O(log B); each push is O(log B). Total complexity drops
+        // from O(B² × maxIterations) (worst case) to
+        // O(B × maxIterations × log B).
+        var rpoIndex: [BlockID: Int] = [:]
+        rpoIndex.reserveCapacity(cfg.reversePostOrder.count)
+        for (index, blockID) in cfg.reversePostOrder.enumerated() {
+            rpoIndex[blockID] = index
+        }
+        // Seed the worklist with every block in RPO order. Blocks not
+        // in `reversePostOrder` (unreachable) get a high sentinel
+        // index so they're processed last but still processed.
+        var worklist = Heap<Int>()
+        var inWorklist = Set<Int>()
+        worklist.reserveCapacity(cfg.blockOrder.count)
+        let unreachableBase = cfg.reversePostOrder.count
+        for (offset, blockID) in cfg.blockOrder.enumerated() {
+            let index = rpoIndex[blockID] ?? (unreachableBase + offset)
+            worklist.insert(index)
+            inWorklist.insert(index)
+        }
         var iterations = 0
 
-        while !worklist.isEmpty, iterations < configuration.maxIterations {
+        while let nextIndex = worklist.popMin(), iterations < configuration.maxIterations {
             iterations += 1
+            inWorklist.remove(nextIndex)
 
-            // Get next block (prefer reverse postorder)
-            let blockID: BlockID
-            if let rpoBlock = cfg.reversePostOrder.first(where: { worklist.contains($0) }) {
-                blockID = rpoBlock
-            } else {
-                blockID = worklist.removeFirst()
-                continue
-            }
-            worklist.remove(blockID)
+            let blockID: BlockID =
+                nextIndex < cfg.reversePostOrder.count
+                ? cfg.reversePostOrder[nextIndex]
+                : cfg.blockOrder[nextIndex - unreachableBase]
 
             guard let block = cfg.blocks[blockID] else { continue }
 
@@ -388,8 +408,13 @@ internal struct ReachingDefinitionsAnalysis: Sendable {
                 reachIn[blockID] = newReachIn
                 reachOut[blockID] = newReachOut
 
-                // Add successors to worklist
-                worklist.formUnion(block.successors)
+                // Enqueue successors that aren't already pending.
+                for successorID in block.successors {
+                    let successorIndex = rpoIndex[successorID] ?? unreachableBase
+                    if inWorklist.insert(successorIndex).inserted {
+                        worklist.insert(successorIndex)
+                    }
+                }
             }
         }
 

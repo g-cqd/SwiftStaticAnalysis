@@ -5,6 +5,34 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.6] - Unreleased
+
+Closes **B3-7** from the deferred B3.1 cluster: the dataflow worklist
+algorithms drop the `O(B²)` per-iteration linear scan. 1135 tests
+green; `unused-reachability` bench median is 2.109s vs. baseline 2.189s
+(noise-level improvement; the worst-case complexity drop is the real
+win for adversarial CFG shapes the bench doesn't exercise).
+
+### Algorithmic correctness (audit B3-7)
+
+- **`ReachingDefinitions.computeReachingDefinitions`** —
+  `Set<BlockID>` worklist + per-outer-iteration
+  `cfg.reversePostOrder.first(where: worklist.contains)` linear scan
+  replaced with `Collections.Heap<Int>` keyed on the block's
+  reverse-postorder index, plus a parallel `inWorklist: Set<Int>` for
+  dedup. Worst-case complexity drops from
+  `O(B² × maxIterations)` to `O(B × maxIterations × log B)`.
+- **`LiveVariableAnalysis.computeLiveVariables`** — same shape for the
+  backward sweep, keyed on `(reversePostOrderCount - 1 - rpoIndex)`
+  so `popMin` returns the deepest block first (postorder traversal,
+  the correct frontier for liveness).
+- The dataflow analyses are unit-tested but not on the
+  `swa-bench unused-reachability` hot path (that scenario goes
+  through `DependencyExtractor` + reachability BFS, not the
+  intra-procedural CFG analyses). The win here is bounding the
+  inner-loop complexity for adversarial CFG shapes the bench doesn't
+  exercise.
+
 ## [0.3.0-alpha.5] - Unreleased
 
 Closes **B3-3 + B3-11** from the deferred B3.1 cluster: the memory

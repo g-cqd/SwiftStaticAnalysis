@@ -2,6 +2,7 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
+import Collections
 import Foundation
 import SwiftStaticAnalysisCore
 import SwiftSyntax
@@ -179,6 +180,14 @@ internal struct LiveVariableAnalysis: Sendable {
     // MARK: - Worklist Algorithm
 
     /// Compute live variables using iterative worklist algorithm.
+    ///
+    /// 0.3.0-α.6: backward analysis worklist is a `Heap<Int>` keyed on
+    /// *negated* RPO index (= postorder), with a parallel
+    /// `inWorklist: Set<Int>` for dedup. Heap.popMin returns the
+    /// largest RPO index, i.e. the deepest block in the forward
+    /// traversal, which is the correct frontier for liveness's
+    /// backward sweep. Same O(B log B × maxIterations) bound as
+    /// `ReachingDefinitions` (audit B3-7).
     private func computeLiveVariables(
         _ cfg: inout ControlFlowGraph
     ) -> (liveIn: [BlockID: Set<VariableID>], liveOut: [BlockID: Set<VariableID>]) {
@@ -191,14 +200,56 @@ internal struct LiveVariableAnalysis: Sendable {
             liveOut[id] = []
         }
 
-        // Worklist (use postorder for backward analysis)
-        var worklist = Set(cfg.blockOrder)
+        // RPO map. Reverse-postorder index `i` ↔ block; for liveness
+        // we want postorder traversal, so we key the heap on
+        // `(reversePostOrderCount - 1 - i)` and pop the smallest —
+        // that's the deepest block first.
+        var rpoIndex: [BlockID: Int] = [:]
+        rpoIndex.reserveCapacity(cfg.reversePostOrder.count)
+        for (index, blockID) in cfg.reversePostOrder.enumerated() {
+            rpoIndex[blockID] = index
+        }
+        let lastRPOIndex = max(0, cfg.reversePostOrder.count - 1)
+        func postorderKey(for blockID: BlockID) -> Int {
+            if let index = rpoIndex[blockID] {
+                return lastRPOIndex - index
+            }
+            // Unreachable blocks: dump at the very end of the heap so
+            // they still get processed but don't starve reachable ones.
+            return Int.max
+        }
+
+        var worklist = Heap<Int>()
+        var inWorklist = Set<Int>()
+        worklist.reserveCapacity(cfg.blockOrder.count)
+        for blockID in cfg.blockOrder {
+            let key = postorderKey(for: blockID)
+            if inWorklist.insert(key).inserted {
+                worklist.insert(key)
+            }
+        }
+
+        // Maintain a key → blockID map so popMin can recover the
+        // matching block. We can have multiple blocks at Int.max
+        // (unreachable); keep a stack per key.
+        var blocksByKey: [Int: [BlockID]] = [:]
+        for blockID in cfg.blockOrder {
+            let key = postorderKey(for: blockID)
+            blocksByKey[key, default: []].append(blockID)
+        }
+
         var iterations = 0
-
-        while !worklist.isEmpty, iterations < configuration.maxIterations {
+        while let key = worklist.popMin(), iterations < configuration.maxIterations {
             iterations += 1
-
-            let blockID = worklist.removeFirst()
+            inWorklist.remove(key)
+            guard let blockID = blocksByKey[key]?.popLast() else { continue }
+            // If a block re-enqueues itself, put it back so future
+            // pops find it again.
+            defer {
+                if inWorklist.contains(key) {
+                    blocksByKey[key, default: []].append(blockID)
+                }
+            }
             guard let block = cfg.blocks[blockID] else { continue }
 
             // Compute LIVE_out = ∪ LIVE_in[S] for all successors S
@@ -229,8 +280,14 @@ internal struct LiveVariableAnalysis: Sendable {
                 cfg.blocks[blockID]?.liveIn = newLiveIn
                 cfg.blocks[blockID]?.liveOut = newLiveOut
 
-                // Add predecessors to worklist
-                worklist.formUnion(block.predecessors)
+                // Add predecessors to the worklist (dedup via inWorklist).
+                for predecessorID in block.predecessors {
+                    let predecessorKey = postorderKey(for: predecessorID)
+                    if inWorklist.insert(predecessorKey).inserted {
+                        worklist.insert(predecessorKey)
+                        blocksByKey[predecessorKey, default: []].append(predecessorID)
+                    }
+                }
             }
         }
 
