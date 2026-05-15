@@ -60,3 +60,6 @@ docs/
 *_PLAN.md
 SWIFT_ALGORITHMS.md
 SWIFT_ASYNC_ALGORITHMS.md
+
+# Local model bundles (download via scripts/ or huggingface-cli; not committed)
+Models/
