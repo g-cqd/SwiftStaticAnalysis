@@ -113,6 +113,11 @@ let package = Package(
         // indexstore-db; pinned explicitly so the manifest matches the
         // imports.
         .package(url: "https://github.com/apple/swift-system.git", from: "1.4.0"),
+        // HuggingFace Tokenizers (BPE / WordPiece via AutoTokenizer) so the
+        // duplication detector can load any HF code-embedding model (CodeBERT,
+        // GraphCodeBERT, Jina v2 code, CodeT5+) without hand-rolling a per-model
+        // tokenizer.
+        .package(url: "https://github.com/huggingface/swift-transformers.git", from: "1.3.2"),
     ],
     targets: [
         // MARK: - Core Infrastructure
@@ -150,6 +155,7 @@ let package = Package(
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
