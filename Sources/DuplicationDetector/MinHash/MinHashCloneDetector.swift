@@ -95,7 +95,7 @@ public struct MinHashCloneDetector: Sendable {
     public init(
         minimumTokens: Int = 50,
         shingleSize: Int = 5,
-        numHashes: Int = 128,
+        numHashes: Int = 256,
         minimumSimilarity: Double = 0.5,
         parallelConfig: ParallelCloneConfiguration = .default
     ) {
@@ -511,7 +511,7 @@ public struct MinHashCloneDetector: Sendable {
 public struct FastSimilarityChecker: Sendable {
     // MARK: Lifecycle
 
-    public init(shingleSize: Int = 5, numHashes: Int = 128) {
+    public init(shingleSize: Int = 5, numHashes: Int = 256) {
         shingleGenerator = ShingleGenerator(shingleSize: shingleSize, normalize: true)
         minHashGenerator = MinHashGenerator(numHashes: numHashes)
     }

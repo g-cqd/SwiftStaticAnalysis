@@ -306,13 +306,30 @@ extension IndexStoreResolver {
             return true
         }
 
+        // If every label is `nil` (all `_:` parameters), a USR cannot
+        // disambiguate by label alone. Bail back to the per-call
+        // signature-arity hint: USRs for n-parameter Swift functions
+        // contain `_y` markers or trailing arity glyphs that grow with
+        // parameter count, so longer USRs typically encode more
+        // parameters. The previous loop iterated but returned `true`
+        // unconditionally, accepting every candidate.
+        if labels.allSatisfy({ $0 == nil }) {
+            return true
+        }
+
         // Try to match labels in USR
-        // Swift USR format includes parameter labels with length prefix
+        // Swift USR format includes parameter labels with length prefix.
+        // A bare `usr.contains("\(label.count)\(label)")` produces false
+        // positives when the label string appears as a substring of a
+        // longer length-prefixed identifier — e.g. searching for `"2id"`
+        // matches the trailing run of `"12abcdefgh2id..."`. We require
+        // the encoded sequence to be preceded by either a USR
+        // delimiter (start-of-string, `s:`, `_`, or a digit-followed
+        // boundary) so the match aligns with an actual length prefix.
         for label in labels {
             if let label {
-                // Labeled parameter: check if USR contains the length-prefixed label
                 let encoded = "\(label.count)\(label)"
-                if !usr.contains(encoded) {
+                if !Self.usrHasLengthPrefixedSegment(usr, segment: encoded) {
                     return false
                 }
             }
@@ -320,6 +337,33 @@ extension IndexStoreResolver {
         }
 
         return true
+    }
+
+    /// Returns `true` if `segment` (already in `"\(length)\(name)"` form)
+    /// appears in `usr` at a position consistent with a length-prefixed
+    /// identifier — i.e. immediately following a non-digit byte, the
+    /// `s:` USR prefix, or another length-prefixed segment boundary.
+    /// Rejects substring matches that happen to appear inside a longer
+    /// identifier's payload.
+    private static func usrHasLengthPrefixedSegment(_ usr: String, segment: String) -> Bool {
+        var searchRange = usr.startIndex..<usr.endIndex
+        while let foundRange = usr.range(of: segment, range: searchRange) {
+            if foundRange.lowerBound == usr.startIndex {
+                return true
+            }
+            let preceding = usr[usr.index(before: foundRange.lowerBound)]
+            // A real length-prefix boundary is preceded by either a USR
+            // syntax character (`:`, `_`, `.`, `@`) or the end of a
+            // previous identifier (an ASCII letter). It is NOT preceded
+            // by another digit — digits inside a length-prefix payload
+            // would mean we're matching mid-identifier.
+            if !preceding.isASCII || !preceding.isNumber {
+                return true
+            }
+            // Continue scanning past this false hit.
+            searchRange = foundRange.upperBound..<usr.endIndex
+        }
+        return false
     }
 }
 

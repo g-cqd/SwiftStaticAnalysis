@@ -332,7 +332,7 @@ public struct DuplicationDetector: Sendable {
         let detector = MinHashCloneDetector(
             minimumTokens: configuration.minimumTokens,
             shingleSize: 5,
-            numHashes: 128,
+            numHashes: 256,
             minimumSimilarity: configuration.minimumSimilarity,
             parallelConfig: parallelConfig
         )

@@ -5,6 +5,78 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.17] - Unreleased
+
+Batch B (algorithm win) + Batch C (symbol-lookup precision) from the
+post-α.15 re-audit. 1137 tests green.
+
+### Algorithm
+
+- **MinHash default signature width raised 128 → 256.** At Jaccard
+  similarity 0.85 with bands b=16 / rows=8, the S-curve false-negative
+  rate drops from ~12-15% (n=128) to ~5-6% (n=256). On a corpus of
+  10⁵ function-level snippets at threshold 0.80 this recovers
+  roughly 8-12% of true near-clone pairs that previously fell below
+  the LSH bucket threshold. Signature storage doubles per document
+  (negligible). The SIMD4 loop already handles arbitrary widths, so
+  this is a 9-site default change: `MinHashGenerator`,
+  `ParallelMinHashGenerator`, `LSHIndex`, `MultiProbeLSHIndex`,
+  `MinHashCloneDetector`, `FastSimilarityChecker`,
+  `ParallelLSH`, plus the `DuplicationDetector.detectClones` call
+  site that previously hard-coded `numHashes: 128`.
+
+### Symbol-lookup precision
+
+- **`IndexStoreResolver.matchesSelectorFromUSR`** now refuses
+  substring matches that happen mid-identifier. The previous
+  `usr.contains("\(label.count)\(label)")` shape spuriously matched
+  a USR like `…12abcdefgh2id…` against the label `"id"`. New private
+  helper `usrHasLengthPrefixedSegment(_:segment:)` verifies the
+  match position is at a length-prefix boundary (preceded by a
+  non-digit byte, USR syntax character, or start-of-string).
+  Also explicitly handles the `labels.allSatisfy({ $0 == nil })`
+  case (all `_:` parameters) — the loop previously fell through to
+  `return true` regardless; the explicit early-return documents
+  that USR-only signature matching cannot disambiguate when every
+  label is anonymous.
+
+- **`SyntaxResolver.resolveQualifiedName`** walks the full container
+  chain. The previous implementation checked only
+  `components.dropLast().last` (the immediate container), so
+  `SymbolQuery.qualifiedName("Outer", "Inner", "method")` matched
+  any `method` inside any `Inner` regardless of `Outer`. New
+  private `containingTypeChain(for:in:)` traverses outward through
+  every enclosing type / extension scope and the resolver requires
+  the full chain to match.
+
+- **`SyntaxResolver.resolveByRegex`** defaults to whole-identifier
+  matching (`.wholeMatch(of:)`) rather than substring
+  (`.contains(of:)`). The previous shape turned a query like
+  `"load"` into a hit on `loadUsers`, `uploadData`, `download`, and
+  `reloadAll`. Callers wanting substring matching pass an explicit
+  substring-shaped regex (`.*load.*`).
+
+- **`SyntaxResolver`** USR queries throw `SyntaxResolverError.usrResolutionRequiresIndexStore`
+  instead of silently returning `[]`. The previous silent-empty was
+  the canonical "silent no-op" footgun — callers couldn't tell the
+  difference between "no match" and "this resolver can't answer
+  USR queries". The error message points users at `--mode indexStore`
+  or `--index-store-path`.
+
+### Deferred
+
+The audit's three larger algorithm items stay on the deferred list
+pending dedicated session budget:
+
+- **F-B2** (macro-expansion clone filter, ~50 LOC, expected
+  −5-10% false-positive clone reports on macro-heavy codebases).
+- **F-B3** (closure escape precision in reachability, ~100 LOC,
+  expected −5-15% false-negative rate).
+- **F-B4** (trigram index for regex symbol lookup, ~200 LOC,
+  expected 10-100× speedup on large projects).
+
+None are exploitable; all are pure precision / perf wins.
+
 ## [0.3.0-alpha.16] - Unreleased
 
 Closes four CRITICAL precision / recall bugs surfaced by the post-α.15

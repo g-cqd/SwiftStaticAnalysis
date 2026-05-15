@@ -34,7 +34,7 @@ public struct ParallelMinHashGenerator: Sendable {
     ///   - minParallelDocuments: Minimum documents to trigger parallelism.
     ///   - maxConcurrency: Maximum concurrent tasks.
     public init(
-        numHashes: Int = 128,
+        numHashes: Int = 256,
         seed: UInt64 = 42,
         minParallelDocuments: Int = 50,
         maxConcurrency: Int = ProcessInfo.processInfo.activeProcessorCount

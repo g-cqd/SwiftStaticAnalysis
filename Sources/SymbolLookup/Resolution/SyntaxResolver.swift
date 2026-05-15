@@ -60,9 +60,13 @@ public struct SyntaxResolver: Sendable {
             return resolveBySelector(name: name, labels: labels, in: result)
         case .qualifiedSelector(let types, let name, let labels):
             return resolveQualifiedSelector(types: types, name: name, labels: labels, in: result)
-        case .usr:
-            // USR resolution not supported in syntax-only mode
-            return []
+        case .usr(let usr):
+            // USR resolution requires IndexStoreDB; the syntax-only
+            // resolver cannot decode mangled symbol references. Throw
+            // a typed error so the caller can't silently get empty
+            // results — the previous `return []` was the canonical
+            // "silent no-op" footgun the post-α.15 audit flagged.
+            throw SyntaxResolverError.usrResolutionRequiresIndexStore(usr: usr)
         case .regex(let regex):
             return try resolveByRegex(regex, in: result)
         }
@@ -133,25 +137,62 @@ extension SyntaxResolver {
             return components.first.map { resolveByName($0, in: result) } ?? []
         }
 
-        let containerName = components.dropLast().last ?? ""
+        // Walk the full container chain (e.g. `Outer.Inner.method` →
+        // expected chain `["Outer", "Inner"]`). The previous
+        // implementation only checked the immediate container
+        // (`components.dropLast().last`), so deeply nested types
+        // silently dropped to recall-loss territory.
+        let expectedChain = Array(components.dropLast())
+        let immediateContainerName = expectedChain.last ?? ""
 
         // Find all declarations with the member name
         let memberDecls = result.declarations.find(name: memberName)
 
-        // Filter to those inside the container scope
+        // Filter to those whose enclosing-scope chain matches the
+        // full expected container chain.
         return memberDecls.compactMap { decl -> SymbolMatch? in
-            // Check if this declaration is inside the container
-            let containerDecl = findContainingType(for: decl, in: result)
-
-            guard containerDecl?.name == containerName else {
+            guard containingTypeChain(for: decl, in: result) == expectedChain else {
                 return nil
             }
 
             let match = convertToSymbolMatch(decl, scopeTree: result.scopes)
-            return match.withContainingType(containerName)
+            return match.withContainingType(immediateContainerName)
         }
     }
 
+    /// Walk outward from `decl`'s scope, collecting the names of every
+    /// enclosing type / extension declaration in outer-to-inner order.
+    /// Used to match a qualified-name request against the actual scope
+    /// nesting. Mirrors the single-step `findContainingType` walk but
+    /// continues past the first hit so deeply nested types
+    /// (`Outer.Inner.Leaf.method`) resolve correctly.
+    private func containingTypeChain(
+        for decl: Declaration,
+        in result: AnalysisResult,
+    ) -> [String] {
+        var chain: [String] = []
+        var currentScope: ScopeID? = decl.scope
+        while let scopeID = currentScope, let scope = result.scopes.scope(for: scopeID) {
+            switch scope.kind {
+            case .actor, .class, .struct, .enum, .protocol, .extension:
+                if let typeName = scope.name {
+                    chain.append(typeName)
+                }
+            default:
+                break
+            }
+            currentScope = scope.parent
+        }
+        return chain.reversed()
+    }
+
+    /// Default regex query matches by **whole-identifier** (full-name
+    /// match), not substring. The previous `.contains(regex)` shape
+    /// turned a query like `"load"` into a hit on `loadUsers`,
+    /// `uploadData`, `download`, and `reloadAll` — over-eager and
+    /// rarely what users want from a name-search interface. Callers
+    /// who want substring matching can supply an explicit
+    /// substring-shaped regex (`.*load.*`).
     private func resolveByRegex(_ pattern: String, in result: AnalysisResult) throws -> [SymbolMatch] {
         let regex = try Regex(pattern)
 
@@ -159,7 +200,9 @@ extension SyntaxResolver {
 
         return
             allDeclarations
-            .filter { $0.name.contains(regex) }
+            .filter { decl in
+                decl.name.wholeMatch(of: regex) != nil
+            }
             .map { convertToSymbolMatch($0, scopeTree: result.scopes) }
     }
 
@@ -309,6 +352,25 @@ extension SyntaxResolver {
             return .write
         default:
             return .reference
+        }
+    }
+}
+
+// MARK: - SyntaxResolverError
+
+/// Errors thrown by `SyntaxResolver` when a query is structurally
+/// unresolvable through syntax-only analysis.
+public enum SyntaxResolverError: Error, Sendable, CustomStringConvertible {
+    /// A `.usr(...)` query was issued but the resolver has no
+    /// IndexStoreDB backing. Switch to `--mode indexStore` or supply
+    /// `--index-store-path`.
+    case usrResolutionRequiresIndexStore(usr: String)
+
+    public var description: String {
+        switch self {
+        case .usrResolutionRequiresIndexStore(let usr):
+            return
+                "SyntaxResolver cannot resolve USR '\(usr)'. USR resolution requires IndexStoreDB; use `--mode indexStore` or supply `--index-store-path`."
         }
     }
 }

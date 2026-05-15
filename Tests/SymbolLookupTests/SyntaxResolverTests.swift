@@ -258,8 +258,8 @@ struct SyntaxResolverTests {
 
     // MARK: - USR Resolution
 
-    @Test("USR resolution returns empty for syntax resolver")
-    func usrReturnsEmpty() async throws {
+    @Test("USR resolution throws a typed error on syntax resolver")
+    func usrThrowsTypedError() async throws {
         let code = """
             func test() {}
             """
@@ -268,9 +268,13 @@ struct SyntaxResolverTests {
         defer { cleanupFile(file) }
 
         let resolver = SyntaxResolver()
-        let matches = try await resolver.resolve(.usr("s:4test4testyyF"), in: [file])
-
-        #expect(matches.isEmpty)  // USR not supported in syntax mode
+        // Post-α.17: USR resolution is unsupported on the syntax path.
+        // The resolver now throws a typed `SyntaxResolverError` rather
+        // than silently returning `[]`, so callers can't misinterpret
+        // "no result" as "no match".
+        await #expect(throws: SyntaxResolverError.self) {
+            _ = try await resolver.resolve(.usr("s:4test4testyyF"), in: [file])
+        }
     }
 
     // MARK: - Reference Finding

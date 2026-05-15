@@ -410,7 +410,7 @@ public struct LSHPipeline: Sendable {
     // MARK: Lifecycle
 
     public init(
-        numHashes: Int = 128,
+        numHashes: Int = 256,
         threshold: Double = 0.5,
         seed: UInt64 = 42,
     ) {

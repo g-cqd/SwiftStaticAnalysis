@@ -81,7 +81,7 @@ public struct MinHashSignature: Sendable, Hashable {
 public struct MinHashGenerator: Sendable {
     // MARK: Lifecycle
 
-    public init(numHashes: Int = 128, seed: UInt64 = 42) {
+    public init(numHashes: Int = 256, seed: UInt64 = 42) {
         self.numHashes = numHashes
 
         // Generate independent coefficients via SplitMix64. The Mersenne-prime
@@ -288,7 +288,7 @@ extension MinHashGenerator {
 public struct WeightedMinHashGenerator: Sendable {
     // MARK: Lifecycle
 
-    public init(numHashes: Int = 128, seed: UInt64 = 42) {
+    public init(numHashes: Int = 256, seed: UInt64 = 42) {
         self.numHashes = numHashes
         baseGenerator = MinHashGenerator(numHashes: numHashes, seed: seed)
     }

@@ -49,7 +49,7 @@ public struct ParallelLSHPipeline: Sendable {
     ///   - seed: Random seed.
     ///   - maxConcurrency: Maximum concurrent tasks.
     public init(
-        numHashes: Int = 128,
+        numHashes: Int = 256,
         threshold: Double = 0.5,
         seed: UInt64 = 42,
         maxConcurrency: Int = ProcessInfo.processInfo.activeProcessorCount
