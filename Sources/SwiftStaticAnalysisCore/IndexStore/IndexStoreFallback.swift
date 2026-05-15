@@ -282,7 +282,7 @@ public final class IndexStoreFallbackManager: Sendable {
             let storePath = URL(fileURLWithPath: indexStorePath)
             let databasePath = storePath.deletingLastPathComponent().appendingPathComponent("IndexDatabase")
 
-            try FileManager.default.createDirectory(at: databasePath, withIntermediateDirectories: true)
+            try prepareDatabaseDirectory(at: databasePath)
 
             let libPath = libIndexStorePath ?? IndexStoreReader.findLibIndexStore()
 
@@ -308,6 +308,51 @@ public final class IndexStoreFallbackManager: Sendable {
             }
         } catch {
             return .reachability(reason: .indexStoreFailed(error: error.localizedDescription))
+        }
+    }
+
+    /// Validate `databasePath` and create the directory if the caller
+    /// opted in. Centralises the two gates (`allowsIndexDatabaseCreation`
+    /// for write-side-effect avoidance and `sandboxRootPath` for TOCTOU
+    /// re-validation) so both filesystem touch points share one
+    /// implementation.
+    private func prepareDatabaseDirectory(at databasePath: URL) throws {
+        if let root = configuration.sandboxRootPath {
+            try Self.ensurePathStaysUnder(root: root, candidate: databasePath.path)
+        }
+        if configuration.allowsIndexDatabaseCreation {
+            try FileManager.default.createDirectory(at: databasePath, withIntermediateDirectories: true)
+        } else {
+            var isDirectory: ObjCBool = false
+            let exists = FileManager.default.fileExists(
+                atPath: databasePath.path,
+                isDirectory: &isDirectory,
+            )
+            if !exists || !isDirectory.boolValue {
+                throw IndexStoreError.databaseDirectoryMissing(databasePath.path)
+            }
+        }
+    }
+
+    /// Re-validate that `candidate` resolves to a path underneath
+    /// `root`. Uses the same canonical-path + separator-aware prefix
+    /// pattern that `CodebaseContext.validatePath` applies upstream so
+    /// the contracts compose.
+    static func ensurePathStaysUnder(root: String, candidate: String) throws {
+        let canonicalRoot = URL(fileURLWithPath: root).resolvingSymlinksInPath().standardizedFileURL.path
+        let canonicalCandidate = URL(fileURLWithPath: candidate).resolvingSymlinksInPath().standardizedFileURL.path
+        let rootWithSlash = canonicalRoot.hasSuffix("/") ? canonicalRoot : canonicalRoot + "/"
+        guard canonicalCandidate == canonicalRoot || canonicalCandidate.hasPrefix(rootWithSlash) else {
+            throw IndexStoreError.failedToOpenDatabase(
+                underlying: NSError(
+                    domain: "IndexStoreFallback",
+                    code: 1,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Derived index database path \(canonicalCandidate) escapes sandbox root \(canonicalRoot)"
+                    ],
+                )
+            )
         }
     }
 
@@ -380,7 +425,7 @@ public final class IndexStoreFallbackManager: Sendable {
             let storePath = URL(fileURLWithPath: indexStorePath)
             let databasePath = storePath.deletingLastPathComponent().appendingPathComponent("IndexDatabase")
 
-            try FileManager.default.createDirectory(at: databasePath, withIntermediateDirectories: true)
+            try prepareDatabaseDirectory(at: databasePath)
 
             let libPath = libIndexStorePath ?? IndexStoreReader.findLibIndexStore()
 
@@ -507,6 +552,7 @@ public struct FallbackConfiguration: Sendable {
         hybridMode: Bool = false,
         maxStaleness: TimeInterval = 3600,  // 1 hour
         allowsIndexDatabaseCreation: Bool = true,
+        sandboxRootPath: String? = nil,
         logger: AnalysisLogger = .osLog(category: "IndexStoreFallback"),
     ) {
         self.autoBuild = autoBuild
@@ -515,6 +561,7 @@ public struct FallbackConfiguration: Sendable {
         self.hybridMode = hybridMode
         self.maxStaleness = maxStaleness
         self.allowsIndexDatabaseCreation = allowsIndexDatabaseCreation
+        self.sandboxRootPath = sandboxRootPath
         self.logger = logger
     }
 
@@ -562,6 +609,15 @@ public struct FallbackConfiguration: Sendable {
     /// (MCP) that must not perform filesystem-write side effects from
     /// attacker-controllable argument paths.
     public var allowsIndexDatabaseCreation: Bool
+
+    /// When non-nil, every derived filesystem path the fallback layer
+    /// touches (notably the sibling `IndexDatabase/` directory of an
+    /// attacker-supplied `indexStorePath`) is re-validated to stay
+    /// underneath this root via canonical-path prefix check. Closes
+    /// the TOCTOU window between a sandboxed caller's initial
+    /// `validatePath` and the fallback's subsequent filesystem
+    /// operations. CLI / programmatic callers leave this `nil`.
+    public var sandboxRootPath: String?
 
     /// Logger used for fallback warnings.
     public var logger: AnalysisLogger

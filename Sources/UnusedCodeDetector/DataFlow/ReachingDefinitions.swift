@@ -352,26 +352,33 @@ internal struct ReachingDefinitionsAnalysis: Sendable {
             reachOut[id] = genSets[id] ?? []
         }
 
-        // Worklist is a `Collections.Heap<Int>` keyed on the block's
-        // reverse-postorder index, plus a parallel `inWorklist: Set<Int>`
-        // for de-duplication. Each pop / push is O(log B). Total bound:
-        // O(B × maxIterations × log B).
-        var rpoIndex: [BlockID: Int] = [:]
-        rpoIndex.reserveCapacity(cfg.reversePostOrder.count)
+        // Worklist is a `Collections.Heap<Int>` keyed on a unique
+        // workIndex per block. Reachable blocks get their reverse-
+        // postorder index in `[0, reachableCount)`; unreachable blocks
+        // get `[reachableCount, totalCount)` in `blockOrder` traversal
+        // order. `blockByWorkIndex` is the 1-to-1 inverse so `popMin`
+        // can recover the matching block without ambiguity. Each push
+        // / pop is O(log B); total bound O(B × maxIterations × log B).
+        var workIndex: [BlockID: Int] = [:]
+        workIndex.reserveCapacity(cfg.blockOrder.count)
+        var blockByWorkIndex: [BlockID] = []
+        blockByWorkIndex.reserveCapacity(cfg.blockOrder.count)
         for (index, blockID) in cfg.reversePostOrder.enumerated() {
-            rpoIndex[blockID] = index
+            workIndex[blockID] = index
+            blockByWorkIndex.append(blockID)
         }
-        // Seed the worklist with every block in RPO order. Blocks not
-        // in `reversePostOrder` (unreachable) get a high sentinel
-        // index so they're processed last but still processed.
+        for blockID in cfg.blockOrder where workIndex[blockID] == nil {
+            workIndex[blockID] = blockByWorkIndex.count
+            blockByWorkIndex.append(blockID)
+        }
+
         var worklist = Heap<Int>()
         var inWorklist = Set<Int>()
-        worklist.reserveCapacity(cfg.blockOrder.count)
-        let unreachableBase = cfg.reversePostOrder.count
-        for (offset, blockID) in cfg.blockOrder.enumerated() {
-            let index = rpoIndex[blockID] ?? (unreachableBase + offset)
-            worklist.insert(index)
-            inWorklist.insert(index)
+        worklist.reserveCapacity(blockByWorkIndex.count)
+        for blockID in cfg.blockOrder {
+            if let index = workIndex[blockID], inWorklist.insert(index).inserted {
+                worklist.insert(index)
+            }
         }
         var iterations = 0
 
@@ -379,11 +386,8 @@ internal struct ReachingDefinitionsAnalysis: Sendable {
             iterations += 1
             inWorklist.remove(nextIndex)
 
-            let blockID: BlockID =
-                nextIndex < cfg.reversePostOrder.count
-                ? cfg.reversePostOrder[nextIndex]
-                : cfg.blockOrder[nextIndex - unreachableBase]
-
+            guard nextIndex >= 0, nextIndex < blockByWorkIndex.count else { continue }
+            let blockID = blockByWorkIndex[nextIndex]
             guard let block = cfg.blocks[blockID] else { continue }
 
             // Compute REACH_in = ∪ REACH_out[P] for all predecessors P
@@ -406,8 +410,9 @@ internal struct ReachingDefinitionsAnalysis: Sendable {
 
                 // Enqueue successors that aren't already pending.
                 for successorID in block.successors {
-                    let successorIndex = rpoIndex[successorID] ?? unreachableBase
-                    if inWorklist.insert(successorIndex).inserted {
+                    if let successorIndex = workIndex[successorID],
+                        inWorklist.insert(successorIndex).inserted
+                    {
                         worklist.insert(successorIndex)
                     }
                 }

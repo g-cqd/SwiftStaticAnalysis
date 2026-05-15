@@ -578,6 +578,11 @@ extension SWAMCPServer {
         // `IndexDatabase/` directory even though `index_store_path` is
         // sandbox-validated upstream — keeps "read" tools side-effect-free.
         config.allowsIndexDatabaseCreation = false
+        // Re-validate every filesystem path the IndexStore fallback layer
+        // derives (notably `parent(indexStorePath)/IndexDatabase`) against
+        // the codebase root. Closes the TOCTOU window between
+        // `validatePath` and the fallback's subsequent operations.
+        config.sandboxRootPath = context.rootPath
 
         if let args = arguments {
             // Detection mode

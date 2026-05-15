@@ -941,3 +941,95 @@ struct SliceBasedTokenSequenceTests {
         #expect(sequence.text(at: 1) == "test")
     }
 }
+
+// MARK: - Cage-pattern Sendable regression
+//
+// `MemoryMappedFile`, `FileSlice`, and `ArenaTokenStorage` are plain
+// `Sendable` because their unsafe state lives inside private
+// `@unchecked Sendable` storage classes (the cage). If a future refactor
+// adds a mutable field to one of those storage classes, the compiler
+// still accepts the public type's `Sendable` conformance silently. These
+// tests exercise the contract at runtime — each cage type is constructed
+// on the parent task and read from a `Task.detached`, so any future
+// regression that breaks the cross-actor read shape would surface as a
+// test failure rather than as a quiet sharing of mutable state.
+
+@Suite("Cage Sendable Regression Tests")
+struct CageSendableTests {
+    private func createTempBytes(_ content: String) throws -> String {
+        let tmpURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cage-\(UUID().uuidString).bin")
+        try content.write(to: tmpURL, atomically: true, encoding: .utf8)
+        return tmpURL.path
+    }
+
+    private func deleteTemp(_ path: String) {
+        try? FileManager.default.removeItem(atPath: path)
+    }
+
+    @Test("MemoryMappedFile is safe to read across a detached task")
+    func memoryMappedFileCrossesActor() async throws {
+        let path = try createTempBytes("alpha\nbeta\ngamma\n")
+        defer { deleteTemp(path) }
+
+        let mmf = try MemoryMappedFile(path: path)
+        // The closure captures `mmf` by value; the cage class is
+        // strongly referenced by the storage, so the mapping outlives
+        // the task launch.
+        let newlines = await Task.detached { () -> Int in
+            mmf.withRawSpan { span -> Int in
+                var count = 0
+                for index in 0..<span.byteCount where span.unsafeLoad(fromByteOffset: index, as: UInt8.self) == 0x0A {
+                    count &+= 1
+                }
+                return count
+            }
+        }.value
+        #expect(newlines == 3, "Should observe all three newlines from the detached task")
+    }
+
+    @Test("FileSlice is safe to read across a detached task")
+    func fileSliceCrossesActor() async throws {
+        let path = try createTempBytes("hello, world\n")
+        defer { deleteTemp(path) }
+
+        let mmf = try MemoryMappedFile(path: path)
+        let slice = mmf.slice(offset: 0, length: 5)
+        let observed = await Task.detached { () -> String? in
+            slice.asString()
+        }.value
+        #expect(observed == "hello", "Detached task should see the slice contents through the cage")
+    }
+
+    @Test("ArenaTokenStorage is safe to read across a detached task")
+    func arenaTokenStorageCrossesActor() async throws {
+        // Build a small SoATokenStorage, copy it into an arena-backed view,
+        // then read from a detached task. The arena stays alive for the
+        // duration of the test (until the `await` returns), which is the
+        // lifetime contract callers must honour.
+        var soa = SoATokenStorage(capacity: 3)
+        for entry in [(kind: UInt8(1), offset: UInt32(0), length: UInt16(4), line: UInt32(1)),
+                      (kind: UInt8(2), offset: UInt32(5), length: UInt16(5), line: UInt32(1)),
+                      (kind: UInt8(3), offset: UInt32(11), length: UInt16(3), line: UInt32(2))] {
+            soa.append(
+                kind: TokenKindByte(rawValue: entry.kind),
+                offset: entry.offset,
+                length: entry.length,
+                line: entry.line,
+                column: 0,
+            )
+        }
+        var arena = Arena()
+        let storage = ArenaTokenStorage(from: soa, arena: &arena)
+
+        let summary = await Task.detached { () -> (count: Int, firstKind: UInt8, lastLine: UInt32) in
+            (storage.count, storage.kinds[0], storage.lines[storage.count - 1])
+        }.value
+        #expect(summary.count == 3)
+        #expect(summary.firstKind == 1)
+        #expect(summary.lastLine == 2)
+
+        // Keep arena alive past the await — proves the lifetime contract.
+        _ = consume arena
+    }
+}

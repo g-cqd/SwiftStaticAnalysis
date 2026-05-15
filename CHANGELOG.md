@@ -5,6 +5,84 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.12] - Unreleased
+
+Closes two HIGH-severity security findings and one correctness bug
+surfaced by the post-α.11 re-audit. 1133 tests green (1130 plus
+three cross-actor Sendable regression tests). Bench baselines refreshed.
+
+### Correctness
+
+- **Dataflow worklist decoherence.** Both
+  `LiveVariableAnalysis.computeLiveVariables` and
+  `ReachingDefinitions.computeReachingDefinitions` keyed their `Heap<Int>`
+  worklist on values that could collide across blocks (notably
+  `Int.max` / `unreachableBase` for every unreachable block). The
+  `LiveVariableAnalysis` `blocksByKey` stack could silently drop a
+  block when a predecessor re-inserted a colliding key in the same
+  iteration; `ReachingDefinitions` re-enqueued unreachable successors
+  under a bare sentinel, causing the wrong block to be processed on
+  pop. Both now use a unique workIndex per block
+  (`[0, reachableCount)` for the reverse-postorder reachable set,
+  `[reachableCount, totalCount)` for unreachable blocks in
+  `blockOrder` traversal order) with a 1-to-1
+  `blockByWorkIndex: [BlockID]` inverse so `popMin` deterministically
+  recovers the matching block. The forward / backward distinction is
+  encoded in the key projection only.
+
+### Security
+
+- **`IndexStoreFallback` honours `allowsIndexDatabaseCreation`.** The
+  two `FileManager.default.createDirectory(...)` call sites at
+  `IndexStoreFallback.swift:285` (open-index path) and `:383`
+  (modification-time probe path) were unconditional, bypassing the
+  flag the MCP handler already sets on `IndexStoreReader.init`. A
+  hostile MCP client could drive a `createDirectory` write at
+  `parent(index_store_path)/IndexDatabase` inside the sandbox root
+  even though `read_*` tools advertise themselves as read-only. Both
+  sites now route through a shared `prepareDatabaseDirectory(at:)`
+  helper that gates on `configuration.allowsIndexDatabaseCreation`
+  (throws `IndexStoreError.databaseDirectoryMissing` when creation
+  is forbidden and the directory does not already exist).
+- **`FallbackConfiguration.sandboxRootPath` re-validates derived
+  paths.** When non-nil (the MCP server sets it to `context.rootPath`),
+  every derived filesystem path the fallback layer touches —
+  specifically `parent(indexStorePath)/IndexDatabase` — is
+  re-validated through `ensurePathStaysUnder(root:candidate:)` (the
+  same canonical-path + separator-aware prefix shape
+  `CodebaseContext.validatePath` applies upstream). Closes the TOCTOU
+  window between the MCP handler's initial path validation and the
+  fallback layer's subsequent operations.
+
+### Test coverage
+
+- **Cross-actor Sendable regression tests** for the memory-layer cage
+  pattern. New `CageSendableTests` suite in `MemoryTests.swift`
+  exercises `MemoryMappedFile`, `FileSlice`, and `ArenaTokenStorage`
+  across a `Task.detached` boundary. The cage pattern (private
+  `@unchecked Sendable` storage class behind a `Sendable` public
+  value type) compiles silently even if a future refactor adds a
+  mutable field to the storage class; the runtime tests pin the
+  cross-actor read contract so a regression surfaces as a failure
+  rather than as quiet sharing of mutable state.
+
+### Perf
+
+`unused-simple` shifted from 0.104s → 0.118s mean (+13.78% over the
+previous baseline) — small absolute (10ms on a 100ms scenario),
+likely cache-line pressure from `UnusedCodeConfiguration` gaining a
+`sandboxRootPath: String?` field. Bench baselines refreshed against
+the post-fix code so future PRs are gated against the real surface.
+Other scenarios moved within thermal-noise envelope.
+
+### Migration notes
+
+- `FallbackConfiguration.init` gains a `sandboxRootPath: String? = nil`
+  parameter. Defaults preserve CLI / programmatic behaviour
+  (`nil` = skip re-validation); only sandboxed callers set it.
+- `UnusedCodeConfiguration.init` gains the same parameter in the
+  same position. Same defaults / semantics.
+
 ## [0.3.0-alpha.11] - Unreleased
 
 Final scrub of plan / scheduling / decision-making residue in test

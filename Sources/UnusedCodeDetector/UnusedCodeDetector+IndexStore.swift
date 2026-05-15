@@ -24,6 +24,7 @@ extension UnusedCodeDetector {
             warnOnStale: configuration.warnOnStaleIndex,
             hybridMode: configuration.hybridMode,
             allowsIndexDatabaseCreation: configuration.allowsIndexDatabaseCreation,
+            sandboxRootPath: configuration.sandboxRootPath,
             logger: configuration.logger,
         )
         let fallbackManager = IndexStoreFallbackManager(configuration: fallbackConfig)

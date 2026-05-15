@@ -27,6 +27,7 @@ public struct UnusedCodeConfiguration: Sendable {
         treatTestsAsRoot: Bool = true,
         autoBuild: Bool = false,
         allowsIndexDatabaseCreation: Bool = true,
+        sandboxRootPath: String? = nil,
         hybridMode: Bool = false,
         warnOnStaleIndex: Bool = true,
         useIncremental: Bool = false,
@@ -54,6 +55,7 @@ public struct UnusedCodeConfiguration: Sendable {
         self.treatTestsAsRoot = treatTestsAsRoot
         self.autoBuild = autoBuild
         self.allowsIndexDatabaseCreation = allowsIndexDatabaseCreation
+        self.sandboxRootPath = sandboxRootPath
         self.hybridMode = hybridMode
         self.warnOnStaleIndex = warnOnStaleIndex
         self.useIncremental = useIncremental
@@ -147,6 +149,14 @@ public struct UnusedCodeConfiguration: Sendable {
     /// filesystem-write side effect at an attacker-chosen location,
     /// even after the path-validation gate in `handleDetectUnusedCode`.
     public var allowsIndexDatabaseCreation: Bool
+
+    /// When non-nil, sandboxed callers (notably the MCP server) supply
+    /// the codebase root here. The IndexStore fallback layer
+    /// re-validates every derived path it touches against this root
+    /// (canonical, separator-aware prefix check), closing the TOCTOU
+    /// window between the initial `CodebaseContext.validatePath` and
+    /// the fallback's subsequent filesystem operations.
+    public var sandboxRootPath: String?
 
     /// Use hybrid mode (index for cross-module, syntax for local).
     public var hybridMode: Bool

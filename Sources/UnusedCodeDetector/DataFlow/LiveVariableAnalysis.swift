@@ -198,56 +198,53 @@ internal struct LiveVariableAnalysis: Sendable {
             liveOut[id] = []
         }
 
-        // RPO map. Reverse-postorder index `i` ↔ block; for liveness
-        // we want postorder traversal, so we key the heap on
-        // `(reversePostOrderCount - 1 - i)` and pop the smallest —
-        // that's the deepest block first.
-        var rpoIndex: [BlockID: Int] = [:]
-        rpoIndex.reserveCapacity(cfg.reversePostOrder.count)
+        // Assign every block a unique workIndex. Reachable blocks get
+        // their reverse-postorder index in `[0, reachableCount)`;
+        // unreachable blocks get `[reachableCount, totalCount)` in
+        // `blockOrder` traversal order. `blockByWorkIndex` is the
+        // 1-to-1 inverse so `popMin` can recover the matching block.
+        let reachableCount = cfg.reversePostOrder.count
+        var workIndex: [BlockID: Int] = [:]
+        workIndex.reserveCapacity(cfg.blockOrder.count)
+        var blockByWorkIndex: [BlockID] = []
+        blockByWorkIndex.reserveCapacity(cfg.blockOrder.count)
         for (index, blockID) in cfg.reversePostOrder.enumerated() {
-            rpoIndex[blockID] = index
+            workIndex[blockID] = index
+            blockByWorkIndex.append(blockID)
         }
-        let lastRPOIndex = max(0, cfg.reversePostOrder.count - 1)
-        func postorderKey(for blockID: BlockID) -> Int {
-            if let index = rpoIndex[blockID] {
-                return lastRPOIndex - index
-            }
-            // Unreachable blocks: dump at the very end of the heap so
-            // they still get processed but don't starve reachable ones.
-            return Int.max
+        for blockID in cfg.blockOrder where workIndex[blockID] == nil {
+            workIndex[blockID] = blockByWorkIndex.count
+            blockByWorkIndex.append(blockID)
+        }
+        let lastWorkIndex = max(0, blockByWorkIndex.count - 1)
+
+        // Backward analysis: we want the deepest reachable block popped
+        // first. Key the heap on `lastWorkIndex - workIndex` so `popMin`
+        // returns the largest workIndex (deepest reachable; unreachable
+        // blocks fall after all reachable ones).
+        @inline(__always)
+        func key(for blockID: BlockID) -> Int {
+            lastWorkIndex - (workIndex[blockID] ?? lastWorkIndex)
         }
 
         var worklist = Heap<Int>()
         var inWorklist = Set<Int>()
-        worklist.reserveCapacity(cfg.blockOrder.count)
+        worklist.reserveCapacity(blockByWorkIndex.count)
         for blockID in cfg.blockOrder {
-            let key = postorderKey(for: blockID)
-            if inWorklist.insert(key).inserted {
-                worklist.insert(key)
+            let k = key(for: blockID)
+            if inWorklist.insert(k).inserted {
+                worklist.insert(k)
             }
-        }
-
-        // Maintain a key → blockID map so popMin can recover the
-        // matching block. We can have multiple blocks at Int.max
-        // (unreachable); keep a stack per key.
-        var blocksByKey: [Int: [BlockID]] = [:]
-        for blockID in cfg.blockOrder {
-            let key = postorderKey(for: blockID)
-            blocksByKey[key, default: []].append(blockID)
         }
 
         var iterations = 0
-        while let key = worklist.popMin(), iterations < configuration.maxIterations {
+        while let k = worklist.popMin(), iterations < configuration.maxIterations {
             iterations += 1
-            inWorklist.remove(key)
-            guard let blockID = blocksByKey[key]?.popLast() else { continue }
-            // If a block re-enqueues itself, put it back so future
-            // pops find it again.
-            defer {
-                if inWorklist.contains(key) {
-                    blocksByKey[key, default: []].append(blockID)
-                }
-            }
+            inWorklist.remove(k)
+
+            let resolvedIndex = lastWorkIndex - k
+            guard resolvedIndex >= 0, resolvedIndex < blockByWorkIndex.count else { continue }
+            let blockID = blockByWorkIndex[resolvedIndex]
             guard let block = cfg.blocks[blockID] else { continue }
 
             // Compute LIVE_out = ∪ LIVE_in[S] for all successors S
@@ -280,10 +277,9 @@ internal struct LiveVariableAnalysis: Sendable {
 
                 // Add predecessors to the worklist (dedup via inWorklist).
                 for predecessorID in block.predecessors {
-                    let predecessorKey = postorderKey(for: predecessorID)
+                    let predecessorKey = key(for: predecessorID)
                     if inWorklist.insert(predecessorKey).inserted {
                         worklist.insert(predecessorKey)
-                        blocksByKey[predecessorKey, default: []].append(predecessorID)
                     }
                 }
             }
