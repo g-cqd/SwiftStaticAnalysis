@@ -251,10 +251,10 @@ Use <doc:IgnoreDirectives> to suppress known false positives.
 ## Implementation Sources
 
 - `Sources/UnusedCodeDetector/Reachability/ParallelBFS.swift` (direction-optimizing BFS)
-- `Sources/UnusedCodeDetector/Reachability/DenseGraph.swift` and `Sources/UnusedCodeDetector/Reachability/Bitmap.swift`
+- `Sources/UnusedCodeDetector/Reachability/DenseGraph.swift`
+- `Sources/SwiftStaticAnalysisCore/Concurrency/AtomicBitmap.swift` (lock-free visited tracking)
 - `Sources/UnusedCodeDetector/Reachability/DependencyExtractor.swift` (parallel edge building)
-- `Sources/UnusedCodeDetector/IndexStore/IndexStoreReader.swift` (index store discovery)
-- `PARALLEL_BFS_STUDY.md` and `PARALLEL_BFS_IMPLEMENTATION_STUDY.md`
+- `Sources/SwiftStaticAnalysisCore/IndexStore/IndexStoreReader.swift` (index store discovery)
 
 ## See Also
 

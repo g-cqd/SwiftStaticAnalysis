@@ -35,7 +35,7 @@ consumers can opt into only what they need.
               ┌───▼───────────────▼────────────────┐
               │     SwiftStaticAnalysisCore         │
               │  Models  • Parsing • Memory • IO    │
-              │  Bitmap  • AtomicBitmap • Arena     │
+              │  AtomicBitmap • Arena • IndexStore  │
               │  Concurrency • DenseGraph utilities │
               └─────────────────────────────────────┘
 ```
@@ -55,34 +55,30 @@ your own host process.
 - **SwiftStaticAnalysisCore** has no dependency on the detector modules.
   It owns models (`Declaration`, `Reference`, `SourceLocation`), parsing
   (`SwiftFileParser`), memory (`MemoryMappedFile`, `SourceFileReader`,
-  `Arena`), concurrency primitives (`Bitmap`, `AtomicBitmap`,
-  `BackpressuredChannelStream`, `TaskBackedAsyncStream`), and utilities
-  (`FNV1a`, `PathUtilities`, `RegexCache`, `ProcessExecutor`).
+  `Arena`), the IndexStore reader / fallback layer, concurrency
+  primitives (`AtomicBitmap`, `BackpressuredChannelStream`,
+  `TaskBackedAsyncStream`), and utilities (`FNV1a`, `PathUtilities`,
+  `RegexCache`).
 - **DuplicationDetector** depends on Core only. Its SuffixArray /
   MinHash / Parallel internals are all `internal` or `package`.
-- **UnusedCodeDetector** depends on Core + `IndexStoreDB`. Its
-  reachability and IndexStore implementation helpers are mostly
-  `internal` or `package`.
-- **SymbolLookup** depends on Core + UnusedCodeDetector. The
-  cross-module edge exists because `IndexStoreResolver` consumes the
-  `IndexStoreReader` and `IndexedOccurrence` types that
-  `UnusedCodeDetector` owns. No inverted dependency: SymbolLookup is a
-  *consumer* of those types.
+- **UnusedCodeDetector** depends on Core. Reachability and IndexStore
+  analyzer helpers are mostly `internal` or `package`.
+- **SymbolLookup** depends on Core. Its `IndexStoreResolver` consumes
+  the `IndexStoreReader` and `IndexedOccurrence` types that Core owns.
 - **SwiftStaticAnalysisMCP** depends on Core + DuplicationDetector +
   UnusedCodeDetector + SymbolLookup + `swift-sdk`.
 
-In 0.2.0 the previously inverted edge from `DuplicationDetector` into
-`UnusedCodeDetector` (which existed only to import `Bitmap`) was broken
-by moving `Bitmap` / `AtomicBitmap` into Core.
+The `IndexStoreReader` / `IndexStoreFallback` types live in Core. No
+detector module imports another detector module.
 
 ## Layering rules
 
 | Layer | Imports allowed |
 |---|---|
-| Core | Foundation, SwiftParser, SwiftSyntax, swift-collections, swift-algorithms, swift-async-algorithms, Synchronization |
+| Core | Foundation, SwiftParser, SwiftSyntax, swift-collections, swift-algorithms, swift-async-algorithms, Synchronization, IndexStoreDB, SystemPackage |
 | DuplicationDetector | + Core |
-| UnusedCodeDetector | + Core, IndexStoreDB |
-| SymbolLookup | + Core, UnusedCodeDetector (for IndexStore types) |
+| UnusedCodeDetector | + Core |
+| SymbolLookup | + Core |
 | SwiftStaticAnalysisOutput | + Core, DuplicationDetector, UnusedCodeDetector (formatting only) |
 | SwiftStaticAnalysisMCP | + Core, all analysers, MCP |
 | SwiftStaticAnalysis | re-exports the analyser layers |

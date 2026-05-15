@@ -8,10 +8,8 @@ import PackageDescription
 let package = Package(
     name: "SwiftStaticAnalysis",
     platforms: [
-        // 0.3.0-α: dropped .iOS(.v18). `IndexStoreDB` is macOS-only and
-        // now sits in `SwiftStaticAnalysisCore`'s dependency closure;
-        // there is no usable iOS configuration. The pre-0.3 iOS
-        // declaration was a build-time trap with no CI gate behind it.
+        // macOS only. `IndexStoreDB` sits in `SwiftStaticAnalysisCore`'s
+        // dependency closure and has no iOS configuration.
         .macOS(.v15),
     ],
     products: [
@@ -95,12 +93,11 @@ let package = Package(
         .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.3"),
         .package(url: "https://github.com/apple/swift-async-algorithms.git", .upToNextMajor(from: "1.1.1")),
         .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.0"),
-        // swift-atomics dropped in 0.2.0 in favour of stdlib `Synchronization.Atomic`.
         .package(url: "https://github.com/apple/swift-collections.git", .upToNextMajor(from: "1.3.0")),
-        // 0.3.0-α.5: swift-system gives us typed `FilePath` / `FileDescriptor`
-        // for the memory-mapping layer. The package was already a
-        // transitive dependency (via indexstore-db); pinned explicitly
-        // here so the import is honest at the manifest level.
+        // swift-system supplies the typed `FilePath` / `FileDescriptor`
+        // the memory-mapping layer opens against. Already transitive via
+        // indexstore-db; pinned explicitly so the manifest matches the
+        // imports.
         .package(url: "https://github.com/apple/swift-system.git", from: "1.4.0"),
     ],
     targets: [
@@ -113,17 +110,16 @@ let package = Package(
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-                // 0.3.0-α: IndexStoreReader + IndexStoreFallback moved into
-                // Core (`Sources/SwiftStaticAnalysisCore/IndexStore/`). This
+                // IndexStoreReader + IndexStoreFallback live in Core
+                // (`Sources/SwiftStaticAnalysisCore/IndexStore/`). This
                 // pulls IndexStoreDB into the dependency closure of every
-                // analyzer module, but removes the `SymbolLookup →
-                // UnusedCodeDetector` layering inversion the audit flagged.
+                // analyzer module but keeps `SymbolLookup` independent of
+                // `UnusedCodeDetector`.
                 .product(name: "IndexStoreDB", package: "indexstore-db"),
-                // 0.3.0-α.5: MemoryMappedFile uses swift-system's
+                // MemoryMappedFile uses swift-system's
                 // `FileDescriptor.open(FilePath, .readOnly, [.noFollow])`
-                // for the open/close pair (still mmap/munmap raw on
-                // Darwin; swift-system has no mmap wrapper). Typed
-                // errors, no raw POSIX `open` syscall.
+                // for the open/close pair. `mmap`/`munmap` are still raw
+                // on Darwin (swift-system has no mmap wrapper).
                 .product(name: "SystemPackage", package: "swift-system"),
             ],
             swiftSettings: [
@@ -137,8 +133,6 @@ let package = Package(
             name: "DuplicationDetector",
             dependencies: [
                 "SwiftStaticAnalysisCore",
-                // 0.2.0: AtomicBitmap/Bitmap moved to SwiftStaticAnalysisCore;
-                // the prior reverse dependency on UnusedCodeDetector is gone.
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
@@ -183,10 +177,9 @@ let package = Package(
         .target(
             name: "SymbolLookup",
             dependencies: [
-                // 0.3.0-α: the audit's F-01 inverted dependency
-                // (`SymbolLookup → UnusedCodeDetector` purely to borrow
-                // `IndexStoreReader`) is now gone. The reader and fallback
-                // live in Core; SymbolLookup picks them up transitively.
+                // `IndexStoreReader` / `IndexStoreFallback` live in Core;
+                // SymbolLookup picks them up transitively without
+                // depending on `UnusedCodeDetector`.
                 "SwiftStaticAnalysisCore",
                 .product(name: "IndexStoreDB", package: "indexstore-db"),
             ],
@@ -283,10 +276,6 @@ let package = Package(
             dependencies: [
                 "SwiftStaticAnalysisMCP",
                 .product(name: "MCP", package: "swift-sdk"),
-                // 0.3.0-α: swa-mcp adopts ArgumentParser to match the
-                // rest of the toolchain. Pre-0.3 it hand-rolled
-                // `CommandLine.arguments` parsing, which fumbled
-                // `--path=…` (attached value) and similar edge cases.
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             swiftSettings: [

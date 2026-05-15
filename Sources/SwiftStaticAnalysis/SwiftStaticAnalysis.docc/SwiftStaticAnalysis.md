@@ -30,10 +30,12 @@ Core infrastructure including:
 - Declaration and reference models
 - SwiftSyntax-based parsing with bounded LRU caching
 - Visitor patterns for AST traversal
-- Memory-mapped I/O (`MemoryMappedFile`, `SourceFileReader`)
-- Bit-packed reachability primitives (`Bitmap`, `AtomicBitmap`)
+- Memory-mapped I/O (`MemoryMappedFile`, `SourceFileReader`) over
+  swift-system `FileDescriptor`
+- Bit-packed reachability primitives (`AtomicBitmap` for the lock-free
+  parallel-BFS frontier; `swift-collections.BitArray` for single-threaded
+  use)
 - Bump-allocator scratch arena (`Arena`)
-- Process executor with environment scrubbing (`ProcessExecutor`)
 
 ### DuplicationDetector
 
@@ -48,7 +50,7 @@ Clone detection with multiple algorithms:
 
 Unused code detection with configurable modes:
 - **Simple Mode**: Fast syntax-based detection
-- **Reachability Mode**: Graph-based dead code analysis. BFS runs over `DenseGraph` with `Bitmap` visited tracking; auto-selects direction-optimising parallel BFS for large graphs
+- **Reachability Mode**: Graph-based dead code analysis. BFS runs over `DenseGraph` with `AtomicBitmap` (parallel) or `BitArray` (sequential) visited tracking; auto-selects direction-optimising parallel BFS for large graphs
 - **IndexStore Mode**: Cross-module accuracy using compiler index, with a single-sweep `allOccurrencesByUSR(in:)` query to avoid N+1 round trips
 
 ### SymbolLookup
@@ -101,7 +103,7 @@ The `SwiftStaticAnalysis` umbrella module re-exports the analyser libraries. Imp
 
 | Module | Key Types |
 |--------|-----------|
-| SwiftStaticAnalysisCore | `Declaration`, `Reference`, `SourceLocation`, `AnalysisResult`, `MemoryMappedFile`, `SourceFileReader`, `Bitmap`, `AtomicBitmap`, `ProcessExecutor`, `BackpressuredChannelStream` |
+| SwiftStaticAnalysisCore | `Declaration`, `Reference`, `SourceLocation`, `AnalysisResult`, `MemoryMappedFile`, `SourceFileReader`, `AtomicBitmap`, `BackpressuredChannelStream` |
 | DuplicationDetector | `DuplicationDetector`, `CloneType`, `Clone`, `CloneGroup`, `StreamingVerifier` |
 | UnusedCodeDetector | `UnusedCodeDetector`, `UnusedCode`, `Confidence`, `ReachabilityGraph` |
 | SymbolLookup | `SymbolFinder`, `SymbolQuery`, `SymbolMatch`, `SymbolContextExtractor` |

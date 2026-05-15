@@ -29,8 +29,8 @@ for large sources.
 The duplication detectors' shingle generator and SuffixArray builder
 operate on `ArraySlice` of the underlying tokens, so windowed access
 does not allocate new arrays per shingle. The Suffix Array's S/L type
-classification is stored as a `Bitmap` (1 bit per suffix) rather than
-`[Bool]` (1 byte per suffix).
+classification is stored as a `swift-collections.BitArray` (1 bit per
+suffix) rather than `[Bool]` (1 byte per suffix).
 
 **Benefit**: substantially fewer allocations on the duplication hot
 path; 8× memory reduction on the SA-IS classification vector.

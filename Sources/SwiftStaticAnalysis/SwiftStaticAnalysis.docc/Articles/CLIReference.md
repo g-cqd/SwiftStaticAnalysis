@@ -23,7 +23,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.1.4")
+    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.3.0")
 ]
 ```
 
@@ -83,7 +83,7 @@ swa duplicates [OPTIONS] <PATHS>...
 | `--types <TYPE>` | Clone types: `exact`, `near`, `semantic` (repeatable) | `exact` |
 | `--min-tokens <N>` | Minimum tokens for a clone | `50` |
 | `--min-similarity <RATIO>` | Minimum similarity (0.0-1.0) | `0.8` |
-| `--algorithm <ALG>` | Algorithm: `rollingHash`, `suffixArray`, `minHashLSH` | `rollingHash` |
+| `--algorithm <ALG>` | Algorithm: `rollingHash`, `suffixArray`, `minHashLSH` | per-type: `exact` → `suffixArray`, `near`/`semantic` → `minHashLSH`, mixed → `rollingHash` |
 | `--exclude-paths <GLOB>` | Paths to exclude (repeatable) | - |
 | `--parallel-mode <MODE>` | Parallel mode: `none`, `safe`, `maximum` | `none` |
 | `--parallel` | Deprecated: use `--parallel-mode` | `false` |

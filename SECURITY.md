@@ -4,6 +4,7 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 0.3.x   | :white_check_mark: |
 | 0.2.x   | :white_check_mark: |
 | 0.1.x   | :x:                |
 | < 0.1.0 | :x:                |
@@ -87,8 +88,11 @@ Everything else — including `DYLD_INSERT_LIBRARIES`,
 the toolchain.
 
 The SPM plugin host (`StaticAnalysisCommandPlugin`) is sandbox-locked
-to `PackagePlugin + Foundation` and cannot use `ProcessExecutor`; its
-two `Process` invocations remain in-place.
+to `PackagePlugin + Foundation` and cannot use `ProcessExecutor`. Its
+two `Process` invocations explicitly set `process.environment = [:]`
+before `Process.run()` so the same env-injection vectors
+(`DYLD_INSERT_LIBRARIES`, `SWIFTPM_HOOKS_DIR`, `BASH_ENV`) cannot ride
+through the plugin path either.
 
 ## Known Limitations
 

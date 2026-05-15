@@ -59,14 +59,16 @@ that analyse different codebases over a single server lifetime.
 
 `IndexBasedDependencyGraph` and `ReachabilityGraph` both project their
 string-keyed adjacency lists onto a `DenseGraph` (contiguous integer
-indices) lazily on the first reachability query. BFS runs over the
-dense graph with `Bitmap`-backed visited tracking — the inner loop no
+indices) lazily on the first reachability query. Sequential BFS uses
+`swift-collections.BitArray` for visited tracking; the inner loop no
 longer hashes USR strings.
 
 For graphs with ≥ 1000 nodes, `ParallelBFS.computeReachable` runs the
 Beamer-style direction-optimising BFS (top-down → bottom-up switch
-based on the α/β heuristic, with `AtomicBitmap` for lock-free visited
-tracking).
+based on the α/β heuristic) with `AtomicBitmap` for lock-free visited
+tracking and `BitArray` for the bottom-up frontier (built once per
+super-step under the structured-concurrency `let`-binding so the
+worker closures capture an immutable value).
 
 ## Real SIMD MinHash
 
@@ -82,15 +84,17 @@ asserted by `MinHashSIMDEquivalenceTests` in
 
 ## SA-IS memory layout
 
-The Suffix Array constructor uses `Bitmap` from Core for its
+The Suffix Array constructor uses `swift-collections.BitArray` for its
 S-type / L-type classification vector. That's 1 bit per suffix where
-the previous `[Bool]` was 1 byte per suffix — 8× memory saving on the
+a `[Bool]` would be 1 byte per suffix — 8× memory saving on the
 classification step for codebases with millions of tokens.
 
-Bucket scratch arrays in SA-IS (`bucketHeads`, `bucketTails`,
-`lmsNames`) and the recursive reduced strings can be migrated to the
-`Arena` bump allocator if SA-IS becomes RSS-bound. The generic-T
-migration (`UInt32` indices instead of `Int`) is on the roadmap.
+The working `sa` buffer is arena-allocated as an
+`UnsafeMutableBufferPointer<Int>` rather than a per-recursion `[Int]`.
+A single `Arena` lives at the top of `SAIS.build` and grows as
+recursion deepens; the second `placeLMSSuffixesOrdered` pass reuses the
+buffer in place. The generic-`T` migration (`UInt32` indices instead of
+`Int`) is on the roadmap.
 
 ## Streaming
 

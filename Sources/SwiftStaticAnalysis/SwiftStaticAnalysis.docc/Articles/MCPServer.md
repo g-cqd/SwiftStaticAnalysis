@@ -74,7 +74,7 @@ Detect unused code including functions, types, variables, and imports.
 
 **Parameters:**
 - `codebase_path` (optional): Path to analyze
-- `mode`: Detection mode - `simple` or `reachability`
+- `mode`: Detection mode - `simple`, `reachability`, or `indexStore`
 - `min_confidence`: Minimum confidence level - `low`, `medium`, or `high`
 - `include_public`: Whether to include public API (default: false)
 - `treat_public_as_root`: Treat public API as entry points

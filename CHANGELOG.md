@@ -5,9 +5,56 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.0-alpha.9] - Unreleased
+## [0.3.0-alpha.10] - Unreleased
 
-Removes the audit-cycle residue from the codebase. The `audit/`
+Documentation truth-up sweep against the 0.3.0-α code surface. Every
+technical claim in README, SECURITY, and the thirteen DocC articles
+verified directly. No code paths change; this is a docs-only release
+with one Package.swift comment scrub the previous α.9 commit missed.
+1130 tests green.
+
+### What changed
+
+- **README perf section** — drops the false
+  "Default signature width is `InlineArray<128, UInt64>`" claim
+  (signatures are still `[UInt64]`-backed with default count 128) and
+  the stale "`Bitmap`-typed" SA-IS reference (now
+  `swift-collections.BitArray`). Adds an honest description of the
+  arena-allocated `UnsafeMutableBufferPointer<Int>` scratch buffer.
+- **README install snippet** — version pin bumped from `0.2.1` to
+  `0.3.0`. Same in `GettingStarted.md` and `CLIReference.md` (both
+  still showed `0.1.4`).
+- **SECURITY.md** — supported-versions table now lists `0.3.x`.
+  The `StaticAnalysisCommandPlugin` section explicitly documents the
+  `process.environment = [:]` scrub the plugin already performs
+  (previous text could be read as implying the plugin path skipped
+  the scrub).
+- **DocC `SwiftStaticAnalysis.md`** — public-API table loses
+  `Bitmap` (deleted struct) and `ProcessExecutor` (now `internal`).
+  Reachability bullet names `AtomicBitmap` / `BitArray` separately.
+- **DocC `Architecture.md`** — ASCII module diagram updated; layering
+  rules table shows `IndexStoreDB` / `SystemPackage` as Core
+  dependencies and `SymbolLookup` no longer importing
+  `UnusedCodeDetector`. The "previously inverted edge" history
+  paragraph is gone (it documented planning provenance, not the
+  architecture).
+- **DocC `Performance.md`** — sequential BFS uses `BitArray`, parallel
+  BFS uses `AtomicBitmap`; SA-IS uses `BitArray` plus arena-allocated
+  `UnsafeMutableBufferPointer<Int>`.
+- **DocC `PerformanceOptimization.md`** — SA-IS classification swap
+  documented with the swift-collections type name.
+- **DocC `UnusedCodeDetection.md`** — implementation-sources list
+  corrected: `Bitmap.swift` is no longer a file; `IndexStoreReader`
+  moved to Core; `PARALLEL_BFS_STUDY.md` references removed (those
+  files don't exist on `main`).
+- **DocC `MCPServer.md`** — `detect_unused_code.mode` documented as
+  `simple | reachability | indexStore`, matching the schema.
+- **DocC `Security.md`** — pre-0.2.0 framing replaced with general
+  description of the vulnerability classes.
+- **DocC `CLIReference.md`** — `--algorithm` default cell shows the
+  per-type defaults (was incorrectly listed as `rollingHash` flat).
+- **Package.swift** — `0.3.0-α.5: ...` / `Pre-0.3 ...` / `audit F-01`
+  prose in the manifest comments scrubbed (missed by the α.9 pass). The `audit/`
 directory (audit document, six per-area scratch files, remediation
 plan) is deleted; CHANGELOG entries and source comments lose the
 B-id slugs, "audit ..." parenthetical attributions, and `0.3.0-α.N` /

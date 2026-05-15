@@ -32,13 +32,13 @@ filesystem operation derived from MCP input. It performs:
 5. Separator-aware prefix check:
    `canonical == rootPath || canonical.hasPrefix(rootPath + "/")`.
 
-This closes two pre-0.2.0 vulnerabilities:
+This closes two classes of path-traversal vulnerability:
 
-- **Sibling-path bypass.** `hasPrefix(rootPath)` without the trailing
-  separator accepted `/tmp/codebase-secret/...` for a root of
-  `/tmp/codebase`. The separator-aware check rejects it.
+- **Sibling-path bypass.** A naive `hasPrefix(rootPath)` without the
+  trailing separator would accept `/tmp/codebase-secret/...` for a root
+  of `/tmp/codebase`. The separator-aware check rejects it.
 - **Symlink escape.** A file inside the codebase that's a symlink to
-  `/etc/passwd` previously slipped through. `resolvingSymlinksInPath()`
+  `/etc/passwd` would otherwise slip through. `resolvingSymlinksInPath()`
   resolves the chain; the canonical target is re-checked against the
   canonical root.
 

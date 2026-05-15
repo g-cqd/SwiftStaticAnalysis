@@ -37,7 +37,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.2.1")
+    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.3.0")
 ]
 ```
 
@@ -636,11 +636,12 @@ The framework includes several performance optimizations:
   `--parallel-mode safe|maximum` for large graphs.
 - **MinHash + LSH**: `SIMD4<UInt64>` lanes process four hash universes
   per shingle, reduced via Mersenne-prime modulus `M_61 = (1<<61)-1`
-  with SplitMix64 coefficient mixing. Default signature width is
-  `InlineArray<128, UInt64>`.
-- **Arena allocator**: `SA-IS` builds the suffix array entirely over
-  `Bitmap` typed and `Arena`-allocated scratch buffers — no
-  per-recursion `[Int]` allocations.
+  with SplitMix64 coefficient mixing. Default signature width is 128
+  hashes; signatures are `[UInt64]`-backed.
+- **Arena allocator**: `SA-IS` builds the suffix array over
+  `swift-collections.BitArray`-typed S/L vectors and `Arena`-allocated
+  `UnsafeMutableBufferPointer<Int>` scratch buffers — no per-recursion
+  `[Int]` allocations.
 - **SoA token storage**: duplication detectors operate on
   `SoATokenStorage` columns (`[UInt8] kinds`, `[UInt32] offsets`,
   `[UInt16] lengths`, `[UInt32] lines`) with `Span<UInt8>` /
