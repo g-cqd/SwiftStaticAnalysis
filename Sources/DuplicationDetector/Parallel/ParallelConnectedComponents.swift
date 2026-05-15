@@ -129,7 +129,7 @@ public enum ParallelConnectedComponents {
 
             // Direction-optimizing: use bottom-up for large frontiers
             // In undirected clone graph, reverse adjacency = adjacency
-            let useBottomUp = shouldSwitchToBottomUp(
+            let useBottomUp = DirectionOptimizingBFS.shouldSwitchToBottomUp(
                 frontierEdges: frontierEdges,
                 remainingEdges: remainingEdges,
                 alpha: configuration.alpha
@@ -176,15 +176,6 @@ public enum ParallelConnectedComponents {
 
     // MARK: - Direction Switching
 
-    /// Should switch from top-down to bottom-up? (mirrors ParallelBFS heuristic)
-    private static func shouldSwitchToBottomUp(
-        frontierEdges: Int,
-        remainingEdges: Int,
-        alpha: Int
-    ) -> Bool {
-        guard remainingEdges > 0 else { return false }
-        return frontierEdges * alpha > remainingEdges
-    }
 
     // MARK: - Expansion Methods
 

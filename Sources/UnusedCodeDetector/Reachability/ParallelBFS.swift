@@ -159,7 +159,7 @@ public enum ParallelBFS {
             if !useBottomUp {
                 // Currently top-down: switch to bottom-up if frontier is large
                 // relative to remaining graph (Beamer et al. α heuristic)
-                if shouldSwitchToBottomUp(
+                if DirectionOptimizingBFS.shouldSwitchToBottomUp(
                     frontierEdges: frontierEdges,
                     remainingEdges: remainingEdges,
                     alpha: configuration.alpha
@@ -168,7 +168,7 @@ public enum ParallelBFS {
                 }
             } else {
                 // Currently bottom-up: switch back to top-down if frontier is small
-                if shouldSwitchToTopDown(
+                if DirectionOptimizingBFS.shouldSwitchToTopDown(
                     frontierSize: frontier.count,
                     nodeCount: graph.nodeCount,
                     beta: configuration.beta
@@ -209,30 +209,6 @@ public enum ParallelBFS {
     /// graph shrinks. Using total edges would cause premature switches early
     /// and delayed switches late in the traversal.
     ///
-    /// Switch when: `frontierEdges > remainingEdges / α`
-    /// Equivalent: `frontierEdges * α > remainingEdges`
-    private static func shouldSwitchToBottomUp(
-        frontierEdges: Int,
-        remainingEdges: Int,
-        alpha: Int
-    ) -> Bool {
-        // Edge case: if no remaining edges, don't switch (nothing to traverse)
-        guard remainingEdges > 0 else { return false }
-        // Switch when: frontierEdges * alpha > remainingEdges
-        return frontierEdges * alpha > remainingEdges
-    }
-
-    /// Should switch from bottom-up to top-down?
-    ///
-    /// Based on Beamer et al.: switch when frontier becomes small.
-    private static func shouldSwitchToTopDown(
-        frontierSize: Int,
-        nodeCount: Int,
-        beta: Int
-    ) -> Bool {
-        // Switch when: frontierSize < nodeCount / beta
-        frontierSize * beta < nodeCount
-    }
 
     // MARK: - Top-Down Step
 
@@ -440,7 +416,7 @@ extension ParallelBFS {
             let remainingEdges = graph.remainingEdges(visited: visited)
 
             if !useBottomUp {
-                if shouldSwitchToBottomUp(
+                if DirectionOptimizingBFS.shouldSwitchToBottomUp(
                     frontierEdges: frontierEdges,
                     remainingEdges: remainingEdges,
                     alpha: configuration.alpha
@@ -448,7 +424,7 @@ extension ParallelBFS {
                     useBottomUp = true
                 }
             } else {
-                if shouldSwitchToTopDown(
+                if DirectionOptimizingBFS.shouldSwitchToTopDown(
                     frontierSize: frontier.count,
                     nodeCount: graph.nodeCount,
                     beta: configuration.beta
