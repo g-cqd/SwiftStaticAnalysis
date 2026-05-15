@@ -5,6 +5,30 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.11] - Unreleased
+
+**Semantic-deep clone detection user guide.** New DocC article
+`SemanticDeepClones.md` documents the end-to-end wiring for
+plugging a Core ML code-embedding model into the duplication
+detector's verification pass. Covers:
+
+- Picking a model (CodeBERT, GraphCodeBERT, CodeT5-base) with
+  Hugging Face source links and dim / context tables.
+- Converting PyTorch → Core ML via `coremltools` with a worked
+  recipe.
+- Building a Swift `Tokenizer` closure that matches the model's
+  BPE vocab.
+- Plugging the provider into `DuplicationConfiguration` and
+  tuning `semanticEmbeddingThreshold` (0.95 / 0.90 / 0.85
+  precision-recall tradeoff).
+- Performance characteristics (Neural Engine inference latency,
+  memory footprint, batching).
+- Honest scope: the integration is precision-tightening, not
+  recall-recovery. Embedding-based clone discovery (HNSW / IVF
+  over all snippets) is queued as a future direction.
+
+No code changes; documentation only.
+
 ## [0.3.0-beta.10] - Unreleased
 
 **PDG construction layer on top of the SIL parser.** The β.7 SIL
