@@ -5,6 +5,24 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.7] - Unreleased
+
+Closes the MCP swift-sdk `.text(_:metadata:)` deprecation that had been
+spamming every build since 0.2.x. 1135 tests green.
+
+### Build hygiene
+
+- **`Tool.Content.swaText(_:)` helper** added at the bottom of
+  `SWAMCPServer.swift`. Wraps the new
+  `.text(text:annotations:_meta:)` factory the MCP swift-sdk
+  introduced (it deprecated the older `.text(_:metadata:)` /
+  `.text(text:metadata:)` shapes). All 18 call sites inside
+  `SWAMCPServer` route through `swaText` so the call-site cost is
+  one identifier instead of three named arguments, and there is a
+  single place to update when the SDK shifts again.
+- `Resource.Content.text(_:uri:)` calls in the `ReadResource` handler
+  are unchanged — that factory is the canonical non-deprecated shape.
+
 ## [0.3.0-alpha.6] - Unreleased
 
 Closes **B3-7** from the deferred B3.1 cluster: the dataflow worklist

@@ -157,7 +157,7 @@ extension SWAMCPServer {
         // Call tools
         await server.withMethodHandler(CallTool.self) { [weak self] params in
             guard let self else {
-                return .init(content: [.text("Server unavailable")], isError: true)
+                return .init(content: [.swaText("Server unavailable")], isError: true)
             }
             return await self.handleToolCall(params)
         }
@@ -502,13 +502,13 @@ extension SWAMCPServer {
 
             default:
                 return .init(
-                    content: [.text("Unknown tool: \(params.name)")],
+                    content: [.swaText("Unknown tool: \(params.name)")],
                     isError: true
                 )
             }
         } catch {
             return .init(
-                content: [.text("Error: \(error.localizedDescription)")],
+                content: [.swaText("Error: \(error.localizedDescription)")],
                 isError: true
             )
         }
@@ -531,7 +531,7 @@ extension SWAMCPServer {
                 "total_size": "\(info.formattedSize)"
             }
             """
-        return .init(content: [.text(json)], isError: false)
+        return .init(content: [.swaText(json)], isError: false)
     }
 
     private func handleListSwiftFiles(_ arguments: [String: Value]?) async throws -> CallTool.Result {
@@ -566,7 +566,7 @@ extension SWAMCPServer {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let json = try encoder.encode(relativePaths)
 
-        return .init(content: [.text(String(data: json, encoding: .utf8) ?? "[]")], isError: false)
+        return .init(content: [.swaText(String(data: json, encoding: .utf8) ?? "[]")], isError: false)
     }
 
     private func handleDetectUnusedCode(_ arguments: [String: Value]?) async throws -> CallTool.Result {
@@ -660,7 +660,7 @@ extension SWAMCPServer {
         let results = try await detector.detectUnused(in: files)
 
         let output = CompactTextFormatter.formatUnused(results, rootPath: context.rootPath)
-        return .init(content: [.text(output)], isError: false)
+        return .init(content: [.swaText(output)], isError: false)
     }
 
     private func handleDetectDuplicates(_ arguments: [String: Value]?) async throws -> CallTool.Result {
@@ -710,7 +710,7 @@ extension SWAMCPServer {
         let results = try await detector.detectClones(in: files)
 
         let output = CompactTextFormatter.formatClones(results, rootPath: context.rootPath)
-        return .init(content: [.text(output)], isError: false)
+        return .init(content: [.swaText(output)], isError: false)
     }
 
     /// Maximum file size accepted by `read_file` and the `ReadResource`
@@ -809,7 +809,7 @@ extension SWAMCPServer {
 
     private func handleReadFile(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         guard let args = arguments, let path = args["path"]?.stringValue else {
-            return .init(content: [.text("Missing required parameter: path")], isError: true)
+            return .init(content: [.swaText("Missing required parameter: path")], isError: true)
         }
 
         let codebasePath = args["codebase_path"]?.stringValue
@@ -821,7 +821,7 @@ extension SWAMCPServer {
         do {
             validation = try Self.validateForReadFile(path: path, validatedPath: validatedPath)
         } catch {
-            return .init(content: [.text(error.message)], isError: true)
+            return .init(content: [.swaText(error.message)], isError: true)
         }
 
         let content = try String(contentsOfFile: validation.validatedPath, encoding: .utf8)
@@ -838,7 +838,7 @@ extension SWAMCPServer {
             guard startLine >= 1, endLine >= startLine else {
                 return .init(
                     content: [
-                        .text(
+                        .swaText(
                             "Invalid line range: start_line=\(startLine), end_line=\(endLine). Require start_line >= 1 and end_line >= start_line."
                         )
                     ],
@@ -849,7 +849,7 @@ extension SWAMCPServer {
             guard span <= Self.readFileMaxLineSpan else {
                 return .init(
                     content: [
-                        .text(
+                        .swaText(
                             "Refusing to read \(span) lines from '\(path)': limit is \(Self.readFileMaxLineSpan) lines."
                         )
                     ],
@@ -867,7 +867,7 @@ extension SWAMCPServer {
             return "\(lineNum): \(line)"
         }.joined(separator: "\n")
 
-        return .init(content: [.text(output)], isError: false)
+        return .init(content: [.swaText(output)], isError: false)
     }
 
     /// Total wall-clock budget allotted to all regex matches in a single
@@ -884,7 +884,7 @@ extension SWAMCPServer {
 
     private func handleSearchSymbols(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         guard let args = arguments, let query = args["query"]?.stringValue else {
-            return .init(content: [.text("Missing required parameter: query")], isError: true)
+            return .init(content: [.swaText("Missing required parameter: query")], isError: true)
         }
 
         let codebasePath = args["codebase_path"]?.stringValue
@@ -903,12 +903,12 @@ extension SWAMCPServer {
                 compiledRegex = try SafeRegex.compile(query)
             } catch let failure as SafeRegex.Failure {
                 return .init(
-                    content: [.text(failure.description)],
+                    content: [.swaText(failure.description)],
                     isError: true
                 )
             } catch {
                 return .init(
-                    content: [.text("Invalid regex pattern: \(error.localizedDescription)")],
+                    content: [.swaText("Invalid regex pattern: \(error.localizedDescription)")],
                     isError: true
                 )
             }
@@ -989,7 +989,7 @@ extension SWAMCPServer {
                 "\n\n# warning: regex evaluation budget (\(Self.searchSymbolsRegexBudget)) exhausted; results may be incomplete."
         }
 
-        return .init(content: [.text(output)], isError: false)
+        return .init(content: [.swaText(output)], isError: false)
     }
 
     /// Format symbol context in compact text.
@@ -1054,7 +1054,7 @@ extension SWAMCPServer {
 
     private func handleAnalyzeFile(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         guard let args = arguments, let path = args["path"]?.stringValue else {
-            return .init(content: [.text("Missing required parameter: path")], isError: true)
+            return .init(content: [.swaText("Missing required parameter: path")], isError: true)
         }
 
         let codebasePath = args["codebase_path"]?.stringValue
@@ -1099,7 +1099,7 @@ extension SWAMCPServer {
             rootPath: context.rootPath
         )
 
-        return .init(content: [.text(output)], isError: false)
+        return .init(content: [.swaText(output)], isError: false)
     }
 }
 
@@ -1339,4 +1339,21 @@ extension SWAMCPServer {
 /// `MCPError.invalidRequest` inside the `ReadResource` handler.
 internal struct ReadResourceURIError: Error, Sendable {
     let message: String
+}
+
+// MARK: - Tool.Content factory
+
+extension Tool.Content {
+    /// Migration shim around `Tool.Content.text(text:annotations:_meta:)`.
+    ///
+    /// The MCP swift-sdk deprecated `.text(_:metadata:)` in favour of the
+    /// new three-parameter shape with explicit `annotations` and `_meta`.
+    /// Touching every call site with the verbose form would be noisy and
+    /// risk regressing in future SDK revisions; routing through this
+    /// helper keeps the call sites readable and gives a single
+    /// place to update when the SDK changes again.
+    @inline(__always)
+    internal static func swaText(_ text: String) -> Self {
+        .text(text: text, annotations: nil, _meta: nil)
+    }
 }
