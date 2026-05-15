@@ -61,18 +61,31 @@ public struct EmbeddingCloneDiscovery: Sendable {
 
     /// Discover clone groups via embedding-based ANN search.
     ///
+    /// Optionally rescore each candidate pair against the snippets'
+    /// token-set Jaccard similarity (multi-signal fusion). When
+    /// `minTokenOverlap > 0`, pairs whose Jaccard falls below the
+    /// threshold are dropped — this kills the "shape-true, intent-false"
+    /// false positives that pooled cosine misranks (most visible with
+    /// CodeBERT-class encoders; less so with sentence-transformers).
+    ///
     /// - Parameters:
     ///   - snippets: Snippets to embed and index.
     ///   - provider: Embedding provider (Core ML, sentence-transformer, etc.).
     ///   - k: Top-k neighbors per query. Larger = better recall, slower.
     ///   - similarityThreshold: Minimum cosine similarity to keep a pair.
-    /// - Returns: `[CloneGroup]` with `type == .semantic`. Empty if no pairs
-    ///   above threshold or fewer than 2 snippets supplied.
+    ///   - minTokenOverlap: Minimum Jaccard over the snippets' identifier
+    ///     token sets to keep a pair. `0.0` (default in the library API)
+    ///     disables the gate; the CLI sets it to `0.20` empirically — a
+    ///     value permissive enough that genuine Type-2 clones survive
+    ///     (renamed identifiers leave most tokens unchanged) while
+    ///     shape-only matches are dropped.
+    /// - Returns: `[CloneGroup]` with `type == .semantic`.
     public func discover(
         snippets: [EmbeddingSnippet],
         provider: SemanticEmbeddingProvider,
         k: Int = 10,
-        similarityThreshold: Double = 0.92
+        similarityThreshold: Double = 0.92,
+        minTokenOverlap: Double = 0.0
     ) async throws -> [CloneGroup] {
         guard snippets.count >= 2, k > 0 else { return [] }
 
@@ -97,6 +110,14 @@ public struct EmbeddingCloneDiscovery: Sendable {
                 if j == i { continue }
                 if shouldSkipPair(snippets[i], snippets[j]) { continue }
                 if Double(result.similarity) < similarityThreshold { continue }
+
+                // Multi-signal fusion: optionally require lexical
+                // co-occurrence in addition to embedding agreement.
+                if minTokenOverlap > 0 {
+                    let jaccard = TokenJaccard.similarity(
+                        snippets[i].code, snippets[j].code)
+                    if jaccard < minTokenOverlap { continue }
+                }
 
                 let a = min(i, j)
                 let b = max(i, j)

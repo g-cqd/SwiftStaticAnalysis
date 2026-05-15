@@ -323,6 +323,122 @@
             return pooled
         }
 
+        /// Per-token output (L2-normalized, padding-stripped) for the
+        /// snippet. Returns a `[realTokenCount × D]` matrix as `[[Float]]`,
+        /// one row per real token.
+        ///
+        /// Used by `MaxSimVerifier` for late-interaction reranking
+        /// (ColBERT-style) — addresses the limitation of pooled cosine
+        /// where every-token-averaged similarity masks per-token
+        /// alignment signal.
+        ///
+        /// Runs the same forward pass as `embed(snippet:)` but skips the
+        /// mean-pool. Pre-pooled exports (EmbeddingGemma, some sentence-
+        /// transformer variants) throw because they don't surface
+        /// per-token hidden states.
+        public func embedTokens(snippet: String) async throws -> [[Float]] {
+            var ids = tokenizer.encode(text: snippet)
+            let effectiveMax = fixedSequenceLength ?? maxLength
+            if ids.count > effectiveMax {
+                ids = Array(ids.prefix(effectiveMax))
+            }
+            let realTokenCount = ids.count
+            guard realTokenCount > 0 else {
+                throw SemanticEmbeddingError.inferenceFailed(
+                    reason: "Tokenizer produced an empty sequence"
+                )
+            }
+            let sequenceLength = fixedSequenceLength ?? realTokenCount
+
+            guard
+                let inputIDs = try? MLMultiArray(
+                    shape: [1, NSNumber(value: sequenceLength)], dataType: .int32
+                ),
+                let attentionMask = try? MLMultiArray(
+                    shape: [1, NSNumber(value: sequenceLength)], dataType: .int32
+                )
+            else {
+                throw SemanticEmbeddingError.inferenceFailed(
+                    reason: "Failed to allocate input MLMultiArrays"
+                )
+            }
+            for i in 0..<sequenceLength {
+                if i < realTokenCount {
+                    inputIDs[[0, NSNumber(value: i)]] = NSNumber(value: Int32(ids[i]))
+                    attentionMask[[0, NSNumber(value: i)]] = 1
+                } else {
+                    inputIDs[[0, NSNumber(value: i)]] = 0
+                    attentionMask[[0, NSNumber(value: i)]] = 0
+                }
+            }
+
+            var features: [String: MLFeatureValue] = [
+                inputIDsName: MLFeatureValue(multiArray: inputIDs),
+                attentionMaskName: MLFeatureValue(multiArray: attentionMask),
+            ]
+            if acceptsTokenTypeIDs, let name = tokenTypeIDsName {
+                let tt = try? MLMultiArray(
+                    shape: [1, NSNumber(value: sequenceLength)], dataType: .int32
+                )
+                if let tt {
+                    for i in 0..<sequenceLength { tt[[0, NSNumber(value: i)]] = 0 }
+                    features[name] = MLFeatureValue(multiArray: tt)
+                }
+            }
+            if acceptsPositionIDs, let name = positionIDsName {
+                let pos = try? MLMultiArray(
+                    shape: [1, NSNumber(value: sequenceLength)], dataType: .int32
+                )
+                if let pos {
+                    for i in 0..<sequenceLength {
+                        pos[[0, NSNumber(value: i)]] = NSNumber(value: Int32(i))
+                    }
+                    features[name] = MLFeatureValue(multiArray: pos)
+                }
+            }
+
+            let input = try MLDictionaryFeatureProvider(dictionary: features)
+            let output = try await model.prediction(from: input)
+
+            guard let lastHidden = output.featureValue(for: lastHiddenStateName)?.multiArrayValue
+            else {
+                throw SemanticEmbeddingError.inferenceFailed(
+                    reason: "Model output missing '\(lastHiddenStateName)' multi-array"
+                )
+            }
+            let shape = lastHidden.shape.map { $0.intValue }
+            guard shape.count == 3, shape[0] == 1, shape[1] == sequenceLength else {
+                throw SemanticEmbeddingError.inferenceFailed(
+                    reason:
+                        "embedTokens requires per-token output (1, T, D); got \(shape). "
+                        + "Pre-pooled exports (e.g. EmbeddingGemma) don't support late-interaction reranking."
+                )
+            }
+            let pointer = lastHidden.dataPointer.assumingMemoryBound(to: Float.self)
+            let dimension = shape[2]
+            var tokens: [[Float]] = []
+            tokens.reserveCapacity(realTokenCount)
+            for t in 0..<realTokenCount {
+                let base = t * dimension
+                var row = [Float](repeating: 0, count: dimension)
+                var sumSq: Float = 0
+                for d in 0..<dimension {
+                    let v = pointer[base + d]
+                    row[d] = v
+                    sumSq += v * v
+                }
+                // L2-normalize so downstream MaxSim is cosine = dot.
+                if sumSq > 0 {
+                    let inv = 1.0 / sumSq.squareRoot()
+                    for d in 0..<dimension {
+                        row[d] *= inv
+                    }
+                }
+                tokens.append(row)
+            }
+            return tokens
+        }
+
         // MARK: Private
 
         private let model: MLModel

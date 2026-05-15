@@ -64,6 +64,9 @@ struct SWA: AsyncParsableCommand {
             Duplicates.self,
             Unused.self,
             Symbol.self,
+            Search.self,
+            Anomaly.self,
+            Cohesion.self,
         ],
         defaultSubcommand: Analyze.self,
     )
@@ -227,6 +230,26 @@ struct Duplicates: AsyncParsableCommand {
     )
     var embeddingMaxLength: Int?
 
+    @Option(
+        name: .customLong("embedding-min-token-overlap"),
+        help:
+            "Min Jaccard over identifier tokens to keep a semantic pair (0.0 disables; default 0.20)",
+    )
+    var embeddingMinTokenOverlap: Double?
+
+    @Flag(
+        name: .customLong("embedding-rerank-maxsim"),
+        help:
+            "Rerank semantic findings with ColBERT-style MaxSim (token-level late interaction)",
+    )
+    var embeddingRerankMaxSim: Bool = false
+
+    @Option(
+        name: .customLong("embedding-maxsim-threshold"),
+        help: "MaxSim threshold below which findings are dropped during rerank (default 0.55)",
+    )
+    var embeddingMaxSimThreshold: Double?
+
     /// Argument-level validation. `--min-tokens` is bounded to a sensible
     /// range to prevent crashes (negative or zero) and pathological behaviour
     /// (huge values). `--min-similarity` is a Jaccard ratio.
@@ -312,6 +335,9 @@ struct Duplicates: AsyncParsableCommand {
                 similarity: embeddingSimilarity ?? 0.85,
                 k: embeddingK ?? 10,
                 maxLength: embeddingMaxLength ?? 256,
+                minTokenOverlap: embeddingMinTokenOverlap ?? 0.20,
+                rerankMaxSim: embeddingRerankMaxSim,
+                maxSimThreshold: embeddingMaxSimThreshold ?? 0.55,
             )
         } else {
             semantic = []
@@ -354,6 +380,9 @@ struct Duplicates: AsyncParsableCommand {
         similarity: Double,
         k: Int,
         maxLength: Int,
+        minTokenOverlap: Double,
+        rerankMaxSim: Bool,
+        maxSimThreshold: Double,
     ) async throws -> [CloneGroup] {
         let bundleURL = URL(fileURLWithPath: bundlePath)
         let provider = try await HFSemanticEmbeddingProvider(
@@ -378,12 +407,42 @@ struct Duplicates: AsyncParsableCommand {
         guard !snippets.isEmpty else { return [] }
 
         let discovery = EmbeddingCloneDiscovery()
-        return try await discovery.discover(
+        let groups = try await discovery.discover(
             snippets: snippets,
             provider: provider,
             k: k,
             similarityThreshold: similarity,
+            minTokenOverlap: minTokenOverlap,
         )
+
+        guard rerankMaxSim, !groups.isEmpty else { return groups }
+
+        // Late-interaction rerank: for each group, score the first
+        // member-pair via MaxSim on per-token embeddings, drop groups
+        // below the threshold. Per-pair cost is O(m·n·D); only run
+        // on K groups returned by HNSW, so total cost is bounded.
+        let verifier = MaxSimVerifier()
+        var keptGroups: [CloneGroup] = []
+        keptGroups.reserveCapacity(groups.count)
+        for group in groups {
+            guard group.clones.count >= 2 else { continue }
+            let aCode = group.clones[0].codeSnippet
+            let bCode = group.clones[1].codeSnippet
+            do {
+                let aTokens = try await provider.embedTokens(snippet: aCode)
+                let bTokens = try await provider.embedTokens(snippet: bCode)
+                let maxSim = verifier.score(aTokens, bTokens)
+                if Double(maxSim) >= maxSimThreshold {
+                    keptGroups.append(group)
+                }
+            } catch {
+                // Provider doesn't support per-token output (e.g. pre-
+                // pooled Gemma). Fall through and keep the group rather
+                // than penalize the user for choosing an unsupported model.
+                keptGroups.append(group)
+            }
+        }
+        return keptGroups
     }
 }
 
