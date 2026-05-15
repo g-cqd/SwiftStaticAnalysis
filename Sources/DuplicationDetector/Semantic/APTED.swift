@@ -241,7 +241,6 @@ extension APTEDTree {
 
         return APTEDTree(labels: labels, leftLeaf: leftLeaf, parent: parent)
     }
-
 }
 
 extension APTEDTree {

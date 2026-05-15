@@ -37,12 +37,14 @@ public actor SWAMCPServer {
     /// Test-only introspection. Reports the current count of cached
     /// `CodebaseContext` entries so eviction is observable without exposing
     /// the cache itself.
+    // swift-format-ignore: AlwaysUseLowerCamelCase
     internal var _test_contextCacheCount: Int {
         contextCache.count
     }
 
     /// Test-only introspection. Reports whether a previously-cached path is
     /// still resident in the LRU cache.
+    // swift-format-ignore: AlwaysUseLowerCamelCase
     internal func _test_contextCacheContains(_ canonicalPath: String) -> Bool {
         contextCache.peek(forKey: canonicalPath) != nil
     }
@@ -50,6 +52,7 @@ public actor SWAMCPServer {
     /// Test-only wrapper around the private `getContext(for:)`. Allows
     /// regression tests to exercise the cache without going through the full
     /// MCP transport.
+    // swift-format-ignore: AlwaysUseLowerCamelCase
     internal func _test_getContext(for path: String?) throws -> CodebaseContext {
         try getContext(for: path)
     }
@@ -57,6 +60,7 @@ public actor SWAMCPServer {
     /// Test-only wrapper that drives `handleDetectUnusedCode` end-to-end so
     /// security regression tests can exercise argument validation without
     /// going through the MCP transport.
+    // swift-format-ignore: AlwaysUseLowerCamelCase
     internal func _test_handleDetectUnusedCode(
         _ arguments: [String: Value]?
     ) async throws -> CallTool.Result {

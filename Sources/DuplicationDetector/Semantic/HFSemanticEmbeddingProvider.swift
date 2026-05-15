@@ -34,8 +34,8 @@
     /// Swift-side, `Tokenizers.AutoTokenizer.from(modelFolder:)` handles
     /// BPE/WordPiece/SentencePiece transparently, so a single provider
     /// type covers every model in the HF feature-extraction zoo.
-    public final class HFSemanticEmbeddingProvider: SemanticEmbeddingProvider, @unchecked
-        Sendable
+    public final class HFSemanticEmbeddingProvider:
+        SemanticEmbeddingProvider, @unchecked Sendable
     {
         // MARK: Lifecycle
 

@@ -428,8 +428,10 @@ struct Unused: AsyncParsableCommand {
     /// providers, View body properties). Equivalent to passing
     /// `--ignore-swiftui-property-wrappers --ignore-preview-providers
     /// --ignore-view-body` together.
-    @Flag(name: .customLong("swiftui"),
-        help: "SwiftUI-aware mode: skip property wrappers, PreviewProvider, View body")
+    @Flag(
+        name: .customLong("swiftui"),
+        help: "SwiftUI-aware mode: skip property wrappers, PreviewProvider, View body"
+    )
     var swiftUI: Bool = false
 
     // Individual SwiftUI overrides — hidden from --help. Power users who

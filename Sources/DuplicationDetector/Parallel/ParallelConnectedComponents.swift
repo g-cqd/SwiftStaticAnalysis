@@ -174,9 +174,6 @@ public enum ParallelConnectedComponents {
         return component
     }
 
-    // MARK: - Direction Switching
-
-
     // MARK: - Expansion Methods
 
     /// Sequential expansion for small frontiers.

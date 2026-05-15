@@ -50,14 +50,19 @@ public enum PathUtilities {
     /// newline-based line breaks into stderr / log output (log
     /// injection, CWE-117).
     public static func sanitizedForDiagnostic(_ path: String) -> String {
+        // U+FFFD REPLACEMENT CHARACTER. Falls back to U+003F when the
+        // initialiser somehow refuses 0xFFFD (it won't — but the
+        // non-failable UInt8 overload keeps swift-format's NeverForceUnwrap
+        // rule satisfied without compromise).
+        let replacement = UnicodeScalar(0xFFFD) ?? Unicode.Scalar(UInt8(0x3F))
         var result = String.UnicodeScalarView()
         result.reserveCapacity(path.unicodeScalars.count)
         for scalar in path.unicodeScalars {
             let value = scalar.value
             if value < 0x20, value != 0x09 {
-                result.append(UnicodeScalar(0xFFFD)!)
+                result.append(replacement)
             } else if value == 0x7F {
-                result.append(UnicodeScalar(0xFFFD)!)
+                result.append(replacement)
             } else {
                 result.append(scalar)
             }

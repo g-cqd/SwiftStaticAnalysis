@@ -225,9 +225,9 @@ public enum SILParser {
         if instr.hasPrefix("cond_br ") {
             let components = instr.dropFirst("cond_br ".count).split(separator: ",")
             guard components.count >= 3 else { return [] }
-            let true_ = String(components[1]).trimmingCharacters(in: .whitespaces)
-            let false_ = String(components[2]).trimmingCharacters(in: .whitespaces)
-            return [stripBlockArgs(true_), stripBlockArgs(false_)]
+            let trueBranch = String(components[1]).trimmingCharacters(in: .whitespaces)
+            let falseBranch = String(components[2]).trimmingCharacters(in: .whitespaces)
+            return [stripBlockArgs(trueBranch), stripBlockArgs(falseBranch)]
         }
         if instr.hasPrefix("try_apply ") {
             var blocks: [String] = []

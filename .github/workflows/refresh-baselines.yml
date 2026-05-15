@@ -35,7 +35,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Select Xcode toolchain
-        run: sudo xcode-select -s /Applications/Xcode_16.app || true
+        # Package.swift requires Swift tools 6.2; macos-15 ships Xcode 26.1.1.
+        run: sudo xcode-select -s /Applications/Xcode_26.1.1.app || true
 
       - name: Refresh baselines
         env:

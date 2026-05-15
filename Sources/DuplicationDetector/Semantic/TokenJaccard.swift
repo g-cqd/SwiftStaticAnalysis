@@ -84,12 +84,12 @@ public enum TokenJaccard {
     }
 }
 
-private extension Unicode.Scalar {
-    var isLetter: Bool {
+extension Unicode.Scalar {
+    fileprivate var isLetter: Bool {
         (value >= 0x41 && value <= 0x5A) || (value >= 0x61 && value <= 0x7A)
             || properties.isAlphabetic
     }
-    var isDigit: Bool {
+    fileprivate var isDigit: Bool {
         value >= 0x30 && value <= 0x39
     }
 }
