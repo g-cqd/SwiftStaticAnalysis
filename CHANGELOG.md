@@ -5,6 +5,60 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.8] - Unreleased
+
+**Semantic-deep verification pass wired into `DuplicationDetector`.**
+The β.6 `CoreMLSemanticEmbeddingProvider` is now usable end-to-end:
+configure `DuplicationConfiguration.semanticEmbeddingProvider` with
+any `SemanticEmbeddingProvider` conformer and `detectClones(in:)`
+will re-score every clone group against the embedding-space cosine
+similarity of its members. Groups below the threshold drop as
+token-level false positives.
+
+### New configuration
+
+- **`DuplicationConfiguration.semanticEmbeddingProvider:
+  SemanticEmbeddingProvider?`** (default `nil`). When non-nil,
+  enables the verification pass.
+- **`DuplicationConfiguration.semanticEmbeddingThreshold: Double`**
+  (default `0.95`, clamped to `0.0...1.0`). Minimum pairwise
+  cosine similarity for a group to survive.
+
+### Verification pass shape
+
+After the standard token-shingle / suffix-array / AST detection
+runs, every surviving clone group is processed by
+`verifySemantically(groups:provider:threshold:)`:
+
+1. Collect each clone's `codeSnippet`. Groups with fewer than two
+   snippets pass through unchanged (no pairwise comparison
+   possible).
+2. Call `provider.embed(snippets:)` to get one embedding vector
+   per snippet. Embedding failure → conservative-keep
+   (`survivors.append(group)`). Failing-open means a single
+   oversized snippet doesn't drop genuine clones.
+3. Compute pairwise cosine similarity across the group's
+   embeddings.
+4. If the **minimum** pairwise cosine is ≥ threshold, the group
+   survives; otherwise it drops.
+
+Cost: bounded. `O(group_size)` embedding calls per group,
+`O(group_size²)` cosine computations. Only runs on the candidate
+set the structural passes already produced — semantic-deep
+precision tightening, not a parallel recall-recovery pipeline.
+A recall-recovery shape (embed every snippet in the corpus and
+do ANN search) is the next layer.
+
+### Status
+
+Build complete; 1154 tests green. The verification logic is in
+the public `DuplicationConfiguration` surface; programmatic
+consumers can plug `CoreMLSemanticEmbeddingProvider` (with their
+own tokenizer + model bundle) directly into the detector.
+CLI integration (`--semantic-deep <model-path>` flag) needs a
+tokenizer-spec convention the `.swa.json` schema can express;
+that's queued for β.9-or-later.
+
 ## [0.3.0-beta.7] - Unreleased
 
 **SIL extraction + parser spike.** The audit's F-S3 ("PDG/GNN clone

@@ -174,9 +174,11 @@ public enum SILParser {
         var headerColonIndex: String.Index?
         for index in line.indices {
             let ch = line[index]
-            if ch == "(" || ch == "[" { depth += 1 }
-            else if ch == ")" || ch == "]" { depth -= 1 }
-            else if ch == ":", depth == 0 {
+            if ch == "(" || ch == "[" {
+                depth += 1
+            } else if ch == ")" || ch == "]" {
+                depth -= 1
+            } else if ch == ":", depth == 0 {
                 headerColonIndex = index
                 break
             }

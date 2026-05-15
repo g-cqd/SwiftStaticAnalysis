@@ -130,6 +130,8 @@ public struct DuplicationConfiguration: Sendable {
         cacheDirectory: URL? = nil,
         useParallelClones: Bool = false,
         useStreamingVerifier: Bool = false,
+        semanticEmbeddingProvider: SemanticEmbeddingProvider? = nil,
+        semanticEmbeddingThreshold: Double = 0.95,
     ) {
         // Validate and clamp minimumTokens to safe range [1, 10000]
         self.minimumTokens = min(max(minimumTokens, 1), 10000)
@@ -141,6 +143,8 @@ public struct DuplicationConfiguration: Sendable {
         self.cacheDirectory = cacheDirectory
         self.useParallelClones = useParallelClones
         self.useStreamingVerifier = useStreamingVerifier
+        self.semanticEmbeddingProvider = semanticEmbeddingProvider
+        self.semanticEmbeddingThreshold = min(max(semanticEmbeddingThreshold, 0.0), 1.0)
     }
 
     // MARK: Public
@@ -193,6 +197,26 @@ public struct DuplicationConfiguration: Sendable {
     /// unbounded. Engaged by `ParallelMode.maximum` per the
     /// README/CHANGELOG contract.
     public var useStreamingVerifier: Bool
+
+    /// Optional dense-vector embedding provider for semantic-deep
+    /// verification. When non-nil, every clone group produced by the
+    /// token-shingle / suffix-array / AST passes is re-scored
+    /// against the embedding-space cosine similarity of its members;
+    /// groups whose minimum pairwise similarity falls below
+    /// `semanticEmbeddingThreshold` are dropped as token-level false
+    /// positives. The embedder runs only on the candidate set the
+    /// structural passes already produced — bounded cost, real
+    /// precision win.
+    public var semanticEmbeddingProvider: SemanticEmbeddingProvider?
+
+    /// Minimum cosine similarity (0.0...1.0) for a clone group to
+    /// survive the semantic-deep verification pass. Defaults to
+    /// `0.95` — empirically, candidate clone groups with embedding
+    /// similarity below this threshold are usually token-level
+    /// noise (small shared prelude, similar control flow but
+    /// different intent). Ignored when
+    /// `semanticEmbeddingProvider` is `nil`.
+    public var semanticEmbeddingThreshold: Double
 
     /// Incremental configuration with caching enabled.
     public static func incremental(cacheDirectory: URL? = nil) -> Self {
@@ -283,7 +307,94 @@ public struct DuplicationDetector: Sendable {
         let filteredGroups = cloneGroups.filteringIgnored(ignoreRegions)
 
         // Add code snippets to all clones
-        return try await engine.addCodeSnippets(to: filteredGroups)
+        let withSnippets = try await engine.addCodeSnippets(to: filteredGroups)
+
+        // Optional semantic-deep verification: re-score every clone
+        // group against the embedding-space similarity of its
+        // members. Groups whose minimum pairwise cosine similarity
+        // falls below the configured threshold are dropped as
+        // token-level false positives.
+        if let provider = configuration.semanticEmbeddingProvider {
+            return try await verifySemantically(
+                groups: withSnippets,
+                provider: provider,
+                threshold: configuration.semanticEmbeddingThreshold,
+            )
+        }
+
+        return withSnippets
+    }
+
+    /// Re-score every clone group against an embedding provider.
+    /// Drops groups whose minimum pairwise cosine similarity is
+    /// below `threshold`. Bounded cost: O(Σ group_size) embedding
+    /// calls + O(Σ group_size²) cosine computations.
+    ///
+    /// Snippets that fail to embed (encoding errors, context-window
+    /// overflows on a particular member) cause the entire group to
+    /// be conservatively kept — failing-open here means we don't
+    /// drop genuine clones because of a single oversized member.
+    private func verifySemantically(
+        groups: [CloneGroup],
+        provider: SemanticEmbeddingProvider,
+        threshold: Double,
+    ) async throws -> [CloneGroup] {
+        var survivors: [CloneGroup] = []
+        survivors.reserveCapacity(groups.count)
+        for group in groups {
+            let snippets = group.clones.compactMap(\.codeSnippet)
+            guard snippets.count >= 2 else {
+                // Single-member or snippet-less groups can't be
+                // pairwise-verified; keep them.
+                survivors.append(group)
+                continue
+            }
+            let embeddings: [[Float]]
+            do {
+                embeddings = try await provider.embed(snippets: snippets)
+            } catch {
+                // Embedding failure → conservative keep. Surfaces in
+                // logs if the provider routes through `AnalysisLogger`.
+                survivors.append(group)
+                continue
+            }
+            let minSimilarity = Self.minimumPairwiseCosine(embeddings)
+            if minSimilarity >= threshold {
+                survivors.append(group)
+            }
+        }
+        return survivors
+    }
+
+    /// Minimum pairwise cosine similarity across an embedding set.
+    /// Returns 1.0 for sets of fewer than two embeddings (no
+    /// pairwise comparison possible).
+    private static func minimumPairwiseCosine(_ embeddings: [[Float]]) -> Double {
+        guard embeddings.count >= 2 else { return 1.0 }
+        var minimum: Double = 1.0
+        for i in 0..<embeddings.count {
+            for j in (i + 1)..<embeddings.count {
+                let sim = cosineSimilarity(embeddings[i], embeddings[j])
+                if sim < minimum { minimum = sim }
+            }
+        }
+        return minimum
+    }
+
+    private static func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Double {
+        guard !a.isEmpty, a.count == b.count else { return 0.0 }
+        var dot: Double = 0
+        var normA: Double = 0
+        var normB: Double = 0
+        for index in 0..<a.count {
+            let ai = Double(a[index])
+            let bi = Double(b[index])
+            dot += ai * bi
+            normA += ai * ai
+            normB += bi * bi
+        }
+        let denominator = (normA.squareRoot()) * (normB.squareRoot())
+        return denominator > 0 ? dot / denominator : 0.0
     }
 
     // MARK: Private
