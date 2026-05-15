@@ -352,27 +352,49 @@ extension UnusedCodeDetector {
     func detectUnusedImports(result: AnalysisResult) -> [UnusedCode] {
         var unusedImports: [UnusedCode] = []
 
-        // Get all import declarations
+        // Get all import declarations.
         let imports = result.declarations.find(kind: .import)
 
-        // For each import, check if any reference uses that module
+        // Without IndexStoreDB we cannot map a reference like
+        // `URLSession` back to its origin module `Foundation`, so the
+        // syntax-only path checks for explicit module-qualified uses
+        // (`Foundation.NSNumber()` produces a `Reference` with
+        // `qualifier == "Foundation"`) or bare references that happen
+        // to match the module name itself. This is strictly weaker
+        // than IndexStore-backed module resolution — we report at
+        // `.low` confidence so callers can decide whether to surface
+        // it.
+        var referencedIdentifiers = Set<String>()
+        var referencedQualifiers = Set<String>()
+        referencedIdentifiers.reserveCapacity(result.references.references.count)
+        for reference in result.references.references {
+            referencedIdentifiers.insert(reference.identifier)
+            if let qualifier = reference.qualifier {
+                referencedQualifiers.insert(qualifier)
+            }
+        }
+
         for importDecl in imports {
             let moduleName = importDecl.name
 
-            // Check if any type reference might be from this module
-            // This is approximate without semantic analysis
-            let potentiallyUsed = result.references.references.contains { ref in
-                ref.context == .typeAnnotation || ref.context == .inheritance || ref.context == .call
-            }
+            // Match either a qualified reference whose qualifier
+            // equals the module name (`Foundation.NSNumber()`) or a
+            // bare reference whose identifier is the module name
+            // (`Foundation.self`, `Foundation.NSNumber.init` parses
+            // as a reference to `Foundation` followed by member
+            // accesses).
+            let hasModuleReference =
+                referencedQualifiers.contains(moduleName)
+                || referencedIdentifiers.contains(moduleName)
 
-            // For now, mark as low confidence since we can't be certain
-            if !potentiallyUsed {
+            if !hasModuleReference {
                 unusedImports.append(
                     UnusedCode(
                         declaration: importDecl,
                         reason: .importNotUsed,
                         confidence: .low,
-                        suggestion: "Import '\(moduleName)' may not be used",
+                        suggestion:
+                            "Import '\(moduleName)' has no module-qualified reference in the analyzed sources. Verify under `--mode indexStore` for accurate cross-module attribution.",
                     ))
             }
         }

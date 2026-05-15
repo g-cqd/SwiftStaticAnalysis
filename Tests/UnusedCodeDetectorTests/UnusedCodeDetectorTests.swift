@@ -57,7 +57,9 @@ struct UnusedCodeDetectorTests {
         #expect(config.detectTypes == true)
         #expect(config.detectImports == true)
         #expect(config.ignorePublicAPI == true)
-        #expect(config.mode == .simple)
+        // The package default is `.reachability` so out-of-the-box
+        // `swa unused .` matches the README contract.
+        #expect(config.mode == .reachability)
     }
 
     @Test("UnusedCodeDetector initialization")

@@ -5,6 +5,54 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.16] - Unreleased
+
+Closes four CRITICAL precision / recall bugs surfaced by the post-α.15
+re-audit. These are correctness bugs (behaviour ≠ documentation),
+not refactors. 1137 tests green.
+
+### Default flips
+
+- **`UnusedCodeConfiguration.default.mode` is now `.reachability`** (was
+  `.simple`). README, DocC, and SECURITY all describe `.reachability`
+  as the default; the struct disagreed. Users calling `swa unused .`
+  with no `--mode` flag now get the graph-based detection the docs
+  promise (~85% precision, ~80% recall against simple's ~55% precision).
+- **`DuplicationConfiguration.default.cloneTypes` is now
+  `[.exact, .near, .semantic]`** (was `[.exact]`). README's clone-type
+  table and per-type algorithm flip both assume all three are
+  detected; the struct shipped only exact clones. Per-type algorithm
+  routing (suffixArray / minHashLSH) was already correct.
+
+### Correctness
+
+- **`detectUnusedImports` is no longer a no-op.** The previous check
+  was *"if any reference of any kind exists anywhere, mark every
+  import as used"* — recall was effectively 0%. Replaced with a
+  module-qualified reference scan: an import is flagged at `.low`
+  confidence when the analyzed sources contain zero references
+  qualified by the module name. Syntax-only attribution is
+  necessarily weaker than IndexStore-backed (the suggestion text
+  points users to `--mode indexStore` for accurate cross-module
+  attribution).
+- **Cross-language / runtime attribute roots now detected.** Four
+  new `RootReason` cases — `.silgenName`, `.cdecl`,
+  `.dynamicReplacement`, `.objcRuntimeName` — catch declarations
+  referenced through mechanisms invisible to source-level analysis
+  (C ABI, Objective-C runtime, Swift dynamic replacement). Codebases
+  using Swift-C interop had 100% false-positive rate on these
+  declarations.
+
+### Test updates
+
+The four tests that pinned the old defaults are updated to assert
+the documented contract (`mode == .reachability`,
+`cloneTypes == [.exact, .near, .semantic]`). Tests in
+`SwiftSyntaxModeTests.swift` and `IgnoredPatternsTests.swift` that
+exercise the simple-mode detection path now set `config.mode = .simple`
+explicitly — the file name `SwiftSyntaxModeTests` already implied that
+contract; the explicit assignment makes the intent local.
+
 ## [0.3.0-alpha.15] - Unreleased
 
 Final batch of lower-priority hardening + access-level tightening from

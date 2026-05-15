@@ -16,7 +16,11 @@ struct IgnoredPatternsTests {
             func reportedHelper() {}
             """
 
+        // These tests pin the syntax / simple mode detection path; the
+        // package default is now `.reachability` (post-α.16), so request
+        // simple mode explicitly here.
         var config = UnusedCodeConfiguration.default
+        config.mode = .simple
         config.ignorePublicAPI = false
         config.ignoredPatterns = ["^ignored"]
 
@@ -35,6 +39,7 @@ struct IgnoredPatternsTests {
             """
 
         var config = UnusedCodeConfiguration.default
+        config.mode = .simple
         config.ignorePublicAPI = false
         config.ignoredPatterns = ["[invalid"]
 

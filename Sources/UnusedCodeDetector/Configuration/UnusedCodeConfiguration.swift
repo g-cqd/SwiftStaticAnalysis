@@ -18,7 +18,7 @@ public struct UnusedCodeConfiguration: Sendable {
         detectImports: Bool = true,
         detectParameters: Bool = true,
         ignorePublicAPI: Bool = true,
-        mode: DetectionMode = .simple,
+        mode: DetectionMode = .reachability,
         indexStorePath: String? = nil,
         minimumConfidence: Confidence = .medium,
         ignoredPatterns: [String] = [],

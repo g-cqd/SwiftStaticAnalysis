@@ -122,7 +122,7 @@ public struct DuplicationConfiguration: Sendable {
 
     public init(
         minimumTokens: Int = 50,
-        cloneTypes: Set<CloneType> = [.exact],
+        cloneTypes: Set<CloneType> = [.exact, .near, .semantic],
         ignoredPatterns: [String] = [],
         minimumSimilarity: Double = 0.8,
         algorithm: DetectionAlgorithm = .rollingHash,

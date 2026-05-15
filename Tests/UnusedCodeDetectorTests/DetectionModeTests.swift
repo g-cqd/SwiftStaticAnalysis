@@ -10,10 +10,10 @@ import Testing
 
 @Suite("Detection Mode Tests")
 struct DetectionModeTests {
-    @Test("Simple mode is default")
+    @Test("Reachability mode is the package default")
     func defaultMode() {
         let config = UnusedCodeConfiguration()
-        #expect(config.mode == .simple)
+        #expect(config.mode == .reachability)
     }
 
     @Test("Reachability configuration preset")

@@ -97,6 +97,29 @@ public enum RootReason: String, Sendable, Codable {
 
     /// View body property.
     case viewBody
+
+    // MARK: - Cross-language / runtime attribute roots
+
+    /// `@_silgen_name("…")` — function is referenced by mangled name
+    /// from another translation unit, typically C / Objective-C or
+    /// dynamic runtime lookup.
+    case silgenName
+
+    /// `@_cdecl("…")` — function is exposed under a C-mangled name
+    /// for use from C / Objective-C callers. The C side cannot be
+    /// inspected by this analyzer, so the declaration must be a root.
+    case cdecl
+
+    /// `@_dynamicReplacement(for: …)` — declaration replaces another
+    /// at runtime under the Swift dynamic-replacement mechanism. The
+    /// caller resolves through the runtime so the replacement is
+    /// always live.
+    case dynamicReplacement
+
+    /// `@_objcRuntimeName("…")` — declaration is referenced from the
+    /// Objective-C runtime under a non-default selector. The runtime
+    /// invocation is invisible to source-level analysis.
+    case objcRuntimeName
 }
 
 // MARK: - DependencyEdge
@@ -480,6 +503,25 @@ public actor ReachabilityGraph {
             || hasAttribute(declaration, named: "dynamicCallable")
         {
             return .dynamicFeature
+        }
+
+        // Check for cross-language / runtime attribute roots. These
+        // declarations are referenced through mechanisms invisible to
+        // source-level analysis (C ABI, Objective-C runtime, Swift
+        // dynamic replacement). The previous reachability detector
+        // missed them, producing 100% false-positive rates on
+        // codebases that use Swift-C interop.
+        if hasAttribute(declaration, named: "_silgen_name") {
+            return .silgenName
+        }
+        if hasAttribute(declaration, named: "_cdecl") {
+            return .cdecl
+        }
+        if hasAttribute(declaration, named: "_dynamicReplacement") {
+            return .dynamicReplacement
+        }
+        if hasAttribute(declaration, named: "_objcRuntimeName") {
+            return .objcRuntimeName
         }
 
         // MARK: - SwiftUI Root Detection

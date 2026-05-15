@@ -54,7 +54,11 @@ struct CloneModelTests {
         let config = DuplicationConfiguration.default
 
         #expect(config.minimumTokens == 50)
-        #expect(config.cloneTypes == [.exact])
+        // Default clone-type set covers all three Type-1/2/3 categories so
+        // `swa duplicates` with no `--types` flags matches the documented
+        // and README-advertised behaviour. Each type routes through the
+        // per-type algorithm defaults set by `defaultAlgorithm(forCloneTypes:)`.
+        #expect(config.cloneTypes == [.exact, .near, .semantic])
         #expect(config.minimumSimilarity == 0.8)
     }
 
