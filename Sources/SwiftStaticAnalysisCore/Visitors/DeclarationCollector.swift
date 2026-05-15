@@ -486,7 +486,7 @@ public final class DeclarationCollector: ScopeTrackingVisitor {  // swiftlint:di
         return Declaration(
             name: name,
             kind: kind,
-            accessLevel: extractAccessLevel(from: modifiers),
+            accessLevel: AccessLevel.from(modifiers),
             modifiers: extractModifiers(from: modifiers),
             location: location(of: node),
             range: range(of: node),
@@ -501,34 +501,6 @@ public final class DeclarationCollector: ScopeTrackingVisitor {  // swiftlint:di
             attributes: attributes,
             ignoreDirectives: ignoreDirectives,
         )
-    }
-
-    private func extractAccessLevel(from modifiers: DeclModifierListSyntax) -> AccessLevel {
-        for modifier in modifiers {
-            switch modifier.name.tokenKind {
-            case .keyword(.private):
-                return .private
-
-            case .keyword(.fileprivate):
-                return .fileprivate
-
-            case .keyword(.internal):
-                return .internal
-
-            case .keyword(.package):
-                return .package
-
-            case .keyword(.public):
-                return .public
-
-            case .keyword(.open):
-                return .open
-
-            default:
-                continue
-            }
-        }
-        return .internal
     }
 
     private func extractModifiers(from modifiers: DeclModifierListSyntax) -> DeclarationModifiers {

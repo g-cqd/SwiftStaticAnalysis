@@ -204,29 +204,6 @@ public struct AccessLevelExtractor: Sendable {
             return .internal
         }
 
-        return extractAccessLevel(from: modifiers)
-    }
-
-    /// Extracts access level from modifier list.
-    private func extractAccessLevel(from modifiers: DeclModifierListSyntax) -> AccessLevel {
-        for modifier in modifiers {
-            switch modifier.name.tokenKind {
-            case .keyword(.private):
-                return .private
-            case .keyword(.fileprivate):
-                return .fileprivate
-            case .keyword(.internal):
-                return .internal
-            case .keyword(.package):
-                return .package
-            case .keyword(.public):
-                return .public
-            case .keyword(.open):
-                return .open
-            default:
-                continue
-            }
-        }
-        return .internal
+        return AccessLevel.from(modifiers)
     }
 }

@@ -180,6 +180,23 @@ extension SWAMCPServer {
         ),
     ])
 
+    /// Shared schema for the `exclude_paths` property used by every tool that
+    /// scans a codebase (detect_unused_code, detect_duplicates).
+    private static let excludePathsProperty: Value = .object([
+        "type": .string("array"),
+        "items": .object(["type": .string("string")]),
+        "description": .string("Glob patterns to exclude from analysis"),
+    ])
+
+    /// Shared schema for the `paths` property used by every tool that scans
+    /// a codebase (detect_unused_code, detect_duplicates).
+    private static let pathsProperty: Value = .object([
+        "type": .string("array"),
+        "items": .object(["type": .string("string")]),
+        "description": .string(
+            "Specific paths within the codebase to analyze (default: entire codebase)"),
+    ])
+
     private static func buildToolList(defaultRootPath _: String?) -> [Tool] {
         [
             Tool(
@@ -276,17 +293,8 @@ extension SWAMCPServer {
                             "type": .string("string"),
                             "description": .string("Path to IndexStore for enhanced accuracy"),
                         ]),
-                        "exclude_paths": .object([
-                            "type": .string("array"),
-                            "items": .object(["type": .string("string")]),
-                            "description": .string("Glob patterns to exclude from analysis"),
-                        ]),
-                        "paths": .object([
-                            "type": .string("array"),
-                            "items": .object(["type": .string("string")]),
-                            "description": .string(
-                                "Specific paths within the codebase to analyze (default: entire codebase)"),
-                        ]),
+                        "exclude_paths": excludePathsProperty,
+                        "paths": pathsProperty,
                     ]),
                     "required": .array([.string("codebase_path")]),
                 ])
@@ -320,17 +328,8 @@ extension SWAMCPServer {
                             "enum": .array([.string("rollingHash"), .string("suffixArray"), .string("minHashLSH")]),
                             "description": .string("Detection algorithm to use"),
                         ]),
-                        "exclude_paths": .object([
-                            "type": .string("array"),
-                            "items": .object(["type": .string("string")]),
-                            "description": .string("Glob patterns to exclude from analysis"),
-                        ]),
-                        "paths": .object([
-                            "type": .string("array"),
-                            "items": .object(["type": .string("string")]),
-                            "description": .string(
-                                "Specific paths within the codebase to analyze (default: entire codebase)"),
-                        ]),
+                        "exclude_paths": excludePathsProperty,
+                        "paths": pathsProperty,
                     ]),
                     "required": .array([.string("codebase_path")]),
                 ])
@@ -578,6 +577,33 @@ extension SWAMCPServer {
         return .init(content: [.swaText(String(data: json, encoding: .utf8) ?? "[]")], isError: false)
     }
 
+    /// Resolve the file list from `paths` + `exclude_paths` arguments, validating
+    /// every supplied path against the codebase sandbox. Shared by every
+    /// codebase-scanning tool handler (detect_unused_code, detect_duplicates).
+    private func resolveFiles(
+        arguments: [String: Value]?,
+        context: CodebaseContext
+    ) throws -> [String] {
+        var files: [String]
+        if let args = arguments, let paths = args["paths"]?.arrayValue {
+            let relativePaths = paths.compactMap { $0.stringValue }
+            files = try context.validatePaths(relativePaths)
+        } else {
+            files = try context.findSwiftFiles()
+        }
+
+        if let args = arguments, let excludePaths = args["exclude_paths"]?.arrayValue {
+            let patterns = excludePaths.compactMap { $0.stringValue }
+            files = files.filter { file in
+                !patterns.contains { pattern in
+                    UnusedCodeFilter.matchesGlobPattern(file, pattern: pattern)
+                }
+            }
+        }
+
+        return files
+    }
+
     private func handleDetectUnusedCode(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         let codebasePath = arguments?["codebase_path"]?.stringValue
         let context = try getContext(for: codebasePath)
@@ -651,24 +677,7 @@ extension SWAMCPServer {
             }
         }
 
-        // Get files to analyze
-        var files: [String]
-        if let args = arguments, let paths = args["paths"]?.arrayValue {
-            let relativePaths = paths.compactMap { $0.stringValue }
-            files = try context.validatePaths(relativePaths)
-        } else {
-            files = try context.findSwiftFiles()
-        }
-
-        // Apply path exclusions
-        if let args = arguments, let excludePaths = args["exclude_paths"]?.arrayValue {
-            let patterns = excludePaths.compactMap { $0.stringValue }
-            files = files.filter { file in
-                !patterns.contains { pattern in
-                    UnusedCodeFilter.matchesGlobPattern(file, pattern: pattern)
-                }
-            }
-        }
+        let files = try resolveFiles(arguments: arguments, context: context)
 
         let detector = UnusedCodeDetector(configuration: config)
         let results = try await detector.detectUnused(in: files)
@@ -701,24 +710,7 @@ extension SWAMCPServer {
             }
         }
 
-        // Get files to analyze
-        var files: [String]
-        if let args = arguments, let paths = args["paths"]?.arrayValue {
-            let relativePaths = paths.compactMap { $0.stringValue }
-            files = try context.validatePaths(relativePaths)
-        } else {
-            files = try context.findSwiftFiles()
-        }
-
-        // Apply path exclusions
-        if let args = arguments, let excludePaths = args["exclude_paths"]?.arrayValue {
-            let patterns = excludePaths.compactMap { $0.stringValue }
-            files = files.filter { file in
-                !patterns.contains { pattern in
-                    UnusedCodeFilter.matchesGlobPattern(file, pattern: pattern)
-                }
-            }
-        }
+        let files = try resolveFiles(arguments: arguments, context: context)
 
         let detector = DuplicationDetector(configuration: config)
         let results = try await detector.detectClones(in: files)
