@@ -1,0 +1,282 @@
+# SwiftStaticAnalysis (swa) composite GitHub Action.
+#
+# Usage example:
+#
+#   - uses: g-cqd/SwiftStaticAnalysis@main
+#     with:
+#       path: Sources
+#       mode: reachability
+#       clone-types: exact,near
+#       min-tokens: '50'
+#       format: sarif
+#       fail-on: error
+#
+# Inputs are mapped to the real `swa` CLI surface:
+#   - `mode`         -> `swa unused --mode <mode>`
+#   - `clone-types`  -> `swa duplicates --types <type> [<type>...]`
+#   - `min-tokens`   -> `swa duplicates --min-tokens <n>`
+#   - `format`       -> `-f text|json|xcode`, or `sarif` (post-processed from JSON)
+#   - `fail-on`      -> implemented in this action (`swa` has no such flag)
+#
+# Outputs:
+#   - `unused-count`     number of unused-code findings
+#   - `duplicates-count` number of duplicate clone groups
+#   - `sarif-path`       path to the generated SARIF file (when format=sarif)
+
+name: SwiftStaticAnalysis (swa)
+description: Run swa on a Swift codebase to find unused code and duplicates, with SARIF output.
+author: g-cqd
+
+branding:
+  icon: search
+  color: orange
+
+inputs:
+  path:
+    description: Path to scan (directory or file).
+    required: false
+    default: '.'
+  mode:
+    description: Unused-code detection mode (reachability, simple, indexStore).
+    required: false
+    default: reachability
+  clone-types:
+    description: Comma-separated clone types to detect (exact, near, semantic).
+    required: false
+    default: exact,near
+  min-tokens:
+    description: Minimum tokens for a duplicate clone group.
+    required: false
+    default: '50'
+  format:
+    description: Output format (sarif, text, json, xcode). `sarif` is post-processed from JSON.
+    required: false
+    default: sarif
+  fail-on:
+    description: Severity threshold to fail the step (error, warning, never). Implemented in-action; swa itself has no fail-on flag.
+    required: false
+    default: error
+  swa-version:
+    description: Optional git ref to check out before building (tag, branch, or SHA). When empty, uses the workspace as-is.
+    required: false
+    default: ''
+  working-directory:
+    description: Working directory in which to invoke swa.
+    required: false
+    default: ${{ github.workspace }}
+
+outputs:
+  unused-count:
+    description: Number of unused-code findings reported by swa.
+    value: ${{ steps.run.outputs.unused-count }}
+  duplicates-count:
+    description: Number of duplicate clone groups reported by swa.
+    value: ${{ steps.run.outputs.duplicates-count }}
+  sarif-path:
+    description: Path to the generated SARIF file (only when format=sarif).
+    value: ${{ steps.run.outputs.sarif-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Build swa (release)
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        if [[ -n "${{ inputs.swa-version }}" ]]; then
+          echo "Checking out swa ref: ${{ inputs.swa-version }}"
+          git fetch --tags --quiet origin "${{ inputs.swa-version }}" || true
+          git checkout --quiet "${{ inputs.swa-version }}"
+        fi
+        echo "Building swa in release configuration..."
+        swift build -c release --product swa
+        BIN_DIR="$(swift build -c release --show-bin-path)"
+        echo "$BIN_DIR" >> "$GITHUB_PATH"
+        echo "SWA_BIN=$BIN_DIR/swa" >> "$GITHUB_ENV"
+
+    - name: Run swa
+      id: run
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        SWA_PATH: ${{ inputs.path }}
+        SWA_MODE: ${{ inputs.mode }}
+        SWA_CLONE_TYPES: ${{ inputs.clone-types }}
+        SWA_MIN_TOKENS: ${{ inputs.min-tokens }}
+        SWA_FORMAT: ${{ inputs.format }}
+        SWA_FAIL_ON: ${{ inputs.fail-on }}
+      run: |
+        set -euo pipefail
+
+        case "$SWA_FORMAT" in
+          sarif)
+            SWA_FORMAT_FLAG=json
+            ;;
+          text|json|xcode)
+            SWA_FORMAT_FLAG="$SWA_FORMAT"
+            ;;
+          *)
+            echo "::error::Unknown format '$SWA_FORMAT' (expected sarif|text|json|xcode)"
+            exit 2
+            ;;
+        esac
+
+        CLONE_TYPES_ARR=()
+        IFS=',' read -ra _CTS <<<"$SWA_CLONE_TYPES"
+        for t in "${_CTS[@]}"; do
+          t="${t// /}"
+          [[ -z "$t" ]] && continue
+          case "$t" in
+            exact|near|semantic) CLONE_TYPES_ARR+=("$t") ;;
+            *)
+              echo "::error::Unknown clone type '$t' (expected exact|near|semantic)"
+              exit 2
+              ;;
+          esac
+        done
+        if [[ "${#CLONE_TYPES_ARR[@]}" -eq 0 ]]; then
+          CLONE_TYPES_ARR=(exact)
+        fi
+
+        case "$SWA_MODE" in
+          reachability|simple|indexStore) ;;
+          *)
+            echo "::error::Unknown mode '$SWA_MODE' (expected reachability|simple|indexStore)"
+            exit 2
+            ;;
+        esac
+
+        case "$SWA_FAIL_ON" in
+          error|warning|never) ;;
+          *)
+            echo "::error::Unknown fail-on '$SWA_FAIL_ON' (expected error|warning|never)"
+            exit 2
+            ;;
+        esac
+
+        OUT_DIR="${RUNNER_TEMP:-/tmp}/swa-out"
+        mkdir -p "$OUT_DIR"
+        DUP_JSON="$OUT_DIR/duplicates.json"
+        UNUSED_JSON="$OUT_DIR/unused.json"
+
+        echo "Running: swa duplicates $SWA_PATH --types ${CLONE_TYPES_ARR[*]} --min-tokens $SWA_MIN_TOKENS -f json"
+        "$SWA_BIN" duplicates "$SWA_PATH" \
+          --types "${CLONE_TYPES_ARR[@]}" \
+          --min-tokens "$SWA_MIN_TOKENS" \
+          -f json > "$DUP_JSON" || {
+            echo "::error::swa duplicates failed"
+            exit 1
+          }
+
+        echo "Running: swa unused $SWA_PATH --mode $SWA_MODE -f json"
+        "$SWA_BIN" unused "$SWA_PATH" \
+          --mode "$SWA_MODE" \
+          -f json > "$UNUSED_JSON" || {
+            echo "::error::swa unused failed"
+            exit 1
+          }
+
+        DUP_COUNT=$(jq 'length' "$DUP_JSON" 2>/dev/null || echo 0)
+        UNUSED_COUNT=$(jq 'length' "$UNUSED_JSON" 2>/dev/null || echo 0)
+        echo "Duplicate groups: $DUP_COUNT"
+        echo "Unused items:     $UNUSED_COUNT"
+        echo "duplicates-count=$DUP_COUNT" >> "$GITHUB_OUTPUT"
+        echo "unused-count=$UNUSED_COUNT" >> "$GITHUB_OUTPUT"
+
+        SARIF_OUT="$OUT_DIR/swa.sarif"
+        case "$SWA_FORMAT" in
+          sarif)
+            jq -n \
+              --slurpfile dup "$DUP_JSON" \
+              --slurpfile unused "$UNUSED_JSON" \
+              '
+              def dup_results:
+                ($dup[0] // []) | map(
+                  . as $g
+                  | (.clones // []) | map(
+                      {
+                        ruleId: ("duplicate-\($g.type)"),
+                        level: "warning",
+                        message: { text: ("Duplicate code (\($g.type) clone, \($g.occurrences) occurrences, similarity \($g.similarity))") },
+                        locations: [{
+                          physicalLocation: {
+                            artifactLocation: { uri: .file },
+                            region: { startLine: .startLine, endLine: .endLine }
+                          }
+                        }]
+                      }
+                    )
+                ) | add // [];
+              def unused_results:
+                ($unused[0] // []) | map({
+                  ruleId: ("unused-\(.declaration.kind)"),
+                  level: "warning",
+                  message: { text: (.suggestion // "Unused declaration") },
+                  locations: [{
+                    physicalLocation: {
+                      artifactLocation: { uri: .declaration.location.file },
+                      region: {
+                        startLine: .declaration.location.line,
+                        startColumn: .declaration.location.column
+                      }
+                    }
+                  }]
+                });
+              {
+                "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/Schemata/sarif-schema-2.1.0.json",
+                version: "2.1.0",
+                runs: [{
+                  tool: {
+                    driver: {
+                      name: "swa",
+                      informationUri: "https://github.com/g-cqd/SwiftStaticAnalysis",
+                      rules: []
+                    }
+                  },
+                  results: (dup_results + unused_results)
+                }]
+              }
+              ' > "$SARIF_OUT"
+            echo "SARIF written to $SARIF_OUT"
+            echo "sarif-path=$SARIF_OUT" >> "$GITHUB_OUTPUT"
+            ;;
+          text|xcode)
+            "$SWA_BIN" duplicates "$SWA_PATH" \
+              --types "${CLONE_TYPES_ARR[@]}" \
+              --min-tokens "$SWA_MIN_TOKENS" \
+              -f "$SWA_FORMAT_FLAG" || true
+            "$SWA_BIN" unused "$SWA_PATH" \
+              --mode "$SWA_MODE" \
+              -f "$SWA_FORMAT_FLAG" || true
+            ;;
+          json)
+            echo "::group::swa duplicates (json)"
+            cat "$DUP_JSON"
+            echo "::endgroup::"
+            echo "::group::swa unused (json)"
+            cat "$UNUSED_JSON"
+            echo "::endgroup::"
+            ;;
+        esac
+
+        TOTAL=$((DUP_COUNT + UNUSED_COUNT))
+        case "$SWA_FAIL_ON" in
+          never)
+            ;;
+          warning|error)
+            if [[ "$TOTAL" -gt 0 ]]; then
+              echo "::error::swa reported $TOTAL findings (duplicates=$DUP_COUNT unused=$UNUSED_COUNT); failing because fail-on=$SWA_FAIL_ON"
+              exit 1
+            fi
+            ;;
+        esac
+
+    - name: Upload SARIF artifact
+      if: ${{ inputs.format == 'sarif' && steps.run.outputs.sarif-path != '' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: swa-sarif
+        path: ${{ steps.run.outputs.sarif-path }}
+        if-no-files-found: warn
+        retention-days: 30

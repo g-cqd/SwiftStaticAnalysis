@@ -1,0 +1,49 @@
+# pre-commit-framework manifest for SwiftStaticAnalysis (swa).
+#
+# Usage: in a consumer repo's .pre-commit-config.yaml:
+#
+#   repos:
+#     - repo: https://github.com/g-cqd/SwiftStaticAnalysis
+#       rev: 0.3.0-beta.11
+#       hooks:
+#         - id: swa-analyze
+#         - id: swa-duplicates
+#
+# Both hooks require the `swa` binary on $PATH. Install in the consumer
+# repo via:
+#
+#   git clone https://github.com/g-cqd/SwiftStaticAnalysis
+#   cd SwiftStaticAnalysis && swift build -c release --product swa
+#   export PATH="$PWD/.build/release:$PATH"
+
+- id: swa-analyze
+  name: swa analyze
+  description: Run swa analyze on staged Swift files.
+  entry: swa analyze
+  language: system
+  types: [swift]
+  pass_filenames: true
+  require_serial: false
+  stages: [pre-commit]
+
+- id: swa-duplicates
+  name: swa duplicates
+  description: Run swa duplicates against the source tree (not file-scoped — duplication is cross-file).
+  entry: swa duplicates
+  language: system
+  pass_filenames: false
+  always_run: false
+  files: \.swift$
+  args: [Sources, --types, exact, --types, near, --min-tokens, '50']
+  stages: [pre-commit]
+
+- id: swa-unused
+  name: swa unused
+  description: Run swa unused (reachability mode) against the source tree.
+  entry: swa unused
+  language: system
+  pass_filenames: false
+  always_run: false
+  files: \.swift$
+  args: [Sources, --mode, reachability, --sensible-defaults]
+  stages: [pre-commit]

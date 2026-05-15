@@ -1,0 +1,66 @@
+# Self-scan: prove the composite action against this repo's own Sources/.
+#
+# This workflow is the canonical smoke test for action.yml — if it goes
+# red, the action is broken. It runs on push and PR to main.
+
+name: example-self-scan
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'action.yml'
+      - 'Sources/**'
+      - '.github/workflows/example-self-scan.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'action.yml'
+      - 'Sources/**'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  self-scan:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Run swa via composite action (text format, no fail-on)
+        id: swa-text
+        uses: ./
+        with:
+          path: Sources
+          mode: reachability
+          clone-types: exact,near
+          min-tokens: '50'
+          format: text
+          fail-on: never
+
+      - name: Show swa output counts (text run)
+        run: |
+          echo "Duplicates: ${{ steps.swa-text.outputs.duplicates-count }}"
+          echo "Unused:     ${{ steps.swa-text.outputs.unused-count }}"
+
+      - name: Run swa via composite action (sarif format, no fail-on)
+        id: swa-sarif
+        uses: ./
+        with:
+          path: Sources
+          mode: reachability
+          clone-types: exact,near
+          min-tokens: '50'
+          format: sarif
+          fail-on: never
+
+      - name: Upload SARIF to code scanning
+        if: ${{ steps.swa-sarif.outputs.sarif-path != '' }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.swa-sarif.outputs.sarif-path }}
+          category: swa-self-scan
+        continue-on-error: true
