@@ -58,5 +58,7 @@ docs/
 # Generated analysis and planning files
 *_REPORT.md
 *_PLAN.md
+# Exception: hand-authored remediation plan committed alongside its audit
+!audit/REMEDIATION-PLAN.md
 SWIFT_ALGORITHMS.md
 SWIFT_ASYNC_ALGORITHMS.md
