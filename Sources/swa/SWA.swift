@@ -574,7 +574,8 @@ struct Symbol: AsyncParsableCommand {
 
     @Option(
         name: .customLong("lsp"),
-        help: "Workspace root for sourcekit-lsp-backed resolution (build-required mode). When supplied, results include LSP-precision matches (protocol witnesses) merged with IndexStore / syntax results."
+        help:
+            "Workspace root for sourcekit-lsp-backed resolution (build-required mode). When supplied, results include LSP-precision matches (protocol witnesses) merged with IndexStore / syntax results."
     )
     var lspWorkspaceRoot: String?
 

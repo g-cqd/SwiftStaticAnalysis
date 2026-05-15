@@ -5,6 +5,71 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.6] - Unreleased
+
+**Real Core ML semantic-embedding provider.** The β.3
+`SemanticEmbeddingProvider` protocol gains a working
+`CoreMLSemanticEmbeddingProvider` implementation that drives Apple
+`MLModel` inference end-to-end. No model bundle ships in-tree —
+the integration is bring-your-own-model — but the wiring is
+production-shaped, not a stub.
+
+### New: `CoreMLSemanticEmbeddingProvider`
+
+Wraps the standard `MLModel` inference pipeline:
+
+1. Compile the model on first `embed(snippet:)` call via
+   `MLModel.compileModel(at:)`. Pre-compiled `.mlmodelc` paths
+   skip the compile step.
+2. Tokenise via a caller-supplied `Tokenizer` closure (`String →
+   [Int32]`). Each model has its own vocabulary; the closure is
+   the integration seam.
+3. Pack token IDs into `MLMultiArray<Int32>` of shape
+   `[1, contextWindow]`, zero-padding to the model's context
+   window. Refuses snippets that exceed the window.
+4. Run `MLModel.prediction(from:)` (async).
+5. Extract the pooled-output vector as `[Float]`.
+
+Model compilation is cached behind an `NSLock`-guarded
+`ModelStorage` so concurrent first-callers don't recompile.
+
+### Bring-your-own-model
+
+To use it end-to-end:
+
+```swift
+let provider = CoreMLSemanticEmbeddingProvider(
+    modelURL: URL(fileURLWithPath: "/path/to/CodeBERT.mlmodelc"),
+    tokenizer: { snippet in
+        // Map a Swift String to Int32 token IDs.
+        // Match the model's training vocab.
+        return tokenIDsForCodeBERT(snippet)
+    },
+    embeddingDimension: 768,  // CodeBERT default
+    contextWindow: 512,
+    inputName: "input_ids",
+    outputName: "pooler_output"
+)
+let embedding = try await provider.embed(snippet: codeSnippet)
+```
+
+Conversion recipes for CodeBERT / GraphCodeBERT / CodeT5 via
+`coremltools` are upstream documentation; no Swift-specific
+fine-tune ships either. Downstream consumers commit to a model
+choice that fits their licensing / privacy / inference-cost
+constraints.
+
+### Conditional compilation
+
+The provider is gated by `#if canImport(CoreML)` so the
+`DuplicationDetector` module still builds on Linux (where Core ML
+is unavailable). The protocol + `UnconfiguredSemanticEmbeddingProvider`
+default from β.3 remain available on every platform.
+
+Wiring into `DuplicationConfiguration` / `--semantic-deep` CLI is
+staged for the next phase; the provider itself is now a usable
+building block.
+
 ## [0.3.0-beta.5] - Unreleased
 
 **Build-required symbol resolution.** The β.3 `SourceKitLSPClient`
