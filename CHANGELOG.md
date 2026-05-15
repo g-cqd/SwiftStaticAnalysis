@@ -5,6 +5,79 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.14] - Unreleased
+
+**Real semantic embedding provider.** β.12 shipped the embedding-clone-discovery
+*rails* (`HNSWIndex`, `EmbeddingCloneDiscovery`, `DeterministicEmbeddingProvider`)
+but never ran the pipeline against a real model — the deterministic provider is
+just FNV-1a hash bucketing, not semantically meaningful. β.14 closes that gap by
+shipping a provider backed by Apple's built-in `NLContextualEmbedding`
+(macOS 14+, system-provided assets — no bundle download required at build time).
+
+### `NLContextualSemanticEmbeddingProvider`
+
+`Sources/DuplicationDetector/Semantic/NLContextualSemanticEmbeddingProvider.swift`:
+
+- Wraps `NLContextualEmbedding(language:)` from the NaturalLanguage framework.
+- Per-snippet inference: `embeddingResult(for:language:)` →
+  `enumerateTokenVectors(in:using:)` → mean-pool tokens to a single fixed-dim
+  `[Float]`.
+- Construction is eager: `init(language:)` calls `load()` so any asset failure
+  surfaces synchronously rather than on first inference. Returns
+  `SemanticEmbeddingError.modelLoadFailed(underlying:)` wrapping a local
+  `NLContextualEmbeddingError` (`.unsupportedLanguage(_)` or `.assetsUnavailable`)
+  when the asset can't be loaded.
+- Gated behind `#if canImport(NaturalLanguage)` so Linux builds don't break.
+
+### What this captures (and what it doesn't)
+
+`NLContextualEmbedding` is trained on English natural language, not code.
+What it does capture, end-to-end:
+
+- **Type-2 clones** — identifier renames, comment edits. Two implementations
+  of "sum-of-array" with different variable names embed close in cosine space.
+- **Partial Type-3 clones** the structural detector misses.
+
+What it doesn't:
+
+- Idiom-level Type-4 clones (recursion vs iteration, for-loop vs reduce). A
+  code-trained model (`CodeBERT`, `GraphCodeBERT`, `CodeT5-base`) via
+  `CoreMLSemanticEmbeddingProvider` would do materially better. The integration
+  path documented in `SemanticDeepClones.md` is unchanged — `NLContextual…` is
+  the credible no-bundle baseline; Core ML is the production path.
+
+### Integration tests prove the pipeline
+
+`Tests/DuplicationDetectorTests/NLContextualSemanticEmbeddingProviderTests.swift`
+(new, 4 tests). Each test catches `modelLoadFailed` and short-circuits with
+`withKnownIssue` when assets aren't downloadable (offline CI / fresh sandbox),
+so the suite is portable across machines while still exercising the full
+pipeline when assets are present.
+
+- **Dimension probe** — provider reports a positive `embeddingDimension`.
+- **Determinism** — embedding the same snippet twice yields byte-identical
+  vectors.
+- **Direction** — `cosine(sumOfArrayImplA, sumOfArrayImplB) >
+  cosine(sumOfArrayImplA, parseURL)`. The two sum-of-array implementations
+  use renamed identifiers but compute the same thing; the URL-parser is
+  unrelated. NL ranks them correctly.
+- **End-to-end discovery** — `EmbeddingCloneDiscovery.discover(...)` over 4
+  real snippets, with a data-driven threshold derived from the genuine pair's
+  cosine, surfaces a `CloneGroup` containing both `alpha.swift` and
+  `beta.swift`. The pipeline (provider → HNSW → union-find → `CloneGroup`)
+  works against actual embeddings, not stubs.
+
+All 4 new tests pass on this host. Full suite: 1188 tests.
+
+### Truth-up: prior CHANGELOG claim
+
+β.12's CHANGELOG said EmbeddingCloneDiscovery was "no longer future." That was
+true for the *infrastructure* but misleading about the *signal* — the only
+shipped providers were `UnconfiguredSemanticEmbeddingProvider` (throws on every
+call) and `DeterministicEmbeddingProvider` (hash buckets, not semantic). β.14
+makes the claim concrete with a provider whose output actually has semantic
+geometry.
+
 ## [0.3.0-beta.13] - Unreleased
 
 **`swa-lsp` Language Server.** A new executable target surfaces
