@@ -53,7 +53,8 @@ struct SwaBench: AsyncParsableCommand {
 
     @Flag(
         name: .long,
-        help: "Print median and p99 alongside mean to stderr for human reading. The JSON report always carries the full statistical envelope."
+        help:
+            "Print median and p99 alongside mean to stderr for human reading. The JSON report always carries the full statistical envelope."
     )
     var statistical: Bool = false
 
