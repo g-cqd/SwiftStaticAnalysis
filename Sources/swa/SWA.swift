@@ -234,7 +234,8 @@ struct Duplicates: AsyncParsableCommand {
         // uniform `.rollingHash` default routed both through Rabin-Karp,
         // so the documented algorithm mapping was a lie. The CLI flag
         // and `.swa.json` override still win when set.
-        let effectiveAlgorithm = algorithm
+        let effectiveAlgorithm =
+            algorithm
             ?? parseAlgorithm(dupConfig?.algorithm)
             ?? defaultAlgorithm(forCloneTypes: effectiveTypes)
         let effectiveExcludePaths = excludePaths.isEmpty ? (dupConfig?.excludePaths ?? []) : excludePaths
