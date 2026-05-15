@@ -5,6 +5,86 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.15] - Unreleased
+
+**Real downloaded model + self-scan + first model-discovered refactor.**
+
+β.14 wired Apple's `NLContextualEmbedding` as a real (no-bundle) provider but
+NL is trained on English NL, not code. β.15 closes the remaining gap:
+
+1. **`BertSemanticEmbeddingProvider`** — loads a downloaded Core ML model with
+   the standard HF feature-extraction signature (`input_ids` + `attention_mask`
+   → `last_hidden_state`), mean-pools per-token vectors via raw-pointer
+   `MLMultiArray` access, conforms to `SemanticEmbeddingProvider`.
+2. **`BertWordPieceTokenizer`** — minimal Swift WordPiece (~150 LOC) matching
+   the BERT base-uncased convention, greedy longest-prefix-match with `##`
+   subword continuation, loads HF-style `vocab.txt`.
+3. **`scripts/convert-minilm.py`** — converts `sentence-transformers/all-MiniLM-L6-v2`
+   to Core ML. Registers a coremltools custom `new_ones` converter (missing
+   in coremltools 8.x) and explicitly threads `token_type_ids` + `position_ids`
+   so BERT doesn't lazily new_ones them during tracing.
+4. **`scripts/embed-self-scan.py`** — full-codebase self-scan via the same
+   model: extracts 823 function-shaped snippets from `Sources/` via brace
+   counting, embeds via SBERT, runs all-pairs cosine + union-find, prints
+   the top 20 discovered semantic clone groups.
+
+### Real self-scan findings
+
+Running the pipeline against this repo's own `Sources/` surfaced REAL,
+actionable Type-2 clones the structural detector missed:
+
+| sim | finding |
+|---|---|
+| 0.977 | `LiveVariableAnalysis.extractAssignedValue` ↔ `ReachingDefinitions.extractValue` |
+| 0.965 | `IndexBasedDependencyGraph.computeReachableLocked` ↔ `ReachabilityGraph.computeReachable` |
+| 0.959 | `ParallelConnectedComponents.shouldSwitchToBottomUp` ↔ `ParallelBFS.shouldSwitchToBottomUp` |
+| 0.856 | `denseGraph()` triplicate across `IndexBasedDependencyGraph` + `ReachabilityGraph` |
+| 0.812 | `incremental(cacheDirectory:)` factory in both `DuplicationConfiguration` + `UnusedCodeConfiguration` |
+| 0.809 | `classifyToken` / `normalizeToken` across 3 token-handling files |
+
+These are semantic-rename clones — identifier names differ, logic is identical.
+The structural detector (suffix array / MinHash) hashes identifiers and so
+misses them by construction.
+
+### First action on a finding: `DirectionOptimizingBFS` extraction
+
+To prove the discovery is actionable (not just decorative), this release
+consolidates the 0.959-similarity finding:
+
+- New `Sources/SwiftStaticAnalysisCore/Algorithms/DirectionOptimizingBFS.swift`
+  with two `@inlinable public static` helpers: `shouldSwitchToBottomUp` and
+  `shouldSwitchToTopDown` implementing the Beamer-Asanovic-Patterson 2012
+  α/β heuristics for hybrid top-down / bottom-up BFS.
+- `ParallelConnectedComponents` and `ParallelBFS` both delete their
+  copy-pasted private statics and call the shared helper.
+
+Net: −36 LOC of duplicated math, one canonical implementation, full test
+suite (1191 tests including 3 new BERT integration tests) green.
+
+### Tests
+
+`Tests/DuplicationDetectorTests/BertSemanticEmbeddingProviderTests.swift`
+(new, 3 tests, gated on `Models/MiniLM.mlpackage` + `MiniLM-vocab.txt`
+presence with `withKnownIssue` skip):
+
+- `loadsAndEmbeds` — 384-dim non-zero vector against a real snippet.
+- `semanticRankingClonesOverUnrelated` — cosine(sumA, sumB) > 0.7 AND
+  > cosine(sumA, parseURL). Real semantic geometry from a downloaded model.
+- `selfScanDiscoversGroups` — curated repo snippets, data-driven threshold
+  (90% of a calibration pair's cosine), discovery surfaces the FNV-1a hash
+  + its renamed twin (cosine 0.795). Prints pairwise cosines for debugging.
+
+### Honest scope
+
+`all-MiniLM-L6-v2` is a sentence-transformer trained on English text, NOT
+code. It catches Type-2 clones (identifier renames) well, partial Type-3
+adequately, but won't beat a real code-trained model (CodeBERT,
+GraphCodeBERT, CodeT5) on idiom-level Type-4 clones (for-loop vs reduce,
+recursion vs iteration). The `CoreMLSemanticEmbeddingProvider` path
+documented in `SemanticDeepClones.md` remains the production
+recommendation for a Swift-tuned setup. β.15 ships the proof that the
+pipeline works end-to-end against a real downloaded model.
+
 ## [0.3.0-beta.14] - Unreleased
 
 **Real semantic embedding provider.** β.12 shipped the embedding-clone-discovery
