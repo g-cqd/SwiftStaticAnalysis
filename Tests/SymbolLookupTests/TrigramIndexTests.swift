@@ -36,10 +36,10 @@ struct TrigramIndexTests {
     @Test("Candidate intersection narrows to the symbols containing every trigram")
     func candidateIntersection() {
         let index = TrigramIndex(definitions: [
-            occurrence("fetchData"),    // contains "fet", "etc", ...
-            occurrence("fetchUsers"),   // contains "fet", "etc", ...
-            occurrence("loadData"),     // contains "Dat", "ata", but not "fet"
-            occurrence("validate"),     // contains none of the above
+            occurrence("fetchData"),  // contains "fet", "etc", ...
+            occurrence("fetchUsers"),  // contains "fet", "etc", ...
+            occurrence("loadData"),  // contains "Dat", "ata", but not "fet"
+            occurrence("validate"),  // contains none of the above
         ])
 
         let candidates = index.candidates(requiredTrigrams: ["fet", "Dat"])

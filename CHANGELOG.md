@@ -5,6 +5,70 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.3] - Unreleased
+
+Two new pieces of infrastructure for the deferred algorithm-research
+queue. 1151 tests green (1150 + 1 new for the LSP integration test).
+
+### F-S1 — SourceKit-LSP integration spike
+
+New `SourceKitLSPClient` (in `Sources/SymbolLookup/SourceKitLSP/`)
+implements a minimal JSON-RPC 2.0 client over stdio against
+`sourcekit-lsp`. The client handles LSP header framing
+(`Content-Length: N\r\n\r\n<json>`), the `initialize` /
+`shutdown` lifecycle, and the request slice needed for
+protocol-witness resolution:
+`textDocument/prepareCallHierarchy` →
+`callHierarchy/incomingCalls`. The latter is the path that walks
+protocol conformances through the build's type information —
+the precision win over IndexStoreDB-only resolution flagged by
+the post-α.11 audit.
+
+Status: **spike**. The client works end-to-end against
+`/usr/bin/sourcekit-lsp` (new integration test in
+`Tests/SymbolLookupTests/SourceKitLSPClientTests.swift` verifies
+the full handshake), but the integration into `IndexStoreResolver`
+or `SymbolFinder` is **not** wired. That requires a "build-required
+mode" CLI / programmatic-API surface that the 0.3.x line doesn't
+ship (the analyzer is intentionally build-free today). The client
+exists as the scaffolding the 0.4.0 build-required resolver will
+plug into.
+
+### F-S2 — SemanticEmbeddingProvider protocol
+
+New `SemanticEmbeddingProvider` protocol (in
+`Sources/DuplicationDetector/Semantic/`) defines the integration
+point for plugging in dense-vector code embeddings — CodeBERT,
+GraphCodeBERT, CodeT5 via Core ML, remote APIs, or air-gapped
+local models. Producing embeddings unlocks cross-idiom
+semantic-clone recall (the ~20-30% ceiling documented in
+`CloneDetection.md`).
+
+The shipped default is `UnconfiguredSemanticEmbeddingProvider`,
+which throws `SemanticEmbeddingError.notConfigured` on every
+call. This is deliberate: it forces the integration path to be
+explicit. Real providers ship as separate packages or extensions
+that conform to the protocol and get plugged into the detector
+(wiring TBD in 0.4.0; the protocol itself is stable enough to
+extend `DuplicationConfiguration` once consumers materialise).
+
+No model bundle ships in-tree. A 400 MB Core ML model would
+balloon binary releases and a remote API requires policy
+choices (which provider, what egress) that downstream consumers
+should make themselves.
+
+### F-S3 — PDG / GNN clone detection
+
+**Not implementable in the 0.3.x line.** Program-dependence-graph
+construction requires a SIL extraction pipeline
+(`swiftc -emit-sil` or equivalent), which conflicts with the
+build-free design the analyzer commits to today. A future
+"build-required deep mode" could land this; it would share the
+same architectural commitments as F-S1's resolver integration
+(opt-in CLI flag, runtime `swiftc` dependency, project-state
+expectations). No scaffolding ships in beta.3 because there's no
+useful protocol shape without the SIL pipeline.
+
 ## [0.3.0-beta.2] - Unreleased
 
 Three previously-deferred algorithm + precision items shipped.

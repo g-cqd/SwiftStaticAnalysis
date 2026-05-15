@@ -3,8 +3,8 @@
 //  MIT License
 
 import Foundation
-import Synchronization
 import SwiftStaticAnalysisCore
+import Synchronization
 
 /// Resolves symbols using the IndexStoreDB compiler index.
 ///
