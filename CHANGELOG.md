@@ -5,6 +5,87 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.22] - Unreleased
+
+**Continuing CLI cleanup + AST shape reranker (C from the SOTA roadmap).**
+
+### `--semantic` on the umbrella
+
+`swa analyze --semantic` now runs the full umbrella (structural duplicates +
+unused code + embedding clone discovery) in one invocation. The
+`runUmbrellaEmbeddingDiscovery` helper factors the discovery pipeline so
+both `Duplicates` and `Analyze` share the same implementation.
+
+### `--swiftui` shorthand on `swa unused`
+
+The three SwiftUI-specific flags (`--ignore-swiftui-property-wrappers`,
+`--ignore-preview-providers`, `--ignore-view-body`) collapse into a single
+`--swiftui` flag. The individual flags still work (hidden from `--help`)
+for fine-grained control. Most SwiftUI consumers should just pass
+`--swiftui` and forget the rest.
+
+### `--parallel` removed
+
+The deprecated `--parallel` flag was removed from both `duplicates` and
+`unused`. Replacement: `--parallel-mode {none|safe|maximum}`. The
+deprecation has been in place; β.22 finishes the job. Breaking change
+documented in the corresponding CLI test.
+
+### C. AST shape reranker
+
+New `ASTShapeReranker` in `Sources/DuplicationDetector/Semantic/`. Parses
+each snippet via SwiftSyntax, walks the tree pre-order, emits the
+type-name of each visited node into a linear sequence. Two snippets'
+shape sequences are compared by **trigram Jaccard** over the linearized
+node-type sequence. Catches the "same identifiers, different syntactic
+skeleton" false-positive class that MaxSim can't filter (e.g. guard-chain
+vs switch with the same vocabulary).
+
+Why trigrams over node-type bags: bags match on shared vocabulary
+ignoring order. Trigrams require local order to agree, which is closer
+to actual structural similarity.
+
+Why not full APTED tree edit distance: APTED is the gold standard but
+~500 LOC of intricate Swift. The trigram approximation is empirically
+strong on Type-2 detection at a fraction of the cost; APTED is queued
+as a future direction if the precision ceiling needs to be raised.
+
+### Strict preset upgraded
+
+`--preset strict` now applies the full rerank stack:
+
+- cosine threshold 0.90
+- token Jaccard 0.30
+- MaxSim 0.85 (token-level)
+- AST shape 0.25 (structural-level)
+
+A candidate must pass EVERY enabled rerank to survive. Each rerank
+catches a different false-positive class.
+
+Empirical curve on this repo (`swa duplicates Sources --semantic --embedding-bundle Models/MiniLM`):
+
+| preset    | discovered groups |
+|-----------|------------------:|
+| `loose`   | 111 |
+| `balanced`|  74 (default) |
+| `strict`  |  30 (cosine + Jaccard + MaxSim + AST shape) |
+
+### Tests
+
+1188 still green. The `legacyParallelEmitsDeprecationWarning` CLI test
+was rewritten as `legacyParallelIsRejected` — it now asserts that
+`--parallel` is rejected with "Unknown option" (the deprecation became
+removal in β.22).
+
+### What's NOT in β.22 (queued)
+
+- **D. Cross-encoder reranker** — needs another HF model conversion +
+  Swift wrapper. The four layered signals already in place (cosine +
+  Jaccard + MaxSim + AST shape) cover most of the precision wins a
+  cross-encoder would deliver; D is now a marginal improvement, not the
+  blocker it was in β.20.
+- **Full APTED tree edit distance** — see "Why not full APTED" above.
+
 ## [0.3.0-beta.21] - Unreleased
 
 **CLI consolidation: one option group, three presets, bundle auto-discovery.**
