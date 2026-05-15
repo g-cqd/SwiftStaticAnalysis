@@ -87,7 +87,7 @@ public enum SourceFileReader {
             var lines: [String] = []
             lines.reserveCapacity(ranges.count)
             for range in ranges {
-                lines.append(mapped.slice(offset: range.offset, length: range.length).asString() ?? "")
+                lines.append(mapped.readAsString(offset: range.offset, length: range.length) ?? "")
             }
             return lines
         }

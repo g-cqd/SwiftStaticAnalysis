@@ -90,8 +90,9 @@ private final class MappingStorage: @unchecked Sendable {
 /// descriptor is a `SystemPackage.FileDescriptor`, so open/close use typed
 /// errors.
 ///
-/// All public access goes through `RawSpan` (via `withRawSpan`) or
-/// `FileSlice`, both of which are read-only.
+/// All public access goes through `RawSpan` (via `withRawSpan`),
+/// `readAsString(offset:length:)`, or `readBytes(offset:length:)`. All
+/// are read-only.
 ///
 /// Example:
 /// ```swift
@@ -202,13 +203,8 @@ public final class MemoryMappedFile: Sendable {
 
     /// Pointer to the mapped memory. Held by the private storage class
     /// so the only `@unchecked Sendable` in this layer is one private
-    /// type, not the public `MemoryMappedFile` / `FileSlice` types.
+    /// type, not the public `MemoryMappedFile` type.
     private var data: UnsafeRawPointer { storage.data }
-
-    /// Get the entire file as a slice.
-    public var fullSlice: FileSlice {
-        slice(offset: 0, length: size)
-    }
 
     /// Borrow the entire mapping as a `RawSpan`.
     ///
@@ -221,23 +217,21 @@ public final class MemoryMappedFile: Sendable {
         return try body(span)
     }
 
-    // MARK: - Access
-
-    /// Get a slice of the mapped file.
-    ///
-    /// - Parameters:
-    ///   - offset: Starting offset in bytes.
-    ///   - length: Number of bytes to include.
-    /// - Returns: A slice representing the byte range.
-    public func slice(offset: Int, length: Int) -> FileSlice {
+    /// Borrow a sub-range of the mapping as a `RawSpan`. Out-of-range
+    /// offsets / lengths are clamped to the file bounds — never traps.
+    public func withRawSpan<T>(
+        offset: Int,
+        length: Int,
+        _ body: (RawSpan) throws -> T
+    ) rethrows -> T {
         let validOffset = max(0, min(offset, size))
         let validLength = min(length, size - validOffset)
-        return FileSlice(
-            base: data.advanced(by: validOffset),
-            length: validLength,
-            file: self,
-        )
+        let buffer = UnsafeRawBufferPointer(start: data.advanced(by: validOffset), count: validLength)
+        let span = RawSpan(_unsafeBytes: buffer)
+        return try body(span)
     }
+
+    // MARK: - Access
 
     /// Get a byte at the given offset.
     ///
@@ -271,14 +265,42 @@ public final class MemoryMappedFile: Sendable {
 
     /// Read the entire file as a string.
     ///
-    /// Note: This creates a copy. Use slices for zero-copy access.
+    /// Note: This creates a copy. Use `withRawSpan(_:)` for zero-copy
+    /// access.
     public func readAsString() -> String? {
-        fullSlice.asString()
+        readAsString(offset: 0, length: size)
     }
 
-    /// Read a range as a string.
+    /// Read a range as a string. Out-of-range offsets / lengths are
+    /// clamped to the file bounds.
     public func readAsString(offset: Int, length: Int) -> String? {
-        slice(offset: offset, length: length).asString()
+        let validOffset = max(0, min(offset, size))
+        let validLength = min(length, size - validOffset)
+        guard validLength > 0 else { return "" }
+        let buffer = UnsafeBufferPointer(
+            start: data.advanced(by: validOffset).assumingMemoryBound(to: UInt8.self),
+            count: validLength
+        )
+        return String(decoding: buffer, as: UTF8.self)
+    }
+
+    /// Read the entire file as a byte array (creates a copy).
+    public func readBytes() -> [UInt8] {
+        readBytes(offset: 0, length: size)
+    }
+
+    /// Read a range as a byte array (creates a copy). Out-of-range
+    /// offsets / lengths are clamped to the file bounds.
+    public func readBytes(offset: Int, length: Int) -> [UInt8] {
+        let validOffset = max(0, min(offset, size))
+        let validLength = min(length, size - validOffset)
+        guard validLength > 0 else { return [] }
+        var result = [UInt8](repeating: 0, count: validLength)
+        let base = data.advanced(by: validOffset)
+        result.withUnsafeMutableBytes { dest in
+            dest.copyMemory(from: UnsafeRawBufferPointer(start: base, count: validLength))
+        }
+        return result
     }
 
     // MARK: - Line Access
@@ -319,15 +341,15 @@ public final class MemoryMappedFile: Sendable {
         }
     }
 
-    /// Get the contents of a specific line (0-indexed).
+    /// Get the contents of a specific line (0-indexed) as a string.
     ///
     /// - Parameter lineIndex: Line index (0-based).
-    /// - Returns: The line content as a slice, or nil if out of range.
-    public func line(_ lineIndex: Int) -> FileSlice? {
+    /// - Returns: The line content, or nil if out of range.
+    public func line(_ lineIndex: Int) -> String? {
         let ranges = findLineRanges()
         guard lineIndex >= 0, lineIndex < ranges.count else { return nil }
         let range = ranges[lineIndex]
-        return slice(offset: range.offset, length: range.length)
+        return readAsString(offset: range.offset, length: range.length)
     }
 
     // MARK: - Prefetch
@@ -379,144 +401,6 @@ public final class MemoryMappedFile: Sendable {
     private let storage: MappingStorage
 }
 
-// MARK: - FileSliceStorage (private @unchecked Sendable cage)
-
-/// Read-only `UnsafeRawPointer` + offset pair caged inside the same
-/// pattern as `MappingStorage`. Lets `FileSlice` itself drop the
-/// `@unchecked Sendable` attribute. The slice keeps a strong reference
-/// to its parent `MemoryMappedFile`, so the mapping outlives any
-/// derived slice.
-private final class FileSliceStorage: @unchecked Sendable {
-    let base: UnsafeRawPointer
-    let length: Int
-    let file: MemoryMappedFile
-
-    init(base: UnsafeRawPointer, length: Int, file: MemoryMappedFile) {
-        self.base = base
-        self.length = length
-        self.file = file
-    }
-}
-
-// MARK: - FileSlice
-
-/// A zero-copy slice of a memory-mapped file.
-///
-/// Slices reference the underlying mapped memory without copying.
-/// They are lightweight and can be created freely.
-///
-/// `FileSlice` is plain `Sendable`. The `UnsafeRawPointer` + parent
-/// reference live inside a private `FileSliceStorage` class that
-/// internally carries `@unchecked Sendable` — the standard cage
-/// pattern. The slice itself behaves like a value (and is still
-/// `borrowing` at the API boundary for the read-mostly methods).
-public struct FileSlice: Sendable {
-    // MARK: Lifecycle
-
-    init(base: UnsafeRawPointer, length: Int, file: MemoryMappedFile) {
-        self.storage = FileSliceStorage(base: base, length: length, file: file)
-    }
-
-    // MARK: Public
-
-    /// Length of the slice in bytes.
-    public var length: Int { storage.length }
-
-    /// Check if the slice is empty.
-    public var isEmpty: Bool { storage.length == 0 }
-
-    /// Get a byte at the given offset.
-    public subscript(offset: Int) -> UInt8? {
-        guard offset >= 0, offset < storage.length else { return nil }
-        return storage.base.load(fromByteOffset: offset, as: UInt8.self)
-    }
-
-    /// Create a sub-slice.
-    ///
-    /// The returned slice borrows from this slice and references the same
-    /// underlying memory mapping.
-    public borrowing func subslice(offset: Int, length: Int) -> Self {
-        let parentLength = storage.length
-        let validOffset = max(0, min(offset, parentLength))
-        let validLength = min(length, parentLength - validOffset)
-        return Self(
-            base: storage.base.advanced(by: validOffset),
-            length: validLength,
-            file: storage.file
-        )
-    }
-
-    /// Convert to a String (creates a copy).
-    ///
-    /// This creates a copy of the underlying bytes as a Swift String.
-    /// For zero-copy access, use `asRawBuffer()` instead.
-    public borrowing func asString() -> String? {
-        let count = storage.length
-        guard count > 0 else { return "" }
-        let buffer = UnsafeBufferPointer(
-            start: storage.base.assumingMemoryBound(to: UInt8.self),
-            count: count
-        )
-        // swiftlint:disable:next optional_data_string_conversion
-        return String(decoding: buffer, as: UTF8.self)
-    }
-
-    /// Convert to a byte array (creates a copy).
-    public borrowing func asBytes() -> [UInt8] {
-        let count = storage.length
-        guard count > 0 else { return [] }
-        var result = [UInt8](repeating: 0, count: count)
-        let base = storage.base
-        result.withUnsafeMutableBytes { dest in
-            dest.copyMemory(from: UnsafeRawBufferPointer(start: base, count: count))
-        }
-        return result
-    }
-
-    /// Get a raw buffer pointer (zero-copy).
-    ///
-    /// The returned pointer is only valid while this slice (and its parent
-    /// `MemoryMappedFile`) remains alive.
-    public borrowing func asRawBuffer() -> UnsafeRawBufferPointer {
-        UnsafeRawBufferPointer(start: storage.base, count: storage.length)
-    }
-
-    /// Borrow the slice contents as a `RawSpan`.
-    ///
-    /// `RawSpan` is `~Escapable`: the closure receives a lifetime-bounded
-    /// view that cannot outlive this slice (and therefore cannot outlive
-    /// the owning `MemoryMappedFile`). Prefer this over `asRawBuffer()`
-    /// for new code — the compiler enforces safety.
-    public borrowing func withRawSpan<T>(_ body: (RawSpan) throws -> T) rethrows -> T {
-        let buffer = UnsafeRawBufferPointer(start: storage.base, count: storage.length)
-        let span = RawSpan(_unsafeBytes: buffer)
-        return try body(span)
-    }
-
-    /// Compare with another slice for equality.
-    public func equals(_ other: Self) -> Bool {
-        guard storage.length == other.storage.length else { return false }
-        return memcmp(storage.base, other.storage.base, storage.length) == 0
-    }
-
-    /// Compare with a string.
-    public func equals(_ string: String) -> Bool {
-        guard let str = asString() else { return false }
-        return str == string
-    }
-
-    /// Hash the slice contents (FNV-1a, see `FNV1a` for details).
-    public func hash() -> UInt64 {
-        FNV1a.hash(UnsafeRawBufferPointer(start: storage.base, count: storage.length))
-    }
-
-    // MARK: Private
-
-    /// Backing storage. The unsafe pointer is held inside a
-    /// `FileSliceStorage` so this struct itself can drop `@unchecked`.
-    private let storage: FileSliceStorage
-}
-
 // MARK: - TokenSlice
 
 /// A slice-based token representation using offsets into a memory-mapped file.
@@ -548,12 +432,7 @@ public struct TokenSlice: Sendable, Hashable {
 
     /// Get the token text from a memory-mapped file.
     public func text(from file: MemoryMappedFile) -> String? {
-        file.slice(offset: offset, length: length).asString()
-    }
-
-    /// Get the raw slice from a memory-mapped file.
-    public func slice(from file: MemoryMappedFile) -> FileSlice {
-        file.slice(offset: offset, length: length)
+        file.readAsString(offset: offset, length: length)
     }
 }
 
@@ -609,6 +488,6 @@ public struct SliceBasedTokenSequence: Sendable {
         let endRange = lineRanges[end - 1]
         let length = endRange.offset + endRange.length - startOffset
 
-        return source.slice(offset: startOffset, length: length).asString()
+        return source.readAsString(offset: startOffset, length: length)
     }
 }

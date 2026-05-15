@@ -109,7 +109,7 @@ public struct ZeroCopyParsedFile: Sendable {
         let length = lastRange.offset + lastRange.length - startOffset
 
         if let mapped = mappedSource {
-            return mapped.slice(offset: startOffset, length: length).asString() ?? ""
+            return mapped.readAsString(offset: startOffset, length: length) ?? ""
         } else if let source = sourceString {
             let startIdx = source.utf8.index(source.utf8.startIndex, offsetBy: startOffset)
             let endIdx = source.utf8.index(startIdx, offsetBy: length)

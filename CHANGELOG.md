@@ -5,6 +5,64 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.4] - Unreleased
+
+**Breaking.** `FileSlice` deleted. Every consumer routes through
+`MemoryMappedFile.readAsString(offset:length:)` /
+`readBytes(offset:length:)` / `withRawSpan(offset:length:_:)`. The
+memory layer is down to exactly **one** `@unchecked Sendable` cage
+(`MappingStorage`), from three.
+
+### Removed (API break)
+
+- `public struct FileSlice` (~130 LOC). Every method —
+  `subscript(offset:)`, `subslice(offset:length:)`, `asString()`,
+  `asBytes()`, `asRawBuffer()`, `withRawSpan(_:)`, `equals(_:)`,
+  `hash()` — gone.
+- `private final class FileSliceStorage: @unchecked Sendable` (cage).
+- `public var MemoryMappedFile.fullSlice` (read the entire file via
+  `readBytes()` / `readAsString()` instead).
+- `public func MemoryMappedFile.slice(offset:length:)` (use the new
+  range-based methods).
+- `public func TokenSlice.slice(from:)` (use `text(from:)` which
+  already returned `String?`).
+
+### Added (replacement surface)
+
+- `public func MemoryMappedFile.readBytes() -> [UInt8]`
+- `public func MemoryMappedFile.readBytes(offset:length:) -> [UInt8]`
+- `public func MemoryMappedFile.withRawSpan(offset:length:_:)` —
+  borrows a sub-range of the mapping as a lifetime-bounded
+  `~Escapable` `RawSpan`. The compiler enforces that the span does
+  not outlive the file.
+
+### Behaviour changes
+
+- `MemoryMappedFile.line(_:)` now returns `String?` directly (was
+  `FileSlice?`). Out-of-range indices still return `nil`.
+- `readAsString(offset:length:)` now decodes bytes inline (no
+  intermediate `FileSlice`). Out-of-range offset/length values
+  clamp to the file bounds rather than producing a slice with
+  whatever-length-actually-fits.
+
+### Migration
+
+| Old call | New call |
+| --- | --- |
+| `mmf.slice(offset: o, length: l).asString()` | `mmf.readAsString(offset: o, length: l)` |
+| `mmf.fullSlice.asString()` | `mmf.readAsString()` |
+| `mmf.fullSlice.asBytes()` | `mmf.readBytes()` |
+| `mmf.line(i)?.asString()` | `mmf.line(i)` |
+| `mmf.fullSlice.withRawSpan { … }` | `mmf.withRawSpan { … }` |
+| `mmf.slice(offset: o, length: l).withRawSpan { … }` | `mmf.withRawSpan(offset: o, length: l) { … }` |
+| `tokenSlice.slice(from: mmf)` | call `tokenSlice.text(from: mmf)` directly, or use the new range-based methods |
+
+1151 tests green. Internal sources (`ZeroCopyParser`, `SoATokenStorage`,
+`SourceFileReader`, `TokenSlice`, `SliceBasedTokenSequence`) all
+migrated. The Sendable cage tests for `MemoryMappedFile` and
+`ArenaTokenStorage` stay; the `FileSlice` cage test is gone alongside
+the type it pinned.
+
 ## [0.3.0-beta.3] - Unreleased
 
 Two new pieces of infrastructure for the deferred algorithm-research

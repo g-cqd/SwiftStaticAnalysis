@@ -243,9 +243,8 @@ struct MemoryMappedFileTests {
 
         let mmf = try MemoryMappedFile(path: path)
 
-        let slice = mmf.slice(offset: 5, length: 5)
-        #expect(slice.length == 5)
-        #expect(slice.asString() == "56789")
+        #expect(mmf.readAsString(offset: 5, length: 5) == "56789")
+        #expect(mmf.readBytes(offset: 5, length: 5) == [53, 54, 55, 56, 57])  // '5'..'9'
     }
 
     @Test("File subscript access works")
@@ -271,9 +270,9 @@ struct MemoryMappedFileTests {
         let ranges = mmf.findLineRanges()
 
         #expect(ranges.count == 3)
-        #expect(mmf.slice(offset: ranges[0].offset, length: ranges[0].length).asString() == "Line 1")
-        #expect(mmf.slice(offset: ranges[1].offset, length: ranges[1].length).asString() == "Line 2")
-        #expect(mmf.slice(offset: ranges[2].offset, length: ranges[2].length).asString() == "Line 3")
+        #expect(mmf.readAsString(offset: ranges[0].offset, length: ranges[0].length) == "Line 1")
+        #expect(mmf.readAsString(offset: ranges[1].offset, length: ranges[1].length) == "Line 2")
+        #expect(mmf.readAsString(offset: ranges[2].offset, length: ranges[2].length) == "Line 3")
     }
 
     @Test("Getting specific line works")
@@ -284,9 +283,9 @@ struct MemoryMappedFileTests {
 
         let mmf = try MemoryMappedFile(path: path)
 
-        #expect(mmf.line(0)?.asString() == "First")
-        #expect(mmf.line(1)?.asString() == "Second")
-        #expect(mmf.line(2)?.asString() == "Third")
+        #expect(mmf.line(0) == "First")
+        #expect(mmf.line(1) == "Second")
+        #expect(mmf.line(2) == "Third")
         #expect(mmf.line(3) == nil)
     }
 
@@ -308,10 +307,10 @@ struct MemoryMappedFileTests {
     }
 }
 
-// MARK: - FileSliceTests
+// MARK: - MemoryMappedFile range-read tests
 
-@Suite("File Slice Tests")
-struct FileSliceTests {
+@Suite("Memory Mapped File Range Reads")
+struct MemoryMappedFileRangeReadTests {
     func createTempFile(content: String) throws -> String {
         let tempDir = FileManager.default.temporaryDirectory
         let fileName = "test_\(UUID().uuidString).txt"
@@ -324,57 +323,52 @@ struct FileSliceTests {
         try? FileManager.default.removeItem(atPath: path)
     }
 
-    @Test("Slice can create subslice")
-    func subslice() throws {
+    @Test("Sub-range reads via offset/length parameters")
+    func subrangeRead() throws {
         let content = "0123456789"
         let path = try createTempFile(content: content)
         defer { deleteTempFile(path) }
 
         let mmf = try MemoryMappedFile(path: path)
-        let slice = mmf.fullSlice
-        let sub = slice.subslice(offset: 2, length: 5)
-
-        #expect(sub.length == 5)
-        #expect(sub.asString() == "23456")
+        #expect(mmf.readAsString(offset: 2, length: 5) == "23456")
+        #expect(mmf.readBytes(offset: 2, length: 5) == [50, 51, 52, 53, 54])
     }
 
-    @Test("Slice hash is consistent")
-    func sliceHash() throws {
-        let content = "TestContent"
-        let path = try createTempFile(content: content)
-        defer { deleteTempFile(path) }
-
-        let mmf = try MemoryMappedFile(path: path)
-        let slice1 = mmf.fullSlice
-        let slice2 = mmf.fullSlice
-
-        #expect(slice1.hash() == slice2.hash())
-    }
-
-    @Test("Slice equality comparison works")
-    func sliceEquality() throws {
-        let content = "ABCABC"
-        let path = try createTempFile(content: content)
-        defer { deleteTempFile(path) }
-
-        let mmf = try MemoryMappedFile(path: path)
-        let slice1 = mmf.slice(offset: 0, length: 3)
-        let slice2 = mmf.slice(offset: 3, length: 3)
-
-        #expect(slice1.equals(slice2))
-        #expect(slice1.equals("ABC"))
-    }
-
-    @Test("Slice asBytes creates correct array")
-    func sliceToBytes() throws {
+    @Test("readBytes() returns the full file contents")
+    func fullFileBytes() throws {
         let content = "ABC"
         let path = try createTempFile(content: content)
         defer { deleteTempFile(path) }
 
         let mmf = try MemoryMappedFile(path: path)
-        let bytes = mmf.fullSlice.asBytes()
+        #expect(mmf.readBytes() == [65, 66, 67])
+    }
 
-        #expect(bytes == [65, 66, 67])
+    @Test("Out-of-range offset / length clamps rather than traps")
+    func outOfRangeReadsAreClamped() throws {
+        let content = "ABCDE"
+        let path = try createTempFile(content: content)
+        defer { deleteTempFile(path) }
+
+        let mmf = try MemoryMappedFile(path: path)
+        // offset past EOF → empty string
+        #expect(mmf.readAsString(offset: 100, length: 5) == "")
+        // length runs past EOF → truncated to file bound
+        #expect(mmf.readAsString(offset: 3, length: 100) == "DE")
+    }
+
+    @Test("withRawSpan(offset:length:) is bounds-clamped")
+    func boundedRawSpan() throws {
+        let content = "abcdef"
+        let path = try createTempFile(content: content)
+        defer { deleteTempFile(path) }
+
+        let mmf = try MemoryMappedFile(path: path)
+        let observed: UInt8 = mmf.withRawSpan(offset: 2, length: 3) { span in
+            #expect(span.byteCount == 3)
+            return span.unsafeLoad(fromByteOffset: 0, as: UInt8.self)
+        }
+        #expect(observed == UInt8(ascii: "c"))
     }
 }
 
@@ -944,7 +938,7 @@ struct SliceBasedTokenSequenceTests {
 
 // MARK: - Cage-pattern Sendable regression
 //
-// `MemoryMappedFile`, `FileSlice`, and `ArenaTokenStorage` are plain
+// `MemoryMappedFile` and `ArenaTokenStorage` are plain
 // `Sendable` because their unsafe state lives inside private
 // `@unchecked Sendable` storage classes (the cage). If a future refactor
 // adds a mutable field to one of those storage classes, the compiler
@@ -988,17 +982,16 @@ struct CageSendableTests {
         #expect(newlines == 3, "Should observe all three newlines from the detached task")
     }
 
-    @Test("FileSlice is safe to read across a detached task")
-    func fileSliceCrossesActor() async throws {
+    @Test("Sub-range reads are safe across a detached task")
+    func subrangeReadCrossesActor() async throws {
         let path = try createTempBytes("hello, world\n")
         defer { deleteTemp(path) }
 
         let mmf = try MemoryMappedFile(path: path)
-        let slice = mmf.slice(offset: 0, length: 5)
         let observed = await Task.detached { () -> String? in
-            slice.asString()
+            mmf.readAsString(offset: 0, length: 5)
         }.value
-        #expect(observed == "hello", "Detached task should see the slice contents through the cage")
+        #expect(observed == "hello", "Detached task should see the same bytes through the cage")
     }
 
     @Test("ArenaTokenStorage is safe to read across a detached task")

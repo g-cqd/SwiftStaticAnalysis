@@ -206,7 +206,8 @@ public final class SourceKitLSPClient: @unchecked Sendable {
         while true {
             let headerLine = try readLine(from: stdoutHandle)
             guard headerLine.hasPrefix("Content-Length: "),
-                let length = Int(headerLine.dropFirst("Content-Length: ".count).trimmingCharacters(in: .whitespacesAndNewlines))
+                let length = Int(
+                    headerLine.dropFirst("Content-Length: ".count).trimmingCharacters(in: .whitespacesAndNewlines))
             else {
                 throw SourceKitLSPError.protocolError(reason: "missing or malformed Content-Length")
             }

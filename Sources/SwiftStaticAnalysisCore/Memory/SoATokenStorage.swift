@@ -255,7 +255,7 @@ public struct SoATokenStorage: Sendable {
     public func text(at index: Int, from file: MemoryMappedFile) -> String? {
         let offset = offset(at: index)
         let length = length(at: index)
-        return file.slice(offset: offset, length: length).asString()
+        return file.readAsString(offset: offset, length: length)
     }
 
     // MARK: - Range Access
