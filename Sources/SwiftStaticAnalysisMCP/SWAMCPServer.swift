@@ -829,7 +829,26 @@ extension SWAMCPServer {
             return .init(content: [.swaText(error.message)], isError: true)
         }
 
-        let content = try String(contentsOfFile: validation.validatedPath, encoding: .utf8)
+        // Read via `MemoryMappedFile` so the open syscall carries
+        // `.noFollow` (closes the TOCTOU window between `validatePath`
+        // and the subsequent open: a symlink swapped in after
+        // validation cannot redirect the read). The size has already
+        // been gated by `validateForReadFile`.
+        let mmf: MemoryMappedFile
+        do {
+            mmf = try MemoryMappedFile(path: validation.validatedPath)
+        } catch {
+            return .init(
+                content: [.swaText("Failed to open file: \(PathUtilities.sanitizedForDiagnostic(path))")],
+                isError: true,
+            )
+        }
+        guard let content = mmf.readAsString() else {
+            return .init(
+                content: [.swaText("Failed to decode file as UTF-8: \(PathUtilities.sanitizedForDiagnostic(path))")],
+                isError: true,
+            )
+        }
         var lines = content.components(separatedBy: .newlines)
         let totalLines = lines.count
 
@@ -1176,7 +1195,16 @@ extension SWAMCPServer {
                     } catch let validationError as ReadFileValidationError {
                         throw MCPError.invalidRequest(validationError.message)
                     }
-                    let content = try String(contentsOfFile: validation.validatedPath, encoding: .utf8)
+                    // Open via `MemoryMappedFile` so the read carries the
+                    // same `.noFollow` boundary `handleReadFile` uses —
+                    // closes the TOCTOU window between `validatePath`
+                    // and the subsequent open.
+                    let mmf = try MemoryMappedFile(path: validation.validatedPath)
+                    guard let content = mmf.readAsString() else {
+                        throw MCPError.invalidRequest(
+                            "Failed to decode file as UTF-8: \(PathUtilities.sanitizedForDiagnostic(path))",
+                        )
+                    }
                     return .init(contents: [.text(content, uri: uri)])
                 }
             } catch let error as CodebaseContextError {
@@ -1331,6 +1359,17 @@ extension SWAMCPServer {
         }
         if let host = parsed.host, !host.isEmpty, host.lowercased() != "localhost" {
             throw ReadResourceURIError(message: "Remote file:// URIs are not supported")
+        }
+        // `file://` has no concept of authentication or port. Reject any
+        // URI that carries them rather than silently ignoring — the
+        // attacker-controlled extra fields would otherwise survive the
+        // gate as a parser-fingerprinting signal at minimum, and could
+        // mask path-confusion attacks against future URL implementations.
+        if parsed.user != nil || parsed.password != nil {
+            throw ReadResourceURIError(message: "file:// URIs must not carry user/password components")
+        }
+        if parsed.port != nil {
+            throw ReadResourceURIError(message: "file:// URIs must not carry a port component")
         }
         let path = parsed.path
         guard !path.isEmpty else {

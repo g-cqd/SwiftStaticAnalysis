@@ -19,18 +19,26 @@ import RegexBuilder
 ///    rejected outright. The default of 512 bytes is large enough for every
 ///    sensible glob or symbol query and tight enough to bound worst-case
 ///    compilation cost.
-/// 2. **Static antipattern prefilter.** Nested quantifiers of the form
-///    `(...*)*` / `(...+)+` are the textbook ReDoS recipe. The prefilter
-///    refuses these without ever compiling the offending pattern.
+/// 2. **Static antipattern prefilter.** Catches the canonical
+///    nested-quantifier shapes `(...*)*` / `(...+)+` and the
+///    `(.*)*` / `(.*)+` "catch-all repetition" recipe. **The prefilter
+///    is a best-effort signal, not a comprehensive ReDoS oracle.** It
+///    does not catch:
+///    - Alternation-with-overlap (`(a|a)*`, `(a|ab)*`).
+///    - Polynomial backtracking (`a*a*a*…b` run-length attacks).
+///    - Lookaround antipatterns (`(?=(.+)+)`).
+///    - Quantified alternation outside groups (`[ab]*[ab]*[ab]*c`).
 ///
-/// Wall-clock budgeting (each match capped against a per-call deadline) is
-/// the caller's responsibility — the budget is necessarily caller-specific
-/// because it depends on how many strings are scanned per request. See the
-/// `search_symbols` handler in `SWAMCPServer` for the canonical
-/// `ContinuousClock.now.advanced(by:)` pattern.
+/// The **authoritative** defence is wall-clock budgeting at the call site
+/// — each match capped against a per-call deadline. The prefilter
+/// reduces the population of obvious offenders before they reach the
+/// budgeted matcher. See the `search_symbols` handler in
+/// `SWAMCPServer` for the canonical `ContinuousClock.now.advanced(by:)`
+/// pattern; that budget, not this prefilter, bounds the actual CPU
+/// exposure.
 ///
-/// This helper is the single source of truth for these guards; do not
-/// re-implement them at call sites.
+/// This helper is the single source of truth for the static guards; do
+/// not re-implement them at call sites.
 public enum SafeRegex {
     /// Maximum allowed UTF-8 length of a pattern, in bytes.
     public static let maxPatternLength = 512

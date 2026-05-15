@@ -56,8 +56,24 @@ private final class MappingStorage: @unchecked Sendable {
 
     deinit {
         munmap(UnsafeMutableRawPointer(mutating: data), size)
-        try? descriptor.close()
+        do {
+            try descriptor.close()
+        } catch {
+            // Surface descriptor-close failures so file-table exhaustion
+            // under load is observable rather than silent. We can't
+            // `throw` from `deinit`, so the log is the only signal —
+            // suppressing it would let an EBADF / EIO run accumulate
+            // until the process can't open more files.
+            MappingStorage.deinitLogger.warning(
+                "MemoryMappedFile descriptor close failed for \(self.path): \(error)"
+            )
+        }
     }
+
+    /// Dedicated logger for the closing side. The `os.Logger` instance
+    /// itself is `Sendable` (it's a value wrapper around an OSLog
+    /// handle), so it composes with the storage class's safety story.
+    private static let deinitLogger = AnalysisLogger.osLog(category: "MemoryMappedFile")
 }
 
 // MARK: - MemoryMappedFile

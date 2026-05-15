@@ -1008,9 +1008,11 @@ struct CageSendableTests {
         // duration of the test (until the `await` returns), which is the
         // lifetime contract callers must honour.
         var soa = SoATokenStorage(capacity: 3)
-        for entry in [(kind: UInt8(1), offset: UInt32(0), length: UInt16(4), line: UInt32(1)),
-                      (kind: UInt8(2), offset: UInt32(5), length: UInt16(5), line: UInt32(1)),
-                      (kind: UInt8(3), offset: UInt32(11), length: UInt16(3), line: UInt32(2))] {
+        for entry in [
+            (kind: UInt8(1), offset: UInt32(0), length: UInt16(4), line: UInt32(1)),
+            (kind: UInt8(2), offset: UInt32(5), length: UInt16(5), line: UInt32(1)),
+            (kind: UInt8(3), offset: UInt32(11), length: UInt16(3), line: UInt32(2)),
+        ] {
             soa.append(
                 kind: TokenKindByte(rawValue: entry.kind),
                 offset: entry.offset,

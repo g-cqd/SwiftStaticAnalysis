@@ -302,6 +302,15 @@ public final class IndexStoreReader: @unchecked Sendable {
     public let indexStorePath: String
 
     /// Find libIndexStore.dylib in the system.
+    ///
+    /// Each candidate path is verified to be a regular file owned by
+    /// `root` (uid 0) before it's returned. Without that check, a low-
+    /// privilege user with write access under
+    /// `/Applications/Xcode.app/...` or `/Library/Developer/...` (rare,
+    /// but plausible in shared dev / CI environments) could plant a
+    /// hostile dylib that this process would later `dlopen`. The
+    /// owner check is the smallest defence-in-depth gate against that
+    /// shape.
     public static func findLibIndexStore() -> String {
         // Try common locations
         let possiblePaths = [
@@ -314,7 +323,7 @@ public final class IndexStoreReader: @unchecked Sendable {
             "/Library/Developer/CommandLineTools/usr/lib/libIndexStore.dylib",
         ]
 
-        for path in possiblePaths where FileManager.default.fileExists(atPath: path) {
+        for path in possiblePaths where Self.isTrustedDylib(at: path) {
             return path
         }
 
@@ -334,14 +343,40 @@ public final class IndexStoreReader: @unchecked Sendable {
                     .deletingLastPathComponent()  // usr
                     .appendingPathComponent("lib")
                     .appendingPathComponent("libIndexStore.dylib")
-                return toolchainPath.path
+                let resolved = toolchainPath.path
+                if Self.isTrustedDylib(at: resolved) {
+                    return resolved
+                }
             }
         }
 
-        // Default fallback
+        // Default fallback — last-resort path. We still verify it
+        // before letting `IndexStoreLibrary` load it; if verification
+        // fails the empty return surfaces to the caller as a load
+        // failure rather than as a silent attacker-controlled dylib
+        // open.
         // swiftlint:disable:next line_length
-        return
+        let xcodeDefault =
             "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libIndexStore.dylib"
+        return Self.isTrustedDylib(at: xcodeDefault) ? xcodeDefault : ""
+    }
+
+    /// Verify a candidate `libIndexStore.dylib` path is a regular file
+    /// owned by `root` (uid 0). Returning `true` means it's safe to
+    /// hand to `IndexStoreLibrary.init`; `false` means skip this
+    /// candidate.
+    private static func isTrustedDylib(at path: String) -> Bool {
+        guard !path.isEmpty else { return false }
+        var info = stat()
+        guard lstat(path, &info) == 0 else { return false }
+        // Reject symlinks at this layer — `IndexStoreLibrary` will
+        // dlopen whatever resolves, and a symlink in a writable
+        // toolchain directory is a redirect we have no business
+        // following without an explicit check.
+        guard (info.st_mode & S_IFMT) == S_IFREG else { return false }
+        // Owner must be root (uid 0). Any other owner means a non-
+        // privileged user could have replaced the dylib.
+        return info.st_uid == 0
     }
 
     /// Find all occurrences of a symbol with the given name.

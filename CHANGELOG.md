@@ -5,6 +5,72 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.13] - Unreleased
+
+Six defence-in-depth hardening items the post-α.11 re-audit flagged
+as MEDIUM. None individually exploitable today; together they tighten
+the MCP perimeter, the toolchain-dylib trust path, and the diagnostic
+log surface. 1133 tests green.
+
+### Security
+
+- **`handleReadFile` and `ReadResource` use `.noFollow`-opened reads.**
+  Previously both sites called `String(contentsOfFile:)` *after*
+  `validatePath`, leaving a TOCTOU window where a symlink swapped in
+  between validation and open would redirect the read. Both now read
+  through `MemoryMappedFile`, which opens with `FileDescriptor.open(
+  ..., options: [.noFollow])`. The kernel rejects the open if the
+  path component became a symlink; the existing 10 MiB extension /
+  size gate continues to apply.
+- **`findLibIndexStore` verifies dylib trust.** Every candidate path
+  (the three hardcoded toolchain locations, the `xcrun --find swift`
+  resolved path, and the Xcode-default fallback) is `lstat`-ed and
+  required to be a regular file owned by `root` (uid 0) before
+  `IndexStoreLibrary` will `dlopen` it. Without this, a low-privilege
+  user with write access under `/Applications/Xcode.app/...` or
+  `/Library/Developer/...` could plant a hostile dylib that the
+  analyzer process would later load. New private helper
+  `isTrustedDylib(at:)`.
+- **`parseFileURI` rejects credentials and ports.**
+  `file://user:pass@localhost:8080/path` previously passed the gate
+  because `parsed.user` / `parsed.password` / `parsed.port` were
+  ignored. `file://` has no concept of any of these; carrying them
+  is either a fingerprinting probe or a path-confusion attack against
+  future URL implementations. All three components now throw
+  `ReadResourceURIError`.
+- **`MappingStorage.deinit` logs close failures.**
+  `try? descriptor.close()` discarded `EBADF` / `EIO` silently. Under
+  load this could leak descriptors until the process can't open more
+  files (a quiet availability issue). The close failure now routes
+  through `AnalysisLogger.warning` so file-table exhaustion is
+  observable. New private static
+  `MappingStorage.deinitLogger`.
+- **MCP error descriptions sanitise paths.**
+  `CodebaseContextError.errorDescription` embeds attacker-controlled
+  paths in stderr-bound diagnostics. A path containing newlines or
+  ANSI escape sequences would inject log breaks / terminal escapes
+  (CWE-117 log injection). New
+  `PathUtilities.sanitizedForDiagnostic(_:)` replaces C0 control
+  bytes (`0x00...0x1F` except `\t`) and DEL (`0x7F`) with `U+FFFD`
+  before path interpolation. Applied to `invalidRootPath`,
+  `pathOutsideSandbox`, `enumerationFailed`, and the new
+  `handleReadFile` / `ReadResource` open-failure paths.
+
+### Truth-up
+
+- **`SafeRegex` docstring narrowed to match the actual probe scope.**
+  Previously claimed comprehensive ReDoS protection; the prefilter
+  catches the canonical nested-quantifier shapes (`(...*)*`,
+  `(...+)+`) and the catch-all repetition (`(.*)*` / `(.*)+`) only.
+  It does *not* catch alternation-with-overlap (`(a|a)*`), polynomial
+  backtracking (`a*a*a*...b`), lookaround antipatterns
+  (`(?=(.+)+)`), or quantified alternation outside groups. The
+  authoritative defence remains the wall-clock budget at the call
+  site (`search_symbols`'s `ContinuousClock.now.advanced(by:)`).
+  Adding probes for the missed shapes risks rejecting legitimate
+  patterns; the budget already bounds CPU exposure. Documentation
+  now states the contract honestly.
+
 ## [0.3.0-alpha.12] - Unreleased
 
 Closes two HIGH-severity security findings and one correctness bug
