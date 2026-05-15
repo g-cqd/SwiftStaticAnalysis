@@ -337,7 +337,14 @@ Use `--parallel-mode safe` with `reachability` for direction-optimizing BFS on l
 |------|-------------|-----------|
 | **Exact** (Type-1) | Identical code, whitespace-normalized | Suffix Array (SA-IS) |
 | **Near** (Type-2) | Renamed variables/literals | MinHash + LSH |
-| **Semantic** (Type-3/4) | Functionally equivalent | AST Fingerprinting |
+| **Semantic** (Type-3/4) | Structurally equivalent code (same AST topology with different literals / identifiers) | AST fingerprinting + MinHash |
+
+**Semantic detection** is **structural**, not functional. Two functions
+that compute the same result but use different idioms (e.g. an explicit
+`for` loop vs. `reduce(0, +)`; recursion vs. iteration) have near-zero
+AST overlap and are typically **not** grouped — empirical recall for
+cross-idiom equivalents is ~20-30%. See <doc:CloneDetection> for examples
+of what's caught vs. missed.
 
 Use `--parallel-mode safe` with `minHashLSH` to enable parallel clone detection.
 

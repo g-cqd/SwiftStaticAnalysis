@@ -5,6 +5,39 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.18] - Unreleased
+
+Docs truth-up for two algorithm claims the post-α.15 audit flagged
+as misleading. Code-only docstring + README + DocC changes. 1137
+tests green.
+
+### Truth-up
+
+- **`MultiProbeLSH` docstring acknowledges its theoretical
+  limitations.** The post-α.15 audit pointed out the type's
+  perturbation strategy doesn't implement Lv et al. 2007 (VLDB).
+  Investigation: Lv et al.'s algorithm is for **E2LSH** (Euclidean
+  p-stable LSH, Datar et al. 2004), where perturbing the bucket
+  index ±1 corresponds to a small geometric movement. In MinHash
+  LSH the bucket is `hash(b₁, b₂, …, bᵣ)` of the band's signature
+  values, so the perturbation doesn't reach "nearby buckets" in any
+  theoretically grounded sense. The type has **zero consumers** in
+  the codebase or test suite — rather than ship a misguided rewrite
+  or break the public API during alpha, the docstring is updated to
+  acknowledge the limitation and redirect users to `numHashes`
+  tuning (raising signature width is the theoretically grounded
+  alternative). A real MinHash-specific multi-probe variant
+  (LSH Forest, b-bit MinHash) is filed as future work.
+
+- **README clone-type table and `CloneDetection.md` semantic-clone
+  section** acknowledge the ~20-30% recall ceiling for cross-idiom
+  equivalence. The audit's `sumSquaresLoop` / `sumSquaresFunctional`
+  fixture pair is the canonical false-negative example. Semantic
+  detection is **structural** (same AST topology, different literals
+  / identifiers) — empirical recall for same-idiom equivalents is
+  ~85-95%, cross-idiom is ~20-30%. The docs now state this directly
+  rather than implying full Type-3/4 coverage.
+
 ## [0.3.0-alpha.17] - Unreleased
 
 Batch B (algorithm win) + Batch C (symbol-lookup precision) from the

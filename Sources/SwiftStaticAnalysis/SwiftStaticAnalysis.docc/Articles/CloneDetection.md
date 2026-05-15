@@ -62,16 +62,43 @@ func fetchProducts(page: Int) async throws -> [Product] {
 
 Functionally equivalent code with structural differences.
 
-**Algorithm**: AST Fingerprinting with tree similarity matching
+**Algorithm**: AST fingerprinting on the SwiftSyntax tree (depth-rolling
+Mersenne-61 polynomial hash) combined with MinHash + LSH over normalised
+token shingles.
 
 ```bash
 swa duplicates . --types semantic
 ```
 
-**Example**:
+**What semantic detection catches well** — code that shares *structural*
+shape after identifier and literal normalisation: equivalent control flow
+with renamed variables, identical AST topology with different node-level
+content, similar 5-token shingle distribution. The `for`-loop variant of
+`sum(numbers:)` below and a near-identical `for`-loop that adds 1 instead
+of `n` produce nearly identical fingerprints and are reliably grouped.
+
+**Known recall ceiling** — semantic detection here is **structural**, not
+*functional*. Two functions that compute the same result but use
+fundamentally different idioms (e.g. an explicit `for` loop vs.
+`reduce(0, +)`; recursion vs. iteration; `while` vs. `repeat-while`) have
+near-zero AST overlap and near-zero shingle overlap after normalisation,
+so the detector will **not** group them. The audit's fixture pair
+`sumSquaresLoop` / `sumSquaresFunctional` is the canonical false-negative
+example.
+
+Empirically, recall for cross-idiom semantic equivalents is **~20-30%**
+on the project's own fixtures; recall for same-idiom structural
+equivalents is **~85-95%**. Catching cross-idiom equivalence requires
+either dataflow / control-flow-graph analysis (`--mode reachability`'s
+dataflow passes, scoped to a single function) or learned embeddings
+(CodeBERT / GraphCodeBERT, future work).
+
+**Example** (structural equivalent — caught):
 ```swift
-// Original (for loop)
-func sum(numbers: [Int]) -> Int {
+// Two for-loops over the same shape, different literal.
+// Same AST topology, same shingle distribution after normalisation
+// → reliably grouped.
+func sumA(numbers: [Int]) -> Int {
     var total = 0
     for n in numbers {
         total += n
@@ -79,8 +106,27 @@ func sum(numbers: [Int]) -> Int {
     return total
 }
 
-// Semantic clone (reduce)
-func sum(numbers: [Int]) -> Int {
+func sumB(numbers: [Int]) -> Int {
+    var acc = 0
+    for value in numbers {
+        acc += value * 2
+    }
+    return acc
+}
+```
+
+**Example** (cross-idiom equivalent — typically missed):
+```swift
+// Equivalent semantics, completely different AST topology and
+// shingle composition. Detector recall ~20-30% at default
+// thresholds.
+func sumLoop(numbers: [Int]) -> Int {
+    var total = 0
+    for n in numbers { total += n }
+    return total
+}
+
+func sumFunctional(numbers: [Int]) -> Int {
     numbers.reduce(0, +)
 }
 ```

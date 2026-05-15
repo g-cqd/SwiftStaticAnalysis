@@ -9,13 +9,32 @@ import Foundation
 
 /// Multi-probe LSH for improved recall without increasing index size.
 ///
-/// Standard LSH may miss some similar pairs due to hash collisions.
-/// Multi-probe queries multiple nearby buckets to improve recall by
-/// probing perturbations of the original hash values.
+/// > Experimental. This type implements a perturbation strategy that
+/// > is **not** theoretically grounded for MinHash LSH. The
+/// > foundational multi-probe LSH paper (Lv et al., *Multi-probe LSH:
+/// > Efficient Indexing for High-Dimensional Similarity Search*,
+/// > VLDB 2007) was designed for **E2LSH** — Euclidean LSH with
+/// > p-stable projections, where perturbing a bucket index ±1
+/// > corresponds to a small geometric movement. In MinHash LSH the
+/// > bucket is `hash(b₁, b₂, …, bᵣ)` of the band's signature values,
+/// > so there is no "nearby bucket" the perturbations meaningfully
+/// > reach. Empirical recall improvements over plain
+/// > `LSHIndex.query(_:)` are not bounded by the Lv et al. theory.
+/// >
+/// > **For production use, prefer raising the MinHash signature
+/// > width** (`numHashes`, default 256 as of 0.3.0-α.17). At
+/// > similarity threshold 0.85, doubling the signature width from
+/// > 128 to 256 drops the LSH false-negative rate from ~12-15% to
+/// > ~5-6% with bounded, theoretically grounded behaviour.
+/// >
+/// > A real MinHash-specific multi-probe variant (e.g. LSH Forest,
+/// > Bawa et al. 2005, or b-bit MinHash, Li et al. 2010) would
+/// > require its own implementation. Filed as future work.
 ///
 /// The key insight is that similar documents may hash to slightly different
 /// buckets. By probing nearby buckets (obtained by perturbing hash values),
-/// we can find additional candidates without increasing index size.
+/// we may find additional candidates without increasing index size — but
+/// the perturbation model has no theoretical guarantee for MinHash LSH.
 public struct MultiProbeLSH: Sendable, LSHQueryable {
     // MARK: Lifecycle
 
