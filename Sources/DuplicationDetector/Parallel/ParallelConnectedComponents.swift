@@ -142,8 +142,14 @@ public enum ParallelConnectedComponents {
                 // Sequential for small frontiers
                 nextFrontier = expandSequential(frontier, graph: graph, visited: visited)
             } else if useBottomUp {
-                // Bottom-up: unvisited nodes check if any neighbor is in frontier
-                let frontierBitmap = Bitmap(size: graph.nodeCount, setting: frontier)
+                // Bottom-up: unvisited nodes check if any neighbor is in frontier.
+                // Rebind to `let` so the closure captures an immutable value
+                // (Swift 6 sending-closure correctness).
+                let frontierBitmap: BitArray = {
+                    var bits = BitArray(repeating: false, count: graph.nodeCount)
+                    for index in frontier { bits[index] = true }
+                    return bits
+                }()
                 nextFrontier = await bottomUpExpand(
                     frontierBitmap: frontierBitmap,
                     graph: graph,
@@ -221,7 +227,7 @@ public enum ParallelConnectedComponents {
     /// For undirected clone graphs, reverse adjacency = adjacency,
     /// so we just check if any neighbor is in the frontier.
     private static func bottomUpExpand(
-        frontierBitmap: Bitmap,
+        frontierBitmap: BitArray,
         graph: CloneSimilarityGraph,
         visited: AtomicBitmap,
         maxConcurrency: Int
@@ -233,7 +239,7 @@ public enum ParallelConnectedComponents {
             guard !visited.test(node) else { return false }
 
             for neighbor in graph.adjacency[node] {
-                if frontierBitmap.test(neighbor) {
+                if frontierBitmap[neighbor] {
                     return visited.testAndSet(node)
                 }
             }
@@ -246,20 +252,20 @@ public enum ParallelConnectedComponents {
 
     /// Sequential fallback for small graphs.
     private static func findComponentsSequential(graph: CloneSimilarityGraph) -> [[Int]] {
-        var visited = Bitmap(size: graph.nodeCount)
+        var visited = BitArray(repeating: false, count: graph.nodeCount)
         var components: [[Int]] = []
 
         for seed in 0..<graph.nodeCount {
             guard !graph.adjacency[seed].isEmpty else { continue }
-            guard !visited.test(seed) else { continue }
-            visited.set(seed)
+            guard !visited[seed] else { continue }
+            visited[seed] = true
 
             var component = [seed]
             var queue = Deque([seed])  // O(1) popFirst
 
             while let node = queue.popFirst() {
-                for neighbor in graph.adjacency[node] where !visited.test(neighbor) {
-                    visited.set(neighbor)
+                for neighbor in graph.adjacency[node] where !visited[neighbor] {
+                    visited[neighbor] = true
                     queue.append(neighbor)
                     component.append(neighbor)
                 }

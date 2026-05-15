@@ -168,65 +168,8 @@ struct AtomicBitmapTests {
     }
 }
 
-// MARK: - Non-Atomic Bitmap Tests
-
-@Suite("Non-Atomic Bitmap Tests")
-struct BitmapTests {
-    @Test("Basic operations work")
-    func basicOperations() {
-        var bitmap = Bitmap(size: 100)
-
-        bitmap.set(42)
-        #expect(bitmap.test(42))
-
-        bitmap.clear(42)
-        #expect(!bitmap.test(42))
-    }
-
-    @Test("TestAndSet works correctly")
-    func testAndSet() {
-        var bitmap = Bitmap(size: 100)
-
-        #expect(bitmap.testAndSet(42) == true)  // Was unset
-        #expect(bitmap.testAndSet(42) == false)  // Was already set
-    }
-
-    @Test("PopCount is accurate")
-    func popCount() {
-        var bitmap = Bitmap(size: 100)
-
-        bitmap.set(10)
-        bitmap.set(20)
-        bitmap.set(30)
-
-        #expect(bitmap.popCount == 3)
-    }
-
-    @Test("ClearAll resets bitmap")
-    func clearAll() {
-        var bitmap = Bitmap(size: 100)
-
-        for i in 0..<50 {
-            bitmap.set(i)
-        }
-        #expect(bitmap.popCount == 50)
-
-        bitmap.clearAll()
-        #expect(bitmap.popCount == 0)
-    }
-
-    @Test("ForEachSetBit iterates correctly")
-    func forEachSetBit() {
-        var bitmap = Bitmap(size: 100)
-
-        let expected = [5, 10, 42, 67, 99]
-        for bit in expected {
-            bitmap.set(bit)
-        }
-
-        var collected: [Int] = []
-        bitmap.forEachSetBit { collected.append($0) }
-
-        #expect(Set(collected) == Set(expected))
-    }
-}
+// MARK: - Non-Atomic Bits
+//
+// The non-atomic `Bitmap` struct was retired in 0.3.0-α.8 in favour of
+// `swift-collections.BitArray`. `BitArray` is exercised by swift-collections'
+// own test suite, so no shim tests live here.

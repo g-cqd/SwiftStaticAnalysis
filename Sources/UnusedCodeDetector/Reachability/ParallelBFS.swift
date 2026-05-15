@@ -3,6 +3,7 @@
 //  MIT License
 
 import Algorithms
+import Collections
 import Foundation
 import SwiftStaticAnalysisCore  // For ParallelFrontierExpansion
 
@@ -291,7 +292,7 @@ public enum ParallelBFS {
     ///
     /// ## Optimization (per review findings)
     ///
-    /// - Uses non-atomic `Bitmap` for frontier (only read during parallel phase)
+    /// - Uses non-atomic `BitArray` for frontier (only read during parallel phase)
     /// - Uses strided range iteration instead of building unvisited array (O(1) vs O(n))
     /// - Chunk boundaries computed from node count, not materialized array
     private static func bottomUpStep(
@@ -301,9 +302,14 @@ public enum ParallelBFS {
         maxConcurrency: Int
     ) async -> [Int] {
         // Build frontier bitmap for O(1) membership checks
-        // Use non-atomic Bitmap since it's only written here (single-threaded init)
-        // and only read during parallel phase
-        let frontierBitmap = Bitmap(size: graph.nodeCount, setting: frontier)
+        // Use non-atomic BitArray since it's only written here (single-threaded init)
+        // and only read during parallel phase. Rebind to `let` so the closure
+        // captures an immutable value (Swift 6 sending-closure correctness).
+        let frontierBitmap: BitArray = {
+            var bits = BitArray(repeating: false, count: graph.nodeCount)
+            for index in frontier { bits[index] = true }
+            return bits
+        }()
 
         // Estimate unvisited count without materializing the array
         let unvisitedCount = graph.nodeCount - visited.popCount
@@ -334,7 +340,7 @@ public enum ParallelBFS {
 
                         // Check if any predecessor is in frontier
                         for predecessor in graph.reverseAdjacency[node] {
-                            if frontierBitmap.test(predecessor) {
+                            if frontierBitmap[predecessor] {
                                 // Found a parent in frontier
                                 if visited.testAndSet(node) {
                                     localNext.append(node)
@@ -360,7 +366,7 @@ public enum ParallelBFS {
     /// Iterates over all nodes, skipping visited ones inline.
     private static func bottomUpStepSequential(
         nodeCount: Int,
-        frontierBitmap: Bitmap,
+        frontierBitmap: BitArray,
         graph: DenseGraph,
         visited: AtomicBitmap
     ) -> [Int] {
@@ -371,7 +377,7 @@ public enum ParallelBFS {
             guard !visited.test(node) else { continue }
 
             for predecessor in graph.reverseAdjacency[node] {
-                if frontierBitmap.test(predecessor) {
+                if frontierBitmap[predecessor] {
                     if visited.testAndSet(node) {
                         nextFrontier.append(node)
                     }

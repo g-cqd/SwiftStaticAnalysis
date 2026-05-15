@@ -2,6 +2,7 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
+import Collections
 import Foundation
 import SwiftStaticAnalysisCore
 
@@ -191,15 +192,14 @@ extension DenseGraph {
     public func computeReachableSequential() -> Set<Int> {
         guard !roots.isEmpty else { return [] }
 
-        var visited = Bitmap(size: nodeCount)
+        var visited = BitArray(repeating: false, count: nodeCount)
         var queue: [Int] = []
         queue.reserveCapacity(nodeCount)
 
         // Initialize with roots
-        for root in roots {
-            if visited.testAndSet(root) {
-                queue.append(root)
-            }
+        for root in roots where !visited[root] {
+            visited[root] = true
+            queue.append(root)
         }
 
         var head = 0
@@ -207,13 +207,17 @@ extension DenseGraph {
             let current = queue[head]
             head += 1
 
-            for neighbor in adjacency[current] {
-                if visited.testAndSet(neighbor) {
-                    queue.append(neighbor)
-                }
+            for neighbor in adjacency[current] where !visited[neighbor] {
+                visited[neighbor] = true
+                queue.append(neighbor)
             }
         }
 
-        return Set(visited.allSetBits())
+        var result = Set<Int>()
+        result.reserveCapacity(queue.count)
+        for index in 0..<nodeCount where visited[index] {
+            result.insert(index)
+        }
+        return result
     }
 }

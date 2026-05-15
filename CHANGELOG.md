@@ -5,6 +5,68 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.8] - Unreleased
+
+Closes **B3-1** from the deferred B3.1 cluster: the hand-rolled
+non-atomic `Bitmap` struct (130 LOC of word-packed bits + `set` /
+`test` / `popCount` / `forEachSetBit`) is replaced everywhere by
+`swift-collections.BitArray`. The atomic cousin (`AtomicBitmap`)
+stays — `BitArray` has no lock-free `testAndSet`, which the parallel
+BFS frontier coordination relies on. 1130 tests green
+(down 5 — the deleted tests covered the deleted struct).
+
+### What changed
+
+- **`Sources/SwiftStaticAnalysisCore/Concurrency/Bitmap.swift`**
+  deleted; the file becomes
+  `Sources/SwiftStaticAnalysisCore/Concurrency/AtomicBitmap.swift`
+  with the `AtomicBitmap` class and its `AtomicWord` companion only.
+- **SA-IS `classifyTypes` / induced-sort helpers**
+  (`DuplicationDetector/SuffixArray/SuffixArray.swift`) take
+  `BitArray` instead of `Bitmap`; the subscript shape `types[i]`
+  replaces `types.test(i)`. Hot-path read pattern unchanged.
+- **`ParallelBFS.bottomUpStep`** and
+  **`ParallelConnectedComponents.bottomUpExpand`** build the
+  frontier as a `let`-bound `BitArray` (immediately-invoked
+  closure pattern) so the parallel closures capture an immutable
+  value, satisfying Swift 6's sending-closure check without
+  `@unchecked` or `Mutex`.
+- **`DenseGraph.computeReachableSequential`** uses
+  `BitArray` for the visited set; the final `Set<Int>` is built
+  by a single forward pass over the bit indices.
+- **`Tests/SwiftStaticAnalysisCoreTests/AtomicBitmapTests.swift`**
+  drops the 5 non-atomic-`Bitmap` shim tests. `BitArray` is
+  exercised by swift-collections' own test suite.
+
+### Perf
+
+Bench gate on macos-15 with `--warmup 2 --iterations 5`,
+comparing against the committed baselines:
+
+| Scenario | Mean Δ | p99 Δ |
+| --- | ---: | ---: |
+| duplicates-exact (SA-IS hot path) | +2.79% | +5.68% |
+| duplicates-near | -2.01% | -5.39% |
+| duplicates-semantic | -13.67% | -30.62% |
+| unused-reachability (BFS hot path) | -3.03% | -7.21% |
+| unused-simple | -8.20% | -17.93% |
+| symbol-lookup | -10.34% | -10.34% |
+
+The +2.79% on the SA-IS hot path is well within the +10% mean / +25% p99
+gate. The improvements on the other five scenarios are inside thermal-
+noise territory — the iterations bump from 3 to 5 between baselines
+and the current run drives the apparent gain. None of the unaffected
+scenarios touch `Bitmap`, so any genuine swap-driven win is bounded to
+the two hot paths.
+
+### Why `BitArray` and not "delete it and use `[Bool]`"
+
+`[Bool]` is 8x memory for the same information and prevents the word-
+parallel iteration patterns SA-IS depends on. `BitArray` is the same
+1-bit-per-bit packed representation we had, just maintained upstream
+and with `Hashable` / `Codable` / `Sendable` / `BitwiseCopyable`
+conformances we'd otherwise have to write ourselves.
+
 ## [0.3.0-alpha.7] - Unreleased
 
 Closes the MCP swift-sdk `.text(_:metadata:)` deprecation that had been

@@ -1,4 +1,4 @@
-//  Bitmap.swift
+//  AtomicBitmap.swift
 //  SwiftStaticAnalysis
 //  MIT License
 
@@ -29,6 +29,14 @@ private final class AtomicWord: Sendable {
 /// access. The class itself is plain `Sendable` because every stored
 /// property is `let` and the wrapped atomic-word references are themselves
 /// `Sendable`.
+///
+/// ## Why not `BitArray`?
+///
+/// The non-atomic frontier bits use `swift-collections.BitArray` as of
+/// 0.3.0-α.8. `BitArray` provides no atomic update primitive — its
+/// subscript writes go through standard COW, which is not safe under
+/// concurrent mutation. `AtomicBitmap` is kept as a separate type because
+/// it owns the lock-free fetch-or that parallel BFS relies on.
 ///
 /// ## Performance Characteristics
 ///
@@ -164,135 +172,4 @@ public final class AtomicBitmap: Sendable {
 
     private let storage: [AtomicWord]
     private let wordCount: Int
-}
-
-// MARK: - Bitmap (Non-Atomic)
-
-/// Non-atomic bitmap for single-threaded use.
-///
-/// More efficient than `AtomicBitmap` when thread safety is not required.
-public struct Bitmap: Sendable {
-    // MARK: Lifecycle
-
-    /// Create a bitmap with the given number of bits, all initially unset.
-    public init(size: Int) {
-        precondition(size >= 0, "Bitmap size must be non-negative")
-        self.size = size
-        let wordCount = (size + 63) / 64
-        self.storage = [UInt64](repeating: 0, count: wordCount)
-    }
-
-    /// Create a bitmap with the given number of bits, setting specified indices.
-    ///
-    /// This is more efficient than creating an empty bitmap and calling `set`
-    /// repeatedly because it initializes all bits in a single pass and avoids
-    /// the need for a mutable variable (important for Sendable conformance
-    /// when captured by closures).
-    public init(size: Int, setting indices: some Sequence<Int>) {
-        precondition(size >= 0, "Bitmap size must be non-negative")
-        self.size = size
-        let wordCount = (size + 63) / 64
-        var storage = [UInt64](repeating: 0, count: wordCount)
-
-        for index in indices {
-            precondition(index >= 0 && index < size, "Bitmap index out of bounds")
-            let wordIndex = index / 64
-            let bitIndex = index % 64
-            let mask: UInt64 = 1 << bitIndex
-            storage[wordIndex] |= mask
-        }
-
-        self.storage = storage
-    }
-
-    // MARK: Public
-
-    /// Number of bits in the bitmap.
-    public let size: Int
-
-    /// Set a bit.
-    @inline(__always)
-    public mutating func set(_ index: Int) {
-        precondition(index >= 0 && index < size, "Bitmap index out of bounds")
-
-        let wordIndex = index / 64
-        let bitIndex = index % 64
-        let mask: UInt64 = 1 << bitIndex
-
-        storage[wordIndex] |= mask
-    }
-
-    /// Clear a bit.
-    @inline(__always)
-    public mutating func clear(_ index: Int) {
-        precondition(index >= 0 && index < size, "Bitmap index out of bounds")
-
-        let wordIndex = index / 64
-        let bitIndex = index % 64
-        let mask: UInt64 = 1 << bitIndex
-
-        storage[wordIndex] &= ~mask
-    }
-
-    /// Check if a bit is set.
-    @inline(__always)
-    public func test(_ index: Int) -> Bool {
-        precondition(index >= 0 && index < size, "Bitmap index out of bounds")
-
-        let wordIndex = index / 64
-        let bitIndex = index % 64
-        let mask: UInt64 = 1 << bitIndex
-
-        return (storage[wordIndex] & mask) != 0
-    }
-
-    /// Test and set a bit. Returns true if bit was previously unset.
-    @inline(__always)
-    public mutating func testAndSet(_ index: Int) -> Bool {
-        let wasSet = test(index)
-        if !wasSet {
-            set(index)
-        }
-        return !wasSet
-    }
-
-    /// Count of set bits.
-    public var popCount: Int {
-        storage.reduce(0) { $0 + $1.nonzeroBitCount }
-    }
-
-    /// Iterate over all set bit indices.
-    public func forEachSetBit(_ body: (Int) -> Void) {
-        for (wordIndex, var word) in storage.enumerated() {
-            let baseIndex = wordIndex * 64
-
-            while word != 0 {
-                let bitIndex = word.trailingZeroBitCount
-                let globalIndex = baseIndex + bitIndex
-                if globalIndex < size {
-                    body(globalIndex)
-                }
-                word &= word - 1
-            }
-        }
-    }
-
-    /// Get all set bit indices as an array.
-    public func allSetBits() -> [Int] {
-        var result: [Int] = []
-        result.reserveCapacity(popCount)
-        forEachSetBit { result.append($0) }
-        return result
-    }
-
-    /// Clear all bits.
-    public mutating func clearAll() {
-        for i in 0..<storage.count {
-            storage[i] = 0
-        }
-    }
-
-    // MARK: Private
-
-    private var storage: [UInt64]
 }

@@ -2,6 +2,7 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
+import Collections
 import Foundation
 import SwiftStaticAnalysisCore
 
@@ -214,28 +215,28 @@ enum SAIS {
 
     /// Classify each suffix as S-type (set bit) or L-type (clear bit).
     ///
-    /// Uses `Bitmap` from `SwiftStaticAnalysisCore` so the type vector is
+    /// Uses `BitArray` from swift-collections so the type vector is
     /// 1 bit per suffix rather than the 1 byte that `[Bool]` consumes —
     /// 8x less memory for a 30 M-token codebase.
-    private static func classifyTypes(_ text: [Int]) -> Bitmap {
+    private static func classifyTypes(_ text: [Int]) -> BitArray {
         let n = text.count
-        var types = Bitmap(size: n)
-        types.set(n - 1)  // Last suffix is always S-type (sentinel)
+        var types = BitArray(repeating: false, count: n)
+        types[n - 1] = true  // Last suffix is always S-type (sentinel)
 
         for i in stride(from: n - 2, through: 0, by: -1) {
             if text[i] < text[i + 1] {
-                types.set(i)
-            } else if text[i] == text[i + 1], types.test(i + 1) {
-                types.set(i)
+                types[i] = true
+            } else if text[i] == text[i + 1], types[i + 1] {
+                types[i] = true
             }
         }
         return types
     }
 
     /// Find LMS (Leftmost S-type) positions.
-    private static func findLMSPositions(_ types: Bitmap) -> [Int] {
+    private static func findLMSPositions(_ types: BitArray) -> [Int] {
         var positions: [Int] = []
-        for i in 1..<types.size where types.test(i) && !types.test(i - 1) {
+        for i in 1..<types.count where types[i] && !types[i - 1] {
             positions.append(i)
         }
         return positions
@@ -299,11 +300,11 @@ enum SAIS {
     private static func inducedSortLType(
         sa: UnsafeMutableBufferPointer<Int>,
         text: [Int],
-        types: Bitmap,
+        types: BitArray,
         bucketHeads: [Int],
     ) {
         var heads = bucketHeads
-        for i in 0..<sa.count where sa[i] > 0 && !types.test(sa[i] - 1) {
+        for i in 0..<sa.count where sa[i] > 0 && !types[sa[i] - 1] {
             let j = sa[i] - 1
             let c = text[j]
             sa[heads[c]] = j
@@ -315,11 +316,11 @@ enum SAIS {
     private static func inducedSortSType(
         sa: UnsafeMutableBufferPointer<Int>,
         text: [Int],
-        types: Bitmap,
+        types: BitArray,
         bucketTails: [Int],
     ) {
         var tails = bucketTails
-        for i in stride(from: sa.count - 1, through: 0, by: -1) where sa[i] > 0 && types.test(sa[i] - 1) {
+        for i in stride(from: sa.count - 1, through: 0, by: -1) where sa[i] > 0 && types[sa[i] - 1] {
             let j = sa[i] - 1
             let c = text[j]
             sa[tails[c]] = j
@@ -331,7 +332,7 @@ enum SAIS {
     private static func assignLMSNames(
         sa: UnsafeMutableBufferPointer<Int>,
         text: [Int],
-        types: Bitmap,
+        types: BitArray,
     ) -> (names: [Int], maxName: Int) {
         let n = text.count
         var lmsNames = [Int](repeating: -1, count: n)
@@ -340,7 +341,7 @@ enum SAIS {
 
         for i in 0..<n {
             let pos = sa[i]
-            guard pos > 0, types.test(pos), !types.test(pos - 1) else { continue }
+            guard pos > 0, types[pos], !types[pos - 1] else { continue }
 
             if prevLMS >= 0, !lmsSubstringsEqual(text: text, types: types, i: prevLMS, j: pos) {
                 name += 1
@@ -358,7 +359,7 @@ enum SAIS {
     }
 
     /// Check if two LMS substrings are equal.
-    private static func lmsSubstringsEqual(text: [Int], types: Bitmap, i: Int, j: Int) -> Bool {
+    private static func lmsSubstringsEqual(text: [Int], types: BitArray, i: Int, j: Int) -> Bool {
         let n = text.count
         var pi = i
         var pj = j
@@ -367,7 +368,7 @@ enum SAIS {
             if text[pi] != text[pj] {
                 return false
             }
-            if types.test(pi) != types.test(pj) {
+            if types[pi] != types[pj] {
                 return false
             }
 
@@ -379,8 +380,8 @@ enum SAIS {
             }
 
             // Check if we've reached the end of both LMS substrings
-            let endI = pi > 0 && types.test(pi) && !types.test(pi - 1)
-            let endJ = pj > 0 && types.test(pj) && !types.test(pj - 1)
+            let endI = pi > 0 && types[pi] && !types[pi - 1]
+            let endJ = pj > 0 && types[pj] && !types[pj - 1]
 
             if endI, endJ {
                 return true
