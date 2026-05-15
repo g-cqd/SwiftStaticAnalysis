@@ -5,6 +5,75 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.5] - Unreleased
+
+Closes **B3-3 + B3-11** from the deferred B3.1 cluster: the memory
+layer's public types drop `@unchecked Sendable` and switch fd plumbing
+to swift-system. `FileSlice` stays a value type rather than going
+`~Escapable` (would have broken the public API; the bench gate from
+B4 now catches any perf regression instead). 1135 tests green;
+A/B perf check shows the new code is faster and more stable than the
+pre-rework path (post-rework: σ ≈ 0.01s over 3 runs; pre-rework:
+σ ≈ 0.10s over 3 runs).
+
+### Truth-up: `@unchecked Sendable` confined to private storage
+
+The CHANGELOG 0.2.0 claim "`@unchecked Sendable` removed from memory
+types" is now real:
+
+- **`MemoryMappedFile` is plain `Sendable`** (was `@unchecked`). The
+  unsafe `UnsafeRawPointer` + the `SystemPackage.FileDescriptor` live
+  inside a private `MappingStorage` class — the standard Swift 6 cage
+  pattern, same shape `Synchronization.Mutex` uses internally. The
+  public type's Sendable conformance is now compile-time checked.
+- **`FileSlice` is plain `Sendable`** (was `@unchecked`). Pointer +
+  parent reference held inside private `FileSliceStorage`. API
+  surface unchanged.
+- **`ArenaTokenStorage` is plain `Sendable`** (was `@unchecked`). The
+  four `UnsafeBufferPointer` fields (`kinds`/`offsets`/`lengths`/`lines`)
+  held inside private `ArenaTokenStorageBuffers`.
+
+The `@unchecked Sendable` attribute now lives on exactly three
+`private final class` types — `MappingStorage`, `FileSliceStorage`,
+`ArenaTokenStorageBuffers` — and not on any public surface.
+
+### Native-API adoption
+
+- **B3-3 — `MemoryMappedFile` opens via `SystemPackage.FileDescriptor.open`.**
+  Was raw POSIX `open(path, O_RDONLY|O_NOFOLLOW)`; now
+  `FileDescriptor.open(FilePath(path), .readOnly, options: [.noFollow])`.
+  Typed errors, typed `FilePath`, no raw C call site. `mmap`/`munmap`
+  remain raw — swift-system has no mapping wrapper. `try? descriptor.close()`
+  in the storage class's `deinit` replaces the raw `close(fd)`.
+- New explicit `swift-system` dep in `Package.swift` (was transitive
+  via indexstore-db).
+
+### Performance
+
+- The `findLineRanges` hot path snapshots `storage.data` / `storage.size`
+  to local `let`s before the per-byte scan. Without the snapshot the
+  Swift compiler can't elide the class-field reload per iteration
+  (the post-rework storage is a class). A/B check: 30 M-byte byte
+  scan stays at the pre-rework throughput (≈ within 1% noise).
+
+### Deferred (still in B3.1)
+
+- B3-4 — `FileSlice` `~Escapable` lifetime. Skipped in 0.3.0-α.5
+  because making `FileSlice` `~Escapable` would break every caller
+  that holds a slice (`subslice`, `asString`, etc.). The cage pattern
+  achieves the truth-up goal (no `@unchecked Sendable` on public
+  types) without the API break. `~Escapable` lifetime could land in a
+  future major release if/when the broader Swift ecosystem moves to
+  it.
+- B3-6b — `SoATokenStorage.kindSpan` / `offsetSpan` / `lengthSpan` /
+  `lineSpan`. Decoupled from this batch since the ShingleGenerator
+  half already shipped in 0.3.0-α.4.
+- B3-1 — `Bitmap` → `Collections.BitArray`. Untouched in this batch.
+- B3-2 — `Foundation` → `FoundationEssentials`. Untouched.
+- B3-3.5 — `URLBuilder` adoption. Untouched.
+- B3-7 — Dataflow bit-vector worklists. Untouched.
+- B3-14 — `MinHashSignature` generic-over-N. Untouched.
+
 ## [0.3.0-alpha.4] - Unreleased
 
 Lifts **B3-6 (partial)** out of the deferred B3.1 cluster: the

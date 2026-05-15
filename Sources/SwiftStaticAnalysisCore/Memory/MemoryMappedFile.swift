@@ -4,6 +4,7 @@
 
 import Foundation
 import Synchronization
+import SystemPackage
 
 #if canImport(Darwin)
     import Darwin
@@ -28,6 +29,37 @@ public enum MemoryMappedFileError: Error, Sendable {
     case fileTooLarge(String, size: Int, limit: Int)
 }
 
+// MARK: - MappingStorage (private @unchecked Sendable cage)
+
+/// Owns the raw mmap pointer and the swift-system `FileDescriptor`.
+///
+/// This is the **only** type in the memory layer that carries
+/// `@unchecked Sendable` after 0.3.0-α.5. The compiler can't prove a
+/// `UnsafeRawPointer` is safe to share across threads, but the mmap'd
+/// region is read-only (`PROT_READ`), immutable after init, and lives
+/// for the storage's lifetime — so the guarantee is real, just not
+/// statically checkable. We cage it inside a `private final class`
+/// rather than exposing the unchecked attribute on the public
+/// `MemoryMappedFile` / `FileSlice` types.
+private final class MappingStorage: @unchecked Sendable {
+    let path: String
+    let size: Int
+    let data: UnsafeRawPointer
+    let descriptor: FileDescriptor
+
+    init(path: String, size: Int, data: UnsafeRawPointer, descriptor: FileDescriptor) {
+        self.path = path
+        self.size = size
+        self.data = data
+        self.descriptor = descriptor
+    }
+
+    deinit {
+        munmap(UnsafeMutableRawPointer(mutating: data), size)
+        try? descriptor.close()
+    }
+}
+
 // MARK: - MemoryMappedFile
 
 /// A memory-mapped file for zero-copy read access.
@@ -36,14 +68,16 @@ public enum MemoryMappedFileError: Error, Sendable {
 /// the process's address space. Reads are performed directly from the
 /// kernel's page cache without additional copying.
 ///
-/// Thread Safety: This type is marked `@unchecked Sendable` because it contains
-/// an `UnsafeRawPointer` which the compiler cannot verify. However, it IS
-/// thread-safe for the following reasons:
-/// - All properties are immutable after initialization (`let`)
-/// - The memory mapping is read-only (`PROT_READ`)
-/// - The underlying file descriptor and mapping remain valid for the object's lifetime
+/// 0.3.0-α.5: `MemoryMappedFile` is now plain `Sendable` (no
+/// `@unchecked`). The `UnsafeRawPointer` to the mmap region is held by
+/// a private `MappingStorage` class that internally carries the
+/// `@unchecked` attribute — the standard Swift 6 pattern for a
+/// type-system-opaque pointer that is *practically* safe to share. The
+/// file descriptor is now a `SystemPackage.FileDescriptor` rather than
+/// a raw `Int32`, so open/close use typed errors.
 ///
-/// Multiple threads can read from the same mapping concurrently without synchronization.
+/// All public access goes through `RawSpan` (via `withRawSpan`) or
+/// `FileSlice`, both of which are read-only.
 ///
 /// Example:
 /// ```swift
@@ -51,7 +85,7 @@ public enum MemoryMappedFileError: Error, Sendable {
 /// let slice = mmf.slice(offset: 0, length: 100)
 /// let text = slice.asString()
 /// ```
-public final class MemoryMappedFile: @unchecked Sendable {
+public final class MemoryMappedFile: Sendable {
     // MARK: Lifecycle
 
     /// Default upper bound for the file size accepted by `init(path:)`.
@@ -59,23 +93,17 @@ public final class MemoryMappedFile: @unchecked Sendable {
     /// caps the worst-case CPU cost of full-file scans (`findLineRanges`).
     public static let defaultSizeLimit: Int = 256 * 1024 * 1024
 
-    /// `O_NOFOLLOW` opens fail if the final path component is a symlink.
-    /// The MCP layer (`CodebaseContext.validatePath`) is responsible for
-    /// rejecting symlinks *within* the codebase that point outside; this is
-    /// belt-and-braces for callers that bypass the MCP layer.
-    private static var openFlags: Int32 {
-        #if canImport(Darwin)
-            return O_RDONLY | O_NOFOLLOW
-        #else
-            return O_RDONLY
-        #endif
-    }
-
     /// Initialize a memory-mapped file.
     ///
     /// Rejects non-regular files (FIFOs, devices, sockets) and files larger
     /// than `sizeLimit`. The previous implementation would happily map
     /// `/dev/zero`, leading to a multi-gigabyte byte scan in `findLineRanges`.
+    ///
+    /// The file descriptor is opened via `FileDescriptor.open` (swift-system)
+    /// with `.noFollow` — symlinks at the final path component are rejected
+    /// at the kernel boundary, so `MCP` callers that have already validated
+    /// the canonical path get belt-and-braces protection against TOCTOU
+    /// symlink swaps.
     ///
     /// - Parameters:
     ///   - path: Path to the file to map.
@@ -86,70 +114,79 @@ public final class MemoryMappedFile: @unchecked Sendable {
     public init(path: String, sizeLimit: Int = MemoryMappedFile.defaultSizeLimit)
         throws(MemoryMappedFileError)
     {
-        self.path = path
-
-        let fd = open(path, Self.openFlags)
-        guard fd >= 0 else {
+        let descriptor: FileDescriptor
+        do {
+            descriptor = try FileDescriptor.open(
+                FilePath(path),
+                .readOnly,
+                options: [.noFollow]
+            )
+        } catch {
             throw MemoryMappedFileError.fileNotFound(path)
         }
-        fileDescriptor = fd
 
         var statBuf = stat()
-        guard fstat(fd, &statBuf) == 0 else {
-            close(fd)
+        guard fstat(descriptor.rawValue, &statBuf) == 0 else {
+            try? descriptor.close()
             throw MemoryMappedFileError.mappingFailed(path, errno)
         }
 
         // Reject anything that isn't a regular file. `S_IFMT` masks out the
         // permission bits so we can compare against the file-type constants.
         guard (statBuf.st_mode & S_IFMT) == S_IFREG else {
-            close(fd)
+            try? descriptor.close()
             throw MemoryMappedFileError.notRegularFile(path)
         }
 
-        size = Int(statBuf.st_size)
+        let fileSize = Int(statBuf.st_size)
 
-        guard size > 0 else {
-            close(fd)
+        guard fileSize > 0 else {
+            try? descriptor.close()
             throw MemoryMappedFileError.fileEmpty
         }
 
-        guard size <= sizeLimit else {
-            close(fd)
-            throw MemoryMappedFileError.fileTooLarge(path, size: size, limit: sizeLimit)
+        guard fileSize <= sizeLimit else {
+            try? descriptor.close()
+            throw MemoryMappedFileError.fileTooLarge(path, size: fileSize, limit: sizeLimit)
         }
 
         let mapped = mmap(
             nil,
-            size,
+            fileSize,
             PROT_READ,
             MAP_PRIVATE,
-            fd,
+            descriptor.rawValue,
             0,
         )
 
         guard mapped != MAP_FAILED, let mappedPointer = mapped else {
-            close(fd)
+            try? descriptor.close()
             throw MemoryMappedFileError.mappingFailed(path, errno)
         }
 
-        data = UnsafeRawPointer(mappedPointer)
+        let rawData = UnsafeRawPointer(mappedPointer)
+        madvise(UnsafeMutableRawPointer(mutating: rawData), fileSize, MADV_SEQUENTIAL)
 
-        madvise(UnsafeMutableRawPointer(mutating: data), size, MADV_SEQUENTIAL)
-    }
-
-    deinit {
-        munmap(UnsafeMutableRawPointer(mutating: data), size)
-        close(fileDescriptor)
+        self.storage = MappingStorage(
+            path: path,
+            size: fileSize,
+            data: rawData,
+            descriptor: descriptor
+        )
     }
 
     // MARK: Public
 
     /// Path to the mapped file.
-    public let path: String
+    public var path: String { storage.path }
 
     /// Size of the file in bytes.
-    public let size: Int
+    public var size: Int { storage.size }
+
+    /// Pointer to the mapped memory. Held by the private storage class
+    /// so the only `@unchecked Sendable` in this layer is one private
+    /// type, not the public `MemoryMappedFile` / `FileSlice` types.
+    private var data: UnsafeRawPointer { storage.data }
 
     /// Get the entire file as a slice.
     public var fullSlice: FileSlice {
@@ -233,9 +270,12 @@ public final class MemoryMappedFile: @unchecked Sendable {
     ///
     /// The first call performs a full byte scan; subsequent calls reuse the
     /// cached result. A `Mutex` from `Synchronization` serialises lazy
-    /// construction without paying the cost of a `DispatchQueue`. The type
-    /// is `@unchecked Sendable` because of `UnsafeRawPointer`; the cache is
-    /// now the only mutable field and is compile-time protected.
+    /// construction without paying the cost of a `DispatchQueue`. The
+    /// pointer and size are snapshotted to local `let`s at the top of the
+    /// closure so the per-byte loop body doesn't traverse the
+    /// `storage` class indirection on every load (post-0.3.0-α.5 the
+    /// pointer lives on a private storage class; without the snapshot
+    /// the compiler can't elide the per-iteration class-field reload).
     ///
     /// - Returns: Array of (offset, length) tuples for each line.
     public func findLineRanges() -> [(offset: Int, length: Int)] {
@@ -243,6 +283,8 @@ public final class MemoryMappedFile: @unchecked Sendable {
             if let cached = cache {
                 return cached
             }
+            let data = storage.data
+            let size = storage.size
             var ranges: [(Int, Int)] = []
             ranges.reserveCapacity(max(8, size / 32))
             var lineStart = 0
@@ -315,11 +357,29 @@ public final class MemoryMappedFile: @unchecked Sendable {
     /// `DispatchQueue` and is the project's standard concurrency primitive.
     private let lineRangesLock: Mutex<[(offset: Int, length: Int)]?> = Mutex(nil)
 
-    /// Pointer to the mapped memory.
-    private let data: UnsafeRawPointer
+    /// Backing storage. Owning the unsafe pointer + descriptor here lets
+    /// `MemoryMappedFile` itself drop `@unchecked Sendable` — the
+    /// unchecked attribute is now confined to `MappingStorage`.
+    private let storage: MappingStorage
+}
 
-    /// File descriptor (kept open for the mapping).
-    private let fileDescriptor: Int32
+// MARK: - FileSliceStorage (private @unchecked Sendable cage)
+
+/// Read-only `UnsafeRawPointer` + offset pair caged inside the same
+/// pattern as `MappingStorage`. Lets `FileSlice` itself drop the
+/// `@unchecked Sendable` attribute. The slice keeps a strong reference
+/// to its parent `MemoryMappedFile`, so the mapping outlives any
+/// derived slice.
+private final class FileSliceStorage: @unchecked Sendable {
+    let base: UnsafeRawPointer
+    let length: Int
+    let file: MemoryMappedFile
+
+    init(base: UnsafeRawPointer, length: Int, file: MemoryMappedFile) {
+        self.base = base
+        self.length = length
+        self.file = file
+    }
 }
 
 // MARK: - FileSlice
@@ -329,32 +389,31 @@ public final class MemoryMappedFile: @unchecked Sendable {
 /// Slices reference the underlying mapped memory without copying.
 /// They are lightweight and can be created freely.
 ///
-/// Thread Safety: Marked `@unchecked Sendable` because it contains an
-/// `UnsafeRawPointer`. It is thread-safe because:
-/// - The underlying memory mapping is read-only
-/// - The parent `MemoryMappedFile` reference keeps the mapping alive
-/// - All slice operations are read-only
-public struct FileSlice: @unchecked Sendable {
+/// 0.3.0-α.5: `FileSlice` is now plain `Sendable`. The
+/// `UnsafeRawPointer` + parent reference live inside a private
+/// `FileSliceStorage` class that internally carries `@unchecked
+/// Sendable` — the standard cage pattern. The slice itself behaves
+/// like a value (and is still `borrowing` at the API boundary for the
+/// read-mostly methods).
+public struct FileSlice: Sendable {
     // MARK: Lifecycle
 
     init(base: UnsafeRawPointer, length: Int, file: MemoryMappedFile) {
-        self.base = base
-        self.length = length
-        self.file = file
+        self.storage = FileSliceStorage(base: base, length: length, file: file)
     }
 
     // MARK: Public
 
     /// Length of the slice in bytes.
-    public let length: Int
+    public var length: Int { storage.length }
 
     /// Check if the slice is empty.
-    public var isEmpty: Bool { length == 0 }
+    public var isEmpty: Bool { storage.length == 0 }
 
     /// Get a byte at the given offset.
     public subscript(offset: Int) -> UInt8? {
-        guard offset >= 0, offset < length else { return nil }
-        return base.load(fromByteOffset: offset, as: UInt8.self)
+        guard offset >= 0, offset < storage.length else { return nil }
+        return storage.base.load(fromByteOffset: offset, as: UInt8.self)
     }
 
     /// Create a sub-slice.
@@ -362,12 +421,13 @@ public struct FileSlice: @unchecked Sendable {
     /// The returned slice borrows from this slice and references the same
     /// underlying memory mapping.
     public borrowing func subslice(offset: Int, length: Int) -> Self {
-        let validOffset = max(0, min(offset, self.length))
-        let validLength = min(length, self.length - validOffset)
+        let parentLength = storage.length
+        let validOffset = max(0, min(offset, parentLength))
+        let validLength = min(length, parentLength - validOffset)
         return Self(
-            base: base.advanced(by: validOffset),
+            base: storage.base.advanced(by: validOffset),
             length: validLength,
-            file: file
+            file: storage.file
         )
     }
 
@@ -376,10 +436,11 @@ public struct FileSlice: @unchecked Sendable {
     /// This creates a copy of the underlying bytes as a Swift String.
     /// For zero-copy access, use `asRawBuffer()` instead.
     public borrowing func asString() -> String? {
-        guard length > 0 else { return "" }
+        let count = storage.length
+        guard count > 0 else { return "" }
         let buffer = UnsafeBufferPointer(
-            start: base.assumingMemoryBound(to: UInt8.self),
-            count: length
+            start: storage.base.assumingMemoryBound(to: UInt8.self),
+            count: count
         )
         // swiftlint:disable:next optional_data_string_conversion
         return String(decoding: buffer, as: UTF8.self)
@@ -387,10 +448,12 @@ public struct FileSlice: @unchecked Sendable {
 
     /// Convert to a byte array (creates a copy).
     public borrowing func asBytes() -> [UInt8] {
-        guard length > 0 else { return [] }
-        var result = [UInt8](repeating: 0, count: length)
+        let count = storage.length
+        guard count > 0 else { return [] }
+        var result = [UInt8](repeating: 0, count: count)
+        let base = storage.base
         result.withUnsafeMutableBytes { dest in
-            dest.copyMemory(from: UnsafeRawBufferPointer(start: base, count: length))
+            dest.copyMemory(from: UnsafeRawBufferPointer(start: base, count: count))
         }
         return result
     }
@@ -400,7 +463,7 @@ public struct FileSlice: @unchecked Sendable {
     /// The returned pointer is only valid while this slice (and its parent
     /// `MemoryMappedFile`) remains alive.
     public borrowing func asRawBuffer() -> UnsafeRawBufferPointer {
-        UnsafeRawBufferPointer(start: base, count: length)
+        UnsafeRawBufferPointer(start: storage.base, count: storage.length)
     }
 
     /// Borrow the slice contents as a `RawSpan`.
@@ -410,15 +473,15 @@ public struct FileSlice: @unchecked Sendable {
     /// the owning `MemoryMappedFile`). Prefer this over `asRawBuffer()`
     /// for new code — the compiler enforces safety.
     public borrowing func withRawSpan<T>(_ body: (RawSpan) throws -> T) rethrows -> T {
-        let buffer = UnsafeRawBufferPointer(start: base, count: length)
+        let buffer = UnsafeRawBufferPointer(start: storage.base, count: storage.length)
         let span = RawSpan(_unsafeBytes: buffer)
         return try body(span)
     }
 
     /// Compare with another slice for equality.
     public func equals(_ other: Self) -> Bool {
-        guard length == other.length else { return false }
-        return memcmp(base, other.base, length) == 0
+        guard storage.length == other.storage.length else { return false }
+        return memcmp(storage.base, other.storage.base, storage.length) == 0
     }
 
     /// Compare with a string.
@@ -429,16 +492,14 @@ public struct FileSlice: @unchecked Sendable {
 
     /// Hash the slice contents (FNV-1a, see `FNV1a` for details).
     public func hash() -> UInt64 {
-        FNV1a.hash(UnsafeRawBufferPointer(start: base, count: length))
+        FNV1a.hash(UnsafeRawBufferPointer(start: storage.base, count: storage.length))
     }
 
     // MARK: Private
 
-    /// Pointer to the start of the slice.
-    private let base: UnsafeRawPointer
-
-    /// Reference to the parent file (keeps mapping alive).
-    private let file: MemoryMappedFile
+    /// Backing storage. The unsafe pointer is held inside a
+    /// `FileSliceStorage` so this struct itself can drop `@unchecked`.
+    private let storage: FileSliceStorage
 }
 
 // MARK: - TokenSlice

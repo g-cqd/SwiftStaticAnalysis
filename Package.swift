@@ -97,6 +97,11 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.0"),
         // swift-atomics dropped in 0.2.0 in favour of stdlib `Synchronization.Atomic`.
         .package(url: "https://github.com/apple/swift-collections.git", .upToNextMajor(from: "1.3.0")),
+        // 0.3.0-α.5: swift-system gives us typed `FilePath` / `FileDescriptor`
+        // for the memory-mapping layer. The package was already a
+        // transitive dependency (via indexstore-db); pinned explicitly
+        // here so the import is honest at the manifest level.
+        .package(url: "https://github.com/apple/swift-system.git", from: "1.4.0"),
     ],
     targets: [
         // MARK: - Core Infrastructure
@@ -114,6 +119,12 @@ let package = Package(
                 // analyzer module, but removes the `SymbolLookup →
                 // UnusedCodeDetector` layering inversion the audit flagged.
                 .product(name: "IndexStoreDB", package: "indexstore-db"),
+                // 0.3.0-α.5: MemoryMappedFile uses swift-system's
+                // `FileDescriptor.open(FilePath, .readOnly, [.noFollow])`
+                // for the open/close pair (still mmap/munmap raw on
+                // Darwin; swift-system has no mmap wrapper). Typed
+                // errors, no raw POSIX `open` syscall.
+                .product(name: "SystemPackage", package: "swift-system"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

@@ -312,16 +312,39 @@ public struct SoATokenStorage: Sendable {
 /// providing even better cache performance and eliminating Swift
 /// array overhead.
 ///
-/// Thread Safety: Marked `@unchecked Sendable` because it contains
-/// `UnsafeBufferPointer` fields which the compiler cannot verify. It IS
-/// thread-safe because:
-/// - All properties are immutable (`let`)
-/// - The underlying arena memory remains valid for the arena's lifetime
-/// - All access operations are read-only
+/// 0.3.0-α.5: `ArenaTokenStorage` is now plain `Sendable`. The four
+/// `UnsafeBufferPointer` fields are owned by a private
+/// `ArenaTokenStorageBuffers` class that internally carries
+/// `@unchecked Sendable` — the standard cage pattern Swift 6 uses for
+/// type-system-opaque shared pointers. The runtime safety story is
+/// unchanged:
+///
+/// - All properties are immutable after init.
+/// - Underlying arena memory remains valid for the arena's lifetime.
+/// - All access operations are read-only.
 ///
 /// **Important**: The arena that allocated this storage must remain alive
 /// for the duration of this storage's use.
-public struct ArenaTokenStorage: @unchecked Sendable {
+private final class ArenaTokenStorageBuffers: @unchecked Sendable {
+    let kinds: UnsafeBufferPointer<UInt8>
+    let offsets: UnsafeBufferPointer<UInt32>
+    let lengths: UnsafeBufferPointer<UInt16>
+    let lines: UnsafeBufferPointer<UInt32>
+
+    init(
+        kinds: UnsafeBufferPointer<UInt8>,
+        offsets: UnsafeBufferPointer<UInt32>,
+        lengths: UnsafeBufferPointer<UInt16>,
+        lines: UnsafeBufferPointer<UInt32>,
+    ) {
+        self.kinds = kinds
+        self.offsets = offsets
+        self.lengths = lengths
+        self.lines = lines
+    }
+}
+
+public struct ArenaTokenStorage: Sendable {
     // MARK: Lifecycle
 
     /// Create from SoATokenStorage, allocating in the given arena.
@@ -338,66 +361,76 @@ public struct ArenaTokenStorage: @unchecked Sendable {
         for (i, kind) in storage.kinds.enumerated() {
             kindsBuffer[i] = kind
         }
-        kinds = UnsafeBufferPointer(kindsBuffer)
 
         // Allocate and copy offsets
         let offsetsBuffer = arena.allocate(count: count) as UnsafeMutableBufferPointer<UInt32>
         for (i, offset) in storage.offsets.enumerated() {
             offsetsBuffer[i] = offset
         }
-        offsets = UnsafeBufferPointer(offsetsBuffer)
 
         // Allocate and copy lengths
         let lengthsBuffer = arena.allocate(count: count) as UnsafeMutableBufferPointer<UInt16>
         for (i, length) in storage.lengths.enumerated() {
             lengthsBuffer[i] = length
         }
-        lengths = UnsafeBufferPointer(lengthsBuffer)
 
         // Allocate and copy lines
         let linesBuffer = arena.allocate(count: count) as UnsafeMutableBufferPointer<UInt32>
         for (i, line) in storage.lines.enumerated() {
             linesBuffer[i] = line
         }
-        lines = UnsafeBufferPointer(linesBuffer)
+
+        self.buffers = ArenaTokenStorageBuffers(
+            kinds: UnsafeBufferPointer(kindsBuffer),
+            offsets: UnsafeBufferPointer(offsetsBuffer),
+            lengths: UnsafeBufferPointer(lengthsBuffer),
+            lines: UnsafeBufferPointer(linesBuffer)
+        )
     }
 
     // MARK: Public
 
     /// Token kinds buffer.
-    public let kinds: UnsafeBufferPointer<UInt8>
+    public var kinds: UnsafeBufferPointer<UInt8> { buffers.kinds }
 
     /// Byte offsets buffer.
-    public let offsets: UnsafeBufferPointer<UInt32>
+    public var offsets: UnsafeBufferPointer<UInt32> { buffers.offsets }
 
     /// Token lengths buffer.
-    public let lengths: UnsafeBufferPointer<UInt16>
+    public var lengths: UnsafeBufferPointer<UInt16> { buffers.lengths }
 
     /// Line numbers buffer.
-    public let lines: UnsafeBufferPointer<UInt32>
+    public var lines: UnsafeBufferPointer<UInt32> { buffers.lines }
 
     /// Number of tokens.
     public let count: Int
 
     /// Get kind at index.
     public func kind(at index: Int) -> TokenKindByte {
-        TokenKindByte(rawValue: kinds[index])
+        TokenKindByte(rawValue: buffers.kinds[index])
     }
 
     /// Get offset at index.
     public func offset(at index: Int) -> Int {
-        Int(offsets[index])
+        Int(buffers.offsets[index])
     }
 
     /// Get length at index.
     public func length(at index: Int) -> Int {
-        Int(lengths[index])
+        Int(buffers.lengths[index])
     }
 
     /// Get line at index.
     public func line(at index: Int) -> Int {
-        Int(lines[index])
+        Int(buffers.lines[index])
     }
+
+    // MARK: Private
+
+    /// Backing buffer set. Held inside a private `@unchecked Sendable`
+    /// class so this struct itself doesn't carry the unchecked
+    /// attribute on its Sendable conformance.
+    private let buffers: ArenaTokenStorageBuffers
 }
 
 // MARK: - MultiFileSoAStorage
