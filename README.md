@@ -37,7 +37,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.1.4")
+    .package(url: "https://github.com/g-cqd/SwiftStaticAnalysis.git", from: "0.2.1")
 ]
 ```
 
@@ -52,7 +52,12 @@ Then add the dependency to your target:
 )
 ```
 
-This gives you access to all components including the MCP server. Alternatively, import individual modules:
+The `SwiftStaticAnalysis` umbrella product exposes every analyzer component
+(`SwiftStaticAnalysisCore`, `DuplicationDetector`, `UnusedCodeDetector`,
+`SymbolLookup`). It deliberately **does not include the MCP server library**
+so that consumers who only want the analyzer libraries don't transitively
+pull in `modelcontextprotocol/swift-sdk`. If you need the MCP server, depend
+on `SwiftStaticAnalysisAll` instead. Alternatively, import individual modules:
 
 ```swift
 .target(

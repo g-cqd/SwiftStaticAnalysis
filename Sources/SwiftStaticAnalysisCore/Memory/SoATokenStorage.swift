@@ -4,6 +4,38 @@
 
 import Foundation
 
+// MARK: - SoAStorageError
+
+/// Failures produced when feeding `Int`-typed token attributes into the
+/// `UInt16`-typed SoA columns.
+///
+/// Pre-0.2.1 the convenience `append(...:Int,...:Int,...:Int,...:Int,...:Int)`
+/// overload **silently truncated** lengths and columns above `UInt16.max`,
+/// producing corrupted token records with no diagnostic. The audit flagged
+/// this as a correctness footgun. The convenience overload now surfaces
+/// overflow as a typed error so the parser can decide whether to skip the
+/// token, log a warning, or bail.
+public enum SoAStorageError: Error, Sendable, CustomStringConvertible {
+    /// `length` does not fit in `UInt16`. Token text that long is
+    /// essentially impossible in real Swift code (single keywords and
+    /// identifiers are bounded; long string literals are emitted by
+    /// SwiftSyntax as multiple shorter segments).
+    case lengthOverflow(length: Int)
+    /// `column` does not fit in `UInt16` (over 65 535 characters on one
+    /// line). Indicates either generated single-line code or an upstream
+    /// `SourceLocationConverter` defect.
+    case columnOverflow(column: Int)
+
+    public var description: String {
+        switch self {
+        case .lengthOverflow(let length):
+            return "SoATokenStorage: token length \(length) exceeds UInt16 capacity (65535)"
+        case .columnOverflow(let column):
+            return "SoATokenStorage: token column \(column) exceeds UInt16 capacity (65535)"
+        }
+    }
+}
+
 // MARK: - SoATokenInfo
 
 /// Token information for SoA storage creation.
@@ -152,20 +184,30 @@ public struct SoATokenStorage: Sendable {
         columns.append(column)
     }
 
-    /// Append a token using Int parameters (convenience).
+    /// Append a token using `Int` parameters (convenience).
+    ///
+    /// Throws ``SoAStorageError`` if `length` or `column` exceed
+    /// `UInt16.max`. Pre-0.2.1 this overload silently clamped both values
+    /// to `UInt16.max`, producing corrupted token records.
     public mutating func append(
         kind: TokenKindByte,
         offset: Int,
         length: Int,
         line: Int,
         column: Int = 0,
-    ) {
+    ) throws(SoAStorageError) {
+        guard length <= Int(UInt16.max) else {
+            throw .lengthOverflow(length: length)
+        }
+        guard column <= Int(UInt16.max) else {
+            throw .columnOverflow(column: column)
+        }
         append(
             kind: kind,
             offset: UInt32(offset),
-            length: UInt16(min(length, Int(UInt16.max))),
+            length: UInt16(length),
             line: UInt32(line),
-            column: UInt16(min(column, Int(UInt16.max))),
+            column: UInt16(column),
         )
     }
 
@@ -409,12 +451,16 @@ public struct MultiFileSoAStorage: Sendable {
         let end = storage.count
         files.append((path, start, end))
 
-        // Add file boundary marker (optional, for algorithms that need it)
+        // Add file boundary marker (optional, for algorithms that need it).
+        // The literal 0/0/0/0 values are safely in-range for the UInt16
+        // columns; bypass the Int-typed throwing overload to keep this
+        // signature non-throwing.
         storage.append(
             kind: .fileBoundary,
-            offset: 0,
-            length: 0,
-            line: 0,
+            offset: UInt32(0),
+            length: UInt16(0),
+            line: UInt32(0),
+            column: UInt16(0),
         )
     }
 
@@ -501,11 +547,14 @@ extension SoATokenStorage {
 // MARK: - Conversion Utilities
 
 extension SoATokenStorage {
-    /// Create from an array of TokenInfo.
-    public static func from(_ tokens: [SoATokenInfo]) -> SoATokenStorage {
+    /// Create from an array of `SoATokenInfo`. Propagates
+    /// ``SoAStorageError`` if any record contains a length or column that
+    /// does not fit in `UInt16`. Pre-0.2.1 such overflows were silently
+    /// truncated and produced corrupted storage records.
+    public static func from(_ tokens: [SoATokenInfo]) throws(SoAStorageError) -> SoATokenStorage {
         var storage = SoATokenStorage(capacity: tokens.count)
         for token in tokens {
-            storage.append(
+            try storage.append(
                 kind: token.kind,
                 offset: token.offset,
                 length: token.length,

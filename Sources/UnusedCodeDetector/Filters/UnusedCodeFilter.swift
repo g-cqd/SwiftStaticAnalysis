@@ -82,10 +82,14 @@ public struct UnusedCodeFilter: Sendable {
     public init(configuration: UnusedCodeFilterConfiguration = .none) {
         self.configuration = configuration
 
+        // Compile custom path globs through the canonical `GlobMatcher`
+        // translation and anchor the result so `String.contains(regex)` on
+        // an anchored pattern behaves as a whole-match (the same anchored
+        // semantics MCP `CodebaseContext.matchesGlobPattern` uses).
         compiledPathPatterns = CompiledPatterns(
             configuration.excludePathPatterns
                 .filter { !Self.isCommonGlob($0) }
-                .compactMap(Self.globToRegexPattern)
+                .map { "^\(GlobMatcher.translate(pattern: $0))$" }
         )
         namePatterns = CompiledPatterns(configuration.excludeNamePatterns)
     }
@@ -109,8 +113,16 @@ public struct UnusedCodeFilter: Sendable {
 
     /// Check if a path matches a glob pattern.
     ///
-    /// Uses pre-compiled patterns for common globs, falling back to
-    /// dynamic compilation for custom patterns.
+    /// Uses hand-tuned fast paths for the three most common project-level
+    /// globs (avoiding regex compilation altogether) and falls back to the
+    /// canonical ``GlobMatcher`` for anything else.
+    ///
+    /// Pre-0.2.1 this function used `String.contains(regex)` — a partial
+    /// match — while the sibling implementation in
+    /// `SwiftStaticAnalysisMCP.CodebaseContext` used `wholeMatch(of:)`. A
+    /// single MCP `detect_unused_code` call routed `excludePaths` through
+    /// both with opposite semantics. Both now share `GlobMatcher`'s
+    /// anchored `wholeMatch` semantics.
     public static func matchesGlobPattern(_ path: String, pattern: String) -> Bool {
         switch pattern {
         case "**/Tests/**":
@@ -120,11 +132,7 @@ public struct UnusedCodeFilter: Sendable {
         case "**/Fixtures/**":
             return pathMatchesFixturesGlob(path)
         default:
-            let regexPattern = globToRegexPattern(pattern)
-            guard let regex = try? Regex(regexPattern) else {
-                return false
-            }
-            return path.contains(regex)
+            return GlobMatcher.matches(path: path, pattern: pattern)
         }
     }
 
@@ -203,51 +211,6 @@ public struct UnusedCodeFilter: Sendable {
 
     /// Pre-compiled name patterns.
     private let namePatterns: CompiledPatterns
-
-    /// Convert a glob pattern to a regex pattern string.
-    ///
-    /// Properly escapes all regex metacharacters to prevent regex injection,
-    /// then converts glob wildcards to their regex equivalents.
-    private static func globToRegexPattern(_ pattern: String) -> String {
-        // Placeholder for glob wildcards to preserve them during escaping
-        let doubleStarPlaceholder = "\u{0000}DOUBLESTAR\u{0000}"
-        let singleStarPlaceholder = "\u{0000}SINGLESTAR\u{0000}"
-        let questionPlaceholder = "\u{0000}QUESTION\u{0000}"
-
-        var result =
-            pattern
-            // First, replace glob wildcards with placeholders
-            .replacingOccurrences(of: "**", with: doubleStarPlaceholder)
-            .replacingOccurrences(of: "*", with: singleStarPlaceholder)
-            .replacingOccurrences(of: "?", with: questionPlaceholder)
-
-        // Escape all regex metacharacters (order matters - backslash first)
-        let metacharacters: [(String, String)] = [
-            ("\\", "\\\\"),  // Backslash must be escaped first
-            (".", "\\."),
-            ("^", "\\^"),
-            ("$", "\\$"),
-            ("+", "\\+"),
-            ("[", "\\["),
-            ("]", "\\]"),
-            ("(", "\\("),
-            (")", "\\)"),
-            ("{", "\\{"),
-            ("}", "\\}"),
-            ("|", "\\|"),
-        ]
-
-        for (char, escaped) in metacharacters {
-            result = result.replacingOccurrences(of: char, with: escaped)
-        }
-
-        // Convert glob placeholders to regex equivalents
-        return
-            result
-            .replacingOccurrences(of: doubleStarPlaceholder, with: ".*")
-            .replacingOccurrences(of: singleStarPlaceholder, with: "[^/]*")
-            .replacingOccurrences(of: questionPlaceholder, with: ".")
-    }
 
     private static func isCommonGlob(_ pattern: String) -> Bool {
         switch pattern {

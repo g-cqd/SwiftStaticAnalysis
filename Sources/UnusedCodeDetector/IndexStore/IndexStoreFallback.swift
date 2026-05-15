@@ -167,6 +167,7 @@ public final class IndexStoreFallbackManager: Sendable {
             let reader = try IndexStoreReader(
                 indexStorePath: indexStorePath,
                 libIndexStorePath: libIndexStorePath,
+                allowsDirectoryCreation: true,
             )
 
             // Check freshness if enabled

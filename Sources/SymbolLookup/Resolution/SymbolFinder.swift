@@ -88,7 +88,10 @@ public final class SymbolFinder: Sendable {
         indexStorePath: String,
         configuration: Configuration = .default
     ) throws {
-        let reader = try IndexStoreReader(indexStorePath: indexStorePath)
+        let reader = try IndexStoreReader(
+            indexStorePath: indexStorePath,
+            allowsDirectoryCreation: true
+        )
         self.indexResolver = Mutex(IndexStoreResolver(reader: reader))
         self.syntaxResolver = SyntaxResolver()
         self.accessLevelExtractor = AccessLevelExtractor()
@@ -115,7 +118,10 @@ public final class SymbolFinder: Sendable {
         configuration: Configuration = .default
     ) {
         if let indexPath = IndexStorePathFinder.findIndexStorePath(in: projectPath),
-            let reader = try? IndexStoreReader(indexStorePath: indexPath)
+            let reader = try? IndexStoreReader(
+                indexStorePath: indexPath,
+                allowsDirectoryCreation: true
+            )
         {
             self.indexResolver = Mutex(IndexStoreResolver(reader: reader))
         } else {

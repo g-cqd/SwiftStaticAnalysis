@@ -18,11 +18,16 @@ struct GlobPatternMatchingTests {
 
     @Test("Matches double star wildcard")
     func matchesDoubleStar() {
-        // ** matches zero or more path segments
+        // 0.2.1: `**` matches zero or more path segments, including the
+        // empty segment, so `/src/**/*.swift` matches both
+        // `/src/file.swift` and `/src/sub/file.swift`. Pre-0.2.1 the
+        // partial-match implementation returned `false` for the
+        // zero-segment case; the canonical `GlobMatcher` now anchors
+        // matches and uses `(?:.*/)?` for `**/`, which is the
+        // user-intuitive shape and matches the `CodebaseContext` impl.
         #expect(UnusedCodeFilter.matchesGlobPattern("/src/deep/nested/file.swift", pattern: "/src/**/*.swift") == true)
         #expect(UnusedCodeFilter.matchesGlobPattern("/src/sub/file.swift", pattern: "/src/**/*.swift") == true)
-        // Note: /src/**/*.swift requires at least one directory segment due to the / after **
-        #expect(UnusedCodeFilter.matchesGlobPattern("/src/file.swift", pattern: "/src/**/*.swift") == false)
+        #expect(UnusedCodeFilter.matchesGlobPattern("/src/file.swift", pattern: "/src/**/*.swift") == true)
         #expect(UnusedCodeFilter.matchesGlobPattern("/other/file.swift", pattern: "/src/**/*.swift") == false)
         // Pattern without trailing /* matches files directly too
         #expect(UnusedCodeFilter.matchesGlobPattern("/src/file.swift", pattern: "/src/**.swift") == true)
@@ -51,8 +56,16 @@ struct GlobPatternMatchingTests {
 
     @Test("Escapes dots in patterns")
     func escapesDotsInPatterns() {
-        #expect(UnusedCodeFilter.matchesGlobPattern("/src/file.swift", pattern: "*.swift") == true)
-        #expect(UnusedCodeFilter.matchesGlobPattern("/src/fileXswift", pattern: "*.swift") == false)
+        // 0.2.1: `*` is a single-segment wildcard that does not cross
+        // `/`. `*.swift` therefore matches only path-leaf-only inputs;
+        // a leading `/src/` requires the pattern to declare structure
+        // (`**/*.swift` or `/src/*.swift`). Pre-0.2.1 partial-match
+        // semantics happily found `file.swift` as a substring of
+        // `/src/file.swift`; the audit flagged that as misleading.
+        #expect(UnusedCodeFilter.matchesGlobPattern("file.swift", pattern: "*.swift") == true)
+        #expect(UnusedCodeFilter.matchesGlobPattern("/src/file.swift", pattern: "*.swift") == false)
+        #expect(UnusedCodeFilter.matchesGlobPattern("/src/file.swift", pattern: "**/*.swift") == true)
+        #expect(UnusedCodeFilter.matchesGlobPattern("fileXswift", pattern: "*.swift") == false)
     }
 
     @Test("Handles question mark wildcard")

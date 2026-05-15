@@ -414,6 +414,80 @@ struct CLICommandTests {
         #expect(output.combined.contains("--limit"))
     }
 
+    @Test(".swa.json top-level `format` field is used when --format is omitted")
+    func swaJsonFormatFallback() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+
+        // Project a temp dir with a `.swa.json` declaring `format: json`,
+        // plus a copy of the fixture so analysis has input.
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("swa_fmt_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let copiedFixture = tempDir.appendingPathComponent("SimpleClass.swift")
+        try FileManager.default.copyItem(atPath: fixture, toPath: copiedFixture.path)
+
+        let configURL = tempDir.appendingPathComponent(".swa.json")
+        let configBody = """
+            {
+              "format": "json",
+              "unused": { "mode": "simple" }
+            }
+            """
+        try configBody.write(to: configURL, atomically: true, encoding: .utf8)
+
+        // Don't pass --format; the resolver should pick up `format: "json"`
+        // from the project's `.swa.json`.
+        let output = try await runSWA(["unused", "--config", configURL.path, copiedFixture.path])
+
+        #expect(output.ranToCompletion)
+        let trimmed = output.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        #expect(
+            trimmed.hasPrefix("[") || trimmed.hasPrefix("{"),
+            "Expected JSON output picked up from .swa.json, got: '\(trimmed.prefix(40))...'"
+        )
+    }
+
+    @Test("--report errors when --mode is not reachability")
+    func reportRequiresReachabilityMode() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["unused", "--mode", "simple", "--report", fixture])
+
+        // ValidationError → exit 64 (ArgumentParser convention).
+        #expect(output.exitCode == 64, "Expected exit 64, got \(output.exitCode)")
+        #expect(
+            output.combined.contains("--report"),
+            "Diagnostic should mention the offending flag, got: \(output.combined)"
+        )
+    }
+
+    @Test("--report runs cleanly in reachability mode")
+    func reportRunsInReachabilityMode() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["unused", "--mode", "reachability", "--report", fixture])
+
+        #expect(output.ranToCompletion, "Reachability report should run to completion")
+    }
+
+    @Test("--parallel emits the documented deprecation warning")
+    func legacyParallelEmitsDeprecationWarning() async throws {
+        let fixture = try fixtureFile("SimpleClass.swift")
+        let output = try await runSWA(["duplicates", "--parallel", fixture])
+
+        // Subcommand should still complete (legacy flag is preserved
+        // through 0.x).
+        #expect(output.ranToCompletion, "Legacy --parallel must still run to completion")
+        #expect(
+            output.stderr.contains("'--parallel' is deprecated"),
+            "Stderr should carry the deprecation diagnostic, got: \(output.stderr)"
+        )
+        #expect(
+            output.stderr.contains("'--parallel-mode safe"),
+            "Diagnostic should point users at the canonical mapping (--parallel-mode safe)"
+        )
+    }
+
     private func countOccurrences(in haystack: String, of needle: String) -> Int {
         var count = 0
         var remainder = Substring(haystack)

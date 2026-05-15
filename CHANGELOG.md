@@ -5,6 +5,117 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - Unreleased
+
+Batch 1 of the 0.2.0 audit remediation
+([`audit/REMEDIATION-PLAN.md`](audit/REMEDIATION-PLAN.md)). Closes the four
+HIGH-severity MCP findings from `audit/_scratch/03-security.md` and fixes
+several correctness bugs surfaced by the audit. No public API removals;
+one access-level expansion (`SWAMCPServer` gains internal test surface).
+
+### Security (MCP)
+
+- **HIGH-1 closed — `index_store_path` sandbox-validated.**
+  `handleDetectUnusedCode` now routes the attacker-controllable
+  `index_store_path` MCP argument through `CodebaseContext.validatePath`,
+  preventing both the arbitrary-directory read and the implicit
+  `createDirectory(.../IndexDatabase)` write outside the codebase root
+  that pre-0.2.1 servers exposed. Defence-in-depth: `IndexStoreReader.init`
+  now takes an `allowsDirectoryCreation: Bool = false` parameter; CLI
+  paths explicitly opt in (`true`), while any caller that forgets gets
+  the safe-by-default semantics. `IndexStoreError.databaseDirectoryMissing`
+  surfaces the refusal.
+- **HIGH-2 closed — `ReadResource` URI parser hardened.** The pre-0.2.1
+  `String(uri.dropFirst(7))` is replaced with `URL(string: uri)` plus
+  scheme/host/empty-path checks. Percent-encoded `%2F` no longer round-
+  trips into the sandbox-prefix check; host-bearing `file://example.com/...`
+  URIs are rejected outright instead of silently collapsing to a relative
+  sandbox path. Factored into the testable
+  `SWAMCPServer.parseFileURI(_:)` helper.
+- **HIGH-3 closed — `SWAMCPServer.contextCache` is bounded.** The
+  unbounded `Dictionary<String, CodebaseContext>` is replaced with a
+  32-entry `LRUDictionary`. A hostile MCP prompt can no longer pin
+  unbounded memory by flood-creating distinct codebase paths.
+- **HIGH-4 closed — `SafeRegex` central compiler.** New
+  `SwiftStaticAnalysisCore.SafeRegex` enforces a length cap and a
+  RegexBuilder-typed nested-quantifier prefilter. Every MCP-reachable
+  regex construction (`search_symbols`, glob translation in
+  `CodebaseContext.matchesGlobPattern` and `UnusedCodeFilter`) now
+  routes through it.
+- **`read_file` extension allowlist trimmed.** `.plist`, `.json`,
+  `.yaml`, `.yml` are removed from the MCP-accessible allowlist —
+  those extensions commonly host secrets in real-world Swift
+  projects (`fastlane/Appfile`, `.env.json`, generated
+  `GoogleService-Info.plist`). The CLI is unaffected.
+
+### Correctness
+
+- **`GlobMatcher` consolidation.** Two divergent glob implementations
+  (`contains`-based in `UnusedCodeFilter`, `wholeMatch`-based in
+  `CodebaseContext`) collapsed into a single
+  `SwiftStaticAnalysisCore.GlobMatcher` with anchored whole-match
+  semantics. `Tests` and `Sources` as bare patterns no longer match
+  any path containing the segment — they match only the literal
+  filename. Existing fast paths (`**/Tests/**`,
+  `**/*Tests.swift`, `**/Fixtures/**`) preserved.
+- **`--parallel` flag mapping aligned with README.** The deprecated
+  CLI flag now routes through `ParallelMode.from(legacyParallel:)`
+  (mapping `true → .safe`), matching the documented contract and the
+  `.swa.json` decoder. A once-per-run deprecation diagnostic is
+  emitted on stderr.
+- **`SoATokenStorage.append(...:Int,...:Int,...)` no longer truncates.**
+  The `Int`-typed convenience overload now throws
+  `SoAStorageError.lengthOverflow`/`.columnOverflow` instead of
+  silently clamping `length`/`column` to `UInt16.max`. Propagated
+  through `ZeroCopyParser.extractTokensToSoA` (typed throws).
+- **`RegexCache` LRU eviction is now genuine LRU.** The
+  `Dictionary.keys.first` eviction (undefined order) is replaced by
+  the new canonical `LRUDictionary` (built on swift-collections'
+  `OrderedDictionary`). `SwiftFileParser` and `ZeroCopyParser` also
+  migrate to `LRUDictionary`.
+- **`--report` validates its mode.** `swa unused --report --mode simple`
+  now exits 64 with a clear diagnostic instead of silently producing a
+  regular unused-code listing.
+- **`CodebaseContext.getCodebaseInfo` no longer allocates
+  per-file `String`s.** The line-count loop now uses `MemoryMappedFile`
+  + `withRawSpan` and skips files over 64 MiB.
+
+### Features (truth-up)
+
+- **`SymbolQuery.qualifiedName(_:_:)` and `SymbolQuery.selector(_:labels:)`
+  added.** These factories are referenced by README's "Programmatic
+  API" examples but were missing before this release.
+- **`.swa.json` top-level `format` field applied.** Each subcommand
+  resolves `--format` > `.swa.json:format` > `.xcode`. The field was
+  decoded but unused pre-0.2.1.
+
+### Consistency
+
+- **Single source-of-truth `swaVersion`.** New
+  `SwiftStaticAnalysisCore.Version.swift` is the only place version
+  literals live; `swa`, `swa-mcp`, and `SWAMCPServer` all reference it
+  (pre-0.2.1 the MCP server advertised the stale literal `"0.1.0"`).
+  `VersionTests.testVersionMatchesChangelog` is the regression pin.
+- **README pin bumped (`0.1.4` → `0.2.1`).** SECURITY.md supported-
+  versions table updated (`0.1.x` → `0.2.x` supported).
+- **README umbrella clarification.** The "all components including the
+  MCP server" sentence is reworded — `SwiftStaticAnalysis` exposes
+  analyzer modules only; `SwiftStaticAnalysisAll` is required for MCP.
+- **`.swa.schema.json` defaults aligned with CLI/library defaults.**
+  `treatPublicAsRoot`, `treatObjcAsRoot`, `treatTestsAsRoot`,
+  `treatSwiftUIViewsAsRoot` all flip schema default `false → true`.
+
+### Internal
+
+- New canonical primitives in `SwiftStaticAnalysisCore.Utilities`:
+  `LRUDictionary` (bounded LRU), `SafeRegex` (ReDoS-guarded regex
+  compilation, RegexBuilder antipattern probes),
+  `GlobMatcher` (anchored glob → regex translation).
+- Test-only introspection helpers in `SWAMCPServer`
+  (`_test_getContext`, `_test_handleDetectUnusedCode`,
+  `_test_contextCacheCount`, `_test_contextCacheContains`) so security
+  regressions are observable without driving the full MCP transport.
+
 ## [0.2.0] - 2026-05-15
 
 This release closes the audit (see `AUDIT.md`) across two remediation

@@ -2,7 +2,6 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
-import Collections
 import Foundation
 import SwiftParser
 import SwiftSyntax
@@ -27,7 +26,9 @@ public actor SwiftFileParser {
     ///   Default 256 is safe for most CLI invocations and bounded enough
     ///   for long-running MCP servers.
     public init(cacheLimit: Int = 256) {
-        self.cacheLimit = max(1, cacheLimit)
+        let bounded = max(1, cacheLimit)
+        self.cacheLimit = bounded
+        self.cache = LRUDictionary(capacity: bounded)
     }
 
     // MARK: Public
@@ -53,10 +54,9 @@ public actor SwiftFileParser {
         // cache.
         let key = PathUtilities.canonicalize(filePath)
 
-        if let cached = cache[key] {
+        if let cached = cache.value(forKey: key) {
             let currentModDate = try fileModificationDate(filePath)
             if cached.modificationDate >= currentModDate {
-                touch(key)
                 return cached.syntax
             }
         }
@@ -68,13 +68,13 @@ public actor SwiftFileParser {
         // Cache the result
         let modDate = try fileModificationDate(filePath)
         let lineCount = source.utf8.lazy.count(where: { $0 == 0x0A }) + 1
-        insertIntoCache(
-            key,
+        cache.setValue(
             CachedParse(
                 syntax: syntax,
                 modificationDate: modDate,
                 lineCount: lineCount,
-            )
+            ),
+            forKey: key
         )
 
         return syntax
@@ -103,7 +103,7 @@ public actor SwiftFileParser {
     /// - Parameter filePath: Path to the file.
     /// - Returns: Line count if cached, nil otherwise.
     public func lineCount(for filePath: String) -> Int? {
-        cache[filePath]?.lineCount
+        cache.peek(forKey: filePath)?.lineCount
     }
 
     // MARK: - Source String Parsing
@@ -145,27 +145,10 @@ public actor SwiftFileParser {
         let lineCount: Int
     }
 
-    /// Cached parsed files. `OrderedDictionary` from swift-collections gives
-    /// O(1) eviction (`removeFirst`) and O(1) ordered insertion, replacing
-    /// the prior `[String: CachedParse]` + parallel `[String]` access-order
-    /// array which had O(n) `firstIndex(of:)` on every cache touch.
-    private var cache: OrderedDictionary<String, CachedParse> = [:]
-
-    // MARK: - Private Helpers
-
-    /// Move the entry for `path` to the most-recently-used position.
-    /// Caller has already confirmed the entry exists.
-    private func touch(_ path: String) {
-        guard let value = cache.removeValue(forKey: path) else { return }
-        cache[path] = value
-    }
-
-    private func insertIntoCache(_ path: String, _ entry: CachedParse) {
-        if cache[path] == nil, cache.count >= cacheLimit {
-            cache.removeFirst()
-        }
-        cache[path] = entry
-    }
+    /// Cached parsed files. `LRUDictionary` (built on `OrderedDictionary`)
+    /// is the canonical bounded-cache primitive — see
+    /// `Sources/SwiftStaticAnalysisCore/Utilities/LRUDictionary.swift`.
+    private var cache: LRUDictionary<String, CachedParse>
 
     private func readFile(_ path: String) throws -> String {
         guard FileManager.default.fileExists(atPath: path) else {

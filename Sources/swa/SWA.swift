@@ -8,6 +8,7 @@ import Foundation
 import SwiftStaticAnalysisCore
 import SwiftStaticAnalysisOutput
 import SymbolLookup
+import Synchronization
 import UnusedCodeDetector
 
 // MARK: - Diagnostic Output
@@ -21,6 +22,35 @@ func eprint(_ message: String) {
     }
 }
 
+// MARK: - Deprecation Diagnostics
+
+/// Once-per-run diagnostic warnings for deprecated CLI surfaces.
+///
+/// The warnings emit at most once per process invocation so that scripts
+/// using a deprecated flag aren't drowned in repeated diagnostics — exactly
+/// one helpful line on stderr, then silence.
+enum DeprecatedFlags {
+    /// Lock around the warning's one-shot flag; ensures a single stderr
+    /// write even when subcommands run in parallel.
+    private static let warnedLegacyParallel = Mutex<Bool>(false)
+
+    /// Emit a deprecation warning the first time `--parallel` is observed
+    /// in a single run. The flag is preserved through 0.x for backwards
+    /// compatibility but always routes through
+    /// `ParallelMode.from(legacyParallel:)`, which maps `true → .safe`.
+    static func warnLegacyParallel() {
+        let firstUse = warnedLegacyParallel.withLock { wasWarned -> Bool in
+            defer { wasWarned = true }
+            return !wasWarned
+        }
+        guard firstUse else { return }
+        eprint(
+            "warning: '--parallel' is deprecated; use '--parallel-mode safe|maximum|none'. "
+            + "Legacy '--parallel' now maps to '--parallel-mode safe', matching the .swa.json contract."
+        )
+    }
+}
+
 // MARK: - SWA
 
 @main
@@ -28,7 +58,7 @@ struct SWA: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "swa",
         abstract: "Swift Static Analysis - Analyze Swift code for issues",
-        version: "0.2.0",
+        version: swaVersion,
         subcommands: [
             Analyze.self,
             Duplicates.self,
@@ -55,7 +85,7 @@ struct Analyze: AsyncParsableCommand {
     var config: String?
 
     @Option(name: .shortAndLong, help: "Output format (text, json, xcode)")
-    var format: OutputFormat = .xcode
+    var format: OutputFormat?
 
     func run() async throws {
         // Use first path for configuration discovery
@@ -64,8 +94,10 @@ struct Analyze: AsyncParsableCommand {
         // Load configuration
         let swaConfig = try loadConfiguration(configPath: config, analysisPath: primaryPath)
 
-        // Apply format from config if not specified on CLI
-        let outputFormat = format
+        // Resolve format: CLI --format > .swa.json top-level format > .xcode.
+        // Pre-0.2.1 the config-file format field was decoded but never
+        // applied here, defeating users who set it once globally.
+        let outputFormat = format ?? swaConfig?.format ?? .xcode
 
         let files = try findSwiftFiles(in: paths, excludePaths: swaConfig?.excludePaths)
 
@@ -171,7 +203,7 @@ struct Duplicates: AsyncParsableCommand {
     var parallelMode: ParallelMode?
 
     @Option(name: .shortAndLong, help: "Output format")
-    var format: OutputFormat = .xcode
+    var format: OutputFormat?
 
     /// Argument-level validation. `--min-tokens` is bounded to a sensible
     /// range to prevent crashes (negative or zero) and pathological behaviour
@@ -200,15 +232,21 @@ struct Duplicates: AsyncParsableCommand {
         let effectiveTypes = types.isEmpty ? parseCloneTypes(dupConfig?.types) : Set(types)
         let effectiveExcludePaths = excludePaths.isEmpty ? (dupConfig?.excludePaths ?? []) : excludePaths
 
-        // Resolve parallel mode: CLI --parallel-mode > CLI --parallel > config
-        let effectiveParallelMode: ParallelMode =
-            if let mode = parallelMode {
-                mode
-            } else if parallel {
-                .maximum
-            } else {
-                dupConfig?.resolvedParallelMode ?? .maximum
-            }
+        // Resolve parallel mode: CLI --parallel-mode > CLI --parallel > config.
+        // Pre-0.2.1 the deprecated `--parallel` flag mapped to `.maximum`
+        // here while `ParallelMode.from(legacyParallel:)`, the canonical
+        // mapping used by config-file decoding, mapped to `.safe`. README
+        // also documented `--parallel == .safe`. Aligning on the canonical
+        // mapping closes the drift.
+        let effectiveParallelMode: ParallelMode
+        if let mode = parallelMode {
+            effectiveParallelMode = mode
+        } else if parallel {
+            DeprecatedFlags.warnLegacyParallel()
+            effectiveParallelMode = ParallelMode.from(legacyParallel: parallel)
+        } else {
+            effectiveParallelMode = dupConfig?.resolvedParallelMode ?? .maximum
+        }
         let effectiveParallel = effectiveParallelMode.isParallel
 
         // Merge with global excludePaths
@@ -227,7 +265,8 @@ struct Duplicates: AsyncParsableCommand {
         let detector = DuplicationDetector(configuration: detectorConfig)
         let clones = try await detector.detectClones(in: files)
 
-        switch format {
+        let outputFormat = format ?? swaConfig?.format ?? .xcode
+        switch outputFormat {
         case .text:
             print("CLONES \(clones.count) groups")
             OutputFormatter.printCloneGroupsText(clones)
@@ -275,7 +314,7 @@ struct Unused: AsyncParsableCommand {
     var report: Bool = false
 
     @Option(name: .shortAndLong, help: "Output format")
-    var format: OutputFormat = .xcode
+    var format: OutputFormat?
 
     // Exclusion flags
     @Option(name: .long, parsing: .upToNextOption, help: "Paths to exclude (glob patterns)")
@@ -362,15 +401,18 @@ struct Unused: AsyncParsableCommand {
         let effectiveIgnorePreviewProviders = ignorePreviewProviders || (unusedConfig?.ignorePreviewProviders ?? false)
         let effectiveIgnoreViewBody = ignoreViewBody || (unusedConfig?.ignoreViewBody ?? false)
 
-        // Resolve parallel mode: CLI --parallel-mode > CLI --parallel > config
-        let effectiveParallelMode: ParallelMode =
-            if let mode = parallelMode {
-                mode
-            } else if parallel {
-                .maximum
-            } else {
-                unusedConfig?.resolvedParallelMode ?? .maximum
-            }
+        // Resolve parallel mode: CLI --parallel-mode > CLI --parallel > config.
+        // See `Duplicates.run` for the alignment rationale; both subcommands
+        // now route `--parallel` through `ParallelMode.from(legacyParallel:)`.
+        let effectiveParallelMode: ParallelMode
+        if let mode = parallelMode {
+            effectiveParallelMode = mode
+        } else if parallel {
+            DeprecatedFlags.warnLegacyParallel()
+            effectiveParallelMode = ParallelMode.from(legacyParallel: parallel)
+        } else {
+            effectiveParallelMode = unusedConfig?.resolvedParallelMode ?? .maximum
+        }
         let effectiveParallel = effectiveParallelMode.isParallel
 
         // Merge path exclusions
@@ -401,6 +443,16 @@ struct Unused: AsyncParsableCommand {
             ignoreViewBody: effectiveIgnoreViewBody,
             useParallelBFS: effectiveParallel,
         )
+
+        // `--report` is only meaningful in reachability mode (it walks the
+        // reachability graph). Surface the misuse instead of silently
+        // ignoring it, which pre-0.2.1 produced an unused-code listing
+        // with no warning.
+        if report, effectiveMode != .reachability {
+            throw ValidationError(
+                "--report requires --mode reachability (current mode: \(effectiveMode.rawValue))"
+            )
+        }
 
         let detector = UnusedCodeDetector(configuration: detectorConfig)
 
@@ -442,7 +494,8 @@ struct Unused: AsyncParsableCommand {
             minConfidence: minConf,
         )
 
-        switch format {
+        let outputFormat = format ?? swaConfig?.format ?? .xcode
+        switch outputFormat {
         case .text:
             print("UNUSED \(unused.count) items")
             OutputFormatter.printUnusedText(unused)
@@ -501,7 +554,7 @@ struct Symbol: AsyncParsableCommand {
     /// Symbol defaults to `xcode` for parity with `analyze`/`duplicates`/`unused`.
     /// Pass `--format text` for human-readable interactive output.
     @Option(name: .shortAndLong, help: "Output format")
-    var format: OutputFormat = .xcode
+    var format: OutputFormat?
 
     // Context flags
     @Option(name: .customLong("context-lines"), help: "Lines of context before and after symbol")
@@ -536,6 +589,13 @@ struct Symbol: AsyncParsableCommand {
 
     func run() async throws {
         let files = try findSwiftFiles(in: paths, excludePaths: nil)
+
+        // Resolve output format: CLI flag > auto-discovered .swa.json top-level
+        // > .xcode default. `symbol` has no explicit `--config` flag, so we
+        // rely on the loader's auto-discovery from `paths.first`.
+        let primaryPath = paths.first ?? "."
+        let swaConfig = try loadConfiguration(configPath: nil, analysisPath: primaryPath)
+        let outputFormat: OutputFormat = format ?? swaConfig?.format ?? .xcode
 
         // Configure symbol finder
         var config = SymbolFinder.Configuration.default
@@ -588,7 +648,7 @@ struct Symbol: AsyncParsableCommand {
                 let occurrences = try await finder.findUsages(of: match)
                 allUsages.append(contentsOf: occurrences)
             }
-            outputUsages(allUsages, matches: matches)
+            outputUsages(allUsages, matches: matches, format: outputFormat)
             return
         }
 
@@ -601,7 +661,7 @@ struct Symbol: AsyncParsableCommand {
         }
 
         // Output results
-        outputMatches(matches, contexts: contexts)
+        outputMatches(matches, contexts: contexts, format: outputFormat)
     }
 
     /// Builds context configuration from CLI flags.
@@ -624,13 +684,17 @@ struct Symbol: AsyncParsableCommand {
         )
     }
 
-    private func outputMatches(_ matches: [SymbolMatch], contexts: [SymbolMatch: SymbolContext] = [:]) {
+    private func outputMatches(
+        _ matches: [SymbolMatch],
+        contexts: [SymbolMatch: SymbolContext] = [:],
+        format outputFormat: OutputFormat
+    ) {
         if matches.isEmpty {
             print("No symbols found matching '\(query)'")
             return
         }
 
-        switch format {
+        switch outputFormat {
         case .text:
             print("SYMBOLS \(matches.count) matches for '\(query)'")
             OutputFormatter.printSymbolsText(matches, contexts: contexts)
@@ -660,13 +724,17 @@ struct Symbol: AsyncParsableCommand {
         OutputFormatter.printJSON(combined)
     }
 
-    private func outputUsages(_ usages: [SymbolOccurrence], matches: [SymbolMatch]) {
+    private func outputUsages(
+        _ usages: [SymbolOccurrence],
+        matches: [SymbolMatch],
+        format outputFormat: OutputFormat
+    ) {
         if usages.isEmpty {
             print("No usages found for '\(query)'")
             return
         }
 
-        switch format {
+        switch outputFormat {
         case .text:
             print("USAGES \(usages.count) refs of \(matches.count) symbols for '\(query)'")
             OutputFormatter.printUsagesText(usages)

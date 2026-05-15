@@ -20,7 +20,48 @@ public actor SWAMCPServer {
     public let defaultContext: CodebaseContext?
 
     /// Cache of codebase contexts for dynamic path support.
-    private var contextCache: [String: CodebaseContext] = [:]
+    ///
+    /// Bounded with LRU eviction. A hostile MCP prompt that flood-creates
+    /// distinct codebase paths would otherwise pin unbounded memory for the
+    /// lifetime of the server — `CodebaseContext` retains an open root URL,
+    /// glob filters, and a per-context regex cache. The cap is tuned for
+    /// realistic dev workflows where a single client rotates between a
+    /// handful of repositories.
+    private var contextCache = LRUDictionary<String, CodebaseContext>(capacity: SWAMCPServer.contextCacheCapacity)
+
+    /// Maximum number of `CodebaseContext` entries retained simultaneously.
+    /// Exposed `internal` for regression tests against the unbounded-cache
+    /// memory-DoS that pre-0.2.1 servers were vulnerable to.
+    internal static let contextCacheCapacity = 32
+
+    /// Test-only introspection. Reports the current count of cached
+    /// `CodebaseContext` entries so eviction is observable without exposing
+    /// the cache itself.
+    internal var _test_contextCacheCount: Int {
+        contextCache.count
+    }
+
+    /// Test-only introspection. Reports whether a previously-cached path is
+    /// still resident in the LRU cache.
+    internal func _test_contextCacheContains(_ canonicalPath: String) -> Bool {
+        contextCache.peek(forKey: canonicalPath) != nil
+    }
+
+    /// Test-only wrapper around the private `getContext(for:)`. Allows
+    /// regression tests to exercise the cache without going through the full
+    /// MCP transport.
+    internal func _test_getContext(for path: String?) throws -> CodebaseContext {
+        try getContext(for: path)
+    }
+
+    /// Test-only wrapper that drives `handleDetectUnusedCode` end-to-end so
+    /// security regression tests can exercise argument validation without
+    /// going through the MCP transport.
+    internal func _test_handleDetectUnusedCode(
+        _ arguments: [String: Value]?
+    ) async throws -> CallTool.Result {
+        try await handleDetectUnusedCode(arguments)
+    }
 
     /// The MCP server instance.
     private let server: Server
@@ -46,7 +87,7 @@ public actor SWAMCPServer {
 
         self.server = Server(
             name: "swa-mcp",
-            version: "0.1.0",
+            version: swaVersion,
             capabilities: .init(
                 resources: .init(subscribe: false, listChanged: false),
                 tools: .init(listChanged: false)
@@ -70,12 +111,12 @@ public actor SWAMCPServer {
                 relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             )
 
-            if let cached = contextCache[resolvedPath] {
+            if let cached = contextCache.value(forKey: resolvedPath) {
                 return cached
             }
 
             let context = try CodebaseContext(rootPath: resolvedPath)
-            contextCache[resolvedPath] = context
+            contextCache.setValue(context, forKey: resolvedPath)
             return context
         }
 
@@ -580,9 +621,15 @@ extension SWAMCPServer {
                 config.ignoreViewBody = ignoreViewBody
             }
 
-            // Index store path
+            // Index store path. Route through the sandbox validator so an
+            // attacker-controlled MCP argument can't drive IndexStoreDB
+            // to read arbitrary on-disk directories or — via
+            // `IndexStoreReader.init`'s implicit `createDirectory(.../IndexDatabase)`
+            // — write outside the codebase root. The CLI auto-discovery
+            // path uses `allowsDirectoryCreation: true` on the reader; here
+            // the reader defaults to `false`.
             if let indexStorePath = args["index_store_path"]?.stringValue {
-                config.indexStorePath = indexStorePath
+                config.indexStorePath = try context.validatePath(indexStorePath)
             }
         }
 
@@ -673,8 +720,20 @@ extension SWAMCPServer {
     /// File extensions that `read_file` and the resource reader will accept.
     /// Everything else is rejected — the MCP tool exists to inspect source
     /// code, not binaries, not character devices, not log files.
+    ///
+    /// 0.2.1 dropped `.plist`, `.json`, `.yml`, `.yaml`: those extensions
+    /// commonly host secrets in real-world Swift projects (`fastlane/Appfile`,
+    /// `.env.json`, generated GoogleService-Info.plist, CI workflow secrets).
+    /// A hostile LLM prompt that drives the MCP `read_file` tool would
+    /// otherwise have a free exfiltration channel for those files. The CLI
+    /// is unaffected — it doesn't gate `swa` on this allowlist — only the
+    /// LLM-controllable MCP surface narrows.
+    ///
+    /// `.toml` is retained: it is commonly used for tool config
+    /// (`pyproject.toml`, `rust`-adjacent files) and does not have the same
+    /// secret-bearing convention.
     static let readFileAllowedExtensions: Set<String> = [
-        "swift", "md", "json", "yml", "yaml", "txt", "toml", "plist",
+        "swift", "md", "txt", "toml",
     ]
 
     /// Result of validating a file path for MCP read operations.
@@ -807,11 +866,6 @@ extension SWAMCPServer {
         return .init(content: [.text(output)], isError: false)
     }
 
-    /// Maximum length of a `search_symbols` query (256 chars). Longer queries
-    /// dramatically increase the cost of catastrophic backtracking and have
-    /// no legitimate use.
-    static let searchSymbolsMaxQueryLength = 256
-
     /// Total wall-clock budget allotted to all regex matches in a single
     /// `search_symbols` call. Once exceeded, regex evaluation stops and only
     /// the partial result set is returned with a warning.
@@ -824,20 +878,6 @@ extension SWAMCPServer {
     /// real Swift code are essentially nonexistent.
     static let searchSymbolsMaxNameLength = 1024
 
-    /// Patterns containing nested quantifiers that are notorious for
-    /// catastrophic backtracking. These are pre-emptively rejected.
-    ///
-    /// `Regex` is value-typed and the array is never mutated after init, so
-    /// `nonisolated(unsafe)` is sound. The Swift stdlib does not yet declare
-    /// `Regex` itself as `Sendable`.
-    nonisolated(unsafe) private static let reDoSAntipatterns: [Regex<AnyRegexOutput>] = {
-        let raw = [
-            #"\([^)]*[*+][^)]*\)\s*[*+]"#,  // (...*)* / (...+)+
-            #"\(\.\*\)\s*[*+]"#,  // (.*)+ / (.*)*
-        ]
-        return raw.compactMap { try? Regex($0) }
-    }()
-
     private func handleSearchSymbols(_ arguments: [String: Value]?) async throws -> CallTool.Result {
         guard let args = arguments, let query = args["query"]?.stringValue else {
             return .init(content: [.text("Missing required parameter: query")], isError: true)
@@ -848,35 +888,20 @@ extension SWAMCPServer {
 
         let useRegex = args["use_regex"]?.boolValue ?? false
 
-        if useRegex {
-            guard query.utf8.count <= Self.searchSymbolsMaxQueryLength else {
-                return .init(
-                    content: [
-                        .text(
-                            "Refusing regex query of \(query.utf8.count) bytes (limit \(Self.searchSymbolsMaxQueryLength))."
-                        )
-                    ],
-                    isError: true
-                )
-            }
-            for antipattern in Self.reDoSAntipatterns where query.contains(antipattern) {
-                return .init(
-                    content: [
-                        .text(
-                            "Refusing regex query: contains a nested-quantifier antipattern known for catastrophic backtracking."
-                        )
-                    ],
-                    isError: true
-                )
-            }
-        }
-
         // Pre-compile the regex once so we don't pay the compile cost per
-        // declaration; this is also where a malformed regex fails fast.
+        // declaration. `SafeRegex.compile` applies the canonical length cap
+        // and ReDoS-antipattern prefilter, so length and antipattern
+        // rejections surface uniformly across every MCP-reachable regex
+        // entry point.
         let compiledRegex: Regex<AnyRegexOutput>?
         if useRegex {
             do {
-                compiledRegex = try Regex(query)
+                compiledRegex = try SafeRegex.compile(query)
+            } catch let failure as SafeRegex.Failure {
+                return .init(
+                    content: [.text(failure.description)],
+                    isError: true
+                )
             } catch {
                 return .init(
                     content: [.text("Invalid regex pattern: \(error.localizedDescription)")],
@@ -1099,18 +1124,18 @@ extension SWAMCPServer {
 
         // Read resource
         await server.withMethodHandler(ReadResource.self) { [defaultContext] params in
-            let uri = params.uri
-
-            // Only allow resources within the sandbox
-            guard uri.hasPrefix("file://") else {
-                throw MCPError.invalidRequest("Only file:// URIs are supported")
+            let path: String
+            do {
+                path = try SWAMCPServer.parseFileURI(params.uri)
+            } catch let error as ReadResourceURIError {
+                throw MCPError.invalidRequest(error.message)
             }
 
             guard let context = defaultContext else {
                 throw MCPError.invalidRequest("No default codebase configured. Resources are unavailable.")
             }
 
-            let path = String(uri.dropFirst(7))
+            let uri = params.uri
 
             do {
                 let validatedPath = try context.validatePath(path)
@@ -1269,4 +1294,45 @@ enum MCPTextFormatter {
 
         return output
     }
+}
+
+// MARK: - ReadResource URI parsing
+
+extension SWAMCPServer {
+    /// Parse a `file://` URI as accepted by the `ReadResource` MCP handler.
+    ///
+    /// - `URL.path` returns the percent-decoded filesystem path, so callers
+    ///   that subsequently feed the result into `CodebaseContext.validatePath`
+    ///   see the real filename rather than a URI-encoded shadow string. The
+    ///   pre-0.2.1 implementation used `String(uri.dropFirst(7))` which
+    ///   never decoded `%2F`/`%2E` — a latent traversal that turned into a
+    ///   sandbox escape the moment anything downstream decoded the path.
+    /// - Host components are rejected (except an empty host or
+    ///   `localhost`). The pre-0.2.1 implementation silently treated
+    ///   `file://example.com/etc/passwd` as the relative path
+    ///   `example.com/etc/passwd` inside the sandbox, producing surprise
+    ///   matches against any sandbox-internal file with that suffix.
+    /// - Any non-`file` scheme is rejected.
+    ///
+    /// Exposed at `internal` access so the regression suite can exercise it
+    /// directly without going through the MCP transport.
+    internal static func parseFileURI(_ uri: String) throws -> String {
+        guard let parsed = URL(string: uri), parsed.scheme == "file" else {
+            throw ReadResourceURIError(message: "Only file:// URIs are supported")
+        }
+        if let host = parsed.host, !host.isEmpty, host.lowercased() != "localhost" {
+            throw ReadResourceURIError(message: "Remote file:// URIs are not supported")
+        }
+        let path = parsed.path
+        guard !path.isEmpty else {
+            throw ReadResourceURIError(message: "file:// URI must include a path")
+        }
+        return path
+    }
+}
+
+/// Surface for `parseFileURI` rejection reasons. Translated to
+/// `MCPError.invalidRequest` inside the `ReadResource` handler.
+internal struct ReadResourceURIError: Error, Sendable {
+    let message: String
 }

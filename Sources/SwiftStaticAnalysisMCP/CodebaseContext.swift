@@ -149,36 +149,19 @@ public struct CodebaseContext: Sendable {
         return swiftFiles.sorted()
     }
 
-    /// Simple glob pattern matching (supports * and **).
+    /// Simple glob pattern matching. Delegates to the canonical
+    /// `GlobMatcher` in `SwiftStaticAnalysisCore`. Retained as a thin
+    /// alias so callers inside this file read naturally.
     static func matchesGlobPattern(_ path: String, pattern: String) -> Bool {
-        // Escape regex metacharacters that aren't part of the glob alphabet,
-        // then translate the three glob tokens. The previous implementation
-        // only escaped `.`, which let `+`, `(`, `[`, `?`, `^`, `$`, `|`, `\`
-        // leak through as regex syntax.
-        var escaped = ""
-        escaped.reserveCapacity(pattern.count * 2)
-        for character in pattern {
-            switch character {
-            case "*":
-                escaped.append("*")  // handled below
-            case ".", "+", "(", ")", "[", "]", "{", "}", "^", "$", "|", "\\", "?":
-                escaped.append("\\")
-                escaped.append(character)
-            default:
-                escaped.append(character)
-            }
-        }
-        let regexPattern =
-            escaped
-            .replacingOccurrences(of: "**/", with: "(.*/)?")
-            .replacingOccurrences(of: "**", with: ".*")
-            .replacingOccurrences(of: "*", with: "[^/]*")
-
-        guard let regex = try? Regex("^\(regexPattern)$") else {
-            return false
-        }
-        return path.wholeMatch(of: regex) != nil
+        GlobMatcher.matches(path: path, pattern: pattern)
     }
+
+    /// Maximum size of an individual file we will scan for line count in
+    /// `getCodebaseInfo`. Files larger than this still contribute to
+    /// `totalBytes` (via the directory metadata) but not to `totalLines` —
+    /// we refuse to mmap the file to avoid pinning hundreds of megabytes
+    /// behind a single MCP call.
+    static let getCodebaseInfoMaxScanBytes: UInt64 = 64 * 1024 * 1024  // 64 MiB
 
     /// Returns information about the codebase.
     public func getCodebaseInfo() throws -> CodebaseInfo {
@@ -189,15 +172,40 @@ public struct CodebaseContext: Sendable {
 
         let fileManager = FileManager.default
         for file in swiftFiles {
+            let fileSize: UInt64
             if let attributes = try? fileManager.attributesOfItem(atPath: file),
                 let size = attributes[.size] as? UInt64
             {
                 totalBytes += size
+                fileSize = size
+            } else {
+                continue
             }
 
-            if let content = try? String(contentsOfFile: file, encoding: .utf8) {
-                totalLines += content.utf8.lazy.count(where: { $0 == 0x0A }) + 1
+            // Skip line counting on pathologically large files. The byte
+            // total is already recorded; spending wall-clock and address
+            // space on a 200 MiB generated Swift file is not worth it for
+            // an MCP `get_codebase_info` call.
+            guard fileSize > 0, fileSize <= Self.getCodebaseInfoMaxScanBytes else {
+                continue
             }
+
+            // Use memory-mapped I/O + raw-span byte scan rather than
+            // `String(contentsOfFile:)` so a 116-file codebase doesn't
+            // allocate 116 fresh UTF-8 strings just to count newlines.
+            // Pre-0.2.1 the heap allocation showed up in MCP latency
+            // profiles for large fixtures.
+            guard let mapped = try? MemoryMappedFile(path: file) else { continue }
+            let newlines = mapped.withRawSpan { span -> Int in
+                var count = 0
+                for index in 0..<span.byteCount {
+                    if span.unsafeLoad(fromByteOffset: index, as: UInt8.self) == 0x0A {
+                        count &+= 1
+                    }
+                }
+                return count
+            }
+            totalLines += newlines + 1
         }
 
         return CodebaseInfo(

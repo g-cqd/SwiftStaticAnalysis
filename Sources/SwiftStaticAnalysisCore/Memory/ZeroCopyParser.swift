@@ -2,7 +2,6 @@
 //  SwiftStaticAnalysis
 //  MIT License
 
-import Collections
 import Foundation
 import SwiftParser
 import SwiftSyntax
@@ -132,8 +131,10 @@ public actor ZeroCopyParser {
     // MARK: Lifecycle
 
     public init(configuration: ZeroCopyParserConfiguration = .default, cacheLimit: Int = 64) {
+        let bounded = max(1, cacheLimit)
         self.configuration = configuration
-        self.cacheLimit = max(1, cacheLimit)
+        self.cacheLimit = bounded
+        self.cache = LRUDictionary(capacity: bounded)
     }
 
     // MARK: Public
@@ -159,10 +160,9 @@ public actor ZeroCopyParser {
         // Canonicalise the cache key so aliased paths share one entry.
         let key = PathUtilities.canonicalize(path)
 
-        if let cached = cache[key] {
+        if let cached = cache.value(forKey: key) {
             let currentModDate = try fileModificationDate(path)
             if cached.modificationDate >= currentModDate {
-                touch(key)
                 return cached.parsedFile
             }
         }
@@ -182,12 +182,12 @@ public actor ZeroCopyParser {
 
         // Cache result
         let modDate = try fileModificationDate(path)
-        insertIntoCache(
-            key,
+        cache.setValue(
             CachedZeroCopyParse(
                 parsedFile: parsedFile,
                 modificationDate: modDate,
-            )
+            ),
+            forKey: key
         )
 
         return parsedFile
@@ -228,22 +228,9 @@ public actor ZeroCopyParser {
         let modificationDate: Date
     }
 
-    /// Cache of parsed files. `OrderedDictionary` gives O(1) LRU eviction
-    /// and ordered insertion; the prior `[String: CachedZeroCopyParse]` +
-    /// parallel `[String]` access-order array paid O(n) on every touch.
-    private var cache: OrderedDictionary<String, CachedZeroCopyParse> = [:]
-
-    private func touch(_ path: String) {
-        guard let value = cache.removeValue(forKey: path) else { return }
-        cache[path] = value
-    }
-
-    private func insertIntoCache(_ path: String, _ entry: CachedZeroCopyParse) {
-        if cache[path] == nil, cache.count >= cacheLimit {
-            cache.removeFirst()
-        }
-        cache[path] = entry
-    }
+    /// Cache of parsed files. `LRUDictionary` is the canonical bounded-cache
+    /// primitive — see `Utilities/LRUDictionary.swift`.
+    private var cache: LRUDictionary<String, CachedZeroCopyParse>
 
     // MARK: - Private Implementation
 
@@ -255,7 +242,7 @@ public actor ZeroCopyParser {
         let syntax = Parser.parse(source: source)
 
         // Extract tokens to SoA storage
-        let tokens = extractTokensToSoA(from: syntax, source: source)
+        let tokens = try extractTokensToSoA(from: syntax, source: source)
 
         // Compute line ranges
         let lineRanges = configuration.computeLineRanges ? mapped.findLineRanges() : nil
@@ -277,7 +264,7 @@ public actor ZeroCopyParser {
         let syntax = Parser.parse(source: source)
 
         // Extract tokens to SoA storage
-        let tokens = extractTokensToSoA(from: syntax, source: source)
+        let tokens = try extractTokensToSoA(from: syntax, source: source)
 
         // Compute line ranges
         var lineRanges: [(Int, Int)]?
@@ -295,7 +282,7 @@ public actor ZeroCopyParser {
         )
     }
 
-    private func extractTokensToSoA(from tree: SourceFileSyntax, source: String) -> SoATokenStorage {
+    private func extractTokensToSoA(from tree: SourceFileSyntax, source: String) throws(SoAStorageError) -> SoATokenStorage {
         var storage = SoATokenStorage()
         let converter = SourceLocationConverter(fileName: "", tree: tree)
 
@@ -304,7 +291,7 @@ public actor ZeroCopyParser {
             let position = token.positionAfterSkippingLeadingTrivia
             let location = converter.location(for: position)
 
-            storage.append(
+            try storage.append(
                 kind: kind,
                 offset: position.utf8Offset,
                 length: token.text.utf8.count,

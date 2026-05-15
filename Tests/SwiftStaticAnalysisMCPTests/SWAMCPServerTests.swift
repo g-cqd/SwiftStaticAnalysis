@@ -4,6 +4,7 @@
 
 import Foundation
 import MCP
+import SwiftStaticAnalysisCore
 import Testing
 
 @testable import SwiftStaticAnalysisMCP
@@ -255,6 +256,157 @@ struct SWAMCPServerTests {
     func contextErrorOutsideSandbox() {
         let error = CodebaseContextError.pathOutsideSandbox("/etc/passwd", allowedRoot: "/home")
         #expect(error.localizedDescription.contains("outside"))
+    }
+
+    // MARK: - HIGH security regressions
+
+    @Test(
+        "read_file rejects extensions commonly used to store secrets",
+        arguments: ["secrets.json", "Appfile.plist", "credentials.yaml", "config.yml"]
+    )
+    func readFileRejectsSecretBearingExtensions(filename: String) async throws {
+        let codebasePath = try createTestCodebase()
+        defer { cleanupTestCodebase(codebasePath) }
+
+        // Plant a same-extension file inside the sandbox to prove that the
+        // *extension allowlist* is what closes the surface (not just path
+        // validation, which would happily allow the file).
+        let suspect = (codebasePath as NSString).appendingPathComponent(filename)
+        try "fake-secret".write(toFile: suspect, atomically: true, encoding: .utf8)
+
+        let server = try SWAMCPServer(codebasePath: codebasePath)
+
+        // The handler returns CallTool.Result with `isError: true`; we use
+        // the public-surface tool-call test wrapper to drive it. The
+        // extension allowlist sits below path validation, so the path
+        // check passes and we reach the allowlist refusal.
+        let context = try await server._test_getContext(for: codebasePath)
+        let validatedPath = try context.validatePath(filename)
+        #expect(throws: SWAMCPServer.ReadFileValidationError.self) {
+            _ = try SWAMCPServer.validateForReadFile(path: filename, validatedPath: validatedPath)
+        }
+    }
+
+    @Test("ReadResource URI parser rejects host-bearing file:// URIs")
+    func readResourceURIRejectsHost() throws {
+        // file://example.com/etc/passwd previously collapsed to the
+        // relative path `example.com/etc/passwd`, producing surprise
+        // matches inside the sandbox. Must be rejected outright.
+        #expect(throws: ReadResourceURIError.self) {
+            _ = try SWAMCPServer.parseFileURI("file://example.com/etc/passwd")
+        }
+    }
+
+    @Test(
+        "ReadResource URI parser produces a deterministic path per RFC 3986",
+        arguments: [
+            // Reserved separator (`%2F`) is kept encoded by `URL.path`,
+            // so the encoded form cannot smuggle a `/` past the sandbox.
+            ("file:///a%2Fb", "/a%2Fb"),
+            // Unreserved characters (`.`, space) decode normally. The
+            // resulting `..` is then collapsed by
+            // `URL.standardizedFileURL` inside `CodebaseContext.validatePath`,
+            // which is what catches the traversal end-to-end.
+            ("file:///%2e%2e/etc/passwd", "/../etc/passwd"),
+            ("file:///path%20with%20spaces", "/path with spaces"),
+            // Plain unencoded path passes through.
+            ("file:///Users/me/project/Sources/Test.swift", "/Users/me/project/Sources/Test.swift"),
+        ] as [(String, String)]
+    )
+    func readResourceURIParsing(uri: String, expected: String) throws {
+        let path = try SWAMCPServer.parseFileURI(uri)
+        #expect(path == expected)
+    }
+
+    @Test("ReadResource URI parser rejects non-file schemes")
+    func readResourceURIRejectsNonFileScheme() {
+        #expect(throws: ReadResourceURIError.self) {
+            _ = try SWAMCPServer.parseFileURI("http://example.com/Test.swift")
+        }
+        #expect(throws: ReadResourceURIError.self) {
+            _ = try SWAMCPServer.parseFileURI("https://example.com/Test.swift")
+        }
+        // Bare malformed URI also rejected.
+        #expect(throws: ReadResourceURIError.self) {
+            _ = try SWAMCPServer.parseFileURI("not-a-uri")
+        }
+    }
+
+    @Test("ReadResource URI parser allows empty host (file:///) and localhost")
+    func readResourceURIAcceptsValidHosts() throws {
+        #expect(try SWAMCPServer.parseFileURI("file:///tmp/x") == "/tmp/x")
+        #expect(try SWAMCPServer.parseFileURI("file://localhost/tmp/x") == "/tmp/x")
+        #expect(try SWAMCPServer.parseFileURI("file://Localhost/tmp/x") == "/tmp/x")
+    }
+
+    @Test("ReadResource URI parser rejects file:// with empty path")
+    func readResourceURIRejectsEmptyPath() {
+        #expect(throws: ReadResourceURIError.self) {
+            _ = try SWAMCPServer.parseFileURI("file://")
+        }
+    }
+
+    @Test("detect_unused_code rejects an index_store_path outside the sandbox")
+    func indexStorePathOutsideSandboxThrows() async throws {
+        let codebasePath = try createTestCodebase()
+        defer { cleanupTestCodebase(codebasePath) }
+
+        let server = try SWAMCPServer(codebasePath: codebasePath)
+        let maliciousPath = "/etc/passwd"
+
+        // The handler should throw via CodebaseContext.validatePath before any
+        // filesystem-write side effect can reach IndexStoreReader.
+        await #expect(throws: CodebaseContextError.self) {
+            _ = try await server._test_handleDetectUnusedCode([
+                "codebase_path": .string(codebasePath),
+                "mode": .string("indexStore"),
+                "index_store_path": .string(maliciousPath),
+            ])
+        }
+    }
+
+    // MARK: - contextCache LRU regression
+
+    @Test("contextCache evicts the oldest entry once capacity is exceeded")
+    func contextCacheEvictsBeyondCapacity() async throws {
+        let server = try SWAMCPServer(codebasePath: nil)
+        let capacity = SWAMCPServer.contextCacheCapacity
+
+        // Build (capacity + 5) distinct codebases.
+        var paths: [String] = []
+        for _ in 0..<(capacity + 5) {
+            paths.append(try createTestCodebase())
+        }
+        defer { paths.forEach(cleanupTestCodebase) }
+
+        // Touch each path through the server in insertion order.
+        for path in paths {
+            _ = try await server._test_getContext(for: path)
+        }
+
+        // Cache count must be clamped at capacity.
+        let resident = await server._test_contextCacheCount
+        #expect(resident == capacity, "Cache should plateau at capacity, got \(resident)")
+
+        // Earliest paths must have been evicted; latest must still be cached.
+        // We compare against the canonicalised path the server actually keys.
+        let lastFiveCanonicalised = paths.suffix(5).map {
+            PathUtilities.canonicalize(
+                $0,
+                relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            )
+        }
+        for path in lastFiveCanonicalised {
+            let cached = await server._test_contextCacheContains(path)
+            #expect(cached, "Most-recently-used entry \(path) should remain cached")
+        }
+
+        let firstCanonicalised = PathUtilities.canonicalize(
+            paths[0],
+            relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        )
+        let firstCached = await server._test_contextCacheContains(firstCanonicalised)
+        #expect(firstCached == false, "Oldest entry should have been evicted")
     }
 }
 

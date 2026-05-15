@@ -15,6 +15,12 @@ public enum IndexStoreError: Error, Sendable {
     case failedToOpenDatabase(underlying: Error)
     case invalidConfiguration
     case noIndexStoreForProject
+    /// The sibling `IndexDatabase/` directory does not exist and the caller
+    /// did not opt into creation (e.g. the MCP server, which must not
+    /// perform filesystem-write side effects from attacker-controlled
+    /// argument paths). The CLI auto-discovery path opts in via
+    /// `IndexStoreReader.init(allowsDirectoryCreation: true)`.
+    case databaseDirectoryMissing(String)
 }
 
 // MARK: - IndexedSymbol
@@ -227,11 +233,23 @@ public final class IndexStoreReader: @unchecked Sendable {
     /// ``IndexStoreError`` so callers don't have to inspect Foundation /
     /// IndexStoreDB internals.
     ///
-    /// - Parameter indexStorePath: Path to the index store (e.g., .build/debug/index/store)
-    /// - Parameter libIndexStorePath: Optional path to libIndexStore.dylib
+    /// - Parameters:
+    ///   - indexStorePath: Path to the index store (e.g.,
+    ///     `.build/debug/index/store`).
+    ///   - libIndexStorePath: Optional path to `libIndexStore.dylib`.
+    ///   - allowsDirectoryCreation: When `true`, the sibling
+    ///     `IndexDatabase/` directory is created if missing. CLI
+    ///     auto-discovery sets this to `true` because it has authority over
+    ///     the project workspace; the MCP server sets it to `false` so a
+    ///     hostile prompt cannot drive a directory-creation side effect at
+    ///     an attacker-chosen filesystem location. When `false` and the
+    ///     directory does not exist, the initialiser throws
+    ///     ``IndexStoreError/databaseDirectoryMissing(_:)`` instead of
+    ///     materialising it.
     public init(
         indexStorePath: String,
         libIndexStorePath: String? = nil,
+        allowsDirectoryCreation: Bool = false,
     ) throws(IndexStoreError) {
         self.indexStorePath = indexStorePath
 
@@ -245,10 +263,26 @@ public final class IndexStoreReader: @unchecked Sendable {
         let storePath = URL(fileURLWithPath: indexStorePath)
         let databasePath = storePath.deletingLastPathComponent().appendingPathComponent("IndexDatabase")
 
-        do {
-            try FileManager.default.createDirectory(at: databasePath, withIntermediateDirectories: true)
-        } catch {
-            throw IndexStoreError.failedToOpenDatabase(underlying: error)
+        if allowsDirectoryCreation {
+            do {
+                try FileManager.default.createDirectory(at: databasePath, withIntermediateDirectories: true)
+            } catch {
+                throw IndexStoreError.failedToOpenDatabase(underlying: error)
+            }
+        } else {
+            // Sandboxed callers (notably the MCP server) supply paths that
+            // they have already validated against a codebase root, but the
+            // reader itself must not perform filesystem-write side effects:
+            // refuse to materialise `IndexDatabase/` and require the caller
+            // to opt into it.
+            var isDirectory: ObjCBool = false
+            let exists = FileManager.default.fileExists(
+                atPath: databasePath.path,
+                isDirectory: &isDirectory
+            )
+            if !exists || !isDirectory.boolValue {
+                throw IndexStoreError.databaseDirectoryMissing(databasePath.path)
+            }
         }
 
         do {

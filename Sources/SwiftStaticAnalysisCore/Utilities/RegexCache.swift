@@ -27,7 +27,7 @@ public final class RegexCache: Sendable {
     ///
     /// - Parameter capacity: Maximum number of patterns to cache. Defaults to 100.
     public init(capacity: Int = 100) {
-        self.capacity = capacity
+        self.storage = Mutex(LRUDictionary(capacity: capacity))
     }
 
     // MARK: Public
@@ -40,8 +40,8 @@ public final class RegexCache: Sendable {
     /// - Parameter pattern: The regex pattern string.
     /// - Returns: The compiled regex, or nil if the pattern is invalid.
     public func regex(for pattern: String) -> Regex<AnyRegexOutput>? {
-        storage.withLock { storage in
-            if let cached = storage.cache[pattern] {
+        storage.withLock { cache in
+            if let cached = cache.value(forKey: pattern) {
                 return cached
             }
 
@@ -49,13 +49,7 @@ public final class RegexCache: Sendable {
                 return nil
             }
 
-            if storage.cache.count >= capacity,
-                let firstKey = storage.cache.keys.first
-            {
-                storage.cache.removeValue(forKey: firstKey)
-            }
-
-            storage.cache[pattern] = compiled
+            cache.setValue(compiled, forKey: pattern)
             return compiled
         }
     }
@@ -65,33 +59,28 @@ public final class RegexCache: Sendable {
     /// - Parameter pattern: The regex pattern string.
     /// - Returns: True if the pattern is cached.
     public func isCached(_ pattern: String) -> Bool {
-        storage.withLock { storage in
-            storage.cache[pattern] != nil
+        storage.withLock { cache in
+            cache.peek(forKey: pattern) != nil
         }
     }
 
     /// Clears all cached patterns.
     public func clear() {
-        storage.withLock { storage in
-            storage.cache.removeAll()
+        storage.withLock { cache in
+            cache.removeAll()
         }
     }
 
     /// Number of patterns currently cached.
     public var count: Int {
-        storage.withLock { storage in
-            storage.cache.count
+        storage.withLock { cache in
+            cache.count
         }
     }
 
     // MARK: Private
 
-    private let capacity: Int
-    private let storage = Mutex(Storage())
-
-    private struct Storage {
-        var cache: [String: Regex<AnyRegexOutput>] = [:]
-    }
+    private let storage: Mutex<LRUDictionary<String, Regex<AnyRegexOutput>>>
 }
 
 // MARK: - CompiledPatterns

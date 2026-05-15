@@ -46,6 +46,23 @@ struct RegexCacheTests {
         #expect(cache.isCached("first") == false)
     }
 
+    @Test("Eviction evicts the genuine least-recently-used entry (not a hash-order pick)")
+    func evictsGenuineLRU() {
+        // Pre-0.2.1 the cache used `Dictionary.keys.first` which has
+        // undefined order — a regression test pin against any future
+        // re-introduction.
+        let cache = RegexCache(capacity: 2)
+        _ = cache.regex(for: "alpha")
+        _ = cache.regex(for: "beta")
+        // Touch alpha — it must become MRU, beta becomes LRU.
+        _ = cache.regex(for: "alpha")
+
+        _ = cache.regex(for: "gamma")
+        #expect(cache.isCached("alpha"))
+        #expect(cache.isCached("beta") == false) // genuinely LRU → evicted
+        #expect(cache.isCached("gamma"))
+    }
+
     @Test("CompiledPatterns ignores invalid patterns")
     func compiledPatternsIgnoreInvalid() {
         let patterns = CompiledPatterns(["foo.*", "[invalid"])

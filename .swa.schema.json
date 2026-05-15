@@ -56,22 +56,22 @@
         "treatPublicAsRoot": {
           "type": "boolean",
           "description": "Treat public API as entry points (reachable by definition)",
-          "default": false
+          "default": true
         },
         "treatObjcAsRoot": {
           "type": "boolean",
           "description": "Treat @objc declarations as entry points",
-          "default": false
+          "default": true
         },
         "treatTestsAsRoot": {
           "type": "boolean",
           "description": "Treat test methods as entry points",
-          "default": false
+          "default": true
         },
         "treatSwiftUIViewsAsRoot": {
           "type": "boolean",
           "description": "Treat SwiftUI Views as entry points",
-          "default": false
+          "default": true
         },
         "ignoreSwiftUIPropertyWrappers": {
           "type": "boolean",

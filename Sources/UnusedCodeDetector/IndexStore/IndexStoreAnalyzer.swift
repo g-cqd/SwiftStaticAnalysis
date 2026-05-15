@@ -216,8 +216,14 @@ public struct IndexStoreBasedDetector: Sendable {
 
     /// Detect unused code using the index store.
     public func detect(in files: [String], indexStorePath: String) throws -> [UnusedCode] {
-        // Create the reader
-        let reader = try IndexStoreReader(indexStorePath: indexStorePath)
+        // CLI path: opt into `IndexDatabase/` directory creation. The MCP
+        // path validates `index_store_path` against the codebase sandbox
+        // before reaching this entry point, so creation stays scoped to a
+        // path the caller already controls.
+        let reader = try IndexStoreReader(
+            indexStorePath: indexStorePath,
+            allowsDirectoryCreation: true
+        )
 
         // Poll for any recent changes
         reader.pollForChanges()

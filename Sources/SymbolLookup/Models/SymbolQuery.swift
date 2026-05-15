@@ -208,6 +208,50 @@ extension SymbolQuery {
     public static func usages(of name: String) -> SymbolQuery {
         SymbolQuery(pattern: .simpleName(name), mode: .usages)
     }
+
+    /// Creates a qualified-name query from an `owner.member` pair.
+    ///
+    /// Convenience wrapper that the README's "Programmatic API" snippet
+    /// reaches for; equivalent to `qualified("\(owner).\(member)")` but
+    /// makes the two-component case explicit.
+    ///
+    /// ```swift
+    /// let q = SymbolQuery.qualifiedName("APIClient", "shared")
+    /// // Equivalent to SymbolQuery.qualified("APIClient.shared")
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - owner: The enclosing type / module.
+    ///   - member: The qualified member name (may itself contain dots
+    ///     for deeper nesting).
+    public static func qualifiedName(_ owner: String, _ member: String) -> SymbolQuery {
+        let path =
+            [owner]
+            + member
+            .split(separator: ".", omittingEmptySubsequences: true)
+            .map(String.init)
+        return SymbolQuery(pattern: .qualifiedName(path))
+    }
+
+    /// Creates a selector-style method query with parameter labels.
+    ///
+    /// Convenience wrapper that materialises ``Pattern/selector(name:labels:)``
+    /// from a flat `[String]` of labels; the underlying pattern stores
+    /// labels as `[String?]` (nil for unlabeled `_:` parameters), so each
+    /// entry is treated as the labeled form. Use the underlying
+    /// initialiser if you need to express unlabeled parameter slots.
+    ///
+    /// ```swift
+    /// let q = SymbolQuery.selector("fetch", labels: ["id", "completion"])
+    /// // Matches `fetch(id:completion:)`
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - name: The base function name.
+    ///   - labels: Parameter labels in declaration order.
+    public static func selector(_ name: String, labels: [String]) -> SymbolQuery {
+        SymbolQuery(pattern: .selector(name: name, labels: labels.map { Optional($0) }))
+    }
 }
 
 // MARK: - CustomStringConvertible
