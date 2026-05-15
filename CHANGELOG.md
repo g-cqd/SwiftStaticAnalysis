@@ -5,6 +5,92 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.23] - Unreleased
+
+**Full tree edit distance (APTED / Zhang-Shasha) replaces β.22's trigram
+approximation in the `strict` preset.**
+
+β.22 documented the trigram-Jaccard AST reranker as "a future direction
+if the precision ceiling needs to be raised". β.23 raises it: ships the
+real tree edit distance algorithm (Zhang-Shasha 1989 — which is the
+LEFT-path strategy of Pawlik-Augsten 2015 APTED) and wires it into
+`--preset strict`.
+
+### New surfaces
+
+- **`APTEDTree`** — post-order-indexed Swift tree representation. Stores
+  labels + leftmost-leaf-descendant + parent indices per node. Keyroots
+  computed via the canonical leftLeaf-disambiguation rule.
+- **`APTED.distance(_:_:)`** — pure tree edit distance over two
+  `APTEDTree`s. Insert/delete cost = 1, rename cost = 1 if labels
+  differ, 0 if equal. Returns the minimum operation count.
+- **`APTEDReranker`** — bridges SwiftSyntax source to APTED.
+  `score(_:_:)` parses both snippets, builds APTED trees, computes the
+  distance, returns the normalized similarity `1 - (TED / max(treeSize))`
+  clamped to `[0, 1]`. Higher = more structurally similar.
+- **`--embedding-rerank-apted` / `--embedding-apted-threshold`** —
+  hidden CLI flags so power users can opt-in to APTED rerank
+  independently of the `strict` preset. Default threshold 0.70.
+
+### Strict preset is now properly layered
+
+Four signals, in order of cost:
+
+1. **Cosine** ≥ 0.90 (HNSW retrieval)
+2. **Token Jaccard** ≥ 0.30 (multi-signal fusion, β.20)
+3. **MaxSim** ≥ 0.85 (ColBERT-style token-level alignment, β.20)
+4. **APTED** ≥ 0.70 (full tree edit distance, β.23 — replaces β.22 trigram)
+
+Each gate catches a different false-positive class. A candidate must
+pass every enabled gate.
+
+### Empirical curve on this repo
+
+```
+swa duplicates Sources --semantic --embedding-bundle Models/MiniLM
+  --preset loose    → 111 groups
+  --preset balanced →  74 (default; cosine + Jaccard)
+  --preset strict   →  26 (+ MaxSim + APTED — β.22 trigram-strict was 30)
+```
+
+APTED kills 4 more shape-only false positives than the β.22 trigram did.
+Wall time on the full repo: 17.6s for strict (vs ~10s for β.22 trigram).
+
+### Implementation honesty
+
+- The shipped algorithm is **Zhang-Shasha** (1989). Mathematically it
+  gives identical distances to full APTED — they're not different
+  algorithms in output, only in worst-case time complexity (Zhang-Shasha
+  is O(n² · d · l) where d=depth, l=leaves; APTED with strategy
+  selection is O(n³)).
+- The Pawlik-Augsten 2015 "all-path" upgrade adds a strategy-selection
+  layer (LEFT vs RIGHT vs HEAVY path per subtree pair) on top of the
+  same DP. That layer would speed up pathological skewed trees but
+  doesn't change correctness. Swift function bodies are bounded-depth
+  (typically 5-10 deep), so Zhang-Shasha's running time on our corpus
+  is well below APTED's amortized advantage. Strategy selection is
+  queued as a future direction if heavily-skewed inputs surface.
+- The trigram `ASTShapeReranker` from β.22 is retained for power users
+  who want the faster approximation; selectable via
+  `--embedding-rerank-shape` (hidden flag).
+
+### Tests
+
+`Tests/DuplicationDetectorTests/APTEDTests.swift` (new, 9 tests, all pass):
+
+- Empty + empty → 0
+- Single-node identical → 0
+- Single-node renamed → 1
+- Single-node vs empty → 1 (insert or delete count)
+- Identical 3-node tree → 0
+- 3-node tree with one rename → 1
+- Symmetry: `dist(A, B) == dist(B, A)`
+- `APTEDReranker` on identical Swift source → score 1.0
+- `APTEDReranker` Type-2 clone vs unrelated Swift snippet → strict
+  ordering preserved
+
+Full suite: 1197 tests.
+
 ## [0.3.0-beta.22] - Unreleased
 
 **Continuing CLI cleanup + AST shape reranker (C from the SOTA roadmap).**
