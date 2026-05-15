@@ -5,6 +5,80 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.7] - Unreleased
+
+**SIL extraction + parser spike.** The audit's F-S3 ("PDG/GNN clone
+detection — not implementable in 0.3.x because it requires
+`swiftc -emit-sil`") is no longer architecturally blocked. We now
+ship a real SIL extractor + parser that drives `swiftc -emit-sil`
+through `ProcessExecutor` and parses the textual output into
+function-level control-flow graphs. The PDG construction layer
+that consumes these CFGs is the next step (data-flow edges, def-use
+chains beyond the SIL-emitted `// users:` comments); the
+infrastructure to extract SIL at all is now in place.
+
+### New: `Sources/SwiftStaticAnalysisCore/SIL/SILParser.swift`
+
+Three types:
+
+- **`SILFunction`** — a parsed function: mangled name, block-name
+  → block map, block-order array for traversal.
+- **`SILBasicBlock`** — block name, arguments (`%0`, `%1`, ...),
+  raw instruction lines, successor block names derived from the
+  terminator.
+- **`SILParser`** — line-oriented parser. Recognised terminators:
+  `return`, `br`, `cond_br`, `switch_value`, `switch_enum`,
+  `switch_enum_addr`, `throw`, `unwind`, `unreachable`, `try_apply`,
+  `dynamic_method_br`. Unrecognised terminators produce a block
+  with no outgoing edges (a CFG sink); the caller can treat that
+  as either a true exit or a parser gap.
+
+The parser correctly handles paren-nested colons (`bb0(%0 : $Int):`
+is two colons; only the depth-0 one is the block-header
+terminator).
+
+### New: `SILExtractor`
+
+Invokes `swiftc -emit-sil <source>` through `ProcessExecutor` (env
+allowlist applies — `DYLD_INSERT_LIBRARIES` etc. cannot ride into
+the toolchain). Captures stdout, returns the parsed
+`[SILFunction]`. `extraArguments` lets callers pass `-target`,
+`-sdk`, `-I` etc. when the source needs them. On non-zero exit,
+throws `SILExtractionError.compilationFailed(stderr:exitCode:)`
+with the toolchain's diagnostic text.
+
+### Test coverage
+
+`Tests/SwiftStaticAnalysisCoreTests/SILParserTests.swift` (new, 3
+tests):
+
+- Parses a single-block function with no branches (`return` is a
+  CFG sink).
+- Parses a conditional-branch function — `cond_br` + `br` build
+  a 4-block diamond CFG; predecessors / successors verified.
+- Parses multiple functions independently in one SIL blob.
+
+1154 tests green (1151 + 3 SIL parser tests); build warning-free.
+
+### Status
+
+This is the SIL **infrastructure** layer. The 0.4.0 PDG layer on
+top can build:
+
+1. **Intra-procedural data-flow** — extract def-use chains from
+   SIL's SSA form (`%N = ...` defines, `%N` references use). SIL
+   emits these in `// users: %M, %K` comments alongside each def
+   line; the parser preserves the raw instruction text so a
+   downstream pass can extract them.
+2. **PDG construction** — combine CFG edges (we have them) with
+   def-use edges (next layer) into a Program Dependence Graph
+   per function. The GNN clone detection in the SOTA research
+   queue consumes the PDG.
+3. **Whole-program SIL** — driving `-emit-sil` per module
+   (matching the build's compile-flag context) rather than
+   per-file. The current extractor is per-file as the spike
+   shape; production would integrate with SPM's build description.
+
 ## [0.3.0-beta.6] - Unreleased
 
 **Real Core ML semantic-embedding provider.** The β.3
