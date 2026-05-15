@@ -125,6 +125,29 @@ public final class SourceKitLSPClient: @unchecked Sendable {
         process.waitUntilExit()
     }
 
+    /// Issue a `workspace/symbol` query. Returns the parsed
+    /// `SymbolInformation[]` payload from the LSP response. Empty
+    /// results (no matches) come back as `[]` rather than throwing.
+    public func workspaceSymbol(query: String) async throws -> [[String: Any]] {
+        let response = try await sendRequest(
+            method: "workspace/symbol",
+            params: ["query": query] as Any,
+        )
+        guard let result = response["result"] else {
+            return []
+        }
+        if result is NSNull {
+            return []
+        }
+        guard let symbols = result as? [[String: Any]] else {
+            throw SourceKitLSPError.requestFailed(
+                method: "workspace/symbol",
+                reason: "unexpected result shape — expected array of SymbolInformation"
+            )
+        }
+        return symbols
+    }
+
     /// Issue a `callHierarchy/incomingCalls` request to discover
     /// every call site that targets the symbol at the given source
     /// position. `sourcekit-lsp` walks protocol witnesses through

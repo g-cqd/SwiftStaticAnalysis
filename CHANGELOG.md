@@ -5,6 +5,64 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.5] - Unreleased
+
+**Build-required symbol resolution.** The β.3 `SourceKitLSPClient`
+spike is wired into a real `LSPSymbolResolver` + CLI flag. Users can
+now run `swa symbol <query> --lsp <workspace-root>` to merge
+`sourcekit-lsp` results (including protocol-witness dispatch
+targets) with the IndexStore / syntax resolver's output.
+
+### New: `LSPSymbolResolver`
+
+Drives `sourcekit-lsp`'s `workspace/symbol` request against a
+build-required workspace. Owns a lazily-started
+`SourceKitLSPClient` (via a `Synchronization.Mutex`-guarded
+storage slot) and shuts it down on demand. Supports:
+
+- `.simpleName(...)` — direct workspace symbol query, name-equality
+  filter.
+- `.qualifiedName(...)` — query by leaf member name, filter by the
+  immediate container reported in `SymbolInformation.containerName`.
+- `.selector(...)` / `.qualifiedSelector(...)` — same name-query +
+  container filter; LSP doesn't carry signature info on
+  `workspace/symbol`, so selector-arity matching is upstream.
+- `.regex(...)` — pattern is passed to sourcekit-lsp as the
+  fuzzy-match query; results are then refined client-side with
+  `Regex.wholeMatch`.
+- `.usr(...)` throws `LSPSymbolResolverError.usrNotSupported` —
+  LSP doesn't accept USRs on `workspace/symbol`, so the caller
+  knows to fall back to IndexStore.
+
+`SourceKitLSPClient` gains `workspaceSymbol(query:)` that issues
+the request and returns the raw `SymbolInformation[]` payload. The
+client's `start()` / `shutdown()` lifecycle is unchanged.
+
+### CLI: `swa symbol --lsp <workspace>`
+
+New `--lsp` option on `swa symbol` takes a workspace root path. When
+supplied:
+
+1. The standard IndexStore / syntax resolution runs first.
+2. The `LSPSymbolResolver` runs against the workspace, returning
+   any additional matches the build-required resolver finds.
+3. Results are merged with `(file, line, column)`-keyed
+   deduplication so the same definition isn't reported twice.
+4. The LSP subprocess is shut down on command exit.
+
+End-to-end smoke confirmed: `swa symbol "SourceKitLSPClient"
+--lsp "$PWD"` finds the class via the LSP backend.
+
+### New: `SymbolMatch.Source.lsp`
+
+`SymbolMatch.Source` gains an `.lsp` case so downstream consumers
+can distinguish LSP-backed matches from IndexStore / syntax /
+cached ones. This is a SemVer-breaking addition to the public enum;
+direct `switch` consumers must add the `.lsp` case.
+
+1151 tests green; build warning-free; LSP smoke verified against
+`/usr/bin/sourcekit-lsp`.
+
 ## [0.3.0-beta.4] - Unreleased
 
 **Breaking.** `FileSlice` deleted. Every consumer routes through

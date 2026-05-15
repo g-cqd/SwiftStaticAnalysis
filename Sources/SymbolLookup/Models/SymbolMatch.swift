@@ -59,6 +59,11 @@ public struct SymbolMatch: Sendable, Hashable, Codable {
         /// Resolved via SwiftSyntax parsing.
         case syntaxTree
 
+        /// Resolved via `sourcekit-lsp` workspace/symbol or
+        /// callHierarchy requests. Requires a build-required
+        /// `LSPSymbolResolver` rooted at the workspace.
+        case lsp
+
         /// Resolved via cached data.
         case cached
     }

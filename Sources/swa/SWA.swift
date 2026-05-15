@@ -572,6 +572,12 @@ struct Symbol: AsyncParsableCommand {
     @Option(name: .long, help: "Path to index store")
     var indexStorePath: String?
 
+    @Option(
+        name: .customLong("lsp"),
+        help: "Workspace root for sourcekit-lsp-backed resolution (build-required mode). When supplied, results include LSP-precision matches (protocol witnesses) merged with IndexStore / syntax results."
+    )
+    var lspWorkspaceRoot: String?
+
     @Option(name: .long, help: "Maximum results to return")
     var limit: Int?
 
@@ -663,7 +669,37 @@ struct Symbol: AsyncParsableCommand {
             limit: limit ?? 0,
         )
 
-        let matches = try await finder.find(symbolQuery)
+        var matches = try await finder.find(symbolQuery)
+
+        // Merge LSP-backed results when --lsp <workspace> was supplied.
+        // The LSP resolver runs sourcekit-lsp under the build-required
+        // mode (sourcekit-lsp needs a building workspace); it finds
+        // matches the IndexStore-only resolver misses, notably
+        // protocol-witness dispatch targets.
+        if let workspaceRoot = lspWorkspaceRoot {
+            let lspResolver = LSPSymbolResolver(workspaceRoot: workspaceRoot)
+            defer {
+                // Best-effort shutdown — we can't await in defer, so
+                // schedule a detached task that joins the subprocess.
+                Task { await lspResolver.shutdown() }
+            }
+            do {
+                let lspMatches = try await lspResolver.resolve(pattern)
+                // Deduplicate by (file, line, column) — LSP and
+                // IndexStore frequently agree on a definition's
+                // location; we want one entry, not two.
+                var seen = Set(matches.map { "\($0.file):\($0.line):\($0.column)" })
+                for match in lspMatches {
+                    let key = "\(match.file):\(match.line):\(match.column)"
+                    if seen.insert(key).inserted {
+                        matches.append(match)
+                    }
+                }
+            } catch LSPSymbolResolverError.usrNotSupported {
+                // USR queries can't go through LSP; the IndexStore /
+                // syntax matches already cover them. Silently continue.
+            }
+        }
 
         // If usages mode was requested, also find usages for each match
         if usages, !matches.isEmpty {
