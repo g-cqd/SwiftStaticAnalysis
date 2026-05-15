@@ -34,15 +34,17 @@ public struct UnusedCodeDetector: Sendable {
     /// - Parameter files: Array of Swift file paths.
     /// - Returns: Array of unused code findings.
     public func detectUnused(in files: [String]) async throws -> [UnusedCode] {
-        switch configuration.mode {
-        case .simple:
-            try await detectUnusedWithSyntax(in: files)
+        try await Signposter.shared.withInterval("UnusedCodeDetector.detectUnused") {
+            switch configuration.mode {
+            case .simple:
+                try await detectUnusedWithSyntax(in: files)
 
-        case .reachability:
-            try await detectUnusedWithReachability(in: files)
+            case .reachability:
+                try await detectUnusedWithReachability(in: files)
 
-        case .indexStore:
-            try await detectUnusedWithIndexStore(in: files)
+            case .indexStore:
+                try await detectUnusedWithIndexStore(in: files)
+            }
         }
     }
 

@@ -235,6 +235,12 @@ public struct DuplicationDetector: Sendable {
     /// - Parameter files: Array of Swift file paths.
     /// - Returns: Array of clone groups found.
     public func detectClones(in files: [String]) async throws -> [CloneGroup] {
+        try await Signposter.shared.withInterval("DuplicationDetector.detectClones") {
+            try await detectClonesBody(in: files)
+        }
+    }
+
+    private func detectClonesBody(in files: [String]) async throws -> [CloneGroup] {
         // Scan for ignore directives
         let scanner = IgnoreDirectiveScanner()
         let ignoreRegions = try scanner.scan(files: files)

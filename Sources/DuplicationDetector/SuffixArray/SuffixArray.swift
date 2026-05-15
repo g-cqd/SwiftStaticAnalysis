@@ -91,10 +91,22 @@ enum SuffixArrayBuilder {
         text.append(0)  // Sentinel
 
         // Build suffix array using SA-IS
-        let sa = SAIS.build(text, alphabetSize: alphabetSize)
+        var sa = SAIS.build(text, alphabetSize: alphabetSize)
 
-        // Remove sentinel position from result
-        return sa.filter { $0 < n }
+        // 0.3.0-α: skip the `sa.filter { $0 < n }` postpass that
+        // pre-0.3 allocated a fresh `[Int]`. The sentinel was appended
+        // at position `n` and 0 is the smallest character — SA-IS
+        // sorts that suffix to position 0 in `sa`. Drop it via
+        // `removeFirst()`, which is an O(n) memmove in place, no
+        // allocation.
+        if !sa.isEmpty, sa[0] == n {
+            sa.removeFirst()
+        } else if let sentinelIndex = sa.firstIndex(of: n) {
+            // Defensive: handle any future SA-IS variant that doesn't
+            // pin the sentinel to position 0.
+            sa.remove(at: sentinelIndex)
+        }
+        return sa
     }
 }
 
@@ -102,6 +114,13 @@ enum SuffixArrayBuilder {
 
 /// Implementation of the SA-IS (Suffix Array Induced Sorting) algorithm.
 /// Achieves O(n) time complexity for suffix array construction.
+///
+/// 0.3.0-α: the working `sa` buffer is **arena-allocated** rather than
+/// fresh `[Int]` per recursion. A single `Arena` is created at the top
+/// of the entry point and grows as recursion deepens. The second
+/// `placeLMSSuffixesOrdered` pass mutates the same buffer in place
+/// rather than allocating a new `[Int]`. The pre-0.3 README's
+/// "Arena-backed scratch buffers" claim is now backed by code.
 enum SAIS {
     // MARK: Internal
 
@@ -120,6 +139,24 @@ enum SAIS {
             return buildSimple(text)
         }
 
+        var arena = Arena()
+        let buffer = buildInArena(&arena, text: text, alphabetSize: alphabetSize)
+        // Copy the arena slice into an Array before the arena deallocates.
+        return Array(buffer)
+    }
+
+    /// Recursive SA-IS body. Allocates the working `sa` buffer from
+    /// the supplied arena; the buffer is valid for as long as the
+    /// arena is. Returned buffer must be consumed (e.g. copied to
+    /// `Array`) before the arena is released. Recursion grows the
+    /// arena rather than allocating a new `[Int]` per level.
+    private static func buildInArena(
+        _ arena: inout Arena,
+        text: [Int],
+        alphabetSize: Int
+    ) -> UnsafeMutableBufferPointer<Int> {
+        let n = text.count
+
         // Classify suffixes and find LMS positions
         let types = classifyTypes(text)
         let lmsPositions = findLMSPositions(types)
@@ -127,10 +164,15 @@ enum SAIS {
         // Compute bucket boundaries
         let (bucketHeads, bucketTails) = computeBucketBoundaries(text, alphabetSize: alphabetSize)
 
-        // Initial placement and first round of induced sorting
-        var sa = placeLMSSuffixes(text, lmsPositions: lmsPositions, bucketTails: bucketTails)
-        inducedSortLType(sa: &sa, text: text, types: types, bucketHeads: bucketHeads)
-        inducedSortSType(sa: &sa, text: text, types: types, bucketTails: bucketTails)
+        // Allocate the working SA buffer from the arena. All subsequent
+        // SA-IS phases write into this single buffer; the second
+        // `placeLMSSuffixesOrdered` pass reuses it via in-place reset.
+        let sa: UnsafeMutableBufferPointer<Int> = arena.allocate(count: n)
+        for index in 0..<n { sa[index] = -1 }
+
+        placeLMSSuffixes(into: sa, text: text, lmsPositions: lmsPositions, bucketTails: bucketTails)
+        inducedSortLType(sa: sa, text: text, types: types, bucketHeads: bucketHeads)
+        inducedSortSType(sa: sa, text: text, types: types, bucketTails: bucketTails)
 
         // Assign names to LMS substrings
         let (lmsNames, name) = assignLMSNames(sa: sa, text: text, types: types)
@@ -139,14 +181,30 @@ enum SAIS {
         let lmsCount = lmsPositions.count
         if name + 1 < lmsCount {
             let reducedString = buildReducedString(lmsNames: lmsNames)
-            let reducedSA = build(reducedString, alphabetSize: name + 1)
+            let reducedSA: [Int]
+            if reducedString.count <= 32 {
+                reducedSA = buildSimple(reducedString)
+            } else {
+                let reducedBuffer = buildInArena(
+                    &arena,
+                    text: reducedString,
+                    alphabetSize: name + 1
+                )
+                // Copy out so we can mutate `sa` (which shares the arena).
+                reducedSA = Array(reducedBuffer)
+            }
 
-            // Rebuild SA with correct LMS order
-            sa = placeLMSSuffixesOrdered(
-                text, lmsPositions: lmsPositions, reducedSA: reducedSA, bucketTails: bucketTails,
+            // Reset SA in place (no fresh allocation).
+            for index in 0..<n { sa[index] = -1 }
+            placeLMSSuffixesOrdered(
+                into: sa,
+                text: text,
+                lmsPositions: lmsPositions,
+                reducedSA: reducedSA,
+                bucketTails: bucketTails,
             )
-            inducedSortLType(sa: &sa, text: text, types: types, bucketHeads: bucketHeads)
-            inducedSortSType(sa: &sa, text: text, types: types, bucketTails: bucketTails)
+            inducedSortLType(sa: sa, text: text, types: types, bucketHeads: bucketHeads)
+            inducedSortSType(sa: sa, text: text, types: types, bucketTails: bucketTails)
         }
 
         return sa
@@ -203,11 +261,14 @@ enum SAIS {
         return (heads, tails)
     }
 
-    /// Place LMS suffixes at bucket tails.
+    /// Place LMS suffixes at bucket tails into the supplied (already
+    /// `-1`-cleared) arena buffer.
     private static func placeLMSSuffixes(
-        _ text: [Int], lmsPositions: [Int], bucketTails: [Int],
-    ) -> [Int] {
-        var sa = [Int](repeating: -1, count: text.count)
+        into sa: UnsafeMutableBufferPointer<Int>,
+        text: [Int],
+        lmsPositions: [Int],
+        bucketTails: [Int],
+    ) {
         var tails = bucketTails
         for i in stride(from: lmsPositions.count - 1, through: 0, by: -1) {
             let pos = lmsPositions[i]
@@ -215,14 +276,16 @@ enum SAIS {
             sa[tails[c]] = pos
             tails[c] -= 1
         }
-        return sa
     }
 
     /// Place LMS suffixes in order determined by reduced SA.
     private static func placeLMSSuffixesOrdered(
-        _ text: [Int], lmsPositions: [Int], reducedSA: [Int], bucketTails: [Int],
-    ) -> [Int] {
-        var sa = [Int](repeating: -1, count: text.count)
+        into sa: UnsafeMutableBufferPointer<Int>,
+        text: [Int],
+        lmsPositions: [Int],
+        reducedSA: [Int],
+        bucketTails: [Int],
+    ) {
         var tails = bucketTails
         for i in stride(from: lmsPositions.count - 1, through: 0, by: -1) {
             let pos = lmsPositions[reducedSA[i]]
@@ -230,12 +293,14 @@ enum SAIS {
             sa[tails[c]] = pos
             tails[c] -= 1
         }
-        return sa
     }
 
     /// Induced sort L-type suffixes (left to right).
     private static func inducedSortLType(
-        sa: inout [Int], text: [Int], types: Bitmap, bucketHeads: [Int],
+        sa: UnsafeMutableBufferPointer<Int>,
+        text: [Int],
+        types: Bitmap,
+        bucketHeads: [Int],
     ) {
         var heads = bucketHeads
         for i in 0..<sa.count where sa[i] > 0 && !types.test(sa[i] - 1) {
@@ -248,7 +313,10 @@ enum SAIS {
 
     /// Induced sort S-type suffixes (right to left).
     private static func inducedSortSType(
-        sa: inout [Int], text: [Int], types: Bitmap, bucketTails: [Int],
+        sa: UnsafeMutableBufferPointer<Int>,
+        text: [Int],
+        types: Bitmap,
+        bucketTails: [Int],
     ) {
         var tails = bucketTails
         for i in stride(from: sa.count - 1, through: 0, by: -1) where sa[i] > 0 && types.test(sa[i] - 1) {
@@ -261,7 +329,9 @@ enum SAIS {
 
     /// Assign names to sorted LMS substrings.
     private static func assignLMSNames(
-        sa: [Int], text: [Int], types: Bitmap,
+        sa: UnsafeMutableBufferPointer<Int>,
+        text: [Int],
+        types: Bitmap,
     ) -> (names: [Int], maxName: Int) {
         let n = text.count
         var lmsNames = [Int](repeating: -1, count: n)

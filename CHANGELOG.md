@@ -5,6 +5,92 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.2] - Unreleased
+
+Partial Batch 3 of the 0.2.0 audit remediation
+([`audit/REMEDIATION-PLAN.md`](audit/REMEDIATION-PLAN.md)). The
+small-scope native-API + perf-truth-up items shipped; the coupled
+memory-layer rework cluster (B3-1/B3-2/B3-3/B3-3.5/B3-4/B3-6/B3-7/B3-11/B3-14)
+exceeds session budget and is deferred to a focused **B3.1** follow-up.
+1135 tests green.
+
+### Truth-up: perf claims now backed by code
+
+- **B3-12 — AST fingerprint switches to M_61.**
+  `FingerprintHasher` replaces `% 1_000_000_007` (a 30-bit prime that
+  collided ~50% at N≈50 000 snippets) with the same Mersenne-61
+  reduction the SIMD MinHash kernel already uses. Regression test
+  verifies (a) every output stays under 2^61 − 1, (b) > 9 990 / 10 000
+  distinct hashes on a deterministic probe set.
+- **B3-13 — SA-IS is now arena-backed end-to-end.**
+  `SAIS.build` creates an `Arena` at the top of the call and threads
+  it through recursion. The working `sa` buffer is an
+  `UnsafeMutableBufferPointer<Int>` from the arena; the second
+  `placeLMSSuffixesOrdered` pass reuses the same buffer in place (no
+  fresh `[Int]` allocation). `placeLMSSuffixes`,
+  `placeLMSSuffixesOrdered`, `inducedSortLType`, `inducedSortSType`,
+  `assignLMSNames` all take the buffer pointer instead of `inout [Int]`.
+  `SuffixArrayBuilder.build`'s `sa.filter { $0 < n }` postpass is
+  replaced by an in-place `removeFirst()` (the sentinel sorts to
+  index 0). The README's pre-0.3 "Arena-backed scratch buffers" claim
+  is now true. Existing `SAISCorrectnessTests`,
+  `SuffixArrayConstructionTests`, `LCPCorrectnessTests` pass unchanged.
+
+### Native-API adoption + concurrency hygiene
+
+- **B3-5 — `withThrowingDiscardingTaskGroup`** at
+  `ParallelProcessor.forEach`. Drops the per-task result-slot
+  allocation; any throw cancels siblings + propagates automatically.
+- **B3-9 — `ParallelProcessor.map`/`compactMap` and
+  `ParallelMinHashGenerator.computeSignatures` now honour their
+  `maxConcurrency` caps** via the streaming-bounded pattern from
+  `ZeroCopyParser.extractParallel:437-467`. Pre-0.3 the
+  documents-per-task ratio scaled with input size, ignoring the cap.
+- **B3-10 — `BackpressuredChannelStream.makeChannel` cancellation.**
+  The producer Task is now wrapped in `withTaskCancellationHandler`;
+  on cancel the channel is finished *immediately* rather than at the
+  operation's next `Task.isCancelled` checkpoint. The docstring
+  promise (consumer-side iteration termination drains the producer)
+  is now actually wired.
+- **B3-8 — `OSSignposter` instrumentation.** New
+  `SwiftStaticAnalysisCore.Utilities.Signposter` with
+  `#if canImport(os.signpost)` guards for Linux. Phase intervals on
+  `DuplicationDetector.detectClones`, `UnusedCodeDetector.detectUnused`,
+  and `SymbolFinder.find` show up as named regions in Instruments'
+  os_signpost track.
+
+### Deferred to B3.1 (focused memory-layer + algorithm rework)
+
+The remaining audit items in B3 form a tightly coupled cluster — the
+memory-layer Sendable cleanup, `swift-system` `FilePath`/`FileDescriptor`
+adoption, `URLBuilder` integration, `FileSlice` `~Escapable` lifetime,
+`SoATokenStorage` Span accessors + `ShingleGenerator` Span-driven
+rewrite, dataflow `Set<…>` → `BitArray` worklists, and `MinHashSignature`
+generic-over-N `InlineArray<N, UInt64>` migration are all interlocking
+and exceed the per-batch budget. They land in a single focused B3.1
+batch:
+
+- B3-1 — `Bitmap` → `Collections.BitArray` (benchmark-gated swap).
+- B3-2 — `Foundation` → `FoundationEssentials` (~88 files).
+- B3-3 — `MemoryMappedFile` → `swift-system` `FileDescriptor`.
+- B3-3.5 — `g-cqd/URLBuilder` adoption at file-URL construction sites.
+- B3-4 — `FileSlice` `~Escapable` lifetime-bound to its
+  `MemoryMappedFile`.
+- B3-6 — `SoATokenStorage` `Span<T>` accessors + `ShingleGenerator`
+  Span-driven rewrite (drops two per-file `[String]`/`[TokenKind]`
+  allocations).
+- B3-7 — Dataflow `Set<DefinitionSite>` / `Set<VariableID>` →
+  `BitArray` worklists + RPO-indexed priority deque.
+- B3-11 — Drop `@unchecked Sendable` from `MemoryMappedFile`,
+  `FileSlice`, `ArenaTokenStorage` (depends on B3-3 + B3-4).
+- B3-14 — `MinHashSignature` generic over `let N: Int` so the SIMD
+  path's `InlineArray<128, UInt64>` claim is honoured for the default
+  width without breaking the `numHashes != 128` test suite.
+
+The README/CHANGELOG still references some of these as if shipped;
+truth-up of those bullets happens at the start of B3.1 (deliver in the
+same batch).
+
 ## [0.3.0-alpha] - Unreleased
 
 Batch 2 of the 0.2.0 audit remediation

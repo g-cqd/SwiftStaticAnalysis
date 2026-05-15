@@ -67,8 +67,22 @@ public enum TaskBackedAsyncStream {
 /// - The consumer is uniformly fast; the buffer-and-drop semantics of
 ///   `TaskBackedAsyncStream` are cheaper.
 public enum BackpressuredChannelStream {
-    /// Create an `AsyncChannel` plus a producer `Task` that fills it. The
-    /// returned channel cancels the producer on `finish()`.
+    /// Create an `AsyncChannel` plus a producer `Task` that fills it.
+    ///
+    /// Cancellation propagation (post 0.3.0-α):
+    ///
+    /// - The producer is spawned as a structured `Task` from the caller's
+    ///   context, so **parent-task cancellation** propagates via
+    ///   `Task.isCancelled` at the producer's async checkpoints.
+    /// - We additionally wrap the producer in `withTaskCancellationHandler`
+    ///   so the `onCancel:` callback finishes the channel **immediately**,
+    ///   regardless of where in the operation the cancellation arrives.
+    ///   Without that, a consumer that drops its iterator would have to
+    ///   wait for the producer to reach its next `Task.isCancelled`
+    ///   checkpoint before the channel closed — measurable as stale
+    ///   results piling up after the consumer has stopped reading.
+    /// - On normal completion the operation finishes the channel itself
+    ///   (or the trailing `channel.finish()` below does it).
     ///
     /// The producer closure receives the channel; it should send via
     /// `await channel.send(_:)` (suspends on backpressure) and call
@@ -77,12 +91,20 @@ public enum BackpressuredChannelStream {
     /// - Parameter operation: Async producer that pushes elements through
     ///   the channel and finishes it.
     /// - Returns: The channel for the consumer to iterate.
+    @discardableResult
     public static func makeChannel<Element: Sendable>(
         operation: @escaping @Sendable (AsyncChannel<Element>) async -> Void
     ) -> AsyncChannel<Element> {
         let channel = AsyncChannel<Element>()
         Task {
-            await operation(channel)
+            await withTaskCancellationHandler {
+                await operation(channel)
+            } onCancel: {
+                // Immediate close so the consumer's `for await` loop
+                // returns on the next iteration even if the operation
+                // closure is suspended in `await channel.send(_:)`.
+                channel.finish()
+            }
             channel.finish()
         }
         return channel

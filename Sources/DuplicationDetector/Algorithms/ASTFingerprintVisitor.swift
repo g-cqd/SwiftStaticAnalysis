@@ -299,13 +299,21 @@ struct FingerprintHasher {
     /// Hash a string and incorporate it into the hash.
     mutating func hashString(_ str: String) {
         let strHash = computeStringHash(str)
-        hash = (hash &* 31 &+ strHash) % prime
+        hash = mersenne61Reduce(hash &* 31 &+ strHash)
     }
 
     // MARK: Private
 
+    // 0.3.0-α: AST fingerprint switches from `% 1_000_000_007` (30-bit
+    // prime, ~50% collision rate at N≈50 000 snippets) to the
+    // Mersenne-61 prime already used by MinHash. The reduction is
+    // branch-free `(r & M) + (r >> 61)` with one conditional subtract
+    // — see `mersenne61Reduce` in `MinHash.swift`. Inputs stay
+    // < 2^61 throughout (hash * 31 is < 2^66, the `+ strHash` keeps
+    // it well below 2^122 which `mersenne61Reduce` is documented to
+    // accept).
+
     private var hash: UInt64 = 0
-    private let prime: UInt64 = 1_000_000_007
 
     private mutating func hashNode(_ node: Syntax, depth: Int, stats: inout Stats) {
         stats.nodeCount += 1
@@ -320,13 +328,13 @@ struct FingerprintHasher {
         }
 
         // Add closing marker for this level
-        hash = (hash &* 31 &+ 0xDEAD_BEEF) % prime
+        hash = mersenne61Reduce(hash &* 31 &+ 0xDEAD_BEEF)
     }
 
     private func computeStringHash(_ str: String) -> UInt64 {
         var h: UInt64 = 0
         for char in str.utf8 {
-            h = (h &* 31 &+ UInt64(char)) % prime
+            h = mersenne61Reduce(h &* 31 &+ UInt64(char))
         }
         return h
     }

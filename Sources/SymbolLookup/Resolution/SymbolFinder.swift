@@ -145,6 +145,12 @@ extension SymbolFinder {
     /// - Parameter query: The symbol query.
     /// - Returns: Array of matching symbols.
     public func find(_ query: SymbolQuery) async throws -> [SymbolMatch] {
+        try await Signposter.shared.withInterval("SymbolFinder.find") {
+            try await findBody(query)
+        }
+    }
+
+    private func findBody(_ query: SymbolQuery) async throws -> [SymbolMatch] {
         // Try IndexStore first (synchronous)
         var matches = resolveWithIndex(query.pattern)
 

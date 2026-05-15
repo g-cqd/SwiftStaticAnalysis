@@ -61,11 +61,17 @@ public struct ConcurrencyConfiguration: Sendable {
 
 /// Utilities for parallel file processing with concurrency limits.
 public enum ParallelProcessor {
-    /// Process items in parallel with a concurrency limit using batching.
+    /// Process items in parallel with a strict concurrency cap.
+    ///
+    /// Uses the streaming-bounded pattern (start `maxConcurrency` tasks,
+    /// add a new one each time one completes) — no batch-barriers, so
+    /// fast items don't sit idle waiting for a slow neighbour to finish
+    /// its chunk. The pattern matches
+    /// `ZeroCopyParser.extractParallel(from:maxConcurrency:)`.
     ///
     /// - Parameters:
     ///   - items: Items to process.
-    ///   - maxConcurrency: Maximum concurrent tasks (used as batch size).
+    ///   - maxConcurrency: Maximum concurrent tasks.
     ///   - operation: Async operation to perform on each item.
     /// - Returns: Array of results in same order as input.
     public static func map<T, R: Sendable>(
@@ -74,50 +80,41 @@ public enum ParallelProcessor {
         operation: @Sendable @escaping (T) async throws -> R,
     ) async throws -> [R] where T: Sendable {
         guard !items.isEmpty else { return [] }
+        let cap = max(1, maxConcurrency)
 
-        // For small batches, process with simple TaskGroup
-        if items.count <= maxConcurrency {
-            return try await withThrowingTaskGroup(of: (Int, R).self) { group in
-                for (index, item) in items.enumerated() {
-                    group.addTask {
-                        let result = try await operation(item)
-                        return (index, result)
-                    }
-                }
+        return try await withThrowingTaskGroup(of: (Int, R).self) { group in
+            var iterator = items.enumerated().makeIterator()
+            var inFlight = 0
 
-                var indexedResults: [(Int, R)] = []
-                indexedResults.reserveCapacity(items.count)
-                for try await result in group {
-                    indexedResults.append(result)
-                }
-
-                return indexedResults.sorted { $0.0 < $1.0 }.map(\.1)
+            // Prime up to the concurrency cap.
+            while inFlight < cap, let next = iterator.next() {
+                let (index, item) = next
+                group.addTask { (index, try await operation(item)) }
+                inFlight += 1
             }
-        }
 
-        // For larger batches, process in chunks to limit concurrency
-        var allResults: [R?] = Array(repeating: nil, count: items.count)
-        let batchSize = maxConcurrency
-
-        for chunk in items.chunks(ofCount: batchSize) {
-            try await withThrowingTaskGroup(of: (Int, R).self) { group in
-                for (globalIndex, item) in chunk.indexed() {
-                    group.addTask {
-                        let result = try await operation(item)
-                        return (globalIndex, result)
-                    }
-                }
-
-                for try await (index, result) in group {
-                    allResults[index] = result
+            // Drain completions, replacing each finished slot with the
+            // next pending item. Order-preserving via `index`.
+            var indexedResults: [(Int, R)] = []
+            indexedResults.reserveCapacity(items.count)
+            while let result = try await group.next() {
+                indexedResults.append(result)
+                inFlight -= 1
+                if let next = iterator.next() {
+                    let (index, item) = next
+                    group.addTask { (index, try await operation(item)) }
+                    inFlight += 1
                 }
             }
+            return indexedResults.sorted { $0.0 < $1.0 }.map(\.1)
         }
-
-        return Array(allResults.compacted())
     }
 
     /// Process items in parallel, collecting only successful results.
+    ///
+    /// Uses the streaming-bounded pattern (no batch barriers) so the
+    /// `maxConcurrency` cap is tracked continuously rather than re-set
+    /// at every chunk boundary.
     ///
     /// - Parameters:
     ///   - items: Items to process.
@@ -130,28 +127,30 @@ public enum ParallelProcessor {
         operation: @Sendable @escaping (T) async -> R?,
     ) async -> [R] where T: Sendable {
         guard !items.isEmpty else { return [] }
+        let cap = max(1, maxConcurrency)
 
-        var results: [R] = []
+        return await withTaskGroup(of: R?.self) { group in
+            var iterator = items.makeIterator()
+            var inFlight = 0
 
-        // Process in batches
-        let batchSize = max(1, maxConcurrency)
-        for chunk in items.chunks(ofCount: batchSize) {
-            await withTaskGroup(of: R?.self) { group in
-                for item in chunk {
-                    group.addTask {
-                        await operation(item)
-                    }
+            while inFlight < cap, let item = iterator.next() {
+                group.addTask { await operation(item) }
+                inFlight += 1
+            }
+
+            var results: [R] = []
+            while let result = await group.next() {
+                inFlight -= 1
+                if let result {
+                    results.append(result)
                 }
-
-                for await result in group {
-                    if let result {
-                        results.append(result)
-                    }
+                if let item = iterator.next() {
+                    group.addTask { await operation(item) }
+                    inFlight += 1
                 }
             }
+            return results
         }
-
-        return results
     }
 
     /// Process items in parallel for side effects only.
@@ -167,17 +166,21 @@ public enum ParallelProcessor {
     ) async throws where T: Sendable {
         guard !items.isEmpty else { return }
 
-        // Process in batches
+        // Process in batches.
+        //
+        // `withThrowingDiscardingTaskGroup` is the right shape here:
+        // results are `Void`, so we don't pay for the per-task result
+        // slot that `withThrowingTaskGroup(of: Void.self)` allocates,
+        // and any throw cancels siblings + propagates out of the group
+        // automatically (no explicit `waitForAll`).
         let batchSize = max(1, maxConcurrency)
         for chunk in items.chunks(ofCount: batchSize) {
-            try await withThrowingTaskGroup(of: Void.self) { group in
+            try await withThrowingDiscardingTaskGroup { group in
                 for item in chunk {
                     group.addTask {
                         try await operation(item)
                     }
                 }
-
-                try await group.waitForAll()
             }
         }
     }
