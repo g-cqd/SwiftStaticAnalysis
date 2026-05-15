@@ -80,6 +80,20 @@ let package = Package(
             name: "swa-bench",
             targets: ["swa-bench"]
         ),
+
+        // LSP server library (DuplicationDetector + UnusedCodeDetector results
+        // surfaced as editor diagnostics over JSON-RPC).
+        .library(
+            name: "SwiftStaticAnalysisLSPServer",
+            targets: ["SwiftStaticAnalysisLSPServer"]
+        ),
+
+        // LSP server executable. Pair with the editor's LSP client config to
+        // get duplication / unused-code diagnostics inline.
+        .executable(
+            name: "swa-lsp",
+            targets: ["swa-lsp"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "602.0.0"),
@@ -301,6 +315,32 @@ let package = Package(
             ]
         ),
 
+        // MARK: - LSP Server
+        .target(
+            name: "SwiftStaticAnalysisLSPServer",
+            dependencies: [
+                "SwiftStaticAnalysisCore",
+                "DuplicationDetector",
+                "UnusedCodeDetector",
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+                .enableExperimentalFeature("StrictConcurrency"),
+            ]
+        ),
+
+        .executableTarget(
+            name: "swa-lsp",
+            dependencies: [
+                "SwiftStaticAnalysisLSPServer",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+                .enableExperimentalFeature("StrictConcurrency"),
+            ]
+        ),
+
         // MARK: - Tests
         .testTarget(
             name: "SwiftStaticAnalysisCoreTests",
@@ -333,6 +373,13 @@ let package = Package(
         .testTarget(
             name: "SwiftStaticAnalysisOutputTests",
             dependencies: ["SwiftStaticAnalysisOutput"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "SwiftStaticAnalysisLSPServerTests",
+            dependencies: ["SwiftStaticAnalysisLSPServer"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]
