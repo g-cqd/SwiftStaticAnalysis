@@ -5,6 +5,96 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.19] - Unreleased
+
+**7-model embedding benchmark + provider robustness for fixed-shape and
+pre-pooled exports.**
+
+After β.16 wired SOTA via `swa duplicates --embedding-bundle`, the open
+question was: which model to recommend by default. β.19 answers it
+empirically — `scripts/swa-embed-benchmark.sh` A/Bs every downloaded HF
+CoreML bundle through the swa CLI on this repo's `Sources/`, at four
+thresholds, reporting dup-line count, wall time, and top-1 cosine.
+
+### Results (full `Sources/`, 823 function snippets)
+
+| Bundle | params | 0.80 dup-L | 0.85 dup-L | 0.90 dup-L | 0.95 dup-L | wall (s) | top cosine |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **MiniLM** | 22M | 6071 | 3435 | 1376 | **244** | **10** | 82→96% smooth |
+| BGEBase | 110M | 17520 | 16910 | 13517 | 2678 | 16 | 91→98% bouncy |
+| BGELarge | 335M | 12085 | 5700 | 2481 | 634 | 41 | 83→98% |
+| MxbaiLarge | 335M | crash | crash | crash | crash | 7 | (SIGSEGV in MLModel.prediction) |
+| MSMarcoCode | 110M | 13117 | 8097 | 3268 | 826 | 17 | 85→95% |
+| CodeBERT | 125M | 18529 | 18529 | 18529 | 18529 | ~190 | 99% (plateau) |
+| EmbeddingGemma | 300M | (slow) | — | — | — | >>300 | (works, too slow to bench) |
+
+### Conclusions
+
+**MiniLM wins on this codebase.** It's the only model with a properly
+graduated cosine curve (smooth halving per 0.05 threshold step). The
+top-1 cosine rises from 82% → 96% as the threshold rises, indicating
+the embedding space separates similar from dissimilar code cleanly.
+Plus, it's the smallest (22M, 88MB on disk) and fastest (10s for the
+full repo).
+
+**CodeBERT is unusable.** Its dup-line count is identical at all four
+thresholds (18529) because every pair has cosine > 0.95. The model
+clusters all Swift code at the top of its embedding space — a property
+of its masked-LM training objective, not the CoreML conversion (the β.18
+`verify-codebert-conversion.py` script proved the PyTorch and CoreML
+outputs agree to within 0.0074 max cosine divergence).
+
+**BGE family clusters too tight at low thresholds**; only useful at
+0.95+, at which point a smaller model gets you the same precision faster.
+
+**MSMarcoCode** (sentence-transformers/msmarco-bert-base-dot-v5
+fine-tuned on CodeSearchNet) found a real **3-way cross-module clone**
+in dataflow `debugDescription()` methods that MiniLM missed — but
+inspection showed it's an **intentional shape duplication** (each
+dataflow analysis prints its own state; the structural similarity is
+necessary, not refactorable). So MSMarcoCode trades MiniLM's precision
+for broader recall, with the recall mostly returning false-positives-
+by-intent.
+
+**MxbaiLarge** segfaults inside `MLModel.prediction(from:)` in Swift,
+despite working in Python via `coremltools.predict`. Probably a bundle-
+format issue; not fixable without re-converting. Excluded.
+
+**EmbeddingGemma** works (after a β.19 padding fix) but its fixed
+[1, 128] input shape + 300M params makes per-snippet inference ~1.5s,
+which doesn't scale to a full-repo scan in reasonable wall time.
+
+### Provider robustness landed in this release
+
+`HFSemanticEmbeddingProvider` now handles two cases the β.16 implementation
+rejected:
+
+1. **Fixed-shape inputs**: when the model declares `input_ids` as `[1, N]`
+   (e.g. EmbeddingGemma's `[1, 128]`) instead of dynamic `[1, 1]`, the
+   provider pads the token sequence to N. The `attention_mask` is 1 for
+   real tokens, 0 for padding, so mean-pooling skips padding positions.
+2. **Pre-pooled outputs**: sentence-transformer exports that bake the
+   pooling into the model graph emit a `[1, D]` tensor rather than the
+   canonical `[1, T, D]` `last_hidden_state`. The provider detects 2D
+   output and uses it directly.
+
+These changes unlocked EmbeddingGemma; future model bundles with either
+shape work without per-model code.
+
+### Recommended default
+
+`swa duplicates ... --embedding-bundle Models/MiniLM --embedding-similarity 0.90`
+is the empirical winner on this codebase: ~1.3k dup-lines surfaced, top
+cosines in the 91-96% range, 10-second wall time. Tighter (`0.95`) gives
+~250 dup-lines if you only want the highest-confidence semantic clones.
+
+### Tools shipped
+
+- `scripts/swa-embed-benchmark.sh` — full A/B harness (7 bundles × 4
+  thresholds), apples-to-apples through the swa CLI.
+- `scripts/verify-codebert-conversion.py` — PyTorch-vs-CoreML faithfulness
+  check (used to prove the CodeBERT plateau is model, not conversion).
+
 ## [0.3.0-beta.18] - Unreleased
 
 **Consolidate `CFGStatement.shortDescription(maxLength:)` — model-discovered.**
