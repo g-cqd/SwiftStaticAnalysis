@@ -3,8 +3,16 @@
 //  MIT License
 
 import Foundation
-@_exported import SwiftParser
-// Re-export SwiftSyntax types commonly needed by consumers
+// SwiftParser is an internal-only dependency: only `Parser.parse(source:)`
+// is called, and it is consumed inside `SwiftFileParser` / `ZeroCopyParser`,
+// never exposed in a public signature. Re-exporting it would leak the
+// entire SwiftParser surface to consumers who never declared a dependency.
+import SwiftParser
+// SwiftSyntax types DO appear in public signatures (`SourceFileSyntax`
+// from `SwiftFileParser.parse`, `SyntaxVisitor` subclasses in
+// `DeclarationCollector` / `ReferenceCollector`, `AbsolutePosition`
+// extensions for source-location conversion, etc.). The re-export is
+// load-bearing.
 @_exported import SwiftSyntax
 
 // MARK: - Module Exports

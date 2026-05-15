@@ -16,4 +16,4 @@
 /// Bump this constant on every release and keep it aligned with `CHANGELOG.md`.
 /// A CI / test gate (`SwiftStaticAnalysisCoreTests.testVersion…`) asserts the
 /// alignment.
-public let swaVersion = "0.2.1"
+public let swaVersion = "0.3.0-alpha"

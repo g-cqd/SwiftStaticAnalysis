@@ -4,7 +4,6 @@
 
 import Foundation
 import IndexStoreDB
-import SwiftStaticAnalysisCore
 
 // MARK: - IndexStoreError
 

@@ -228,8 +228,15 @@ struct Duplicates: AsyncParsableCommand {
         // Merge CLI args with config (CLI takes precedence)
         let effectiveMinTokens = minTokens ?? dupConfig?.minTokens ?? 50
         let effectiveMinSimilarity = minSimilarity ?? dupConfig?.minSimilarity ?? 0.8
-        let effectiveAlgorithm = algorithm ?? parseAlgorithm(dupConfig?.algorithm)
         let effectiveTypes = types.isEmpty ? parseCloneTypes(dupConfig?.types) : Set(types)
+        // 0.3.0-α: per-type algorithm defaults. The README clone-type table
+        // promised SA-IS for exact and MinHash+LSH for near; pre-0.3 the
+        // uniform `.rollingHash` default routed both through Rabin-Karp,
+        // so the documented algorithm mapping was a lie. The CLI flag
+        // and `.swa.json` override still win when set.
+        let effectiveAlgorithm = algorithm
+            ?? parseAlgorithm(dupConfig?.algorithm)
+            ?? defaultAlgorithm(forCloneTypes: effectiveTypes)
         let effectiveExcludePaths = excludePaths.isEmpty ? (dupConfig?.excludePaths ?? []) : excludePaths
 
         // Resolve parallel mode: CLI --parallel-mode > CLI --parallel > config.
@@ -259,7 +266,8 @@ struct Duplicates: AsyncParsableCommand {
             cloneTypes: effectiveTypes,
             minimumSimilarity: effectiveMinSimilarity,
             algorithm: effectiveAlgorithm,
-            useParallelClones: effectiveParallel
+            useParallelClones: effectiveParallel,
+            useStreamingVerifier: effectiveParallelMode.usesStreamingVerifier,
         )
 
         let detector = DuplicationDetector(configuration: detectorConfig)
@@ -335,6 +343,12 @@ struct Unused: AsyncParsableCommand {
     @Flag(name: .long, help: "Apply sensible defaults (exclude imports, deinit, enum cases)")
     var sensibleDefaults: Bool = false
 
+    @Flag(
+        name: .customLong("auto-build"),
+        help: "Build the project automatically when the IndexStoreDB is missing or stale (indexStore mode only)"
+    )
+    var autoBuild: Bool = false
+
     // Root treatment flags (use --no-treat-*-as-root to disable)
     @Flag(inversion: .prefixedNo, help: "Treat public API as entry points")
     var treatPublicAsRoot: Bool?
@@ -404,16 +418,31 @@ struct Unused: AsyncParsableCommand {
         // Resolve parallel mode: CLI --parallel-mode > CLI --parallel > config.
         // See `Duplicates.run` for the alignment rationale; both subcommands
         // now route `--parallel` through `ParallelMode.from(legacyParallel:)`.
+        //
+        // `parallelExplicitlySet` lets the detector know whether to honour
+        // the user's choice or fall back to the auto-select threshold for
+        // parallel BFS. When the user didn't pass `--parallel-mode` /
+        // `--parallel` and `.swa.json` doesn't declare one either, we
+        // forward `nil` to `UnusedCodeConfiguration.useParallelBFS` and
+        // let `parallelBFSThreshold` make the call.
         let effectiveParallelMode: ParallelMode
+        let parallelExplicitlySet: Bool
         if let mode = parallelMode {
             effectiveParallelMode = mode
+            parallelExplicitlySet = true
         } else if parallel {
             DeprecatedFlags.warnLegacyParallel()
             effectiveParallelMode = ParallelMode.from(legacyParallel: parallel)
+            parallelExplicitlySet = true
+        } else if let configMode = unusedConfig?.resolvedParallelMode {
+            effectiveParallelMode = configMode
+            parallelExplicitlySet = true
         } else {
-            effectiveParallelMode = unusedConfig?.resolvedParallelMode ?? .maximum
+            effectiveParallelMode = .maximum
+            parallelExplicitlySet = false
         }
         let effectiveParallel = effectiveParallelMode.isParallel
+        let effectiveUseParallelBFS: Bool? = parallelExplicitlySet ? effectiveParallel : nil
 
         // Merge path exclusions
         let effectiveExcludePaths = excludePaths.isEmpty ? (unusedConfig?.excludePaths ?? []) : excludePaths
@@ -437,11 +466,12 @@ struct Unused: AsyncParsableCommand {
             treatPublicAsRoot: effectiveTreatPublicAsRoot,
             treatObjcAsRoot: effectiveTreatObjcAsRoot,
             treatTestsAsRoot: effectiveTreatTestsAsRoot,
+            autoBuild: autoBuild,
             treatSwiftUIViewsAsRoot: effectiveTreatSwiftUIViewsAsRoot,
             ignoreSwiftUIPropertyWrappers: effectiveIgnoreSwiftUIPropertyWrappers,
             ignorePreviewProviders: effectiveIgnorePreviewProviders,
             ignoreViewBody: effectiveIgnoreViewBody,
-            useParallelBFS: effectiveParallel,
+            useParallelBFS: effectiveUseParallelBFS,
         )
 
         // `--report` is only meaningful in reachability mode (it walks the
@@ -781,11 +811,16 @@ func loadConfiguration(configPath: String?, analysisPath: String) throws -> SWAC
 }
 
 func buildDuplicationConfig(from config: DuplicatesConfiguration?) -> DuplicationConfiguration {
-    DuplicationConfiguration(
+    // 0.3.0-α: `ignoredPatterns` from `.swa.json` is now forwarded into
+    // the detector (pre-0.3 it was decoded and silently dropped — the
+    // schema advertised a regex-name-exclusion knob that did nothing).
+    let cloneTypes = parseCloneTypes(config?.types)
+    return DuplicationConfiguration(
         minimumTokens: config?.minTokens ?? 50,
-        cloneTypes: parseCloneTypes(config?.types),
+        cloneTypes: cloneTypes,
+        ignoredPatterns: config?.ignoredPatterns ?? [],
         minimumSimilarity: config?.minSimilarity ?? 0.8,
-        algorithm: parseAlgorithm(config?.algorithm),
+        algorithm: parseAlgorithm(config?.algorithm) ?? defaultAlgorithm(forCloneTypes: cloneTypes),
     )
 }
 
@@ -803,10 +838,15 @@ func buildDuplicationConfig(from config: DuplicatesConfiguration?) -> Duplicatio
 /// directly, silently ignoring `parallelMode` from `.swa.json` in
 /// `swa analyze`.
 func buildUnusedConfig(from config: UnusedConfiguration?) -> UnusedCodeConfiguration {
+    // 0.3.0-α: `excludeNamePatterns` from `.swa.json` is now forwarded
+    // into `UnusedCodeConfiguration.ignoredPatterns`. Pre-0.3 the field
+    // was decoded by `SWAConfiguration` but silently dropped here, so a
+    // user with `excludeNamePatterns: ["_legacy.*"]` saw no effect.
     UnusedCodeConfiguration(
         ignorePublicAPI: config?.ignorePublicAPI ?? false,
         mode: parseDetectionMode(config?.mode),
         indexStorePath: config?.indexStorePath,
+        ignoredPatterns: config?.excludeNamePatterns ?? [],
         treatPublicAsRoot: config?.treatPublicAsRoot ?? true,
         treatObjcAsRoot: config?.treatObjcAsRoot ?? true,
         treatTestsAsRoot: config?.treatTestsAsRoot ?? true,
@@ -814,7 +854,10 @@ func buildUnusedConfig(from config: UnusedConfiguration?) -> UnusedCodeConfigura
         ignoreSwiftUIPropertyWrappers: config?.ignoreSwiftUIPropertyWrappers ?? false,
         ignorePreviewProviders: config?.ignorePreviewProviders ?? false,
         ignoreViewBody: config?.ignoreViewBody ?? false,
-        useParallelBFS: (config?.resolvedParallelMode ?? .none).isParallel,
+        // .swa.json: honour `parallelMode` / legacy `parallel` only when
+        // explicitly declared. Nil hands control to
+        // `parallelBFSThreshold` auto-select inside `DependencyExtractor`.
+        useParallelBFS: parallelOverride(from: config),
     )
 }
 
@@ -842,13 +885,45 @@ func parseCloneTypes(_ types: [String]?) -> Set<CloneType> {
     return Set(types.compactMap { CloneType(rawValue: $0) })
 }
 
-func parseAlgorithm(_ algorithm: String?) -> DetectionAlgorithm {
-    guard let algorithm else { return .rollingHash }
+/// Returns `nil` when `.swa.json` did not set a parallel preference,
+/// matching the auto-select contract in `UnusedCodeConfiguration`.
+func parallelOverride(from config: UnusedConfiguration?) -> Bool? {
+    if let mode = config?.parallelMode {
+        return mode.isParallel
+    }
+    if let legacy = config?.parallel {
+        return ParallelMode.from(legacyParallel: legacy).isParallel
+    }
+    return nil
+}
+
+func parseAlgorithm(_ algorithm: String?) -> DetectionAlgorithm? {
+    guard let algorithm else { return nil }
     switch algorithm.lowercased() {
     case "rollinghash": return .rollingHash
     case "suffixarray": return .suffixArray
     case "minhashlsh": return .minHashLSH
-    default: return .rollingHash
+    default: return nil
+    }
+}
+
+/// Default `DetectionAlgorithm` for a set of clone types, used when the
+/// user didn't pin one explicitly via `--algorithm` or `.swa.json`.
+///
+/// - `.exact` alone → `.suffixArray` (true Type-1 with SA-IS).
+/// - `.near` and/or `.semantic` (single type) → `.minHashLSH`
+///   (MinHash + LSH with SIMD4 Mersenne-61).
+/// - Mixed sets → `.rollingHash` (the pre-0.3 catch-all; Rabin-Karp can
+///   service every clone type and avoids paying the SA / MinHash setup
+///   cost when the user wants a heterogeneous report).
+///
+/// Empty sets default to `.rollingHash` for parity with the pre-0.3
+/// behaviour; callers should already have populated `effectiveTypes`.
+func defaultAlgorithm(forCloneTypes types: Set<CloneType>) -> DetectionAlgorithm {
+    guard types.count == 1, let only = types.first else { return .rollingHash }
+    switch only {
+    case .exact: return .suffixArray
+    case .near, .semantic: return .minHashLSH
     }
 }
 
@@ -1127,35 +1202,26 @@ private let defaultExcludedDirectories: Set<String> = [
 /// Canonicalizes a file path to prevent path traversal attacks.
 ///
 /// This function:
-/// - Resolves symlinks to their real paths
-/// - Resolves `.` and `..` components
-/// - Returns the standardized absolute path
-///
-/// - Parameter path: The raw path to canonicalize.
-/// - Returns: The canonicalized path.
-/// - Throws: `AnalysisError.invalidPath` if the path cannot be resolved.
-func canonicalizePath(_ path: String) throws -> String {
-    let url = URL(fileURLWithPath: path).standardized
-
-    // Resolve symlinks to prevent symlink attacks
-    let resolvedURL: URL
-    do {
-        resolvedURL = try URL(resolvingAliasFileAt: url, options: [.withoutMounting])
-    } catch {
-        // If resolution fails, use the standardized path
-        resolvedURL = url
-    }
-
-    return resolvedURL.path
-}
+// `canonicalizePath` was removed in 0.3.0-α. The CLI now uses the
+// canonical `PathUtilities.canonicalize(_:relativeTo:)` from Core (the
+// same routine MCP's `CodebaseContext.validatePath` uses), so symlink
+// resolution semantics are identical on both surfaces. The old CLI
+// implementation used `URL.resolvingAliasFileAt`, which had subtly
+// different macOS-alias-resolution behaviour and was a maintenance
+// footgun (audit F-05).
 
 func findSwiftFiles(in paths: [String], excludePaths: [String]? = nil) throws -> [String] {
     let fileManager = FileManager.default
     var swiftFiles: [String] = []
 
     for path in paths {
-        // Canonicalize path to prevent path traversal attacks
-        let canonicalPath = try canonicalizePath(path)
+        // Canonicalize path to prevent path traversal attacks. Use the
+        // CWD as the resolution base so relative inputs (`.`, `Sources`)
+        // resolve consistently with the rest of the toolchain.
+        let canonicalPath = PathUtilities.canonicalize(
+            path,
+            relativeTo: URL(fileURLWithPath: fileManager.currentDirectoryPath)
+        )
         let url = URL(fileURLWithPath: canonicalPath)
 
         var isDirectory: ObjCBool = false
@@ -1181,12 +1247,20 @@ func findSwiftFiles(in paths: [String], excludePaths: [String]? = nil) throws ->
             continue
         }
 
-        // Directory - find all Swift files
+        // Directory - find all Swift files.
+        //
+        // The enumerator follows symlinks by default. We re-resolve each
+        // discovered file's canonical path and verify it stays underneath
+        // the original directory root, matching the hygiene that
+        // `CodebaseContext.findSwiftFiles` already applies on the MCP side
+        // (audit F-06). A symlink pointing at `/tmp/.build/...` would
+        // otherwise sneak generated artifacts into the analysis.
         if let enumerator = fileManager.enumerator(
             at: url,
-            includingPropertiesForKeys: [.isRegularFileKey],
+            includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
             options: [.skipsHiddenFiles],
         ) {
+            let rootPrefix = canonicalPath.hasSuffix("/") ? canonicalPath : canonicalPath + "/"
             for case let fileURL as URL in enumerator {
                 // Skip default excluded directories (even if not hidden)
                 let pathComponents = fileURL.pathComponents
@@ -1199,7 +1273,12 @@ func findSwiftFiles(in paths: [String], excludePaths: [String]? = nil) throws ->
                     continue
                 }
 
-                let filePath = fileURL.path
+                let resolved = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
+                guard resolved == canonicalPath || resolved.hasPrefix(rootPrefix) else {
+                    continue
+                }
+
+                let filePath = resolved
 
                 // Apply exclusion patterns
                 if let excludePaths, !excludePaths.isEmpty {

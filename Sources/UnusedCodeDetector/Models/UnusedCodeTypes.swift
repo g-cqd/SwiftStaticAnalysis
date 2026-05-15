@@ -90,17 +90,10 @@ public struct UnusedCode: Sendable, Codable {
 
 // MARK: - DetectionMode
 
-/// Mode for unused code detection.
-public enum DetectionMode: String, Sendable, Codable, CaseIterable {
-    /// Simple reference counting (fast, approximate).
-    case simple
-
-    /// Reachability graph analysis (more accurate, considers entry points).
-    case reachability
-
-    /// IndexStoreDB-based (most accurate, requires project build).
-    case indexStore
-}
+// 0.3.0-α: `DetectionMode` lives in `SwiftStaticAnalysisCore.Configuration`
+// because `IndexStoreFallback` (also in Core) consumes it for the
+// preferred-mode parameter on `determineAnalysisMode`. Re-exported here so
+// existing `import UnusedCodeDetector` callers keep working.
 
 // MARK: - UnusedCodeReport
 

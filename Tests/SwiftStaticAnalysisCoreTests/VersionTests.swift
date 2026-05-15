@@ -31,8 +31,10 @@ struct VersionTests {
 
         // Find the first `## [x.y.z]` header — that is the unreleased or
         // most-recent release entry. The repo's release policy is to add a
-        // new top-most entry whenever `swaVersion` is bumped.
-        let pattern = #/^##\s+\[(?<version>\d+\.\d+\.\d+)\]/#
+        // new top-most entry whenever `swaVersion` is bumped. Pre-release
+        // suffixes (`-alpha`, `-beta.3`, …) are part of SemVer and must
+        // round-trip through the alignment check unchanged.
+        let pattern = #/^##\s+\[(?<version>\d+\.\d+\.\d+(?:-[\w.]+)?)\]/#
         let topVersion =
             contents
             .split(separator: "\n")

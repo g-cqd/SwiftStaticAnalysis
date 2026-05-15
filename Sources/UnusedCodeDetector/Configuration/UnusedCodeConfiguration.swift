@@ -26,6 +26,7 @@ public struct UnusedCodeConfiguration: Sendable {
         treatObjcAsRoot: Bool = true,
         treatTestsAsRoot: Bool = true,
         autoBuild: Bool = false,
+        allowsIndexDatabaseCreation: Bool = true,
         hybridMode: Bool = false,
         warnOnStaleIndex: Bool = true,
         useIncremental: Bool = false,
@@ -34,7 +35,8 @@ public struct UnusedCodeConfiguration: Sendable {
         ignoreSwiftUIPropertyWrappers: Bool = true,
         ignorePreviewProviders: Bool = true,
         ignoreViewBody: Bool = true,
-        useParallelBFS: Bool = false,
+        useParallelBFS: Bool? = nil,
+        parallelBFSThreshold: Int = 1000,
         logger: AnalysisLogger = .osLog(category: "UnusedCodeDetector"),
     ) {
         self.detectVariables = detectVariables
@@ -51,6 +53,7 @@ public struct UnusedCodeConfiguration: Sendable {
         self.treatObjcAsRoot = treatObjcAsRoot
         self.treatTestsAsRoot = treatTestsAsRoot
         self.autoBuild = autoBuild
+        self.allowsIndexDatabaseCreation = allowsIndexDatabaseCreation
         self.hybridMode = hybridMode
         self.warnOnStaleIndex = warnOnStaleIndex
         self.useIncremental = useIncremental
@@ -60,6 +63,7 @@ public struct UnusedCodeConfiguration: Sendable {
         self.ignorePreviewProviders = ignorePreviewProviders
         self.ignoreViewBody = ignoreViewBody
         self.useParallelBFS = useParallelBFS
+        self.parallelBFSThreshold = max(1, parallelBFSThreshold)
         self.logger = logger
     }
 
@@ -136,6 +140,14 @@ public struct UnusedCodeConfiguration: Sendable {
     /// Automatically build the project if index store is missing/stale.
     public var autoBuild: Bool
 
+    /// When `true`, `IndexStoreReader.init` may create the sibling
+    /// `IndexDatabase/` directory next to the index store. Defaults to
+    /// `true` so direct programmatic and CLI use is unchanged. The MCP
+    /// path sets this to `false` so a hostile prompt cannot drive a
+    /// filesystem-write side effect at an attacker-chosen location,
+    /// even after the path-validation gate in `handleDetectUnusedCode`.
+    public var allowsIndexDatabaseCreation: Bool
+
     /// Use hybrid mode (index for cross-module, syntax for local).
     public var hybridMode: Bool
 
@@ -172,8 +184,27 @@ public struct UnusedCodeConfiguration: Sendable {
     /// - Performance: 2-4x speedup on graphs with > 10,000 nodes
     /// - Small graphs: Minimal benefit due to parallelization overhead
     ///
-    /// Enable via `--parallel` CLI flag.
-    public var useParallelBFS: Bool
+    /// Override for the parallel-BFS routing decision.
+    ///
+    /// - `nil` (default) — auto-select based on `parallelBFSThreshold`:
+    ///   graphs with `>= threshold` nodes use `computeUnreachableParallel`,
+    ///   smaller graphs stay sequential. This is the post-0.3.0-α
+    ///   default and matches the README/CHANGELOG claim that parallel
+    ///   BFS engages "for large graphs" without the user having to flip
+    ///   a flag.
+    /// - `true` — force parallel BFS regardless of size.
+    /// - `false` — force sequential BFS regardless of size.
+    ///
+    /// Pre-0.3 this field was `Bool = false`: parallel BFS was opt-in
+    /// only via the `--parallel` CLI flag and never auto-selected,
+    /// contradicting the CHANGELOG's "auto-selects parallel BFS for
+    /// graphs ≥ 1000 nodes" claim.
+    public var useParallelBFS: Bool?
+
+    /// Node-count threshold above which the auto-select path uses
+    /// parallel BFS. Only consulted when `useParallelBFS == nil`.
+    /// Default 1000 matches the documented contract.
+    public var parallelBFSThreshold: Int
 
     /// Logger used for warnings and fallback notices in library code.
     public var logger: AnalysisLogger

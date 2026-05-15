@@ -4,7 +4,6 @@
 
 import Foundation
 import SwiftStaticAnalysisCore
-import UnusedCodeDetector
 
 /// Resolves symbols using the IndexStoreDB compiler index.
 ///

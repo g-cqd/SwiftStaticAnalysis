@@ -13,12 +13,14 @@ import Foundation
 /// - `none`: Sequential execution, deterministic, lowest memory usage.
 /// - `safe`: Default parallel behaviour (TaskGroup-based), deterministic via
 ///   per-task result sorting.
-/// - `maximum`: Higher concurrency (`highThroughput` preset). Note that
-///   `.safe` and `.maximum` differ only in their `ConcurrencyConfiguration`
-///   shape (max files / max tasks); the streaming/backpressure path is
-///   reached via explicit streaming APIs (e.g. `StreamingVerifier`), not by
-///   choosing `.maximum`. See `TaskBackedAsyncStream` for the buffering
-///   policy details.
+/// - `maximum`: Higher concurrency (`highThroughput` preset) **plus**
+///   AsyncChannel-backed streaming with backpressure on the duplication
+///   pipeline. Use this when memory headroom is the bottleneck on
+///   large codebases (millions of token pairs) — the streaming
+///   verifier suspends the producer if a slow consumer would otherwise
+///   queue an unbounded result buffer. The 0.2.x README claimed this
+///   behaviour but routed `.maximum` through the same plumbing as
+///   `.safe`; the 0.3.0-α release actually wires the streaming path.
 ///
 /// Example usage in `.swa.json`:
 /// ```json
@@ -37,10 +39,23 @@ public enum ParallelMode: String, Codable, Sendable, CaseIterable {
     /// Recommended default for most codebases.
     case safe
 
-    /// Higher-concurrency execution (`highThroughput` preset). Same
-    /// task-group plumbing as `.safe`; results still require sorting at
-    /// boundaries when determinism matters.
+    /// Higher-concurrency execution (`highThroughput` preset) **and**
+    /// AsyncChannel-backed streaming on the duplication pipeline.
+    /// Results still require sorting at boundaries when determinism
+    /// matters.
     case maximum
+
+    /// Whether this mode engages the AsyncChannel-backed streaming
+    /// verifier (`BackpressuredChannelStream` under the hood). Currently
+    /// only `.maximum` flips this — `.safe` runs TaskGroup with
+    /// per-task buffering, `.maximum` adds the streaming sink so a slow
+    /// consumer suspends the producer instead of queueing unbounded.
+    public var usesStreamingVerifier: Bool {
+        switch self {
+        case .none, .safe: return false
+        case .maximum: return true
+        }
+    }
 }
 
 // MARK: - Backward Compatibility

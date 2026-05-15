@@ -52,6 +52,13 @@ struct StaticAnalysisCommandPlugin: CommandPlugin {
             process.executableURL = swaTool.url
             process.arguments = args
             process.currentDirectoryURL = context.package.directoryURL
+            // 0.3.0-α: defence-in-depth. The SPM plugin sandbox forbids
+            // importing `ProcessExecutor` (Core, internal), so we can't
+            // route through the env-allowlisted launcher. Empty the
+            // child environment here so `DYLD_INSERT_LIBRARIES` /
+            // `SWIFTPM_HOOKS_DIR` / `BASH_ENV` cannot ride into the
+            // analyzer process even if the SPM host has them set.
+            process.environment = [:]
 
             let outputPipe = Pipe()
             let errorPipe = Pipe()
@@ -124,6 +131,8 @@ struct StaticAnalysisCommandPlugin: CommandPlugin {
                 process.executableURL = swaTool.url
                 process.arguments = args
                 process.currentDirectoryURL = context.xcodeProject.directoryURL
+                // 0.3.0-α: defence-in-depth (see SPM branch above).
+                process.environment = [:]
 
                 let outputPipe = Pipe()
                 let errorPipe = Pipe()

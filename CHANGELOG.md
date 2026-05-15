@@ -5,6 +5,116 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha] - Unreleased
+
+Batch 2 of the 0.2.0 audit remediation
+([`audit/REMEDIATION-PLAN.md`](audit/REMEDIATION-PLAN.md)). Structural
+cleanups + feature delivery for capabilities the pre-0.3 README/CHANGELOG
+already advertised. 15 items shipped; 1134 tests green.
+
+### Breaking changes (since 0.2.x)
+
+- **Platforms**: `.iOS(.v18)` dropped from `Package.swift`. `IndexStoreDB`
+  is macOS-only and now sits in `SwiftStaticAnalysisCore`'s dependency
+  closure — there was never a working iOS configuration. Pre-0.3
+  consumers that listed `iOS` as a deployment target will see the
+  resolver narrow to macOS 15.
+- **Module graph**: `IndexStoreReader`, `IndexStoreFallbackManager`,
+  `FallbackConfiguration`, and `IndexStoreError` moved from
+  `UnusedCodeDetector.IndexStore` to
+  `SwiftStaticAnalysisCore.IndexStore`. `SymbolLookup` no longer
+  depends on `UnusedCodeDetector` (audit F-01). Consumers that
+  `import UnusedCodeDetector` purely to reach `IndexStoreReader`
+  should switch to `import SwiftStaticAnalysisCore`.
+- **`DetectionMode`** moved from `UnusedCodeDetector.Models` to
+  `SwiftStaticAnalysisCore.Configuration`. Re-imported transitively;
+  no consumer change required.
+- **`UnusedCodeConfiguration.useParallelBFS`** is now `Bool?` (was
+  `Bool`). `nil` (the new default) means "auto-select against
+  `parallelBFSThreshold`"; `true`/`false` force the backend.
+- **`@_exported import` scope narrowed**: Core no longer re-exports
+  `SwiftParser` (it was never in a public signature); `SwiftStaticAnalysisMCP`
+  no longer re-exports the full `MCP` module — only `MCP.Transport`,
+  the one type that appears in `SWAMCPServer.start(transport:)`.
+- **`ProcessExecutor`** demoted from `public` to `internal`. It was
+  never used outside `SwiftStaticAnalysisCore`; making the subprocess
+  launcher API public was an audit-flagged footgun (F-17).
+- **`UnusedCodeDetector.DataFlow.*`** demoted from `public` to
+  `internal` (157 declarations across `CFGBuilder`, `SCCPAnalysis`,
+  `ReachingDefinitions`, `LiveVariableAnalysis`). The dataflow
+  subsystem has no external consumers; the public surface was an
+  unintentional ABI commitment (audit F-03). Use `@testable import
+  UnusedCodeDetector` if you were poking at these.
+
+### Security (defence-in-depth)
+
+- **B2-1.5** — `IndexStoreReader.allowsDirectoryCreation` now flows from
+  `UnusedCodeConfiguration` via the new
+  `allowsIndexDatabaseCreation: Bool` field (default `true` to preserve
+  CLI/programmatic behaviour). `SWAMCPServer.handleDetectUnusedCode`
+  sets it to `false`, so a hostile MCP prompt cannot drive a
+  `createDirectory` side-effect even when an `IndexDatabase/` directory
+  is absent. Surfaces `IndexStoreError.databaseDirectoryMissing`
+  instead.
+- **B2-13** — `StaticAnalysisCommandPlugin` now scrubs
+  `process.environment = [:]` before spawning the `swa` tool, closing
+  the residual `DYLD_INSERT_LIBRARIES` / `SWIFTPM_HOOKS_DIR`
+  passthrough that the SPM-plugin sandbox couldn't fix via
+  `ProcessExecutor` (Core is gated out of plugins).
+
+### Features (truth-up — delivered, not softened)
+
+- **B2-8** — `swa unused --auto-build` CLI flag delivered. Pre-0.3 the
+  flag was referenced by SECURITY.md and DocC but only reachable via
+  the programmatic API and `.indexStoreAutoBuild` preset. CLITests
+  asserts the flag is advertised in `--help`.
+- **B2-9** — `ParallelMode.maximum` actually engages
+  `BackpressuredChannelStream`-backed streaming verification in
+  `MinHashCloneDetector.detectParallel`. New
+  `ParallelMode.usesStreamingVerifier`, `ParallelCloneConfiguration.useStreamingVerifier`,
+  and `DuplicationConfiguration.useStreamingVerifier` thread the
+  choice from CLI to detector.
+- **B2-10** — `.swa.json` `unused.excludeNamePatterns` and
+  `duplicates.ignoredPatterns` now actually reach the detectors.
+  Pre-0.3 they were decoded by `SWAConfiguration` and silently dropped
+  by `buildUnusedConfig`/`buildDuplicationConfig`.
+- **B2-11** — Per-type default algorithm flip. With no `--algorithm`
+  override:
+  - `--types exact` → `.suffixArray` (was `.rollingHash`)
+  - `--types near` → `.minHashLSH` (was `.rollingHash`)
+  - `--types semantic` → `.minHashLSH` (was `.rollingHash`)
+  - Mixed sets → `.rollingHash` (catch-all preserved)
+  The README clone-type table now matches reality. New
+  `defaultAlgorithm(forCloneTypes:)` helper. `parseAlgorithm` now
+  returns `DetectionAlgorithm?` instead of silently defaulting.
+- **B2-11 (cont.)** — MinHash routing for `--types near`: when the user
+  requests `.near` with `.minHashLSH`, `DuplicationDetector` now
+  routes through `MinHashCloneDetector` and **relabels** the output
+  groups `.near` instead of leaking the detector's intrinsic
+  `.semantic` label.
+- **B2-14** — `ParallelBFS` auto-selection. When the user didn't pin
+  `--parallel-mode`/`--parallel`, `DependencyExtractor.detect` chooses
+  `computeReachableParallel` for graphs with ≥
+  `UnusedCodeConfiguration.parallelBFSThreshold` nodes (default 1000)
+  and sequential BFS for smaller graphs. CLI now forwards `nil` for
+  the auto path instead of always forcing parallel.
+
+### Consistency / API hygiene
+
+- **B2-1** — `SymbolLookup → UnusedCodeDetector` dependency removed
+  (audit F-01).
+- **B2-4** — `swa/SWA.swift` local `canonicalizePath` deleted (audit
+  F-05). The CLI now routes path canonicalisation through
+  `PathUtilities.canonicalize`, matching the MCP `CodebaseContext`
+  surface.
+- **B2-5** — CLI `findSwiftFiles` re-resolves each enumerated path and
+  checks it stays inside the analysis root (audit F-06). Symlinks
+  pointing at `/tmp/.build/...` or external artifact trees no longer
+  smuggle generated code into the analysis.
+- **B2-7** — `swa-mcp` ported to `ArgumentParser`. `--path=…`,
+  `--help`, `--version` all use the same parsing engine as the rest
+  of the toolchain.
+
 ## [0.2.1] - Unreleased
 
 Batch 1 of the 0.2.0 audit remediation

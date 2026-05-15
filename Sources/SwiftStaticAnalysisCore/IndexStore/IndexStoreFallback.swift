@@ -4,7 +4,6 @@
 
 import Foundation
 @preconcurrency import IndexStoreDB
-import SwiftStaticAnalysisCore
 
 // MARK: - IndexStoreStatus
 
@@ -167,7 +166,7 @@ public final class IndexStoreFallbackManager: Sendable {
             let reader = try IndexStoreReader(
                 indexStorePath: indexStorePath,
                 libIndexStorePath: libIndexStorePath,
-                allowsDirectoryCreation: true,
+                allowsDirectoryCreation: configuration.allowsIndexDatabaseCreation,
             )
 
             // Check freshness if enabled
@@ -507,6 +506,7 @@ public struct FallbackConfiguration: Sendable {
         warnOnStale: Bool = true,
         hybridMode: Bool = false,
         maxStaleness: TimeInterval = 3600,  // 1 hour
+        allowsIndexDatabaseCreation: Bool = true,
         logger: AnalysisLogger = .osLog(category: "IndexStoreFallback"),
     ) {
         self.autoBuild = autoBuild
@@ -514,6 +514,7 @@ public struct FallbackConfiguration: Sendable {
         self.warnOnStale = warnOnStale
         self.hybridMode = hybridMode
         self.maxStaleness = maxStaleness
+        self.allowsIndexDatabaseCreation = allowsIndexDatabaseCreation
         self.logger = logger
     }
 
@@ -554,6 +555,13 @@ public struct FallbackConfiguration: Sendable {
 
     /// Maximum staleness (in seconds) before considering a rebuild.
     public var maxStaleness: TimeInterval
+
+    /// When `true`, the underlying `IndexStoreReader` may create the
+    /// sibling `IndexDatabase/` directory. Defaults to `true` for direct
+    /// programmatic and CLI use. Set to `false` for sandboxed callers
+    /// (MCP) that must not perform filesystem-write side effects from
+    /// attacker-controllable argument paths.
+    public var allowsIndexDatabaseCreation: Bool
 
     /// Logger used for fallback warnings.
     public var logger: AnalysisLogger

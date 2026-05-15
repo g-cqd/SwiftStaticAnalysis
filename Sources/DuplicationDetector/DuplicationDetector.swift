@@ -128,7 +128,8 @@ public struct DuplicationConfiguration: Sendable {
         algorithm: DetectionAlgorithm = .rollingHash,
         useIncremental: Bool = false,
         cacheDirectory: URL? = nil,
-        useParallelClones: Bool = false
+        useParallelClones: Bool = false,
+        useStreamingVerifier: Bool = false,
     ) {
         // Validate and clamp minimumTokens to safe range [1, 10000]
         self.minimumTokens = min(max(minimumTokens, 1), 10000)
@@ -139,6 +140,7 @@ public struct DuplicationConfiguration: Sendable {
         self.useIncremental = useIncremental
         self.cacheDirectory = cacheDirectory
         self.useParallelClones = useParallelClones
+        self.useStreamingVerifier = useStreamingVerifier
     }
 
     // MARK: Public
@@ -184,6 +186,13 @@ public struct DuplicationConfiguration: Sendable {
 
     /// Whether to use experimental parallel clone detection.
     public var useParallelClones: Bool
+
+    /// When `true`, MinHash+LSH verification flows through an
+    /// `AsyncChannel` with backpressure (`BackpressuredChannelStream`),
+    /// so a slow consumer suspends the producer instead of queueing
+    /// unbounded. Engaged by `ParallelMode.maximum` per the
+    /// README/CHANGELOG contract.
+    public var useStreamingVerifier: Bool
 
     /// Incremental configuration with caching enabled.
     public static func incremental(cacheDirectory: URL? = nil) -> Self {
@@ -232,11 +241,33 @@ public struct DuplicationDetector: Sendable {
 
         var cloneGroups: [CloneGroup] = []
 
-        // Extract token sequences once if needed for exact or near detection
-        if configuration.cloneTypes.contains(.exact) || configuration.cloneTypes.contains(.near) {
+        // 0.3.0-α: when the user requests `--types near --algorithm minHashLSH`
+        // (the per-type default after the B2-11 algorithm flip), route through
+        // `MinHashCloneDetector` rather than the rolling-hash engine — and
+        // relabel its inherently Type-3 output as `.near` to match the
+        // requested clone type. Pre-0.3 the algorithm flag was ignored for
+        // `.near` and MinHash output always read `.semantic` regardless of
+        // the user's `--types`.
+        let routeNearThroughMinHash =
+            configuration.cloneTypes.contains(.near)
+            && configuration.algorithm == .minHashLSH
+        let runEngineFor: Set<CloneType> = {
+            var types = configuration.cloneTypes.intersection([.exact, .near])
+            if routeNearThroughMinHash {
+                types.remove(.near)
+            }
+            return types
+        }()
+
+        if !runEngineFor.isEmpty {
             let sequences = try await extractTokenSequences(from: files)
             let engineClones = engine.detectClones(in: sequences)
             cloneGroups.append(contentsOf: engineClones)
+        }
+
+        if routeNearThroughMinHash {
+            let nearClones = try await detectMinHashClones(in: files, labelledAs: .near)
+            cloneGroups.append(contentsOf: nearClones)
         }
 
         if configuration.cloneTypes.contains(.semantic) {
@@ -264,19 +295,7 @@ public struct DuplicationDetector: Sendable {
     private func detectSemanticClones(in files: [String]) async throws -> [CloneGroup] {
         switch configuration.algorithm {
         case .minHashLSH:
-            // Use MinHash + LSH for Type-3 clone detection
-            let parallelConfig: ParallelCloneConfiguration =
-                configuration.useParallelClones
-                ? .default
-                : .sequential
-            let detector = MinHashCloneDetector(
-                minimumTokens: configuration.minimumTokens,
-                shingleSize: 5,
-                numHashes: 128,
-                minimumSimilarity: configuration.minimumSimilarity,
-                parallelConfig: parallelConfig
-            )
-            return try await detector.detect(in: files)
+            return try await detectMinHashClones(in: files, labelledAs: .semantic)
 
         case .rollingHash,
             .suffixArray:
@@ -286,6 +305,42 @@ public struct DuplicationDetector: Sendable {
                 minimumSimilarity: configuration.minimumSimilarity
             )
             return try await detector.detect(in: files)
+        }
+    }
+
+    /// Run MinHash+LSH clone detection and relabel its inherently Type-3
+    /// output to the requested clone type. `MinHashCloneDetector` always
+    /// tags its groups `.semantic`; calling this helper from the `.near`
+    /// routing path produces groups tagged `.near` so the CLI report
+    /// matches the user's `--types` request.
+    private func detectMinHashClones(
+        in files: [String],
+        labelledAs label: CloneType
+    ) async throws -> [CloneGroup] {
+        let parallelConfig: ParallelCloneConfiguration = {
+            guard configuration.useParallelClones else { return .sequential }
+            // ParallelMode.maximum → streaming verifier; .safe keeps the
+            // TaskGroup-based path.
+            return ParallelCloneConfiguration(
+                useStreamingVerifier: configuration.useStreamingVerifier
+            )
+        }()
+        let detector = MinHashCloneDetector(
+            minimumTokens: configuration.minimumTokens,
+            shingleSize: 5,
+            numHashes: 128,
+            minimumSimilarity: configuration.minimumSimilarity,
+            parallelConfig: parallelConfig
+        )
+        let groups = try await detector.detect(in: files)
+        guard label != .semantic else { return groups }
+        return groups.map { group in
+            CloneGroup(
+                type: label,
+                clones: group.clones,
+                similarity: group.similarity,
+                fingerprint: group.fingerprint,
+            )
         }
     }
 

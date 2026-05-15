@@ -9,7 +9,7 @@ import SwiftSyntax
 // MARK: - LatticeValue
 
 /// Represents the value of a variable in the SCCP lattice.
-public enum LatticeValue: Sendable, Hashable, CustomStringConvertible {
+internal enum LatticeValue: Sendable, Hashable, CustomStringConvertible {
     /// Top: unknown value (not yet computed).
     case top
 
@@ -21,7 +21,7 @@ public enum LatticeValue: Sendable, Hashable, CustomStringConvertible {
 
     // MARK: Public
 
-    public var description: String {
+    internal var description: String {
         switch self {
         case .top:
             "⊤"
@@ -36,7 +36,7 @@ public enum LatticeValue: Sendable, Hashable, CustomStringConvertible {
 
     /// Check if this is a known boolean constant.
     /// Returns nil if not a boolean constant (valid tri-state: true/false/unknown).
-    public var boolValue: Bool? {  // swiftlint:disable:this discouraged_optional_boolean
+    internal var boolValue: Bool? {  // swiftlint:disable:this discouraged_optional_boolean
         if case .constant(let c) = self, case .bool(let b) = c {
             return b
         }
@@ -44,7 +44,7 @@ public enum LatticeValue: Sendable, Hashable, CustomStringConvertible {
     }
 
     /// Meet operation: combines two lattice values.
-    public func meet(_ other: Self) -> Self {
+    internal func meet(_ other: Self) -> Self {
         switch (self, other) {
         case (.top, let v),
             (let v, .top):
@@ -67,7 +67,7 @@ public enum LatticeValue: Sendable, Hashable, CustomStringConvertible {
 // MARK: - ConstantValue
 
 /// Represents a compile-time constant value.
-public enum ConstantValue: Sendable, Hashable, CustomStringConvertible {
+internal enum ConstantValue: Sendable, Hashable, CustomStringConvertible {
     case int(Int)
     case double(Double)
     case bool(Bool)
@@ -76,7 +76,7 @@ public enum ConstantValue: Sendable, Hashable, CustomStringConvertible {
 
     // MARK: Public
 
-    public var description: String {
+    internal var description: String {
         switch self {
         case .int(let i): "\(i)"
         case .double(let d): "\(d)"
@@ -90,27 +90,27 @@ public enum ConstantValue: Sendable, Hashable, CustomStringConvertible {
 // MARK: - CFGEdge
 
 /// Represents an edge in the CFG for SCCP.
-public struct CFGEdge: Hashable, Sendable {
+internal struct CFGEdge: Hashable, Sendable {
     // MARK: Lifecycle
 
-    public init(from: BlockID, to: BlockID) {
+    internal init(from: BlockID, to: BlockID) {
         self.from = from
         self.to = to
     }
 
     // MARK: Public
 
-    public let from: BlockID
-    public let to: BlockID
+    internal let from: BlockID
+    internal let to: BlockID
 }
 
 // MARK: - DeadBranch
 
 /// Represents a branch that is never taken.
-public struct DeadBranch: Sendable {
+internal struct DeadBranch: Sendable {
     // MARK: Lifecycle
 
-    public init(
+    internal init(
         location: SwiftStaticAnalysisCore.SourceLocation,
         condition: String,
         deadBranch: BranchDirection,
@@ -124,31 +124,31 @@ public struct DeadBranch: Sendable {
 
     // MARK: Public
 
-    public enum BranchDirection: String, Sendable, Codable {
+    internal enum BranchDirection: String, Sendable, Codable {
         case trueBranch
         case falseBranch
     }
 
     /// Location of the branch.
-    public let location: SwiftStaticAnalysisCore.SourceLocation
+    internal let location: SwiftStaticAnalysisCore.SourceLocation
 
     /// The branch condition.
-    public let condition: String
+    internal let condition: String
 
     /// Whether the true or false branch is dead.
-    public let deadBranch: BranchDirection
+    internal let deadBranch: BranchDirection
 
     /// The constant value of the condition.
-    public let conditionValue: String
+    internal let conditionValue: String
 }
 
 // MARK: - SCCPResult
 
 /// Results from SCCP analysis.
-public struct SCCPResult: Sendable {
+internal struct SCCPResult: Sendable {
     // MARK: Lifecycle
 
-    public init(
+    internal init(
         cfg: ControlFlowGraph,
         variableValues: [String: LatticeValue],
         executableEdges: Set<CFGEdge>,
@@ -171,22 +171,22 @@ public struct SCCPResult: Sendable {
     // MARK: Public
 
     /// The analyzed CFG.
-    public let cfg: ControlFlowGraph
+    internal let cfg: ControlFlowGraph
 
     /// Lattice values for variables.
-    public let variableValues: [String: LatticeValue]
+    internal let variableValues: [String: LatticeValue]
 
     /// Executable edges.
-    public let executableEdges: Set<CFGEdge>
+    internal let executableEdges: Set<CFGEdge>
 
     /// Unreachable blocks.
-    public let unreachableBlocks: Set<BlockID>
+    internal let unreachableBlocks: Set<BlockID>
 
     /// Dead branches found.
-    public let deadBranches: [DeadBranch]
+    internal let deadBranches: [DeadBranch]
 
     /// Constants that can be propagated.
-    public let propagatableConstants:
+    internal let propagatableConstants:
         [(
             variable: String,
             value: ConstantValue,
@@ -197,20 +197,20 @@ public struct SCCPResult: Sendable {
 // MARK: - SCCPAnalysis
 
 /// Performs Sparse Conditional Constant Propagation analysis.
-public final class SCCPAnalysis: Sendable {  // swiftlint:disable:this type_body_length
+internal final class SCCPAnalysis: Sendable {  // swiftlint:disable:this type_body_length
     // MARK: Lifecycle
 
-    public init(configuration: Configuration = .default) {
+    internal init(configuration: Configuration = .default) {
         self.configuration = configuration
     }
 
     // MARK: Public
 
     /// Configuration for the analysis.
-    public struct Configuration: Sendable {
+    internal struct Configuration: Sendable {
         // MARK: Lifecycle
 
-        public init(
+        internal init(
             maxIterations: Int = 1000,
             detectDeadBranches: Bool = true,
             trackStrings: Bool = false,
@@ -224,26 +224,26 @@ public final class SCCPAnalysis: Sendable {  // swiftlint:disable:this type_body
 
         // MARK: Public
 
-        public static let `default` = Self()
+        internal static let `default` = Self()
 
         /// Maximum iterations for fixed-point computation.
-        public var maxIterations: Int
+        internal var maxIterations: Int
 
         /// Whether to detect dead branches.
-        public var detectDeadBranches: Bool
+        internal var detectDeadBranches: Bool
 
         /// Whether to track string constants.
-        public var trackStrings: Bool
+        internal var trackStrings: Bool
 
         /// Variables to ignore in analysis.
-        public var ignoredVariables: Set<String>
+        internal var ignoredVariables: Set<String>
     }
 
     /// Analyze a control flow graph using SCCP.
     ///
     /// - Parameter cfg: The control flow graph to analyze.
     /// - Returns: Analysis results.
-    public func analyze(_ cfg: ControlFlowGraph) -> SCCPResult {
+    internal func analyze(_ cfg: ControlFlowGraph) -> SCCPResult {
         var session = SCCPAnalysisSession(configuration: configuration, cfg: cfg)
         return session.run()
     }
@@ -650,7 +650,7 @@ private struct SCCPAnalysisSession {
 // swa:ignore-unused - Debug utilities for development and troubleshooting
 extension SCCPResult {
     /// Generate a debug string showing SCCP results.
-    public func debugDescription() -> String {
+    internal func debugDescription() -> String {
         var output = "SCCP Analysis Results:\n"
         output += "======================\n\n"
 

@@ -3,9 +3,9 @@
 //  MIT License
 
 import Foundation
-import SwiftStaticAnalysisCore
 import Testing
 
+@testable import SwiftStaticAnalysisCore
 @testable import UnusedCodeDetector
 
 // MARK: - IndexSymbolNodeTests

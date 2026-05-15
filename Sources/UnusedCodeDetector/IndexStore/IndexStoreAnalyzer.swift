@@ -216,13 +216,15 @@ public struct IndexStoreBasedDetector: Sendable {
 
     /// Detect unused code using the index store.
     public func detect(in files: [String], indexStorePath: String) throws -> [UnusedCode] {
-        // CLI path: opt into `IndexDatabase/` directory creation. The MCP
-        // path validates `index_store_path` against the codebase sandbox
-        // before reaching this entry point, so creation stays scoped to a
-        // path the caller already controls.
+        // Threading the configuration's `allowsIndexDatabaseCreation` here
+        // means CLI/programmatic callers keep the existing
+        // create-if-missing behaviour (default `true`) while MCP callers
+        // — which set `false` from `handleDetectUnusedCode` — surface
+        // `IndexStoreError.databaseDirectoryMissing` instead of
+        // materialising a directory at an attacker-chosen path.
         let reader = try IndexStoreReader(
             indexStorePath: indexStorePath,
-            allowsDirectoryCreation: true
+            allowsDirectoryCreation: configuration.allowsIndexDatabaseCreation
         )
 
         // Poll for any recent changes

@@ -594,9 +594,23 @@ public struct ReachabilityBasedDetector: Sendable {
         let extractor = DependencyExtractor(configuration: extractionConfiguration)
         let graph = await extractor.buildGraph(from: result)
 
-        // Get unreachable declarations using sequential or parallel BFS
+        // Choose BFS backend:
+        // - `useParallelBFS == true` → force parallel.
+        // - `useParallelBFS == false` → force sequential.
+        // - `useParallelBFS == nil` (default) → auto-select against
+        //   `parallelBFSThreshold` (1000 by default), matching the
+        //   README/CHANGELOG contract that parallel BFS engages on large
+        //   graphs without an opt-in flag.
+        let nodeCount = await graph.nodeCount
+        let runParallel: Bool
+        if let forced = configuration.useParallelBFS {
+            runParallel = forced
+        } else {
+            runParallel = nodeCount >= configuration.parallelBFSThreshold
+        }
+
         let unreachable: [DeclarationNode]
-        if configuration.useParallelBFS {
+        if runParallel {
             unreachable = await graph.computeUnreachableParallel()
         } else {
             unreachable = await graph.computeUnreachable()

@@ -574,6 +574,10 @@ extension SWAMCPServer {
         let context = try getContext(for: codebasePath)
 
         var config = UnusedCodeConfiguration.default
+        // MCP is read-only by contract. Refuse to materialise the sibling
+        // `IndexDatabase/` directory even though `index_store_path` is
+        // sandbox-validated upstream — keeps "read" tools side-effect-free.
+        config.allowsIndexDatabaseCreation = false
 
         if let args = arguments {
             // Detection mode

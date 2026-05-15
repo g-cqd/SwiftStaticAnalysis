@@ -36,7 +36,15 @@ struct StaticAnalysisBuildPlugin: BuildToolPlugin {
             "--format", "xcode",
         ]
 
-        // Create output directory for prebuild command
+        // Create output directory for prebuild command.
+        //
+        // Note (0.3.0-α / audit F-24): SPM's `prebuildCommand` runs
+        // unconditionally before every incremental build — there is no
+        // input-file dependency tracking on this command shape.
+        // Migrating to `buildCommand` would require declaring synthetic
+        // output files SPM can timestamp-compare; doing that without
+        // breaking the Xcode-warning passthrough is deferred to B6
+        // polish. Documented here so we don't lose the trace.
         let outputDir = context.pluginWorkDirectoryURL
             .appendingPathComponent("static-analysis-output")
 

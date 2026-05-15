@@ -24,10 +24,10 @@ import SwiftSyntax
 ///     print(x)            // References line 2's x
 /// }
 /// ```
-public struct VariableID: Hashable, Sendable, CustomStringConvertible, Comparable {
+internal struct VariableID: Hashable, Sendable, CustomStringConvertible, Comparable {
     // MARK: Lifecycle
 
-    public init(name: String, scopeDepth: Int = 0, declarationLine: Int? = nil) {
+    internal init(name: String, scopeDepth: Int = 0, declarationLine: Int? = nil) {
         self.name = name
         self.scopeDepth = scopeDepth
         self.declarationLine = declarationLine
@@ -36,22 +36,22 @@ public struct VariableID: Hashable, Sendable, CustomStringConvertible, Comparabl
     // MARK: Public
 
     /// The variable name.
-    public let name: String
+    internal let name: String
 
     /// The scope nesting depth (0 = function level, 1 = first nested block, etc.).
-    public let scopeDepth: Int
+    internal let scopeDepth: Int
 
     /// The line where this variable was declared (if known).
-    public let declarationLine: Int?
+    internal let declarationLine: Int?
 
-    public var description: String {
+    internal var description: String {
         if let line = declarationLine {
             return "\(name)@\(scopeDepth):\(line)"
         }
         return "\(name)@\(scopeDepth)"
     }
 
-    public static func < (lhs: VariableID, rhs: VariableID) -> Bool {
+    internal static func < (lhs: VariableID, rhs: VariableID) -> Bool {
         if lhs.name != rhs.name {
             return lhs.name < rhs.name
         }
@@ -65,30 +65,30 @@ public struct VariableID: Hashable, Sendable, CustomStringConvertible, Comparabl
 // MARK: - BlockID
 
 /// A unique identifier for a basic block.
-public struct BlockID: Hashable, Sendable, CustomStringConvertible {
+internal struct BlockID: Hashable, Sendable, CustomStringConvertible {
     // MARK: Lifecycle
 
-    public init(_ value: String) {
+    internal init(_ value: String) {
         self.value = value
     }
 
     // MARK: Public
 
-    public static let entry = Self("entry")
-    public static let exit = Self("exit")
+    internal static let entry = Self("entry")
+    internal static let exit = Self("exit")
 
-    public let value: String
+    internal let value: String
 
-    public var description: String { value }
+    internal var description: String { value }
 }
 
 // MARK: - CFGStatement
 
 /// Represents a statement in the CFG with its source location.
-public struct CFGStatement: Sendable {
+internal struct CFGStatement: Sendable {
     // MARK: Lifecycle
 
-    public init(
+    internal init(
         syntax: Syntax,
         location: SwiftStaticAnalysisCore.SourceLocation,
         uses: Set<VariableID>,
@@ -103,22 +103,22 @@ public struct CFGStatement: Sendable {
     // MARK: Public
 
     /// The syntax node.
-    public let syntax: Syntax
+    internal let syntax: Syntax
 
     /// Source location.
-    public let location: SwiftStaticAnalysisCore.SourceLocation
+    internal let location: SwiftStaticAnalysisCore.SourceLocation
 
     /// Extracted variable uses (variables read) with scope context.
-    public let uses: Set<VariableID>
+    internal let uses: Set<VariableID>
 
     /// Extracted variable definitions (variables written) with scope context.
-    public let defs: Set<VariableID>
+    internal let defs: Set<VariableID>
 }
 
 // MARK: - Terminator
 
 /// A terminator instruction for a basic block.
-public enum Terminator: Sendable {
+internal enum Terminator: Sendable {
     /// Unconditional branch to another block.
     case branch(BlockID)
 
@@ -150,10 +150,10 @@ public enum Terminator: Sendable {
 // MARK: - BasicBlock
 
 /// A basic block in the control flow graph.
-public struct BasicBlock: Identifiable, Sendable {
+internal struct BasicBlock: Identifiable, Sendable {
     // MARK: Lifecycle
 
-    public init(id: BlockID) {
+    internal init(id: BlockID) {
         self.id = id
         statements = []
         terminator = nil
@@ -170,46 +170,46 @@ public struct BasicBlock: Identifiable, Sendable {
     // MARK: Public
 
     /// Unique identifier.
-    public let id: BlockID
+    internal let id: BlockID
 
     /// Statements in this block (in order).
-    public var statements: [CFGStatement]
+    internal var statements: [CFGStatement]
 
     /// The terminator instruction.
-    public var terminator: Terminator?
+    internal var terminator: Terminator?
 
     /// Successor block IDs.
-    public var successors: [BlockID]
+    internal var successors: [BlockID]
 
     /// Predecessor block IDs.
-    public var predecessors: [BlockID]
+    internal var predecessors: [BlockID]
 
     /// Variables used before being defined in this block (with scope context).
-    public var use: Set<VariableID>
+    internal var use: Set<VariableID>
 
     /// Variables defined in this block (with scope context).
-    public var def: Set<VariableID>
+    internal var def: Set<VariableID>
 
     /// Live variables at block entry (computed by analysis).
-    public var liveIn: Set<VariableID>
+    internal var liveIn: Set<VariableID>
 
     /// Live variables at block exit (computed by analysis).
-    public var liveOut: Set<VariableID>
+    internal var liveOut: Set<VariableID>
 
     /// Whether this is a loop header.
-    public var isLoopHeader: Bool
+    internal var isLoopHeader: Bool
 
     /// The loop ID if this block is in a loop.
-    public var loopID: String?
+    internal var loopID: String?
 }
 
 // MARK: - ControlFlowGraph
 
 /// Control Flow Graph for a function.
-public struct ControlFlowGraph: Sendable {
+internal struct ControlFlowGraph: Sendable {
     // MARK: Lifecycle
 
-    public init(functionName: String, file: String) {
+    internal init(functionName: String, file: String) {
         self.functionName = functionName
         self.file = file
         entryBlock = .entry
@@ -225,55 +225,55 @@ public struct ControlFlowGraph: Sendable {
     // MARK: Public
 
     /// All basic blocks indexed by ID.
-    public var blocks: [BlockID: BasicBlock]
+    internal var blocks: [BlockID: BasicBlock]
 
     /// Entry block ID.
-    public let entryBlock: BlockID
+    internal let entryBlock: BlockID
 
     /// Exit block ID.
-    public let exitBlock: BlockID
+    internal let exitBlock: BlockID
 
     /// Function name.
-    public let functionName: String
+    internal let functionName: String
 
     /// Source file.
-    public let file: String
+    internal let file: String
 
     /// Block order for iteration (topological order when possible).
-    public var blockOrder: [BlockID]
+    internal var blockOrder: [BlockID]
 
     /// Reverse postorder for efficient iteration.
-    public var reversePostOrder: [BlockID]
+    internal var reversePostOrder: [BlockID]
 
     /// Get all blocks in reverse postorder (for forward analysis).
-    public var blocksInReversePostOrder: [BasicBlock] {
+    internal var blocksInReversePostOrder: [BasicBlock] {
         reversePostOrder.compactMap { blocks[$0] }
     }
 
     /// Get all blocks in postorder (for backward analysis).
-    public var blocksInPostOrder: [BasicBlock] {
+    internal var blocksInPostOrder: [BasicBlock] {
         reversePostOrder.reversed().compactMap { blocks[$0] }
     }
 
     /// Get a block by ID.
-    public func block(_ id: BlockID) -> BasicBlock? {
+    internal func block(_ id: BlockID) -> BasicBlock? {
         blocks[id]
     }
 
     /// Add a block to the CFG.
-    public mutating func addBlock(_ block: BasicBlock) {
+    internal mutating func addBlock(_ block: BasicBlock) {
         blocks[block.id] = block
         blockOrder.append(block.id)
     }
 
     /// Add an edge between blocks.
-    public mutating func addEdge(from: BlockID, to: BlockID) {
+    internal mutating func addEdge(from: BlockID, to: BlockID) {
         blocks[from]?.successors.append(to)
         blocks[to]?.predecessors.append(from)
     }
 
     /// Compute reverse postorder traversal.
-    public mutating func computeReversePostOrder() {
+    internal mutating func computeReversePostOrder() {
         var visited = Set<BlockID>()
         var postOrder: [BlockID] = []
 
@@ -297,10 +297,10 @@ public struct ControlFlowGraph: Sendable {
 // MARK: - CFGBuilder
 
 /// Builds a Control Flow Graph from Swift function declarations.
-public final class CFGBuilder: SyntaxVisitor {  // swiftlint:disable:this type_body_length
+internal final class CFGBuilder: SyntaxVisitor {  // swiftlint:disable:this type_body_length
     // MARK: Lifecycle
 
-    public init(file: String, tree: SourceFileSyntax) {
+    internal init(file: String, tree: SourceFileSyntax) {
         self.file = file
         converter = SourceLocationConverter(fileName: file, tree: tree)
         cfg = ControlFlowGraph(functionName: "", file: file)
@@ -311,7 +311,7 @@ public final class CFGBuilder: SyntaxVisitor {  // swiftlint:disable:this type_b
     // MARK: Public
 
     /// Build CFG for a function declaration.
-    public func buildCFG(from function: FunctionDeclSyntax) -> ControlFlowGraph {
+    internal func buildCFG(from function: FunctionDeclSyntax) -> ControlFlowGraph {
         resetAndBuild(name: function.name.text) {
             if let body = function.body {
                 self.processCodeBlock(body)
@@ -320,7 +320,7 @@ public final class CFGBuilder: SyntaxVisitor {  // swiftlint:disable:this type_b
     }
 
     /// Build CFG for an initializer declaration.
-    public func buildCFG(from initializer: InitializerDeclSyntax) -> ControlFlowGraph {
+    internal func buildCFG(from initializer: InitializerDeclSyntax) -> ControlFlowGraph {
         resetAndBuild(name: "init") {
             if let body = initializer.body {
                 self.processCodeBlock(body)
@@ -329,7 +329,7 @@ public final class CFGBuilder: SyntaxVisitor {  // swiftlint:disable:this type_b
     }
 
     /// Build CFG for a closure expression.
-    public func buildCFG(from closure: ClosureExprSyntax) -> ControlFlowGraph {
+    internal func buildCFG(from closure: ClosureExprSyntax) -> ControlFlowGraph {
         resetAndBuild(name: "<closure>") {
             for statement in closure.statements {
                 self.processStatement(statement.item)
@@ -1076,7 +1076,7 @@ private final class ClosureCaptureExtractor: SyntaxVisitor {
 // swa:ignore-unused - Debug utilities for development and troubleshooting
 extension ControlFlowGraph {
     /// Print the CFG for debugging.
-    public func debugPrint() -> String {
+    internal func debugPrint() -> String {
         var output = "CFG for \(functionName):\n"
 
         for id in blockOrder {

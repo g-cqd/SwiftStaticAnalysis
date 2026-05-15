@@ -43,12 +43,14 @@ public struct ParallelCloneConfiguration: Sendable {
         enabled: Bool = true,
         minParallelDocuments: Int = 50,
         minParallelPairs: Int = 100,
-        maxConcurrency: Int = ProcessInfo.processInfo.activeProcessorCount
+        maxConcurrency: Int = ProcessInfo.processInfo.activeProcessorCount,
+        useStreamingVerifier: Bool = false,
     ) {
         self.enabled = enabled
         self.minParallelDocuments = max(1, minParallelDocuments)
         self.minParallelPairs = max(1, minParallelPairs)
         self.maxConcurrency = max(1, maxConcurrency)
+        self.useStreamingVerifier = useStreamingVerifier
     }
 
     // MARK: Public
@@ -58,6 +60,12 @@ public struct ParallelCloneConfiguration: Sendable {
 
     /// Sequential-only configuration.
     public static let sequential = ParallelCloneConfiguration(enabled: false)
+
+    /// Streaming-verifier configuration. Routes verified clone pairs
+    /// through `StreamingVerifier.streamResultsBackpressured`, so a slow
+    /// consumer suspends the producer instead of queueing unbounded.
+    /// Engaged automatically when `ParallelMode.maximum` flows in.
+    public static let streaming = ParallelCloneConfiguration(useStreamingVerifier: true)
 
     /// Whether to enable parallel processing.
     public let enabled: Bool
@@ -70,6 +78,12 @@ public struct ParallelCloneConfiguration: Sendable {
 
     /// Maximum concurrent tasks.
     public let maxConcurrency: Int
+
+    /// When `true`, the verifier emits clone pairs through an
+    /// `AsyncChannel` with backpressure (`BackpressuredChannelStream`)
+    /// rather than buffering all pairs before returning. Required by
+    /// `ParallelMode.maximum` per the README/CHANGELOG contract.
+    public let useStreamingVerifier: Bool
 }
 
 // MARK: - MinHashCloneDetector
@@ -245,9 +259,34 @@ public struct MinHashCloneDetector: Sendable {
         // Build document lookup
         let documentMap = allDocuments.keyed(by: \.id)
 
-        // Verify candidates (parallel or sequential)
+        // Verify candidates. Three paths:
+        //
+        // 1. `useStreamingVerifier` (engaged by `ParallelMode.maximum`):
+        //    pairs flow through an `AsyncChannel` with backpressure.
+        //    Memory-bounded for million-pair codebases.
+        // 2. Parallel TaskGroup (default `.safe` path) when pair count
+        //    crosses the parallel threshold.
+        // 3. Sequential verification for small codebases.
         let clonePairs: [ClonePairInfo]
-        if candidatePairs.count >= parallelConfig.minParallelPairs {
+        if parallelConfig.useStreamingVerifier,
+            candidatePairs.count >= parallelConfig.minParallelPairs
+        {
+            let streamingVerifier = StreamingVerifier(
+                minimumSimilarity: minimumSimilarity,
+                batchSize: 500,
+                maxConcurrency: parallelConfig.maxConcurrency,
+                bufferSize: 8
+            )
+            let channel = streamingVerifier.streamResultsBackpressured(
+                candidatePairs,
+                documentMap: documentMap
+            )
+            var collected: [ClonePairInfo] = []
+            for await result in channel {
+                collected.append(result)
+            }
+            clonePairs = collected
+        } else if candidatePairs.count >= parallelConfig.minParallelPairs {
             let verifier = ParallelVerifier(
                 minimumSimilarity: minimumSimilarity,
                 minParallelPairs: parallelConfig.minParallelPairs,

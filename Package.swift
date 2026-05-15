@@ -8,8 +8,11 @@ import PackageDescription
 let package = Package(
     name: "SwiftStaticAnalysis",
     platforms: [
+        // 0.3.0-α: dropped .iOS(.v18). `IndexStoreDB` is macOS-only and
+        // now sits in `SwiftStaticAnalysisCore`'s dependency closure;
+        // there is no usable iOS configuration. The pre-0.3 iOS
+        // declaration was a build-time trap with no CI gate behind it.
         .macOS(.v15),
-        .iOS(.v18),
     ],
     products: [
         // Umbrella for analyzer libraries (Core, Duplication, Unused, Symbol).
@@ -105,6 +108,12 @@ let package = Package(
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+                // 0.3.0-α: IndexStoreReader + IndexStoreFallback moved into
+                // Core (`Sources/SwiftStaticAnalysisCore/IndexStore/`). This
+                // pulls IndexStoreDB into the dependency closure of every
+                // analyzer module, but removes the `SymbolLookup →
+                // UnusedCodeDetector` layering inversion the audit flagged.
+                .product(name: "IndexStoreDB", package: "indexstore-db"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),
@@ -163,8 +172,11 @@ let package = Package(
         .target(
             name: "SymbolLookup",
             dependencies: [
+                // 0.3.0-α: the audit's F-01 inverted dependency
+                // (`SymbolLookup → UnusedCodeDetector` purely to borrow
+                // `IndexStoreReader`) is now gone. The reader and fallback
+                // live in Core; SymbolLookup picks them up transitively.
                 "SwiftStaticAnalysisCore",
-                "UnusedCodeDetector",
                 .product(name: "IndexStoreDB", package: "indexstore-db"),
             ],
             swiftSettings: [
@@ -260,6 +272,11 @@ let package = Package(
             dependencies: [
                 "SwiftStaticAnalysisMCP",
                 .product(name: "MCP", package: "swift-sdk"),
+                // 0.3.0-α: swa-mcp adopts ArgumentParser to match the
+                // rest of the toolchain. Pre-0.3 it hand-rolled
+                // `CommandLine.arguments` parsing, which fumbled
+                // `--path=…` (attached value) and similar edge cases.
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

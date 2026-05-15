@@ -414,6 +414,21 @@ struct CLICommandTests {
         #expect(output.combined.contains("--limit"))
     }
 
+    @Test("swa unused --help advertises the --auto-build flag")
+    func unusedHelpExposesAutoBuildFlag() async throws {
+        let output = try await runSWA(["unused", "--help"])
+
+        // 0.3.0-α: SECURITY.md / DocC reference `swa unused --auto-build`
+        // as the toggle for auto-rebuilding the IndexStoreDB. Pre-0.3
+        // the flag existed only on the programmatic API, leaving the
+        // security narrative unreachable.
+        #expect(output.succeeded)
+        #expect(
+            output.stdout.contains("--auto-build"),
+            "Help should advertise --auto-build, got: \(output.stdout)"
+        )
+    }
+
     @Test(".swa.json top-level `format` field is used when --format is omitted")
     func swaJsonFormatFallback() async throws {
         let fixture = try fixtureFile("SimpleClass.swift")

@@ -9,10 +9,10 @@ import SwiftSyntax
 // MARK: - DefinitionSite
 
 /// Represents a variable definition at a specific location.
-public struct DefinitionSite: Sendable, Hashable {
+internal struct DefinitionSite: Sendable, Hashable {
     // MARK: Lifecycle
 
-    public init(
+    internal init(
         variable: String,
         block: BlockID,
         statementIndex: Int,
@@ -31,22 +31,22 @@ public struct DefinitionSite: Sendable, Hashable {
     // MARK: Public
 
     /// The variable being defined.
-    public let variable: String
+    internal let variable: String
 
     /// Block containing the definition.
-    public let block: BlockID
+    internal let block: BlockID
 
     /// Index of the statement in the block.
-    public let statementIndex: Int
+    internal let statementIndex: Int
 
     /// Source location of the definition.
-    public let location: SwiftStaticAnalysisCore.SourceLocation
+    internal let location: SwiftStaticAnalysisCore.SourceLocation
 
     /// The value being assigned (if extractable).
-    public let value: String?
+    internal let value: String?
 
     /// Whether this is an initial definition (function parameter, etc.).
-    public let isInitial: Bool
+    internal let isInitial: Bool
 }
 
 // MARK: - Definition Site Set Extensions
@@ -80,10 +80,10 @@ extension Set<DefinitionSite> {
 // MARK: - UninitializedUse
 
 /// Represents a use of a potentially uninitialized variable.
-public struct UninitializedUse: Sendable {
+internal struct UninitializedUse: Sendable {
     // MARK: Lifecycle
 
-    public init(
+    internal init(
         variable: String,
         location: SwiftStaticAnalysisCore.SourceLocation,
         reachingDefinitionCount: Int,
@@ -98,25 +98,25 @@ public struct UninitializedUse: Sendable {
     // MARK: Public
 
     /// The variable being used.
-    public let variable: String
+    internal let variable: String
 
     /// Location of the use.
-    public let location: SwiftStaticAnalysisCore.SourceLocation
+    internal let location: SwiftStaticAnalysisCore.SourceLocation
 
     /// The definitions that may reach this use (for diagnostics).
-    public let reachingDefinitionCount: Int
+    internal let reachingDefinitionCount: Int
 
     /// Whether the variable is definitely uninitialized.
-    public let definitelyUninitialized: Bool
+    internal let definitelyUninitialized: Bool
 }
 
 // MARK: - ReachingDefinitionsResult
 
 /// Results from reaching definitions analysis.
-public struct ReachingDefinitionsResult: Sendable {
+internal struct ReachingDefinitionsResult: Sendable {
     // MARK: Lifecycle
 
-    public init(
+    internal init(
         cfg: ControlFlowGraph,
         definitions: [DefinitionSite],
         reachIn: [BlockID: Set<DefinitionSite>],
@@ -135,41 +135,41 @@ public struct ReachingDefinitionsResult: Sendable {
     // MARK: Public
 
     /// The analyzed CFG.
-    public let cfg: ControlFlowGraph
+    internal let cfg: ControlFlowGraph
 
     /// All definition sites found.
-    public let definitions: [DefinitionSite]
+    internal let definitions: [DefinitionSite]
 
     /// Definitions reaching the entry of each block.
-    public let reachIn: [BlockID: Set<DefinitionSite>]
+    internal let reachIn: [BlockID: Set<DefinitionSite>]
 
     /// Definitions reaching the exit of each block.
-    public let reachOut: [BlockID: Set<DefinitionSite>]
+    internal let reachOut: [BlockID: Set<DefinitionSite>]
 
     /// Potentially uninitialized variable uses.
-    public let uninitializedUses: [UninitializedUse]
+    internal let uninitializedUses: [UninitializedUse]
 
     /// Definition-use chains.
-    public let defUseChains: [DefinitionSite: Set<SwiftStaticAnalysisCore.SourceLocation>]
+    internal let defUseChains: [DefinitionSite: Set<SwiftStaticAnalysisCore.SourceLocation>]
 }
 
 // MARK: - ReachingDefinitionsAnalysis
 
 /// Performs forward data flow analysis for reaching definitions.
-public struct ReachingDefinitionsAnalysis: Sendable {
+internal struct ReachingDefinitionsAnalysis: Sendable {
     // MARK: Lifecycle
 
-    public init(configuration: Configuration = .default) {
+    internal init(configuration: Configuration = .default) {
         self.configuration = configuration
     }
 
     // MARK: Public
 
     /// Configuration for the analysis.
-    public struct Configuration: Sendable {
+    internal struct Configuration: Sendable {
         // MARK: Lifecycle
 
-        public init(
+        internal init(
             maxIterations: Int = 1000,
             detectUninitializedUses: Bool = true,
             buildDefUseChains: Bool = true,
@@ -183,26 +183,26 @@ public struct ReachingDefinitionsAnalysis: Sendable {
 
         // MARK: Public
 
-        public static let `default` = Self()
+        internal static let `default` = Self()
 
         /// Maximum iterations for fixed-point computation.
-        public var maxIterations: Int
+        internal var maxIterations: Int
 
         /// Whether to detect uninitialized uses.
-        public var detectUninitializedUses: Bool
+        internal var detectUninitializedUses: Bool
 
         /// Whether to build def-use chains.
-        public var buildDefUseChains: Bool
+        internal var buildDefUseChains: Bool
 
         /// Variables to ignore in analysis.
-        public var ignoredVariables: Set<String>
+        internal var ignoredVariables: Set<String>
     }
 
     /// Analyze a control flow graph for reaching definitions.
     ///
     /// - Parameter cfg: The control flow graph to analyze.
     /// - Returns: Analysis results.
-    public func analyze(_ cfg: ControlFlowGraph) -> ReachingDefinitionsResult {
+    internal func analyze(_ cfg: ControlFlowGraph) -> ReachingDefinitionsResult {
         // Collect all definitions
         let definitions = collectDefinitions(cfg)
 
@@ -491,7 +491,7 @@ public struct ReachingDefinitionsAnalysis: Sendable {
 // swa:ignore-unused - Debug utilities for development and troubleshooting
 extension ReachingDefinitionsResult {
     /// Generate a debug string showing reaching definitions information.
-    public func debugDescription() -> String {
+    internal func debugDescription() -> String {
         var output = "Reaching Definitions Analysis Results:\n"
         output += "======================================\n\n"
 
@@ -551,10 +551,10 @@ extension ReachingDefinitionsResult {
 // MARK: - CombinedDataFlowAnalysis
 
 /// Combines live variable and reaching definitions analysis.
-public struct CombinedDataFlowAnalysis: Sendable {
+internal struct CombinedDataFlowAnalysis: Sendable {
     // MARK: Lifecycle
 
-    public init(
+    internal init(
         liveConfig: LiveVariableAnalysis.Configuration = .default,
         reachingConfig: ReachingDefinitionsAnalysis.Configuration = .default,
     ) {
@@ -565,7 +565,7 @@ public struct CombinedDataFlowAnalysis: Sendable {
     // MARK: Public
 
     /// Perform combined analysis on a CFG.
-    public func analyze(_ cfg: ControlFlowGraph) -> (
+    internal func analyze(_ cfg: ControlFlowGraph) -> (
         live: LiveVariableResult,
         reaching: ReachingDefinitionsResult,
     ) {
@@ -579,7 +579,7 @@ public struct CombinedDataFlowAnalysis: Sendable {
     /// A store is dead if:
     /// 1. The variable is not live after the store (from live analysis)
     /// 2. The definition doesn't reach any use (from reaching definitions)
-    public func findAllDeadStores(_ cfg: ControlFlowGraph) -> [DeadStore] {
+    internal func findAllDeadStores(_ cfg: ControlFlowGraph) -> [DeadStore] {
         let liveResult = liveAnalysis.analyze(cfg)
         let reachingResult = reachingAnalysis.analyze(cfg)
 
@@ -616,11 +616,11 @@ public struct CombinedDataFlowAnalysis: Sendable {
 // MARK: - DeadStore + Hashable
 
 extension DeadStore: Hashable {
-    public static func == (lhs: DeadStore, rhs: DeadStore) -> Bool {
+    internal static func == (lhs: DeadStore, rhs: DeadStore) -> Bool {
         lhs.variable == rhs.variable && lhs.location.line == rhs.location.line && lhs.location.file == rhs.location.file
     }
 
-    public func hash(into hasher: inout Hasher) {
+    internal func hash(into hasher: inout Hasher) {
         hasher.combine(variable)
         hasher.combine(location.line)
         hasher.combine(location.file)

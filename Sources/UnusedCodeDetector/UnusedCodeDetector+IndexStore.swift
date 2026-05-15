@@ -23,6 +23,7 @@ extension UnusedCodeDetector {
             checkFreshness: true,
             warnOnStale: configuration.warnOnStaleIndex,
             hybridMode: configuration.hybridMode,
+            allowsIndexDatabaseCreation: configuration.allowsIndexDatabaseCreation,
             logger: configuration.logger,
         )
         let fallbackManager = IndexStoreFallbackManager(configuration: fallbackConfig)

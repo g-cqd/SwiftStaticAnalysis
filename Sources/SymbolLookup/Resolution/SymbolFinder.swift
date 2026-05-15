@@ -5,7 +5,6 @@
 import Foundation
 import SwiftStaticAnalysisCore
 import Synchronization
-import UnusedCodeDetector
 
 /// Main coordinator for symbol lookup operations.
 ///

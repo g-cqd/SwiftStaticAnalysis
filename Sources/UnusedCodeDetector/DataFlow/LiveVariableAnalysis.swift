@@ -9,10 +9,10 @@ import SwiftSyntax
 // MARK: - DeadStore
 
 /// Represents an assignment to a variable that is never read.
-public struct DeadStore: Sendable {
+internal struct DeadStore: Sendable {
     // MARK: Lifecycle
 
-    public init(
+    internal init(
         variable: VariableID,
         location: SwiftStaticAnalysisCore.SourceLocation,
         assignedValue: String? = nil,
@@ -27,25 +27,25 @@ public struct DeadStore: Sendable {
     // MARK: Public
 
     /// The variable being assigned (with scope context).
-    public let variable: VariableID
+    internal let variable: VariableID
 
     /// Location of the dead store.
-    public let location: SwiftStaticAnalysisCore.SourceLocation
+    internal let location: SwiftStaticAnalysisCore.SourceLocation
 
     /// The expression being assigned (if simple).
-    public let assignedValue: String?
+    internal let assignedValue: String?
 
     /// Suggested fix.
-    public let suggestion: String
+    internal let suggestion: String
 }
 
 // MARK: - LiveVariableResult
 
 /// Results from live variable analysis.
-public struct LiveVariableResult: Sendable {
+internal struct LiveVariableResult: Sendable {
     // MARK: Lifecycle
 
-    public init(
+    internal init(
         cfg: ControlFlowGraph,
         deadStores: [DeadStore],
         unusedVariables: Set<VariableID>,
@@ -62,38 +62,38 @@ public struct LiveVariableResult: Sendable {
     // MARK: Public
 
     /// The analyzed CFG.
-    public let cfg: ControlFlowGraph
+    internal let cfg: ControlFlowGraph
 
     /// Dead stores found.
-    public let deadStores: [DeadStore]
+    internal let deadStores: [DeadStore]
 
     /// Variables that are defined but never used (with scope context).
-    public let unusedVariables: Set<VariableID>
+    internal let unusedVariables: Set<VariableID>
 
     /// Live-in sets for each block (with scope context).
-    public let liveIn: [BlockID: Set<VariableID>]
+    internal let liveIn: [BlockID: Set<VariableID>]
 
     /// Live-out sets for each block (with scope context).
-    public let liveOut: [BlockID: Set<VariableID>]
+    internal let liveOut: [BlockID: Set<VariableID>]
 }
 
 // MARK: - LiveVariableAnalysis
 
 /// Performs backward data flow analysis to find live variables.
-public struct LiveVariableAnalysis: Sendable {
+internal struct LiveVariableAnalysis: Sendable {
     // MARK: Lifecycle
 
-    public init(configuration: Configuration = .default) {
+    internal init(configuration: Configuration = .default) {
         self.configuration = configuration
     }
 
     // MARK: Public
 
     /// Configuration for the analysis.
-    public struct Configuration: Sendable {
+    internal struct Configuration: Sendable {
         // MARK: Lifecycle
 
-        public init(
+        internal init(
             maxIterations: Int = 1000,
             detectDeadStores: Bool = true,
             interProcedural: Bool = false,
@@ -107,26 +107,26 @@ public struct LiveVariableAnalysis: Sendable {
 
         // MARK: Public
 
-        public static let `default` = Self()
+        internal static let `default` = Self()
 
         /// Maximum iterations for fixed-point computation.
-        public var maxIterations: Int
+        internal var maxIterations: Int
 
         /// Whether to detect dead stores.
-        public var detectDeadStores: Bool
+        internal var detectDeadStores: Bool
 
         /// Whether to track variables across function boundaries (conservative).
-        public var interProcedural: Bool
+        internal var interProcedural: Bool
 
         /// Variables to ignore in analysis.
-        public var ignoredVariables: Set<String>
+        internal var ignoredVariables: Set<String>
     }
 
     /// Analyze a control flow graph for live variables.
     ///
     /// - Parameter cfg: The control flow graph to analyze.
     /// - Returns: Analysis results including dead stores and unused variables.
-    public func analyze(_ cfg: ControlFlowGraph) -> LiveVariableResult {
+    internal func analyze(_ cfg: ControlFlowGraph) -> LiveVariableResult {
         var workCFG = cfg
 
         // Compute live variables using worklist algorithm
@@ -151,7 +151,7 @@ public struct LiveVariableAnalysis: Sendable {
     }
 
     /// Analyze a function declaration.
-    public func analyzeFunction(
+    internal func analyzeFunction(
         _ function: FunctionDeclSyntax,
         file: String,
         tree: SourceFileSyntax,
@@ -162,7 +162,7 @@ public struct LiveVariableAnalysis: Sendable {
     }
 
     /// Analyze a closure expression.
-    public func analyzeClosure(
+    internal func analyzeClosure(
         _ closure: ClosureExprSyntax,
         file: String,
         tree: SourceFileSyntax,
@@ -336,7 +336,7 @@ extension LiveVariableAnalysis {
     ///   - block: The basic block to analyze.
     ///   - liveAtExit: Variables live at block exit.
     /// - Returns: Array of (statement, liveBeforeStatement) pairs.
-    public func computeStatementLiveness(
+    internal func computeStatementLiveness(
         block: BasicBlock,
         liveAtExit: Set<VariableID>
     ) -> [(statement: CFGStatement, liveBefore: Set<VariableID>)] {
@@ -367,7 +367,7 @@ extension LiveVariableAnalysis {
     ///   - file: Path to the Swift source file.
     ///   - tree: Parsed syntax tree.
     /// - Returns: Array of results for each function/closure.
-    public func analyzeFile(
+    internal func analyzeFile(
         file: String,
         tree: SourceFileSyntax,
     ) -> [LiveVariableResult] {
@@ -427,7 +427,7 @@ private final class FunctionCollector: SyntaxVisitor {
 // swa:ignore-unused - Debug utilities for development and troubleshooting
 extension LiveVariableResult {
     /// Generate a debug string showing liveness information.
-    public func debugDescription() -> String {
+    internal func debugDescription() -> String {
         var output = "Live Variable Analysis Results:\n"
         output += "================================\n\n"
 

@@ -38,4 +38,16 @@
 /// - `search_symbols`: Search for symbols
 /// - `analyze_file`: Full file analysis
 
-@_exported import MCP
+// MCP types that genuinely appear in the public signatures of this module:
+// only `Transport` (the parameter of `SWAMCPServer.start(transport:)`). The
+// rest of the MCP swift-sdk surface (`Server`, `CallTool.Result`,
+// `Resource`, …) is implementation detail of the handlers. Consumers that
+// build or test the server should `import MCP` themselves.
+import MCP
+
+/// Re-export the one MCP type that appears in `SWAMCPServer`'s public
+/// interface. Pre-0.3.0-α this module did a full `@_exported import MCP`,
+/// which silently coupled every consumer to whatever version of
+/// `modelcontextprotocol/swift-sdk` we tracked. Narrowing the re-export
+/// keeps the public surface honest.
+public typealias Transport = MCP.Transport
