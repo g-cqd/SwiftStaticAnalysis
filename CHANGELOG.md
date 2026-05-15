@@ -5,6 +5,78 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.10] - Unreleased
+
+**PDG construction layer on top of the SIL parser.** The β.7 SIL
+infrastructure gains a working `ProgramDependenceGraph` builder
+that combines control-flow edges (already extracted by the
+parser) with SSA def-use chains derived from per-instruction
+operand references. The PDG is the input shape the SOTA research
+queue's GNN clone-detection needs; producing it is now bounded
+work (O(instructions)) rather than blocked architecture.
+
+### New types
+
+- **`SILValue`** — SSA value identifier (`%N`). Block arguments
+  and instruction results share the same name space.
+- **`PDGNodeKind`** — either `.value(SILValue)` or
+  `.block(String)`. Block nodes participate in the CFG subset of
+  the PDG.
+- **`PDGEdgeKind`** — `.dataDependence` (SSA def-use) or
+  `.controlFlow` (mirrors block successors).
+- **`PDGEdge`** — `(source, target, kind)`.
+- **`ProgramDependenceGraph`** — the assembled graph:
+  - `function: SILFunction` — the SIL function the PDG was built from
+  - `edges: [PDGEdge]` — all data + control edges
+  - `definitions: [SILValue: (block: String, instructionIndex: Int)]`
+    (block-argument defines use `instructionIndex == -1`)
+  - `uses: [SILValue: [(block: String, instructionIndex: Int)]]`
+
+### Construction
+
+`ProgramDependenceGraph.build(from:)` walks each block's
+instructions, parses each line into `(defined: SILValue?, used:
+[SILValue])`, and records:
+
+- Defines from `%N = <op>` instruction prefix and block-argument
+  declarations.
+- Uses from every `%M` reference in the operand string. Trailing
+  `// users: %N` comments are stripped before scanning so they
+  don't create phantom uses.
+- Data-dependence edges from each used value's definition to the
+  defining instruction (or the block, for terminators).
+- Control-flow edges from each block to its parser-extracted
+  successors.
+
+### Test coverage
+
+`Tests/SwiftStaticAnalysisCoreTests/ProgramDependenceGraphTests.swift`
+(new, 3 tests):
+
+- Straight-line function: defines + uses extracted correctly,
+  block arguments marked with `instructionIndex == -1`.
+- Branching function: both data-dependence and control-flow edges
+  present, 4-block diamond produces 4 control-flow edges.
+- Comments stripped before operand scan: a SIL `// user: %3`
+  comment doesn't produce a phantom `%3` use.
+
+1157 tests green; build warning-free.
+
+### Status of remaining items
+
+The deferred queue narrows:
+
+- **β.11 — MinHash `InlineArray<128, UInt64>` cascade**: stays
+  deferred. ~1100 LOC viral generic through 7 public types for
+  ~6μs amortized perf gain per `swa duplicates` run; not
+  measurable on the project's bench. Closes as
+  `out-of-scope, design-decision-record-only`.
+- **β.12 — PDG-based clone detection**: GNN comparison over PDGs
+  is research-level (graph isomorphism / spectral similarity);
+  the PDG infrastructure shipped here is its prerequisite.
+- **β.13 — Core ML model conversion recipe docs**: bounded work,
+  ships next.
+
 ## [0.3.0-beta.9] - Unreleased
 
 **`swa unused --lsp <workspace>` build-required mode.** Mirrors β.5's

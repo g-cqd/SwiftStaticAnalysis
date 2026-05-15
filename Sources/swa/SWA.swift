@@ -346,7 +346,8 @@ struct Unused: AsyncParsableCommand {
 
     @Option(
         name: .customLong("lsp"),
-        help: "Workspace root for sourcekit-lsp-backed false-positive filtering (build-required mode). Each candidate unused declaration is verified against `callHierarchy/incomingCalls`; declarations the LSP server reports as having callers (including protocol-witness dispatch) are dropped from the unused list."
+        help:
+            "Workspace root for sourcekit-lsp-backed false-positive filtering (build-required mode). Each candidate unused declaration is verified against `callHierarchy/incomingCalls`; declarations the LSP server reports as having callers (including protocol-witness dispatch) are dropped from the unused list."
     )
     var lspWorkspaceRoot: String?
 
