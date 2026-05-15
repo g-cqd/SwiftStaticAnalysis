@@ -5,6 +5,101 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.21] - Unreleased
+
+**CLI consolidation: one option group, three presets, bundle auto-discovery.**
+
+The β.20 embedding surface was too noisy: 7 `--embedding-*` flags
+declared four times across `duplicates`/`search`/`anomaly`/`cohesion`,
+threshold numbers (0.85/0.95/0.20/…) that users had to memorize per
+model, and `--embedding-bundle Models/MiniLM` repeated on every
+invocation. β.21 collapses it.
+
+### The simplified surface
+
+**Before (β.20):**
+```bash
+swa search "query" Sources \
+  --embedding-bundle Models/MiniLM \
+  --embedding-max-length 128 \
+  -f text
+swa duplicates Sources \
+  --embedding-bundle Models/MiniLM \
+  --embedding-similarity 0.85 \
+  --embedding-min-token-overlap 0.20 \
+  --embedding-rerank-maxsim \
+  --embedding-maxsim-threshold 0.85 \
+  --embedding-max-length 128 \
+  --embedding-k 10 \
+  --types exact --min-tokens 10000
+```
+
+**After (β.21):**
+```bash
+swa search "query" Sources               # auto-discovers Models/MiniLM
+swa duplicates Sources --semantic        # auto + balanced preset
+swa duplicates Sources --semantic --preset strict  # MaxSim + tight thresholds
+```
+
+### What changed
+
+- **`EmbeddingOptions: ParsableArguments`** in a new
+  `Sources/swa/EmbeddingOptions.swift`. Shared via `@OptionGroup` across
+  `duplicates`, `search`, `anomaly`, `cohesion` — one definition site
+  for `--embedding-bundle`, `--preset`, `--embedding-max-length`.
+- **`SemanticPreset { balanced, strict, loose }`** materializes
+  `(cosine, jaccard, maxsim)` tuples. Replaces 3-5 hand-tuned numeric
+  flags per invocation:
+  - `balanced` = `(0.85, 0.20, nil)` — fast, default
+  - `strict` = `(0.90, 0.30, 0.85)` — high precision, MaxSim rerank
+  - `loose` = `(0.80, 0.10, nil)` — high recall
+- **Bundle auto-discovery**: if `--embedding-bundle` is omitted and
+  `Models/` has exactly one bundle dir (one with `Model.mlpackage` or
+  `Model.mlmodelc`), use it. If multiple, error with the list. If none,
+  error pointing at `INTEGRATION.md`.
+- **`--semantic` flag** on `duplicates`. Without it the structural pass
+  still runs alone (backward-compatible). With it, embedding discovery
+  fires with the chosen preset.
+- **Advanced overrides hidden from `--help`**: `--embedding-similarity`,
+  `--embedding-k`, `--embedding-min-token-overlap`,
+  `--embedding-rerank-maxsim`, `--embedding-maxsim-threshold`. They
+  still work for tinkerers but no longer clutter the default help view.
+  Discoverable via `--help-hidden`.
+- **`EmbeddingScanContext`** factors out the "load provider + walk paths
+  + embed all snippets + L2-normalize" boilerplate. Each subcommand's
+  body collapses from ~50 lines to ~15.
+
+### Flag count delta
+
+| subcommand | β.20 flags | β.21 flags (visible) | β.21 flags (with `--help-hidden`) |
+|---|---:|---:|---:|
+| duplicates | 19 | 14 | 19 |
+| search     | 6  | 5  | 10 |
+| anomaly    | 7  | 6  | 11 |
+| cohesion   | 6  | 5  | 10 |
+
+The hidden advanced flags are still there — every β.20 invocation is
+binary-compatible with β.21 — but the default `--help` no longer
+includes them.
+
+### Verified on this codebase
+
+Three preset runs on `Sources/` produce the expected curve:
+
+```
+swa duplicates Sources --semantic --embedding-bundle Models/MiniLM
+  loose    → 111 groups (broad)
+  balanced →  74 groups (default)
+  strict   →  30 groups (MaxSim rerank kicks in)
+```
+
+### Tests
+
+1188 still green. The library API for `EmbeddingCloneDiscovery.discover`
+kept `minTokenOverlap: 0.0` as its default (CLI-side `balanced` preset
+sets 0.20) so the existing tests with single-letter stub snippets
+continue to work without modification.
+
 ## [0.3.0-beta.20] - Unreleased
 
 **Beyond cosine: multi-signal fusion, MaxSim late interaction, semantic
