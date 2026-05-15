@@ -3,6 +3,7 @@
 //  MIT License
 
 import Foundation
+import Synchronization
 import SwiftStaticAnalysisCore
 
 /// Resolves symbols using the IndexStoreDB compiler index.
@@ -26,6 +27,14 @@ import SwiftStaticAnalysisCore
 public struct IndexStoreResolver: SymbolResolver, UsageResolver, ReferenceChecker {
     private let reader: IndexStoreReader
     private let regexCache: RegexCache
+    /// Lazily-built trigram index over all definitions. Built on the
+    /// first `resolveByRegex` query whose pattern contains literal
+    /// trigrams; reused for every subsequent regex query against the
+    /// same resolver instance. The `IndexedCorpus` reference type
+    /// holds the index plus the snapshot of definitions it indexes,
+    /// so the resolver itself stays `Sendable` as a value-type with
+    /// a class-typed shared cache (the same shape `regexCache` uses).
+    private let trigramCorpus: IndexedCorpus
 
     /// Creates a new IndexStore resolver.
     ///
@@ -35,6 +44,7 @@ public struct IndexStoreResolver: SymbolResolver, UsageResolver, ReferenceChecke
     public init(reader: IndexStoreReader, regexCacheCapacity: Int = 100) {
         self.reader = reader
         self.regexCache = RegexCache(capacity: regexCacheCapacity)
+        self.trigramCorpus = IndexedCorpus()
     }
 
     /// Resolves a query pattern to matching symbols.
@@ -239,13 +249,29 @@ extension IndexStoreResolver {
             return []
         }
 
-        // Get all definitions and filter by regex
-        let allDefs = reader.allDefinitions()
+        // Try to use the trigram index to narrow the candidate set
+        // before applying the regex. Patterns with extractable literal
+        // trigrams (e.g. `^fetch.*Data$`) hit the inverted index and
+        // touch only candidate symbols; patterns with no literals
+        // (`.+`, pure character classes, alternation-heavy) fall back
+        // to the legacy linear scan.
+        let corpusSnapshot = trigramCorpus.snapshot(reader: reader)
+        let definitions = corpusSnapshot.definitions
+        let candidatePositions: any Sequence<Int> = {
+            if let trigrams = RegexLiteralExtractor.requiredTrigrams(in: pattern),
+                let candidates = corpusSnapshot.index.candidates(requiredTrigrams: trigrams)
+            {
+                return candidates
+            }
+            // No extractable trigrams: scan every definition.
+            return 0..<definitions.count
+        }()
 
         var matches: [SymbolMatch] = []
         var seen = Set<String>()
 
-        for occ in allDefs {
+        for position in candidatePositions {
+            let occ = definitions[position]
             guard occ.symbol.name.contains(regex) else {
                 continue
             }
@@ -452,4 +478,46 @@ public struct SymbolOccurrence: Sendable, Hashable, Codable {
     public var locationString: String {
         "\(file):\(line):\(column)"
     }
+}
+
+// MARK: - IndexedCorpus
+
+/// Lazily-built, thread-safe cache of the definition corpus + its
+/// trigram index. The first regex query against a fresh
+/// `IndexStoreResolver` instance pays the build cost; subsequent
+/// queries are O(k log m + r) where `k` = trigrams extracted, `m` =
+/// posting list size, `r` = surviving candidates.
+///
+/// The class wraps both the index and the snapshot of definitions it
+/// indexes so positions in the index reliably map back to occurrences.
+/// All state is set inside a `Mutex`-guarded init and never mutated
+/// afterwards; the type is `Sendable` because every field becomes
+/// effectively `let` after first access.
+final class IndexedCorpus: Sendable {
+    init() {
+        self.storage = Mutex(nil)
+    }
+
+    /// Return the cached corpus, building it on first access via the
+    /// supplied reader. Subsequent calls return the same snapshot
+    /// without re-querying the IndexStore.
+    func snapshot(reader: IndexStoreReader) -> Snapshot {
+        storage.withLock { stored in
+            if let existing = stored {
+                return existing
+            }
+            let definitions = reader.allDefinitions()
+            let index = TrigramIndex(definitions: definitions)
+            let snapshot = Snapshot(definitions: definitions, index: index)
+            stored = snapshot
+            return snapshot
+        }
+    }
+
+    struct Snapshot: Sendable {
+        let definitions: [IndexedOccurrence]
+        let index: TrigramIndex
+    }
+
+    private let storage: Mutex<Snapshot?>
 }

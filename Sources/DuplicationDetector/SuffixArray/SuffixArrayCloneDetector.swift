@@ -56,8 +56,19 @@ public struct SuffixArrayCloneDetector: Sendable {
         // Safety: ensure minimumTokens is valid
         guard !sequences.isEmpty, minimumTokens > 0 else { return [] }
 
+        // Drop macro-expansion sources from the input. Sequences whose
+        // file contains a `#sourceLocation(...)` directive are
+        // typically the output of Swift macros expanded into
+        // synthesised files (under `.build/.../macroexpansion/...`).
+        // Even though `findSwiftFiles` already excludes `.build/`,
+        // callers may explicitly include macro-expansion roots; clone
+        // groups spanning a macro's definition and its expansion are
+        // expected, not actionable.
+        let filteredSequences = sequences.filter { !Self.containsSourceLocationDirective($0) }
+        guard !filteredSequences.isEmpty else { return [] }
+
         // Build concatenated token stream with file boundaries
-        let streamResult = buildConcatenatedStream(sequences)
+        let streamResult = buildConcatenatedStream(filteredSequences)
 
         guard streamResult.tokens.count >= minimumTokens else { return [] }
 
@@ -74,7 +85,7 @@ public struct SuffixArrayCloneDetector: Sendable {
         return convertToCloneGroups(
             repeatGroups: repeatGroups,
             tokenInfos: streamResult.infos,
-            sequences: sequences,
+            sequences: filteredSequences,
         )
     }
 
@@ -86,8 +97,13 @@ public struct SuffixArrayCloneDetector: Sendable {
         // Safety: ensure minimumTokens is valid
         guard !sequences.isEmpty, minimumTokens > 0 else { return [] }
 
+        // Same macro-expansion filter as `detect(in:)` — see the
+        // comment there for the rationale.
+        let filteredSequences = sequences.filter { !Self.containsSourceLocationDirective($0) }
+        guard !filteredSequences.isEmpty else { return [] }
+
         // Normalize sequences
-        let normalizedSequences = sequences.map { normalizer.normalize($0) }
+        let normalizedSequences = filteredSequences.map { normalizer.normalize($0) }
 
         // Build concatenated stream from normalized tokens
         let streamResult = buildNormalizedStream(normalizedSequences)
@@ -115,6 +131,24 @@ public struct SuffixArrayCloneDetector: Sendable {
 
     /// Token normalizer for Type-2 detection.
     private let normalizer: TokenNormalizer
+
+    /// Return `true` when the sequence's source lines contain a
+    /// `#sourceLocation(...)` directive — the marker the Swift
+    /// compiler emits at the top of macro-expansion files and that
+    /// some hand-authored code uses for error-reporting overrides.
+    /// Conservative: any occurrence is treated as a macro-expansion
+    /// signal. The line-prefix scan is cheap (~one comparison per
+    /// non-blank line, no allocation).
+    static func containsSourceLocationDirective(_ sequence: TokenSequence) -> Bool {
+        for line in sequence.sourceLines {
+            // Skip leading whitespace.
+            let trimmed = line.drop(while: { $0 == " " || $0 == "\t" })
+            if trimmed.hasPrefix("#sourceLocation") {
+                return true
+            }
+        }
+        return false
+    }
 
     // MARK: - Stream Building
 

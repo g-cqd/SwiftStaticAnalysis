@@ -507,7 +507,6 @@ public struct DependencyExtractionConfiguration: Sendable {
         treatSwiftUIPropertyWrappersAsRoot: Bool = true,
         treatPreviewProvidersAsRoot: Bool = true,
         trackProtocolWitnesses: Bool = true,
-        trackClosureCaptures: Bool = true,
     ) {
         self.treatPublicAsRoot = treatPublicAsRoot
         self.treatObjcAsRoot = treatObjcAsRoot
@@ -517,7 +516,6 @@ public struct DependencyExtractionConfiguration: Sendable {
         self.treatSwiftUIPropertyWrappersAsRoot = treatSwiftUIPropertyWrappersAsRoot
         self.treatPreviewProvidersAsRoot = treatPreviewProvidersAsRoot
         self.trackProtocolWitnesses = trackProtocolWitnesses
-        self.trackClosureCaptures = trackClosureCaptures
     }
 
     // MARK: Public
@@ -535,7 +533,6 @@ public struct DependencyExtractionConfiguration: Sendable {
         treatSwiftUIPropertyWrappersAsRoot: true,
         treatPreviewProvidersAsRoot: false,
         trackProtocolWitnesses: true,
-        trackClosureCaptures: true,
     )
 
     /// Treat public/open declarations as roots.
@@ -561,9 +558,6 @@ public struct DependencyExtractionConfiguration: Sendable {
 
     /// Track protocol witness relationships.
     public var trackProtocolWitnesses: Bool
-
-    /// Track closure captures.
-    public var trackClosureCaptures: Bool
 }
 
 // MARK: - ReachabilityBasedDetector

@@ -5,6 +5,98 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.2] - Unreleased
+
+Three previously-deferred algorithm + precision items shipped.
+1150 tests green (1137 + 13 new for the trigram index).
+
+### F-B4 — Trigram index for regex symbol lookup
+
+New `TrigramIndex` (case-sensitive 3-character inverted index) +
+`RegexLiteralExtractor` (conservative regex-pattern literal-segment
+parser) speed up `IndexStoreResolver.resolveByRegex` on patterns
+with extractable literal trigrams (e.g. `^fetch.*Data$` →
+`{fet, etc, tch, Dat, ata}`). Posting lists for each trigram are
+intersected smallest-first; only surviving candidates run the full
+regex match. Patterns with no literal segments of length ≥ 3
+(pure character classes, alternation, `.+`) fall through to the
+prior linear scan unchanged.
+
+Build cost is amortised across all regex queries against the same
+resolver: the corpus + index is materialised once on first regex
+query via `IndexedCorpus.snapshot(reader:)` (a `Mutex`-guarded
+lazy class so the resolver itself stays `Sendable`). Expected
+speedup on real codebases: 10-100× per query depending on how
+selective the trigrams are. Mirrors clangd's `global-index`
+trigram lookup shape.
+
+- `Sources/SymbolLookup/Resolution/TrigramIndex.swift` (new, ~120 LOC)
+- `Sources/SymbolLookup/Resolution/RegexLiteralExtractor.swift` (new, ~125 LOC)
+- `Sources/SymbolLookup/Resolution/IndexStoreResolver.swift` —
+  `IndexedCorpus` cache class appended; `resolveByRegex` rewritten
+  to query the index first.
+- `Tests/SymbolLookupTests/TrigramIndexTests.swift` (new, 13 tests
+  covering trigram extraction, candidate intersection, literal
+  parsing under quantifiers / anchors / groups / character classes,
+  and the nil-fallback contract for unindexable patterns).
+
+### F-B2 — Macro-expansion clone filter
+
+`SuffixArrayCloneDetector.detect(in:)` and `detectWithNormalization`
+drop input `TokenSequence`s whose source lines contain a
+`#sourceLocation(...)` directive. Swift macros emit these at the
+top of generated files under `.build/.../macroexpansion/...`.
+Although `findSwiftFiles` already excludes `.build/` by default,
+callers that explicitly include macro-expansion roots no longer
+see clone groups spanning a macro definition and its expansion
+(expected by construction, not actionable). New private static
+`SuffixArrayCloneDetector.containsSourceLocationDirective(_:)`
+performs the cheap per-line prefix scan.
+
+### F-B3 — Vestigial `trackClosureCaptures` flag removed
+
+Investigation showed the audit's premise was inaccurate: the
+`trackClosureCaptures` field on `DependencyExtractionConfiguration`
+was stored but never read by any code path, and there was no
+cross-function closure-capture edge emission in the reachability
+graph at all. Captures *are* already tracked through the normal
+reference graph — a closure body's references propagate to its
+declarations via the existing `Reference → Declaration` edges
+the BFS walks. The flag did nothing.
+
+Removed the unused `trackClosureCaptures` field from
+`DependencyExtractionConfiguration.init`, the `.strict` preset, the
+caller in `UnusedCodeDetector.detectUnusedWithReachability`, and
+the public property. Migration: drop `trackClosureCaptures:` from
+any direct `DependencyExtractionConfiguration(...)` call.
+
+### Architecturally-deferred items
+
+The audit's three larger algorithm items remain genuinely
+out-of-session-scope for `0.3.x` and are documented as
+0.4.0 design seeds rather than deferred quick wins:
+
+- **F-S1 — SourceKit-LSP witness resolution.** +20-30% protocol-
+  witness precision via `textDocument/callHierarchy/incomingCalls`,
+  but requires `sourcekit-lsp` as a runtime dependency, an
+  available build of the analyzed project, and ~300 LOC of LSP
+  client integration. Architecturally adjacent to a "build-required
+  mode" we don't have.
+- **F-S2 — Core ML transformer embeddings (CodeBERT / GraphCodeBERT).**
+  +15-25% semantic recall on cross-idiom equivalents per BigCloneBench
+  numbers (F1 ~97% on Java; out-of-distribution for Swift without
+  fine-tuning). Requires a ~400 MB Core ML model bundle or a
+  network round-trip per query — realistic only as an opt-in
+  `--semantic-deep` flag, not as a default analyzer pass.
+- **F-S3 — PDG/GNN clones.** Requires `swiftc -emit-sil` for the
+  program-dependence graph; architecturally incompatible with the
+  build-free design today. Future work iff a "build-required deep
+  mode" is added.
+
+None of these are exploitable findings. They're new-capability
+proposals from the SOTA research pass that need their own
+architectural commitments.
+
 ## [0.3.0-beta.1] - Unreleased
 
 Cuts the 0.3.0 beta from the eighteen-alpha cluster. 1137 tests

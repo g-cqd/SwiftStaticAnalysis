@@ -125,7 +125,6 @@ extension UnusedCodeDetector {
             treatProtocolRequirementsAsRoot: true,
             treatSwiftUIViewsAsRoot: configuration.treatSwiftUIViewsAsRoot,
             trackProtocolWitnesses: true,
-            trackClosureCaptures: true,
         )
 
         let reachabilityDetector = ReachabilityBasedDetector(
