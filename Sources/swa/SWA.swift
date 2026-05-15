@@ -203,6 +203,30 @@ struct Duplicates: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Output format")
     var format: OutputFormat?
 
+    @Option(
+        name: .customLong("embedding-bundle"),
+        help: "Directory containing a HF tokenizer + Core ML model for semantic clone discovery",
+    )
+    var embeddingBundle: String?
+
+    @Option(
+        name: .customLong("embedding-similarity"),
+        help: "Cosine similarity threshold for embedding discovery (0.0-1.0)",
+    )
+    var embeddingSimilarity: Double?
+
+    @Option(
+        name: .customLong("embedding-k"),
+        help: "Top-k neighbours per snippet during embedding discovery",
+    )
+    var embeddingK: Int?
+
+    @Option(
+        name: .customLong("embedding-max-length"),
+        help: "Max tokens fed to the embedding model per snippet",
+    )
+    var embeddingMaxLength: Int?
+
     /// Argument-level validation. `--min-tokens` is bounded to a sensible
     /// range to prevent crashes (negative or zero) and pathological behaviour
     /// (huge values). `--min-similarity` is a Jaccard ratio.
@@ -212,6 +236,14 @@ struct Duplicates: AsyncParsableCommand {
         }
         if let minSimilarity, !(0.0...1.0).contains(minSimilarity) {
             throw ValidationError("--min-similarity must be between 0.0 and 1.0 (got \(minSimilarity))")
+        }
+        if let embeddingSimilarity, !(0.0...1.0).contains(embeddingSimilarity) {
+            throw ValidationError(
+                "--embedding-similarity must be between 0.0 and 1.0 (got \(embeddingSimilarity))"
+            )
+        }
+        if let embeddingK, !(1...100).contains(embeddingK) {
+            throw ValidationError("--embedding-k must be between 1 and 100 (got \(embeddingK))")
         }
     }
 
@@ -266,12 +298,37 @@ struct Duplicates: AsyncParsableCommand {
         )
 
         let detector = DuplicationDetector(configuration: detectorConfig)
-        let clones = try await detector.detectClones(in: files)
+        let structural = try await detector.detectClones(in: files)
+
+        // Embedding-based semantic clone discovery via a downloaded HF
+        // model bundle (e.g. GraphCodeBERT / CodeBERT / Jina v2 code /
+        // CodeT5+). Recovers Type-2 / Type-3 clones the structural pass
+        // misses because identifiers differ.
+        let semantic: [CloneGroup]
+        if let embeddingBundle {
+            semantic = try await runEmbeddingDiscovery(
+                bundlePath: embeddingBundle,
+                rootPaths: paths,
+                similarity: embeddingSimilarity ?? 0.85,
+                k: embeddingK ?? 10,
+                maxLength: embeddingMaxLength ?? 256,
+            )
+        } else {
+            semantic = []
+        }
+
+        let clones = structural + semantic
 
         let outputFormat = format ?? swaConfig?.format ?? .xcode
         switch outputFormat {
         case .text:
-            print("CLONES \(clones.count) groups")
+            if !semantic.isEmpty {
+                print(
+                    "CLONES \(clones.count) groups (\(structural.count) structural, \(semantic.count) semantic)"
+                )
+            } else {
+                print("CLONES \(clones.count) groups")
+            }
             OutputFormatter.printCloneGroupsText(clones)
 
         case .json:
@@ -285,6 +342,48 @@ struct Duplicates: AsyncParsableCommand {
         if !clones.isEmpty {
             throw ExitCode(2)
         }
+    }
+
+    /// Run the embedding-based semantic clone discovery pass over the
+    /// supplied source roots. Extracts function bodies, embeds via a
+    /// HuggingFace model loaded through `HFSemanticEmbeddingProvider`,
+    /// and surfaces semantic clone groups via `EmbeddingCloneDiscovery`.
+    private func runEmbeddingDiscovery(
+        bundlePath: String,
+        rootPaths: [String],
+        similarity: Double,
+        k: Int,
+        maxLength: Int,
+    ) async throws -> [CloneGroup] {
+        let bundleURL = URL(fileURLWithPath: bundlePath)
+        let provider = try await HFSemanticEmbeddingProvider(
+            bundleDir: bundleURL,
+            maxLength: maxLength,
+        )
+
+        var snippets: [EmbeddingSnippet] = []
+        for path in rootPaths {
+            let url = URL(fileURLWithPath: path)
+            var isDir: ObjCBool = false
+            FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
+            if isDir.boolValue {
+                let found = try FunctionSnippetExtractor.extract(directory: url)
+                snippets.append(contentsOf: found)
+            } else if url.pathExtension == "swift" {
+                let found = try FunctionSnippetExtractor.extract(fileURL: url)
+                snippets.append(contentsOf: found)
+            }
+        }
+
+        guard !snippets.isEmpty else { return [] }
+
+        let discovery = EmbeddingCloneDiscovery()
+        return try await discovery.discover(
+            snippets: snippets,
+            provider: provider,
+            k: k,
+            similarityThreshold: similarity,
+        )
     }
 }
 
