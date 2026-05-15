@@ -5,6 +5,46 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.9] - Unreleased
+
+**`swa unused --lsp <workspace>` build-required mode.** Mirrors β.5's
+symbol-lookup pattern for unused-code detection. Every candidate the
+reachability / index / syntax detector produces is verified against
+`callHierarchy/incomingCalls` from sourcekit-lsp; declarations the
+LSP server reports as having callers (including protocol-witness
+dispatch the IndexStoreDB-only resolver misses) are dropped from
+the unused list.
+
+### New: `LSPSymbolResolver.incomingCallCount(uri:line:character:)`
+
+Thin wrapper over `SourceKitLSPClient.incomingCalls(...)` that
+issues `prepareCallHierarchy` + `callHierarchy/incomingCalls` and
+returns the count of incoming call sites. Returns `nil` when the
+LSP server reports no call-hierarchy item at that position
+(callable couldn't be resolved). Used by the unused-pass filter
+to keep candidates conservatively when LSP can't answer.
+
+### CLI: `swa unused --lsp <workspace>`
+
+After the standard unused-code detection + filters, each
+surviving candidate is checked against the LSP:
+
+1. Convert the declaration's location to a `file://` URI +
+   0-based LSP line/character coordinates (our SourceLocation is
+   1-based; conversion happens at the boundary).
+2. `incomingCallCount(uri:line:character:)` issues the LSP
+   request.
+3. If `count > 0` → drop the candidate (LSP found callers).
+4. If `count == 0` → keep (LSP confirms unused).
+5. If `nil` or LSP query throws → keep conservatively
+   (fail-open).
+
+Audit's +20-30% protocol-precision claim now has its first real
+implementation path. Subprocess lifecycle handled via the
+`LSPSymbolResolver`'s lazy-start / explicit-shutdown contract.
+
+1154 tests green; build warning-free.
+
 ## [0.3.0-beta.8] - Unreleased
 
 **Semantic-deep verification pass wired into `DuplicationDetector`.**

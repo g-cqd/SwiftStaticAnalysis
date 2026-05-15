@@ -108,6 +108,37 @@ public final class LSPSymbolResolver: @unchecked Sendable {
         }
     }
 
+    /// Query `callHierarchy/incomingCalls` for a symbol at the given
+    /// source location. Returns the count of incoming call sites,
+    /// or `nil` when the LSP server reports no call-hierarchy item
+    /// at that position (e.g. position outside any callable, or
+    /// LSP not yet ready). Used by the build-required unused-code
+    /// pass to filter out false positives — declarations the LSP
+    /// server knows are reachable via protocol dispatch are dropped
+    /// from the unused list.
+    ///
+    /// LSP positions are 0-based; callers pass 0-based `line` and
+    /// `character` UTF-16 column. Our `SourceLocation` is 1-based;
+    /// the `swa` CLI does the conversion at the boundary.
+    public func incomingCallCount(uri: String, line: Int, character: Int) async throws -> Int? {
+        let client = try await ensureStarted()
+        let payload: [String: Any]
+        do {
+            payload = try await client.incomingCalls(
+                uri: uri, line: line, character: character,
+            )
+        } catch SourceKitLSPError.requestFailed {
+            // `prepareCallHierarchy` returned empty — position isn't
+            // a callable. Surface as nil so the caller knows we
+            // can't answer rather than falsely reporting "no callers".
+            return nil
+        }
+        guard let result = payload["result"] as? [[String: Any]] else {
+            return nil
+        }
+        return result.count
+    }
+
     /// Issue the LSP `shutdown` / `exit` handshake and join the
     /// subprocess. Safe to call multiple times.
     public func shutdown() async {

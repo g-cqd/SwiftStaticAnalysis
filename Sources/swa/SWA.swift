@@ -344,6 +344,12 @@ struct Unused: AsyncParsableCommand {
     )
     var autoBuild: Bool = false
 
+    @Option(
+        name: .customLong("lsp"),
+        help: "Workspace root for sourcekit-lsp-backed false-positive filtering (build-required mode). Each candidate unused declaration is verified against `callHierarchy/incomingCalls`; declarations the LSP server reports as having callers (including protocol-witness dispatch) are dropped from the unused list."
+    )
+    var lspWorkspaceRoot: String?
+
     // Root treatment flags (use --no-treat-*-as-root to disable)
     @Flag(inversion: .prefixedNo, help: "Treat public API as entry points")
     var treatPublicAsRoot: Bool?
@@ -517,6 +523,47 @@ struct Unused: AsyncParsableCommand {
             excludeTestSuites: effectiveExcludeTestSuites,
             minConfidence: minConf,
         )
+
+        // Build-required LSP pass: drop any candidate the LSP server
+        // knows is reachable through protocol-witness dispatch or
+        // other build-aware mechanisms IndexStoreDB / syntax can't
+        // see. Each candidate's declaration position is converted
+        // to a `file://` URI + 0-based LSP coordinates and queried
+        // via `callHierarchy/incomingCalls`. A non-zero call count
+        // means the declaration has callers — drop from the unused
+        // list. Errors at the LSP layer (position not callable,
+        // server not yet warm) leave the candidate in place.
+        if let workspaceRoot = lspWorkspaceRoot {
+            let lspResolver = LSPSymbolResolver(workspaceRoot: workspaceRoot)
+            defer {
+                Task { await lspResolver.shutdown() }
+            }
+            var survivors: [UnusedCode] = []
+            survivors.reserveCapacity(unused.count)
+            for candidate in unused {
+                let location = candidate.declaration.location
+                let uri = "file://" + location.file
+                do {
+                    let callCount = try await lspResolver.incomingCallCount(
+                        uri: uri,
+                        line: max(0, location.line - 1),
+                        character: max(0, location.column - 1),
+                    )
+                    // nil = LSP can't answer for this position (not a
+                    // callable, server not ready). Keep the candidate
+                    // conservatively. 0 = LSP says no callers. >0 =
+                    // LSP found callers → drop.
+                    if let count = callCount, count > 0 {
+                        continue
+                    }
+                } catch {
+                    // LSP query failed entirely — fail open, keep
+                    // the candidate.
+                }
+                survivors.append(candidate)
+            }
+            unused = survivors
+        }
 
         let outputFormat = format ?? swaConfig?.format ?? .xcode
         switch outputFormat {
