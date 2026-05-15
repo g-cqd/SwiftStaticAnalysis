@@ -5,6 +5,116 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.20] - Unreleased
+
+**Beyond cosine: multi-signal fusion, MaxSim late interaction, semantic
+search, anomaly detection, module cohesion.** Five new capabilities
+landing in one release — the answer to "cosine isn't the right primitive".
+
+### B. Multi-signal fusion: Token Jaccard verification
+
+The pooled-cosine primitive can't tell "same shape, different content"
+from "real Type-2 clone". `TokenJaccard.similarity(_:_:)` complements it
+by computing identifier-token-set Jaccard on the raw source strings
+(BERT keywords filtered out). `EmbeddingCloneDiscovery.discover(...)`
+gains a `minTokenOverlap: Double` parameter — pairs whose lexical
+Jaccard falls below it are dropped even if their cosine clears the
+threshold. CLI flag: `--embedding-min-token-overlap` (default 0.20).
+This kills the "shape-true, intent-false" false positives CodeBERT and
+high-threshold contrastive models produce on Swift.
+
+### A. MaxSim late interaction (ColBERT-style rerank)
+
+Mean-pooling averages 128 per-token vectors into one — destroys local
+alignment signal. MaxSim is the canonical fix: for each token in
+snippet A, find its best match in snippet B, mean the bests. The
+symmetric form averages both directions.
+
+- **`HFSemanticEmbeddingProvider.embedTokens(snippet:)`** — runs the
+  same forward pass as `embed(snippet:)` but returns the unpooled
+  per-token `[T × D]` matrix, L2-normalized row-wise. Throws on pre-
+  pooled exports (Gemma) which don't surface token-level state.
+- **`MaxSimVerifier.score(_:_:)`** — O(m·n·D) per pair, used as a
+  post-discovery rerank on the K candidates HNSW returns. Drops groups
+  below the `maxSimThreshold`.
+- **CLI**: `swa duplicates --embedding-rerank-maxsim --embedding-maxsim-threshold 0.85`
+  cut 77 → 47 semantic groups on this codebase (39% reduction);
+  threshold 0.90 → 20 groups (very precise).
+
+### F. `swa search "<query>" <paths>` — semantic code search
+
+New subcommand. Embeds the query through the chosen model bundle,
+embeds every function-shaped snippet via `FunctionSnippetExtractor`,
+returns the top-K by cosine. Outputs file:line + first-line preview.
+
+Example:
+```
+swa search "extract identifier from declaration" Sources \
+  --embedding-bundle Models/MiniLM --k 5
+```
+
+Returns the closest functions in the codebase (e.g., extract-signature
+helpers, declaration-walking visitors), ranked by semantic similarity.
+
+### H. `swa anomaly <paths>` — outlier detection
+
+For each snippet, computes the mean cosine to its k nearest neighbors
+(default k=5). Sorts by `1 − meanNeighborSim` — high score = function
+that resembles nothing else in the codebase. Useful for surfacing
+accidental complexity, legacy outliers, copy-paste from unfamiliar
+codebases.
+
+On this repo's `Sources/`, the top anomalies are tiny one-shot helpers
+(`UnionFind.find`, `HNSWIndex.ensureLayerCapacity`,
+`DeterministicEmbeddingProvider.init`) — confirms the signal is real
+(small unique helpers SHOULD look isolated).
+
+### I. `swa cohesion <paths>` — module cohesion
+
+Groups snippets by the last N dirname segments (`--group-by 2`).
+Reports per-module: snippet count, intra-module mean cosine,
+inter-module mean cosine, and the difference (cohesion score).
+Higher cohesion = module's snippets resemble each other more than
+they resemble the rest of the codebase.
+
+Top cohesion on this repo:
+```
+Sources/StaticAnalysisBuildPlugin      2  89% intra  24% inter  +66%
+SwiftStaticAnalysisCore/Algorithms     4  56%      17%        +39%
+SwiftStaticAnalysisCore/SIL           11  48%      26%        +22%
+```
+
+All modules score positive — no split candidates surfaced. Good
+signal of architectural discipline.
+
+### Implementation details
+
+- `TokenJaccard` is regex-light (~70 LOC). One pass over Unicode
+  scalars, lowercase, drop a small stop-word set (Swift control-flow
+  + access modifiers).
+- `MaxSimVerifier` is naive O(m·n·D) per pair. SIMD-acceleration via
+  Accelerate is a future direction. At K=10 reranks per query, total
+  cost is bounded.
+- All three new subcommands (`search`, `anomaly`, `cohesion`) share
+  `SearchMath` for L2-normalization + cosine dot.
+- Hit a `String(format: "%s", swiftString)` UB segfault in cohesion's
+  output formatting — replaced with type-safe `String.padded(...)`
+  helper.
+
+### Scope NOT yet landed (deferred to next iteration)
+
+- **C. AST tree edit distance rerank** — needs APTED in Swift,
+  bigger implementation (~500 LOC). Pending.
+- **D. Cross-encoder reranker** — needs another HF model conversion +
+  Swift integration. Pending.
+
+### Tests
+
+1188 tests still green. Existing `EmbeddingCloneDiscoveryTests` had to
+move `minTokenOverlap` default from `0.20` to `0.0` at the library API
+level (the CLI keeps 0.20 as default) — the stub tests use single-letter
+snippet strings that have zero token overlap.
+
 ## [0.3.0-beta.19] - Unreleased
 
 **7-model embedding benchmark + provider robustness for fixed-shape and
