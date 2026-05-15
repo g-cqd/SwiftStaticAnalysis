@@ -5,6 +5,41 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.15] - Unreleased
+
+Final batch of lower-priority hardening + access-level tightening from
+the post-α.11 re-audit. Closes the LOW findings. 1137 tests green.
+
+### Hardening
+
+- **`SWAMCPServer.resolutionBaseURL` pins CWD at server init.** The
+  context-cache lookup canonicalises relative `codebase_path`
+  arguments against this snapshot rather than the live
+  `FileManager.default.currentDirectoryPath`, so a mid-session
+  `chdir` from another actor (no caller does this today; defensive)
+  cannot collide cache keys across logical roots.
+- **`getCodebaseInfo` cumulative scan ceiling.**
+  `getCodebaseInfoMaxAggregateBytes: UInt64 = 4 * 1024 * 1024 * 1024`
+  (4 GiB) caps the total bytes mmap'd for line counting across the
+  whole codebase. The per-file 64 MiB ceiling was already in place
+  but 10 000 files × 64 MiB still permits a 640 GiB sequential scan
+  in a single MCP call. Files past the aggregate ceiling still
+  contribute to `totalBytes` (already counted via directory
+  metadata); `totalLines` becomes a partial figure.
+
+### API hygiene
+
+- **`Tool.Content.swaText` tightened to `fileprivate`.** All 18 call
+  sites are in `SWAMCPServer.swift`. The previous `internal` level
+  widened the surface unnecessarily.
+
+### Docs
+
+- **`MemoryMappedFile.init` docstring** notes the `.noFollow` flag
+  resolves to `O_NOFOLLOW` on both Darwin and Linux, but flags the
+  Linux configuration as untested in CI. (The `mmap` / `munmap`
+  syscalls themselves are platform-guarded.)
+
 ## [0.3.0-alpha.14] - Unreleased
 
 Simplification + closes the test-coverage gaps the re-audit flagged.

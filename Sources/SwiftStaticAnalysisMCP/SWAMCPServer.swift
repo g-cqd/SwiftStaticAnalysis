@@ -72,6 +72,14 @@ public actor SWAMCPServer {
     /// Configuration for duplication detection.
     private var duplicationConfig: DuplicationConfiguration
 
+    /// Working-directory snapshot taken at server-init time. Subsequent
+    /// `getContext(for:)` calls resolve relative `codebase_path`
+    /// arguments against this snapshot rather than the live
+    /// `FileManager.default.currentDirectoryPath`, so a mid-session
+    /// `chdir` from some other actor cannot collide cache keys across
+    /// logical roots.
+    private let resolutionBaseURL: URL
+
     /// Initialize the SWA MCP server with an optional default codebase.
     /// - Parameter codebasePath: The default root path of the codebase to analyze. If nil,
     ///   tools must specify `codebase_path` for each call.
@@ -84,6 +92,7 @@ public actor SWAMCPServer {
         }
         self.unusedConfig = .default
         self.duplicationConfig = .default
+        self.resolutionBaseURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 
         self.server = Server(
             name: "swa-mcp",
@@ -108,7 +117,7 @@ public actor SWAMCPServer {
         if let path = path {
             let resolvedPath = PathUtilities.canonicalize(
                 path,
-                relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                relativeTo: resolutionBaseURL
             )
 
             if let cached = contextCache.value(forKey: resolvedPath) {
@@ -1399,7 +1408,7 @@ extension Tool.Content {
     /// defaults, and gives one place to update when the SDK shape
     /// shifts again.
     @inline(__always)
-    internal static func swaText(_ text: String) -> Self {
+    fileprivate static func swaText(_ text: String) -> Self {
         .text(text: text, annotations: nil, _meta: nil)
     }
 }

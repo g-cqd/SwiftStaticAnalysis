@@ -163,12 +163,21 @@ public struct CodebaseContext: Sendable {
     /// behind a single MCP call.
     static let getCodebaseInfoMaxScanBytes: UInt64 = 64 * 1024 * 1024  // 64 MiB
 
+    /// Maximum cumulative bytes the line-counting pass will mmap across
+    /// the whole codebase. A repository with 10 000 source files at the
+    /// per-file ceiling (640 GiB worst-case sequential mmap) would
+    /// otherwise pin the MCP server in a single `get_codebase_info`
+    /// call. We cap at 4 GiB and return a partial line total when the
+    /// ceiling is hit — the byte total stays accurate.
+    static let getCodebaseInfoMaxAggregateBytes: UInt64 = 4 * 1024 * 1024 * 1024  // 4 GiB
+
     /// Returns information about the codebase.
     public func getCodebaseInfo() throws -> CodebaseInfo {
         let swiftFiles = try findSwiftFiles()
 
         var totalLines = 0
         var totalBytes: UInt64 = 0
+        var scannedBytes: UInt64 = 0
 
         let fileManager = FileManager.default
         for file in swiftFiles {
@@ -190,6 +199,14 @@ public struct CodebaseContext: Sendable {
                 continue
             }
 
+            // Cumulative ceiling: once we've scanned `maxAggregateBytes`
+            // worth of source, stop counting lines. The remaining files
+            // still contribute to `totalBytes` (already recorded above);
+            // `totalLines` becomes a partial figure.
+            if scannedBytes >= Self.getCodebaseInfoMaxAggregateBytes {
+                continue
+            }
+
             // Use memory-mapped I/O + raw-span byte scan rather than
             // `String(contentsOfFile:)` so a 116-file codebase doesn't
             // allocate 116 fresh UTF-8 strings just to count newlines.
@@ -206,6 +223,7 @@ public struct CodebaseContext: Sendable {
                 return count
             }
             totalLines += newlines + 1
+            scannedBytes += fileSize
         }
 
         return CodebaseInfo(

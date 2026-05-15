@@ -117,7 +117,10 @@ public final class MemoryMappedFile: Sendable {
     /// with `.noFollow` — symlinks at the final path component are rejected
     /// at the kernel boundary, so `MCP` callers that have already validated
     /// the canonical path get belt-and-braces protection against TOCTOU
-    /// symlink swaps.
+    /// symlink swaps. `.noFollow` resolves to `O_NOFOLLOW` on both Darwin
+    /// and Linux; the `mmap` / `munmap` calls below are platform-guarded
+    /// (`#if canImport(Darwin)` / `#elseif canImport(Glibc)`) but the
+    /// Linux configuration has no CI coverage today.
     ///
     /// - Parameters:
     ///   - path: Path to the file to map.
