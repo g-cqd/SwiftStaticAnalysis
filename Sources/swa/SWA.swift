@@ -206,49 +206,20 @@ struct Duplicates: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Output format")
     var format: OutputFormat?
 
-    @Option(
-        name: .customLong("embedding-bundle"),
-        help: "Directory containing a HF tokenizer + Core ML model for semantic clone discovery",
-    )
-    var embeddingBundle: String?
-
-    @Option(
-        name: .customLong("embedding-similarity"),
-        help: "Cosine similarity threshold for embedding discovery (0.0-1.0)",
-    )
-    var embeddingSimilarity: Double?
-
-    @Option(
-        name: .customLong("embedding-k"),
-        help: "Top-k neighbours per snippet during embedding discovery",
-    )
-    var embeddingK: Int?
-
-    @Option(
-        name: .customLong("embedding-max-length"),
-        help: "Max tokens fed to the embedding model per snippet",
-    )
-    var embeddingMaxLength: Int?
-
-    @Option(
-        name: .customLong("embedding-min-token-overlap"),
-        help:
-            "Min Jaccard over identifier tokens to keep a semantic pair (0.0 disables; default 0.20)",
-    )
-    var embeddingMinTokenOverlap: Double?
-
     @Flag(
-        name: .customLong("embedding-rerank-maxsim"),
+        name: .customLong("semantic"),
         help:
-            "Rerank semantic findings with ColBERT-style MaxSim (token-level late interaction)",
+            "Enable semantic clone discovery (HNSW + embedding model). Auto-discovers Models/<bundle>.",
     )
-    var embeddingRerankMaxSim: Bool = false
+    var semantic: Bool = false
 
-    @Option(
-        name: .customLong("embedding-maxsim-threshold"),
-        help: "MaxSim threshold below which findings are dropped during rerank (default 0.55)",
-    )
-    var embeddingMaxSimThreshold: Double?
+    /// Shared embedding configuration (bundle, preset, max-length, advanced
+    /// overrides). Only honored when `--semantic` is on. The advanced
+    /// per-knob flags (`--embedding-similarity`, `--embedding-min-token-overlap`,
+    /// `--embedding-rerank-maxsim`, etc.) are hidden from `--help` and act as
+    /// per-call overrides on top of the chosen `--preset`.
+    @OptionGroup(title: "Semantic discovery (use with --semantic)")
+    var embedding: EmbeddingOptions
 
     /// Argument-level validation. `--min-tokens` is bounded to a sensible
     /// range to prevent crashes (negative or zero) and pathological behaviour
@@ -258,15 +229,16 @@ struct Duplicates: AsyncParsableCommand {
             throw ValidationError("--min-tokens must be between 1 and 10000 (got \(minTokens))")
         }
         if let minSimilarity, !(0.0...1.0).contains(minSimilarity) {
-            throw ValidationError("--min-similarity must be between 0.0 and 1.0 (got \(minSimilarity))")
-        }
-        if let embeddingSimilarity, !(0.0...1.0).contains(embeddingSimilarity) {
             throw ValidationError(
-                "--embedding-similarity must be between 0.0 and 1.0 (got \(embeddingSimilarity))"
+                "--min-similarity must be between 0.0 and 1.0 (got \(minSimilarity))")
+        }
+        if let o = embedding.similarityOverride, !(0.0...1.0).contains(o) {
+            throw ValidationError(
+                "--embedding-similarity must be between 0.0 and 1.0 (got \(o))"
             )
         }
-        if let embeddingK, !(1...100).contains(embeddingK) {
-            throw ValidationError("--embedding-k must be between 1 and 100 (got \(embeddingK))")
+        if let o = embedding.kOverride, !(1...100).contains(o) {
+            throw ValidationError("--embedding-k must be between 1 and 100 (got \(o))")
         }
     }
 
@@ -324,24 +296,13 @@ struct Duplicates: AsyncParsableCommand {
         let structural = try await detector.detectClones(in: files)
 
         // Embedding-based semantic clone discovery via a downloaded HF
-        // model bundle (e.g. GraphCodeBERT / CodeBERT / Jina v2 code /
-        // CodeT5+). Recovers Type-2 / Type-3 clones the structural pass
-        // misses because identifiers differ.
-        let semantic: [CloneGroup]
-        if let embeddingBundle {
-            semantic = try await runEmbeddingDiscovery(
-                bundlePath: embeddingBundle,
-                rootPaths: paths,
-                similarity: embeddingSimilarity ?? 0.85,
-                k: embeddingK ?? 10,
-                maxLength: embeddingMaxLength ?? 256,
-                minTokenOverlap: embeddingMinTokenOverlap ?? 0.20,
-                rerankMaxSim: embeddingRerankMaxSim,
-                maxSimThreshold: embeddingMaxSimThreshold ?? 0.55,
-            )
-        } else {
-            semantic = []
-        }
+        // model bundle (e.g. MiniLM / CodeBERT / GraphCodeBERT). Recovers
+        // Type-2 / Type-3 clones the structural pass misses because
+        // identifiers differ. Only runs when `--semantic` is set.
+        let semantic: [CloneGroup] =
+            semantic
+            ? try await runEmbeddingDiscovery(rootPaths: paths)
+            : []
 
         let clones = structural + semantic
 
@@ -374,75 +335,49 @@ struct Duplicates: AsyncParsableCommand {
     /// supplied source roots. Extracts function bodies, embeds via a
     /// HuggingFace model loaded through `HFSemanticEmbeddingProvider`,
     /// and surfaces semantic clone groups via `EmbeddingCloneDiscovery`.
+    /// Run the embedding-discovery pipeline against `rootPaths` using
+    /// the `--semantic`-enabled `EmbeddingOptions` group. The bundle is
+    /// auto-discovered, the `--preset` choice plus any explicit
+    /// `--embedding-*` overrides materialize into the discovery
+    /// thresholds, and MaxSim rerank kicks in iff the preset enables it
+    /// or the user passes `--embedding-rerank-maxsim`.
     private func runEmbeddingDiscovery(
-        bundlePath: String,
-        rootPaths: [String],
-        similarity: Double,
-        k: Int,
-        maxLength: Int,
-        minTokenOverlap: Double,
-        rerankMaxSim: Bool,
-        maxSimThreshold: Double,
+        rootPaths: [String]
     ) async throws -> [CloneGroup] {
-        let bundleURL = URL(fileURLWithPath: bundlePath)
-        let provider = try await HFSemanticEmbeddingProvider(
-            bundleDir: bundleURL,
-            maxLength: maxLength,
-        )
+        let ctx = try await embedding.loadScanContext(paths: rootPaths)
+        guard !ctx.snippets.isEmpty else { return [] }
 
-        var snippets: [EmbeddingSnippet] = []
-        for path in rootPaths {
-            let url = URL(fileURLWithPath: path)
-            var isDir: ObjCBool = false
-            FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
-            if isDir.boolValue {
-                let found = try FunctionSnippetExtractor.extract(directory: url)
-                snippets.append(contentsOf: found)
-            } else if url.pathExtension == "swift" {
-                let found = try FunctionSnippetExtractor.extract(fileURL: url)
-                snippets.append(contentsOf: found)
-            }
-        }
-
-        guard !snippets.isEmpty else { return [] }
-
+        let thresholds = embedding.resolvedThresholds()
         let discovery = EmbeddingCloneDiscovery()
         let groups = try await discovery.discover(
-            snippets: snippets,
-            provider: provider,
-            k: k,
-            similarityThreshold: similarity,
-            minTokenOverlap: minTokenOverlap,
+            snippets: ctx.snippets,
+            provider: ctx.provider,
+            k: embedding.k,
+            similarityThreshold: thresholds.cosine,
+            minTokenOverlap: thresholds.jaccard,
         )
 
-        guard rerankMaxSim, !groups.isEmpty else { return groups }
+        guard let maxSimThreshold = thresholds.maxsim, !groups.isEmpty else {
+            return groups
+        }
 
-        // Late-interaction rerank: for each group, score the first
-        // member-pair via MaxSim on per-token embeddings, drop groups
-        // below the threshold. Per-pair cost is O(m·n·D); only run
-        // on K groups returned by HNSW, so total cost is bounded.
         let verifier = MaxSimVerifier()
-        var keptGroups: [CloneGroup] = []
-        keptGroups.reserveCapacity(groups.count)
+        var kept: [CloneGroup] = []
+        kept.reserveCapacity(groups.count)
         for group in groups {
             guard group.clones.count >= 2 else { continue }
-            let aCode = group.clones[0].codeSnippet
-            let bCode = group.clones[1].codeSnippet
             do {
-                let aTokens = try await provider.embedTokens(snippet: aCode)
-                let bTokens = try await provider.embedTokens(snippet: bCode)
-                let maxSim = verifier.score(aTokens, bTokens)
-                if Double(maxSim) >= maxSimThreshold {
-                    keptGroups.append(group)
+                let a = try await ctx.provider.embedTokens(snippet: group.clones[0].codeSnippet)
+                let b = try await ctx.provider.embedTokens(snippet: group.clones[1].codeSnippet)
+                if Double(verifier.score(a, b)) >= maxSimThreshold {
+                    kept.append(group)
                 }
             } catch {
-                // Provider doesn't support per-token output (e.g. pre-
-                // pooled Gemma). Fall through and keep the group rather
-                // than penalize the user for choosing an unsupported model.
-                keptGroups.append(group)
+                // Pre-pooled provider (Gemma) → fall through, keep.
+                kept.append(group)
             }
         }
-        return keptGroups
+        return kept
     }
 }
 
