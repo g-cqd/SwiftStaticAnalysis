@@ -383,6 +383,64 @@ with typed builders.
 
 ---
 
+## Batch 5 — Scrub planning artifacts (0.3.0-α.9)
+
+User instruction (recorded 2026-05-15, after `0.3.0-alpha.8`):
+
+> Add a phase to the plan to remove all documentation and comments
+> related to the planification artifacts, decision making or audit.
+
+The audit and this plan were process artifacts. Now that the
+in-scope work is shipped (Batches 1–4 + selected B5 pull-forwards),
+the residue should not survive into the long-term codebase.
+
+### Scope
+
+1. **Delete the `audit/` directory in full** — audit summary,
+   per-area scratch files, `.DS_Store`, and this plan itself.
+   The `.gitignore` exception `!audit/REMEDIATION-PLAN.md` is
+   removed alongside.
+2. **CHANGELOG truth-up to substance.** Each `[0.3.0-α.N]` and
+   `[0.2.1]` section currently leads with a planification slug
+   (`Closes B3-X from the deferred B3.1 cluster`, `audit B3-7`,
+   `Batch 1`, etc.). Rewrite to describe what changed and why,
+   without referencing the audit, the batches, or the plan IDs.
+   Substance stays — the per-section perf tables, behavioural
+   notes, and migration callouts are release-log content, not
+   planning residue.
+3. **Code comment scrub.** Grep-and-trim references to:
+   - `audit B?-?`, `audit F-NN`, `audit ID-NN`
+   - `Batch N` / `B[1-6]-N` slugs
+   - `(audit ...)` parenthetical attributions
+   - `0.3.0-α.N` / `0.3.0-alpha.N` version pin slugs that name
+     the release in which a refactor landed (release info lives
+     in CHANGELOG, not in the code)
+   - `pre-0.3`, `post-0.3`, `pre-B`, `post-B` temporal slugs
+   - `remediation`, `deferred B*`
+   Keep technical WHY comments (invariants, constraints,
+   workaround rationale). Lean toward keeping anything that
+   would help a reader who doesn't know the plan ever existed.
+4. **Final commit's message** documents the scrub directly; the
+   git log is the durable record of why the directory disappeared.
+
+### Acceptance
+
+- `audit/` does not exist on `main`.
+- `git grep -E 'audit|B[1-6]-[0-9]+|Batch [0-9]|deferred B3|REMEDIATION'`
+  returns only false positives (e.g. `IndexStoreReader.findOccurrences`
+  matches `audit` inside an unrelated word, etc.).
+- `swift build -c release` and `swift test --parallel` pass.
+- `bench/compare.sh` is unaffected (this is a docs/comments change).
+- CHANGELOG entries still describe every shipped change; only the
+  meta-vocabulary is gone.
+
+### Estimate
+
+~0.5 day. Mechanical work + one careful sweep for borderline
+comments.
+
+---
+
 ## Deferred (B5/B6 — out of approved scope)
 
 These are *not* tied to current README/CHANGELOG claims, so "always
