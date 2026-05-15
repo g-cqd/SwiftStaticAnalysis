@@ -5,6 +5,96 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.16] - Unreleased
+
+**SOTA semantic clone discovery, fully Swift-native via the `swa` CLI.**
+
+β.15 shipped real downloaded embedding models but proved the pipeline through
+a Python harness (`scripts/embed-self-scan.py`) because the Swift tool had
+three integration gaps: no BPE tokenizer, no CLI flag, no SwiftSyntax-based
+function extractor. β.16 closes all three. The `swa duplicates
+--embedding-bundle <dir>` invocation now runs the full discovery pipeline
+end-to-end in Swift against any HuggingFace feature-extraction model.
+
+### New surfaces
+
+- **`HFSemanticEmbeddingProvider`** — model-agnostic `SemanticEmbeddingProvider`
+  backed by `Tokenizers.AutoTokenizer` (HuggingFace `swift-transformers`) +
+  Core ML. Loads a "bundle directory" containing `Model.mlpackage` /
+  `.mlmodelc` plus the standard HF tokenizer files (`tokenizer.json`,
+  `config.json`, etc.). Handles BERT WordPiece, RoBERTa BPE, SentencePiece
+  transparently — the bundle layout is the only thing the consumer needs to
+  produce.
+- **`FunctionSnippetExtractor`** — SwiftSyntax-based visitor that walks a
+  source string / file / directory, extracts every `FunctionDeclSyntax` and
+  `InitializerDeclSyntax` body that fits inside [`minimumLines`,
+  `maximumLines`] (5..60 by default), and produces `EmbeddingSnippet`s
+  suitable for `EmbeddingCloneDiscovery`. Skips `.build` and `Models`
+  artifact dirs.
+- **`swa duplicates --embedding-bundle <dir>`** CLI flag. Reads the bundle,
+  walks the source roots via `FunctionSnippetExtractor`, embeds via
+  `HFSemanticEmbeddingProvider`, runs `EmbeddingCloneDiscovery`, and merges
+  semantic clone groups into the structural detector's output. Companion
+  flags: `--embedding-similarity` (default 0.85), `--embedding-k` (default
+  10), `--embedding-max-length` (default 256).
+- **`swift-transformers` package dependency** (1.3.2). Pulled in so a single
+  provider type covers every HF feature-extraction model without
+  per-architecture tokenizer code.
+
+### What works end-to-end via `swa` (no Python in the inference path)
+
+| invocation | result |
+|---|---|
+| `swa duplicates Sources --embedding-bundle Models/MiniLM --embedding-max-length 128` | 78 semantic clone groups, 3449 dup lines, full Sources/ in 76s |
+| `swa duplicates Sources/DuplicationDetector/Semantic --embedding-bundle Models/CodeBERT --embedding-max-length 128` | CodeBERT (RoBERTa BPE) loaded via swift-transformers, real semantic findings |
+| `swa duplicates Sources --embedding-bundle Models/CodeBERT --embedding-similarity 0.95 --embedding-max-length 128` | Full Sources/ scan, 5:27 CPU on 823 function snippets |
+
+### Pre-converted model bundles documented
+
+`scripts/convert-hf-encoder.py` produces fresh bundles from any HF encoder.
+For consumers who don't want to fight the `torch 2.8 + coremltools 8.x`
+compatibility gap, pre-converted CoreML bundles are available on
+HuggingFace:
+
+- `sentence-transformers/all-MiniLM-L6-v2` →
+  `wiktorwojcik112/all-MiniLM-L6-v2-coreml` (feature-extraction variant)
+- `microsoft/codebert-base` →
+  `rsvalerio/codebert-base-coreml` (drop-in; output named `hidden_states`)
+
+The provider autodetects output name (`last_hidden_state` →
+`hidden_states` → `output` → first multi-array output) and reads
+`hidden_size` from the bundle's `config.json` so the embedding dimension
+matches the model rather than relying on a baked-in default.
+
+### Python comparison artifacts
+
+`scripts/embed-sota-comparison.py` runs an A/B across 5 SOTA code embedders
+(MiniLM, CodeBERT, GraphCodeBERT, Jina v2 code, CodeT5+ embedding) and
+prints a ranked summary plus the top-5 discovered groups per model. Used to
+inform the threshold defaults: MiniLM clusters wide (p99.5=0.688),
+CodeBERT clusters tight (p99.5=0.996), GraphCodeBERT in-between (p99.5=0.977).
+
+### Honest scope
+
+- All four code-trained SOTA models (CodeBERT, GraphCodeBERT, Jina v2 code,
+  CodeT5+) use RoBERTa byte-level BPE. swift-transformers handles this
+  transparently — no per-model tokenizer code needed.
+- `scripts/convert-hf-encoder.py` was tested fully on MiniLM-L6-v2. On
+  CodeBERT/GraphCodeBERT the conversion segfaults under `torch 2.8.0` +
+  `coremltools 8.x`; downgrading torch to 2.7.0 (the last tested version)
+  is the documented workaround. Pre-converted bundles avoid the issue.
+- The CodeBERT/GraphCodeBERT/Jina-code Python comparison ran fine; only the
+  Swift integration of newly-converted code models requires the torch
+  downgrade. The Swift CLI itself runs cleanly on the pre-converted bundles
+  in the table above.
+
+### Tests
+
+Existing 1191 tests still green. The β.14/β.15 `NLContextual`,
+`Deterministic`, and `Bert` integration tests are unchanged — they
+exercise the same `SemanticEmbeddingProvider` protocol that the new
+`HFSemanticEmbeddingProvider` conforms to.
+
 ## [0.3.0-beta.15] - Unreleased
 
 **Real downloaded model + self-scan + first model-discovered refactor.**
