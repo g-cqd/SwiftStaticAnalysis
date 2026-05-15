@@ -484,21 +484,18 @@ struct CLICommandTests {
         #expect(output.ranToCompletion, "Reachability report should run to completion")
     }
 
-    @Test("--parallel emits the documented deprecation warning")
-    func legacyParallelEmitsDeprecationWarning() async throws {
+    @Test("--parallel is removed (β.22); --parallel-mode is the canonical surface")
+    func legacyParallelIsRejected() async throws {
         let fixture = try fixtureFile("SimpleClass.swift")
         let output = try await runSWA(["duplicates", "--parallel", fixture])
 
-        // Subcommand should still complete (legacy flag is preserved
-        // through 0.x).
-        #expect(output.ranToCompletion, "Legacy --parallel must still run to completion")
+        // The β.22 consolidation dropped the long-deprecated --parallel
+        // flag. ArgumentParser now rejects it with "Unknown option".
+        // The replacement is --parallel-mode {none|safe|maximum}.
+        #expect(!output.ranToCompletion)
         #expect(
-            output.stderr.contains("'--parallel' is deprecated"),
-            "Stderr should carry the deprecation diagnostic, got: \(output.stderr)"
-        )
-        #expect(
-            output.stderr.contains("'--parallel-mode safe"),
-            "Diagnostic should point users at the canonical mapping (--parallel-mode safe)"
+            output.stderr.contains("Unknown option") && output.stderr.contains("--parallel"),
+            "Expected unknown-option diagnostic, got: \(output.stderr)"
         )
     }
 

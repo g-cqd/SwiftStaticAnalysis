@@ -90,6 +90,15 @@ struct Analyze: AsyncParsableCommand {
     @Option(name: .shortAndLong, help: "Output format (text, json, xcode)")
     var format: OutputFormat?
 
+    @Flag(
+        name: .customLong("semantic"),
+        help: "Also run semantic clone discovery (HNSW + embedding model)",
+    )
+    var semantic: Bool = false
+
+    @OptionGroup(title: "Semantic discovery (use with --semantic)")
+    var embedding: EmbeddingOptions
+
     func run() async throws {
         // Use first path for configuration discovery
         let primaryPath = paths.first ?? "."
@@ -110,6 +119,14 @@ struct Analyze: AsyncParsableCommand {
             let dupConfig = buildDuplicationConfig(from: swaConfig?.duplicates)
             let dupDetector = DuplicationDetector(configuration: dupConfig)
             clones = try await dupDetector.detectClones(in: files)
+        }
+
+        // Optional semantic clone discovery (HNSW + embedding model).
+        if semantic {
+            let semanticGroups = try await runUmbrellaEmbeddingDiscovery(
+                embedding: embedding, rootPaths: paths
+            )
+            clones.append(contentsOf: semanticGroups)
         }
 
         // Run unused code detection if enabled
@@ -197,9 +214,6 @@ struct Duplicates: AsyncParsableCommand {
     @Option(name: .long, parsing: .upToNextOption, help: "Paths to exclude (glob patterns)")
     var excludePaths: [String] = []
 
-    @Flag(name: .long, help: "Use parallel processing (deprecated: use --parallel-mode)")
-    var parallel: Bool = false
-
     @Option(name: .long, help: "Parallel mode (none, safe, maximum)")
     var parallelMode: ParallelMode?
 
@@ -267,15 +281,8 @@ struct Duplicates: AsyncParsableCommand {
         // The deprecated `--parallel` flag maps to `.safe` through the
         // canonical `ParallelMode.from(legacyParallel:)`, matching the
         // `.swa.json` decoder and the README contract.
-        let effectiveParallelMode: ParallelMode
-        if let mode = parallelMode {
-            effectiveParallelMode = mode
-        } else if parallel {
-            DeprecatedFlags.warnLegacyParallel()
-            effectiveParallelMode = ParallelMode.from(legacyParallel: parallel)
-        } else {
-            effectiveParallelMode = dupConfig?.resolvedParallelMode ?? .maximum
-        }
+        let effectiveParallelMode: ParallelMode =
+            parallelMode ?? dupConfig?.resolvedParallelMode ?? .maximum
         let effectiveParallel = effectiveParallelMode.isParallel
 
         // Merge with global excludePaths
@@ -335,49 +342,8 @@ struct Duplicates: AsyncParsableCommand {
     /// supplied source roots. Extracts function bodies, embeds via a
     /// HuggingFace model loaded through `HFSemanticEmbeddingProvider`,
     /// and surfaces semantic clone groups via `EmbeddingCloneDiscovery`.
-    /// Run the embedding-discovery pipeline against `rootPaths` using
-    /// the `--semantic`-enabled `EmbeddingOptions` group. The bundle is
-    /// auto-discovered, the `--preset` choice plus any explicit
-    /// `--embedding-*` overrides materialize into the discovery
-    /// thresholds, and MaxSim rerank kicks in iff the preset enables it
-    /// or the user passes `--embedding-rerank-maxsim`.
-    private func runEmbeddingDiscovery(
-        rootPaths: [String]
-    ) async throws -> [CloneGroup] {
-        let ctx = try await embedding.loadScanContext(paths: rootPaths)
-        guard !ctx.snippets.isEmpty else { return [] }
-
-        let thresholds = embedding.resolvedThresholds()
-        let discovery = EmbeddingCloneDiscovery()
-        let groups = try await discovery.discover(
-            snippets: ctx.snippets,
-            provider: ctx.provider,
-            k: embedding.k,
-            similarityThreshold: thresholds.cosine,
-            minTokenOverlap: thresholds.jaccard,
-        )
-
-        guard let maxSimThreshold = thresholds.maxsim, !groups.isEmpty else {
-            return groups
-        }
-
-        let verifier = MaxSimVerifier()
-        var kept: [CloneGroup] = []
-        kept.reserveCapacity(groups.count)
-        for group in groups {
-            guard group.clones.count >= 2 else { continue }
-            do {
-                let a = try await ctx.provider.embedTokens(snippet: group.clones[0].codeSnippet)
-                let b = try await ctx.provider.embedTokens(snippet: group.clones[1].codeSnippet)
-                if Double(verifier.score(a, b)) >= maxSimThreshold {
-                    kept.append(group)
-                }
-            } catch {
-                // Pre-pooled provider (Gemma) → fall through, keep.
-                kept.append(group)
-            }
-        }
-        return kept
+    private func runEmbeddingDiscovery(rootPaths: [String]) async throws -> [CloneGroup] {
+        try await runUmbrellaEmbeddingDiscovery(embedding: embedding, rootPaths: rootPaths)
     }
 }
 
@@ -457,18 +423,25 @@ struct Unused: AsyncParsableCommand {
     @Flag(inversion: .prefixedNo, help: "Treat SwiftUI Views as entry points")
     var treatSwiftUIViewsAsRoot: Bool?
 
-    // SwiftUI flags
-    @Flag(name: .long, help: "Ignore SwiftUI property wrappers")
+    /// SwiftUI-aware mode. Single flag that bundles the three
+    /// previously-separate ignore knobs (property wrappers, preview
+    /// providers, View body properties). Equivalent to passing
+    /// `--ignore-swiftui-property-wrappers --ignore-preview-providers
+    /// --ignore-view-body` together.
+    @Flag(name: .customLong("swiftui"),
+        help: "SwiftUI-aware mode: skip property wrappers, PreviewProvider, View body")
+    var swiftUI: Bool = false
+
+    // Individual SwiftUI overrides — hidden from --help. Power users who
+    // want fine-grained control can still toggle each independently.
+    @Flag(name: .long, help: ArgumentHelp(visibility: .hidden))
     var ignoreSwiftUIPropertyWrappers: Bool = false
 
-    @Flag(name: .long, help: "Ignore PreviewProvider implementations")
+    @Flag(name: .long, help: ArgumentHelp(visibility: .hidden))
     var ignorePreviewProviders: Bool = false
 
-    @Flag(name: .long, help: "Ignore View body properties")
+    @Flag(name: .long, help: ArgumentHelp(visibility: .hidden))
     var ignoreViewBody: Bool = false
-
-    @Flag(name: .long, help: "Use parallel processing (deprecated: use --parallel-mode)")
-    var parallel: Bool = false
 
     @Option(name: .long, help: "Parallel mode (none, safe, maximum)")
     var parallelMode: ParallelMode?
@@ -503,12 +476,19 @@ struct Unused: AsyncParsableCommand {
         let effectiveTreatObjcAsRoot = treatObjcAsRoot ?? unusedConfig?.treatObjcAsRoot ?? true
         let effectiveTreatTestsAsRoot = treatTestsAsRoot ?? unusedConfig?.treatTestsAsRoot ?? true
         let effectiveTreatSwiftUIViewsAsRoot = treatSwiftUIViewsAsRoot ?? unusedConfig?.treatSwiftUIViewsAsRoot ?? true
+        // --swiftui rolls up the three individual ignore-* knobs so users
+        // don't have to remember each one.
+        let swiftUIShorthand = swiftUI
 
         // Merge SwiftUI settings
         let effectiveIgnoreSwiftUIPropertyWrappers =
-            ignoreSwiftUIPropertyWrappers || (unusedConfig?.ignoreSwiftUIPropertyWrappers ?? false)
-        let effectiveIgnorePreviewProviders = ignorePreviewProviders || (unusedConfig?.ignorePreviewProviders ?? false)
-        let effectiveIgnoreViewBody = ignoreViewBody || (unusedConfig?.ignoreViewBody ?? false)
+            swiftUIShorthand || ignoreSwiftUIPropertyWrappers
+            || (unusedConfig?.ignoreSwiftUIPropertyWrappers ?? false)
+        let effectiveIgnorePreviewProviders =
+            swiftUIShorthand || ignorePreviewProviders
+            || (unusedConfig?.ignorePreviewProviders ?? false)
+        let effectiveIgnoreViewBody =
+            swiftUIShorthand || ignoreViewBody || (unusedConfig?.ignoreViewBody ?? false)
 
         // Resolve parallel mode: CLI --parallel-mode > CLI --parallel > config.
         // See `Duplicates.run` for the alignment rationale; both subcommands
@@ -524,10 +504,6 @@ struct Unused: AsyncParsableCommand {
         let parallelExplicitlySet: Bool
         if let mode = parallelMode {
             effectiveParallelMode = mode
-            parallelExplicitlySet = true
-        } else if parallel {
-            DeprecatedFlags.warnLegacyParallel()
-            effectiveParallelMode = ParallelMode.from(legacyParallel: parallel)
             parallelExplicitlySet = true
         } else if let configMode = unusedConfig?.resolvedParallelMode {
             effectiveParallelMode = configMode
@@ -1102,6 +1078,63 @@ func parseDetectionMode(_ mode: String?) -> DetectionMode {
 func parseConfidence(_ confidence: String?) -> Confidence? {
     guard let confidence else { return nil }
     return Confidence(rawValue: confidence.lowercased())
+}
+
+/// Shared embedding-discovery pipeline. Used by both `Duplicates --semantic`
+/// and `Analyze --semantic` so the two subcommands stay consistent.
+func runUmbrellaEmbeddingDiscovery(
+    embedding: EmbeddingOptions, rootPaths: [String]
+) async throws -> [CloneGroup] {
+    let ctx = try await embedding.loadScanContext(paths: rootPaths)
+    guard !ctx.snippets.isEmpty else { return [] }
+
+    let thresholds = embedding.resolvedThresholds()
+    let discovery = EmbeddingCloneDiscovery()
+    let groups = try await discovery.discover(
+        snippets: ctx.snippets,
+        provider: ctx.provider,
+        k: embedding.k,
+        similarityThreshold: thresholds.cosine,
+        minTokenOverlap: thresholds.jaccard,
+    )
+
+    guard !groups.isEmpty else { return groups }
+
+    // Late-interaction reranks. Both MaxSim (token-level alignment) and
+    // AST shape (structural trigram Jaccard) are applied when the
+    // preset / overrides enable them. A group must pass EVERY enabled
+    // rerank to survive — they catch complementary false-positive classes.
+    let maxSimVerifier = thresholds.maxsim != nil ? MaxSimVerifier() : nil
+    let shapeReranker = thresholds.astShape != nil ? ASTShapeReranker() : nil
+    guard maxSimVerifier != nil || shapeReranker != nil else { return groups }
+
+    var kept: [CloneGroup] = []
+    kept.reserveCapacity(groups.count)
+    outer: for group in groups where group.clones.count >= 2 {
+        let aCode = group.clones[0].codeSnippet
+        let bCode = group.clones[1].codeSnippet
+
+        if let maxSimVerifier, let maxSimThreshold = thresholds.maxsim {
+            do {
+                let a = try await ctx.provider.embedTokens(snippet: aCode)
+                let b = try await ctx.provider.embedTokens(snippet: bCode)
+                if Double(maxSimVerifier.score(a, b)) < maxSimThreshold {
+                    continue outer
+                }
+            } catch {
+                // Pre-pooled provider (Gemma) — skip MaxSim gate, fall through.
+            }
+        }
+
+        if let shapeReranker, let shapeThreshold = thresholds.astShape {
+            if shapeReranker.score(aCode, bCode) < shapeThreshold {
+                continue outer
+            }
+        }
+
+        kept.append(group)
+    }
+    return kept
 }
 
 // swiftlint:disable:next function_parameter_count

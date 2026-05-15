@@ -31,11 +31,14 @@ public enum SemanticPreset: String, ExpressibleByArgument, CaseIterable, Sendabl
     public var thresholds: SemanticThresholds {
         switch self {
         case .balanced:
-            return SemanticThresholds(cosine: 0.85, jaccard: 0.20, maxsim: nil)
+            return SemanticThresholds(cosine: 0.85, jaccard: 0.20, maxsim: nil, astShape: nil)
         case .strict:
-            return SemanticThresholds(cosine: 0.90, jaccard: 0.30, maxsim: 0.85)
+            // Strict = cosine + jaccard + MaxSim (token-level alignment) +
+            // AST trigram Jaccard (structural alignment). Either rerank
+            // alone catches a different false-positive class.
+            return SemanticThresholds(cosine: 0.90, jaccard: 0.30, maxsim: 0.85, astShape: 0.25)
         case .loose:
-            return SemanticThresholds(cosine: 0.80, jaccard: 0.10, maxsim: nil)
+            return SemanticThresholds(cosine: 0.80, jaccard: 0.10, maxsim: nil, astShape: nil)
         }
     }
 }
@@ -47,6 +50,9 @@ public struct SemanticThresholds: Sendable {
     public var jaccard: Double
     /// MaxSim rerank threshold. `nil` disables late-interaction rerank.
     public var maxsim: Double?
+    /// AST shape (trigram Jaccard over linearized SwiftSyntax node types)
+    /// rerank threshold. `nil` disables structural rerank.
+    public var astShape: Double?
 }
 
 // MARK: - EmbeddingOptions
@@ -121,6 +127,18 @@ public struct EmbeddingOptions: ParsableArguments {
     )
     public var maxSimThresholdOverride: Double?
 
+    @Flag(
+        name: .customLong("embedding-rerank-shape"),
+        help: ArgumentHelp(visibility: .hidden),
+    )
+    public var rerankShape: Bool = false
+
+    @Option(
+        name: .customLong("embedding-shape-threshold"),
+        help: ArgumentHelp(visibility: .hidden),
+    )
+    public var astShapeThresholdOverride: Double?
+
     // ---- Resolution helpers ----
 
     /// Default top-k for HNSW / search / anomaly etc. Overridden by
@@ -135,6 +153,9 @@ public struct EmbeddingOptions: ParsableArguments {
         if let o = minTokenOverlapOverride { t.jaccard = o }
         if rerankMaxSim || maxSimThresholdOverride != nil {
             t.maxsim = maxSimThresholdOverride ?? t.maxsim ?? 0.85
+        }
+        if rerankShape || astShapeThresholdOverride != nil {
+            t.astShape = astShapeThresholdOverride ?? t.astShape ?? 0.25
         }
         return t
     }
