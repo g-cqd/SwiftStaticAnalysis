@@ -5,6 +5,25 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-beta.17] - Unreleased
+
+**Drop `BertSemanticEmbeddingProvider` — fully superseded by
+`HFSemanticEmbeddingProvider`.** Discovered by running the β.16 structural
+clone detector against the codebase itself: 17 overlapping clone groups
+between `BertSemanticEmbeddingProvider.swift` and the new
+`HFSemanticEmbeddingProvider.swift`, covering the full mean-pooling +
+MLMultiArray-building path. `HFSemanticEmbeddingProvider` already handles
+WordPiece via `Tokenizers.AutoTokenizer`, so the hand-rolled
+`BertWordPieceTokenizer` is dead too.
+
+Net: −370 LOC of redundant provider code, −3 tests (the BERT-specific
+end-to-end coverage is duplicated by the `HF*` path through the same
+MiniLM bundle).
+
+The `Bert*` types were β.15 stopgaps shipped before the
+`swift-transformers` integration in β.16 made model-architecture-agnostic
+loading possible.
+
 ## [0.3.0-beta.16] - Unreleased
 
 **SOTA semantic clone discovery, fully Swift-native via the `swa` CLI.**
