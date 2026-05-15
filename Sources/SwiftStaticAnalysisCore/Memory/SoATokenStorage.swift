@@ -350,29 +350,14 @@ public struct ArenaTokenStorage: Sendable {
     public init(from storage: SoATokenStorage, arena: inout Arena) {
         count = storage.count
 
-        // Allocate and copy kinds
-        let kindsBuffer = arena.allocate(count: count) as UnsafeMutableBufferPointer<UInt8>
-        for (i, kind) in storage.kinds.enumerated() {
-            kindsBuffer[i] = kind
-        }
-
-        // Allocate and copy offsets
-        let offsetsBuffer = arena.allocate(count: count) as UnsafeMutableBufferPointer<UInt32>
-        for (i, offset) in storage.offsets.enumerated() {
-            offsetsBuffer[i] = offset
-        }
-
-        // Allocate and copy lengths
-        let lengthsBuffer = arena.allocate(count: count) as UnsafeMutableBufferPointer<UInt16>
-        for (i, length) in storage.lengths.enumerated() {
-            lengthsBuffer[i] = length
-        }
-
-        // Allocate and copy lines
-        let linesBuffer = arena.allocate(count: count) as UnsafeMutableBufferPointer<UInt32>
-        for (i, line) in storage.lines.enumerated() {
-            linesBuffer[i] = line
-        }
+        // `arena.copy(_:)` allocates and `memcpy`s in one go — replaces
+        // the four per-element loops the previous implementation used,
+        // and lets the compiler lower each bulk copy to a single
+        // vectorised intrinsic.
+        let kindsBuffer = arena.copy(storage.kinds)
+        let offsetsBuffer = arena.copy(storage.offsets)
+        let lengthsBuffer = arena.copy(storage.lengths)
+        let linesBuffer = arena.copy(storage.lines)
 
         self.buffers = ArenaTokenStorageBuffers(
             kinds: UnsafeBufferPointer(kindsBuffer),

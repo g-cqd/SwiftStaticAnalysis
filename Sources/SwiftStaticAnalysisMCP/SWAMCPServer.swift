@@ -1388,14 +1388,16 @@ internal struct ReadResourceURIError: Error, Sendable {
 // MARK: - Tool.Content factory
 
 extension Tool.Content {
-    /// Migration shim around `Tool.Content.text(text:annotations:_meta:)`.
+    /// Canonical single-argument convenience over
+    /// `Tool.Content.text(text:annotations:_meta:)`.
     ///
-    /// The MCP swift-sdk deprecated `.text(_:metadata:)` in favour of the
-    /// new three-parameter shape with explicit `annotations` and `_meta`.
-    /// Touching every call site with the verbose form would be noisy and
-    /// risk regressing in future SDK revisions; routing through this
-    /// helper keeps the call sites readable and gives a single
-    /// place to update when the SDK changes again.
+    /// The MCP swift-sdk's three-named-argument text factory is the
+    /// non-deprecated form, but verbose at every call site (`.text(
+    /// text: ..., annotations: nil, _meta: nil)`). Routing all our
+    /// `swaText(...)` invocations through this helper keeps the call
+    /// sites readable, centralises the `annotations: nil` / `_meta: nil`
+    /// defaults, and gives one place to update when the SDK shape
+    /// shifts again.
     @inline(__always)
     internal static func swaText(_ text: String) -> Self {
         .text(text: text, annotations: nil, _meta: nil)

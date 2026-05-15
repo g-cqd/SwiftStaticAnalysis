@@ -337,4 +337,65 @@ struct DenseGraphTests {
         #expect(stats.maxOutDegree == 2)  // A has 2 outgoing
         #expect(stats.maxInDegree == 2)  // C has 2 incoming
     }
+
+    // MARK: - Parallel ↔ Sequential differential
+
+    @Test("ParallelBFS matches sequential reference on a cyclic graph with duplicate roots")
+    func parallelMatchesSequentialOnCyclicGraph() async {
+        // Cyclic shape with a back edge c → b, duplicate root "a" in the
+        // input list (the constructor dedups via Set<String> on rootIds),
+        // and one node with multiple successors.
+        //
+        //   a → b → c → b   (back edge)
+        //       ↓
+        //       d
+        let graph = DenseGraph(
+            nodeIds: ["a", "b", "c", "d"],
+            edges: [
+                (from: "a", to: "b"),
+                (from: "b", to: "c"),
+                (from: "c", to: "b"),
+                (from: "b", to: "d"),
+            ],
+            rootIds: ["a", "a"]
+        )
+
+        let sequential = graph.computeReachableSequential()
+        let parallel = await ParallelBFS.computeReachable(
+            graph: graph,
+            configuration: ParallelBFS.Configuration(minParallelSize: 1)
+        )
+
+        #expect(
+            sequential == parallel,
+            "Parallel and sequential BFS must agree on cyclic shapes; sequential = \(sequential), parallel = \(parallel)"
+        )
+        #expect(sequential.count == 4, "All four nodes are reachable from root `a`")
+    }
+
+    @Test("ParallelBFS matches sequential reference on a disconnected graph")
+    func parallelMatchesSequentialOnDisconnectedGraph() async {
+        // Two disconnected components, only one root.
+        // Component 1: a → b → c   (rooted)
+        // Component 2: x → y → z   (unreachable)
+        let graph = DenseGraph(
+            nodeIds: ["a", "b", "c", "x", "y", "z"],
+            edges: [
+                (from: "a", to: "b"),
+                (from: "b", to: "c"),
+                (from: "x", to: "y"),
+                (from: "y", to: "z"),
+            ],
+            rootIds: ["a"]
+        )
+
+        let sequential = graph.computeReachableSequential()
+        let parallel = await ParallelBFS.computeReachable(
+            graph: graph,
+            configuration: ParallelBFS.Configuration(minParallelSize: 1)
+        )
+
+        #expect(sequential == parallel)
+        #expect(sequential.count == 3, "Only the rooted component is reachable")
+    }
 }

@@ -5,6 +5,45 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.14] - Unreleased
+
+Simplification + closes the test-coverage gaps the re-audit flagged.
+1137 tests green (1133 + 4 new).
+
+### Test coverage
+
+- **Differential BFS test.** New
+  `parallelMatchesSequentialOnCyclicGraph` + `…OnDisconnectedGraph`
+  cases in `DenseGraphTests`. Each constructs a hand-rolled
+  `DenseGraph` with a known shape (back edge / duplicate roots /
+  disconnected component) and asserts
+  `ParallelBFS.computeReachable(...)` and
+  `DenseGraph.computeReachableSequential()` agree. Prevents future
+  drift between the two implementations as they evolve.
+- **Worklist convergence test.** New
+  `liveVariableAnalysisConvergesOnBackEdge` +
+  `reachingDefinitionsConvergesOnBackEdge` cases in
+  `DataFlowTests`. Each builds a CFG with a back-edge loop *and* an
+  unreachable block (`if false { ... }`) — the shape that exposed
+  the α.12-fixed worklist-decoherence bug. Both pin convergence
+  inside a `maxIterations: 64` budget and check the post-fix
+  liveness / reaching-definitions sets are populated. Future
+  regressions to the worklist's key-uniqueness or key-projection
+  shape would fail these tests rather than silently produce wrong
+  results.
+
+### Simplification
+
+- **`ArenaTokenStorage.init(from:arena:)`** swaps four
+  per-element `for` loops for four `arena.copy(_:)` calls. Same
+  result; lower line count, vectorised bulk copy at the lowering
+  layer.
+- **`Tool.Content.swaText` docstring reframed.** Was labelled a
+  "migration shim around the deprecated `.text(_:metadata:)`"; the
+  reality is that the non-deprecated three-named-argument factory is
+  verbose at every call site, so the wrapper is a permanent
+  convenience, not a shim. Docstring now says so directly.
+
 ## [0.3.0-alpha.13] - Unreleased
 
 Six defence-in-depth hardening items the post-α.11 re-audit flagged

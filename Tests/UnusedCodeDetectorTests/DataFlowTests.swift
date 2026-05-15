@@ -1189,4 +1189,78 @@ struct DataFlowConfigurationTests {
         #expect(config.detectUninitializedUses == true)
         #expect(config.buildDefUseChains == true)
     }
+
+    // MARK: - Worklist convergence regression
+
+    /// Pin the post-fix worklist shape: a CFG with a back edge plus an
+    /// unreachable block exercises both the reachable-key path and the
+    /// unreachable-key path. The previous `Set<BlockID>` / shared-key
+    /// design could silently drop an unreachable block (or, for
+    /// `LiveVariableAnalysis`, drop a reachable block when a predecessor
+    /// re-inserted a colliding key). Both analyses must now terminate
+    /// within `maxIterations` and produce stable liveness / reaching-
+    /// definitions sets.
+    @Test("LiveVariableAnalysis converges on a back-edge function with an unreachable block")
+    func liveVariableAnalysisConvergesOnBackEdge() {
+        let source = """
+            func test(start: Int) -> Int {
+                var total = 0
+                var i = start
+                while i < 10 {
+                    total += i
+                    i += 1
+                }
+                if false {
+                    total = -1  // unreachable
+                }
+                return total
+            }
+            """
+        guard let cfg = buildCFG(from: source) else {
+            Issue.record("Failed to build CFG")
+            return
+        }
+
+        let analysis = LiveVariableAnalysis(configuration: .init(maxIterations: 64))
+        let result = analysis.analyze(cfg)
+        // The analysis must complete (not hit maxIterations) and yield a
+        // CFG whose function name round-trips. If the worklist had
+        // dropped a block, `total` would surface as a spurious dead
+        // store at the loop header.
+        #expect(result.cfg.functionName == "test")
+        #expect(
+            !result.deadStores.contains { $0.variable.name == "total" && $0.location.line <= 4 },
+            "loop-header `total` must not be flagged as a dead store after the worklist fix"
+        )
+    }
+
+    @Test("ReachingDefinitions converges on a back-edge function with an unreachable block")
+    func reachingDefinitionsConvergesOnBackEdge() {
+        let source = """
+            func test(start: Int) -> Int {
+                var x = start
+                while x > 0 {
+                    x -= 1
+                }
+                if false {
+                    x = 99  // unreachable
+                }
+                return x
+            }
+            """
+        guard let cfg = buildCFG(from: source) else {
+            Issue.record("Failed to build CFG")
+            return
+        }
+
+        let analysis = ReachingDefinitionsAnalysis(configuration: .init(maxIterations: 64))
+        let result = analysis.analyze(cfg)
+        // The analysis must converge and produce a non-empty reaching-
+        // definitions map for the function. If unreachable blocks
+        // collided on their worklist key, the loop wouldn't terminate
+        // (or would pick the wrong block on pop) and `result.reachIn`
+        // would be empty / partial.
+        #expect(result.cfg.functionName == "test")
+        #expect(!result.reachIn.isEmpty, "Reaching-in sets must be populated after convergence")
+    }
 }

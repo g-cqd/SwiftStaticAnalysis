@@ -231,7 +231,8 @@ public enum CodebaseContextError: Error, LocalizedError, Sendable {
         // breaks or terminal escape sequences into stderr (CWE-117).
         switch self {
         case .invalidRootPath(let path):
-            return "Invalid root path: '\(PathUtilities.sanitizedForDiagnostic(path))' does not exist or is not a directory"
+            return
+                "Invalid root path: '\(PathUtilities.sanitizedForDiagnostic(path))' does not exist or is not a directory"
         case .pathOutsideSandbox(let path, let root):
             return
                 "Path '\(PathUtilities.sanitizedForDiagnostic(path))' is outside the allowed sandbox: '\(PathUtilities.sanitizedForDiagnostic(root))'"
