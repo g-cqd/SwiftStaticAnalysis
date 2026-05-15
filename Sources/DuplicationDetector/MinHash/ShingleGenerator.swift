@@ -165,6 +165,15 @@ public struct ShingleGenerator: Sendable {
     ///
     /// This breaks the file into logical blocks (functions, classes) for comparison.
     ///
+    /// 0.3.0-α.3: rewritten to iterate `ArraySlice<TokenInfo>` directly.
+    /// Pre-0.3 the hot path materialised `[String]` and `[TokenKind]`
+    /// arrays via `sequence.tokens.map(\.text)` /
+    /// `sequence.tokens.map(\.kind)` once per file — two N-element
+    /// allocations on the hottest duplication code path. Now the
+    /// per-window iterator operates on `sequence.tokens[i..<j]` and
+    /// the shared shingle/normalize pipeline derives strings and
+    /// kinds on demand from the same `TokenInfo` slice.
+    ///
     /// - Parameters:
     ///   - sequence: The full file token sequence.
     ///   - blockSize: Minimum tokens per block.
@@ -177,10 +186,6 @@ public struct ShingleGenerator: Sendable {
     ) -> [ShingledDocument] {
         guard sequence.tokens.count >= blockSize else { return [] }
 
-        // Materialise the texts/kinds arrays once; downstream calls take
-        // `ArraySlice` so no per-window Array copy is created.
-        let tokens = sequence.tokens.map(\.text)
-        let kinds = sequence.tokens.map(\.kind)
         let stride = max(1, blockSize / 2)  // 50% overlap
 
         var documents: [ShingledDocument] = []
@@ -189,9 +194,8 @@ public struct ShingleGenerator: Sendable {
 
         var i = 0
         while i + blockSize <= sequence.tokens.count {
-            let blockTokens = tokens[i..<(i + blockSize)]
-            let blockKinds = kinds[i..<(i + blockSize)]
-            let shingles = generate(tokens: blockTokens, kinds: blockKinds)
+            let blockTokens = sequence.tokens[i..<(i + blockSize)]
+            let shingles = generate(tokenInfos: blockTokens)
 
             let startLine = sequence.tokens[i].line
             let endLine = sequence.tokens[i + blockSize - 1].line
@@ -212,6 +216,84 @@ public struct ShingleGenerator: Sendable {
         }
 
         return documents
+    }
+
+    /// Generate shingles directly from a `TokenInfo` slice, avoiding the
+    /// two per-file `[String]` / `[TokenKind]` allocations that the
+    /// `(tokens: ArraySlice<String>, kinds: ArraySlice<TokenKind>?)`
+    /// overload triggers when invoked from
+    /// `generateBlockDocuments`. Normalisation reads `text`/`kind`
+    /// directly off each `TokenInfo`; per-window text strings are
+    /// captured lazily and only the shingle hash + a single
+    /// `[String]` slot in `Shingle.tokens` survive (callers can
+    /// inspect the raw window if they care).
+    func generate(tokenInfos: ArraySlice<TokenInfo>) -> [Shingle] {
+        guard tokenInfos.count >= shingleSize else { return [] }
+
+        // Normalised text per position. Reuses one growing dictionary
+        // per call instead of the pre-0.3 path's helper-allocated
+        // `[String]` return value.
+        let normalised: [String]
+        if normalize {
+            normalised = normalizeTokenInfos(tokenInfos)
+        } else {
+            // No normalisation: capture the raw text strings as we go.
+            normalised = tokenInfos.map(\.text)
+        }
+
+        var shingles: [Shingle] = []
+        shingles.reserveCapacity(normalised.count - shingleSize + 1)
+
+        let windowCount = normalised.count - shingleSize + 1
+        for i in 0..<windowCount {
+            let window = Array(normalised[i..<(i + shingleSize)])
+            let hash = computeShingleHash(window)
+            shingles.append(Shingle(hash: hash, position: i, tokens: window))
+        }
+
+        return shingles
+    }
+
+    /// Normalise a `TokenInfo` slice into a flat `[String]`, mirroring
+    /// `normalizeTokens(_:kinds:)` but driven by the paired
+    /// `(text, kind)` data sitting inside each `TokenInfo`. Avoids
+    /// allocating intermediate `[String]` / `[TokenKind]` columns.
+    private func normalizeTokenInfos(_ tokenInfos: ArraySlice<TokenInfo>) -> [String] {
+        var result: [String] = []
+        result.reserveCapacity(tokenInfos.count)
+        var identifierMap: [String: String] = [:]
+        var literalMap: [String: String] = [:]
+        var identifierCount = 0
+        var literalCount = 0
+
+        for info in tokenInfos {
+            switch info.kind {
+            case .identifier:
+                if let normalized = identifierMap[info.text] {
+                    result.append(normalized)
+                } else {
+                    let normalized = "$ID\(identifierCount)"
+                    identifierMap[info.text] = normalized
+                    identifierCount += 1
+                    result.append(normalized)
+                }
+
+            case .literal:
+                if let normalized = literalMap[info.text] {
+                    result.append(normalized)
+                } else {
+                    let normalized = "$LIT\(literalCount)"
+                    literalMap[info.text] = normalized
+                    literalCount += 1
+                    result.append(normalized)
+                }
+
+            default:
+                result.append(info.text)
+            }
+        }
+
+        return result
     }
 
     /// Build the `Set<UInt64>` of shingle hashes without the intermediate

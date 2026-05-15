@@ -1,6 +1,6 @@
 {
   "environment" : {
-    "gitSha" : "ad931a9",
+    "gitSha" : "93e3cf6",
     "host" : "mbp23.local",
     "platform" : "Version 26.4.1 (Build 25E253)",
     "swiftVersion" : "Apple Swift version 6.3.1 (swiftlang-6.3.1.1.2 clang-2100.0.123.102)"
@@ -8,26 +8,26 @@
   "fileCount" : 122,
   "fixture" : "Sources",
   "iterations" : 3,
-  "peakRSSBytesMean" : 97506645,
-  "peakRSSBytesP99" : 102372147,
+  "peakRSSBytesMean" : 97255424,
+  "peakRSSBytesP99" : 104167505,
   "samples" : [
     {
-      "peakRSSBytes" : 89899008,
-      "wallSeconds" : 0.330579209
+      "peakRSSBytes" : 89030656,
+      "wallSeconds" : 0.338172625
     },
     {
-      "peakRSSBytes" : 100204544,
-      "wallSeconds" : 0.332312667
+      "peakRSSBytes" : 98451456,
+      "wallSeconds" : 0.334642958
     },
     {
-      "peakRSSBytes" : 102416384,
-      "wallSeconds" : 0.324392583
+      "peakRSSBytes" : 104284160,
+      "wallSeconds" : 0.33056725
     }
   ],
   "scenario" : "duplicates-exact",
-  "wallSecondsMax" : 0.332312667,
-  "wallSecondsMean" : 0.3290948196666667,
-  "wallSecondsMedian" : 0.330579209,
-  "wallSecondsMin" : 0.324392583,
-  "wallSecondsP99" : 0.33227799784
+  "wallSecondsMax" : 0.338172625,
+  "wallSecondsMean" : 0.3344609443333333,
+  "wallSecondsMedian" : 0.334642958,
+  "wallSecondsMin" : 0.33056725,
+  "wallSecondsP99" : 0.33810203166
 }

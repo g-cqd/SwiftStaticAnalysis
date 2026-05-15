@@ -5,6 +5,34 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.4] - Unreleased
+
+Lifts **B3-6 (partial)** out of the deferred B3.1 cluster: the
+`ShingleGenerator` half can ship without the
+`SoATokenStorage`-Span-accessor half (which strictly requires the
+`FileSlice` `~Escapable` lifetime rework). 1135 tests green; baselines
+refreshed.
+
+### Performance
+
+- **B3-6a — `ShingleGenerator.generateBlockDocuments` rewritten to
+  iterate `ArraySlice<TokenInfo>` directly.** Pre-0.3 the hot path
+  materialised an N-element `[String]` (token texts) and an
+  N-element `[TokenKind]` (token kinds) per file via
+  `sequence.tokens.map(\.text)` / `.map(\.kind)`. The new
+  `generate(tokenInfos:)` + `normalizeTokenInfos(_:)` pair reads
+  `text` and `kind` straight off each `TokenInfo`, eliminating both
+  allocations. Measured **−6.5% mean wall-time on
+  `duplicates-near`** over `Sources/` (0.502s → 0.470s, 122 files);
+  the benchmark baseline has been refreshed accordingly.
+
+### Deferred (still in B3.1)
+
+The Span-accessor half of B3-6 (`SoATokenStorage.kindSpan` /
+`offsetSpan` / `lengthSpan` / `lineSpan`) requires `FileSlice`
+`~Escapable` (B3-4) for safe zero-copy lifetime. Stays paired with the
+memory-layer cluster in B3.1.
+
 ## [0.3.0-alpha.3] - Unreleased
 
 Batch 4 of the 0.2.0 audit remediation
