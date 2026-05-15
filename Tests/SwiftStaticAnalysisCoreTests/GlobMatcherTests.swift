@@ -10,17 +10,16 @@ import Testing
 struct GlobMatcherTests {
     // MARK: - Whole-match anchoring regression
     //
-    // Pre-0.2.1 the codebase carried two divergent glob implementations
-    // (partial-match in `UnusedCodeFilter`, whole-match in
-    // `CodebaseContext`). The cases below pin the new canonical
-    // whole-match semantics so a future regression to `String.contains`
-    // would fail the test.
+    // `GlobMatcher` uses anchored `wholeMatch` semantics. The cases below
+    // pin that contract so a future regression to `String.contains` would
+    // fail the test.
 
     @Test(
         "Bare segment names match only as whole tokens, never as substrings",
         arguments: [
-            // Pre-0.2.1 partial-match semantics returned true for these
-            // cases; the new whole-match semantics correctly returns false.
+            // Bare segment names match only the literal filename under
+            // whole-match semantics, never an arbitrary path containing
+            // the segment.
             ("Tests", "/Users/me/project/Sources/Tests/Foo.swift", false),
             ("Sources", "/Users/me/project/Sources/Foo.swift", false),
             // Whole-match exact equality still works.

@@ -48,9 +48,8 @@ struct RegexCacheTests {
 
     @Test("Eviction evicts the genuine least-recently-used entry (not a hash-order pick)")
     func evictsGenuineLRU() {
-        // Pre-0.2.1 the cache used `Dictionary.keys.first` which has
-        // undefined order — a regression test pin against any future
-        // re-introduction.
+        // Regression pin: eviction must pick the LRU entry, not whichever
+        // happens to surface first from `Dictionary.keys` (undefined order).
         let cache = RegexCache(capacity: 2)
         _ = cache.regex(for: "alpha")
         _ = cache.regex(for: "beta")

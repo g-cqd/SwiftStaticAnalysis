@@ -52,9 +52,8 @@ struct SWAMCPCommandTests {
     func versionShowsSemVer() async throws {
         let output = try await runCommand(["--version"])
 
-        // 0.3.0-α: swa-mcp adopted ArgumentParser, which prints just the
-        // version literal — no "swa-mcp" prefix — to match the contract
-        // of the `swa` CLI (`swa --version` is identical).
+        // ArgumentParser's `--version` prints just the version literal
+        // (no "swa-mcp" prefix), matching the contract of `swa --version`.
         #expect(output.succeeded)
         #expect(output.stdout.contains(#/\d+\.\d+\.\d+/#))
     }

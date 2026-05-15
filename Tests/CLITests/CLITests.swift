@@ -418,10 +418,9 @@ struct CLICommandTests {
     func unusedHelpExposesAutoBuildFlag() async throws {
         let output = try await runSWA(["unused", "--help"])
 
-        // 0.3.0-α: SECURITY.md / DocC reference `swa unused --auto-build`
-        // as the toggle for auto-rebuilding the IndexStoreDB. Pre-0.3
-        // the flag existed only on the programmatic API, leaving the
-        // security narrative unreachable.
+        // SECURITY.md and DocC both reference `swa unused --auto-build`
+        // as the toggle for auto-rebuilding the IndexStoreDB. The flag
+        // must be reachable from the CLI, not just the programmatic API.
         #expect(output.succeeded)
         #expect(
             output.stdout.contains("--auto-build"),

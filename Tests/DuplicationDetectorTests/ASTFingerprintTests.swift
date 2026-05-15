@@ -10,12 +10,10 @@ import Testing
 struct ASTFingerprintTests {
     @Test
     func `FingerprintHasher hash output stays in the Mersenne-61 prime range`() {
-        // Post-0.3.0-α the AST fingerprint hasher reduces via M_61 instead
-        // of `% 1_000_000_007` (a 30-bit prime that produced ~50%
-        // collisions at N≈50_000). Probe a deterministic set of strings
-        // and check (a) every output is < 2^61 − 1, (b) distinct inputs
-        // produce distinct outputs (no trivial pigeon-holing into the
-        // pre-0.3 30-bit space).
+        // Probe a deterministic 10 000-sample set and check (a) every
+        // output is < 2^61 − 1 (the M_61 reduction envelope), (b) the
+        // collision rate is essentially zero (>9 990 / 10 000 distinct,
+        // allowing a tiny margin for unlucky inputs).
         let mersenne61: UInt64 = (1 &<< 61) &- 1
         var outputs = Set<UInt64>()
         for index in 0..<10_000 {
@@ -26,10 +24,6 @@ struct ASTFingerprintTests {
             #expect(value < mersenne61, "hash \(value) exceeded M_61 envelope")
             outputs.insert(value)
         }
-        // With M_61 a 10 000-sample set should collide essentially
-        // never. The pre-0.3 30-bit modulus collided ~hundreds of
-        // times at this volume. We assert > 9 990 distinct (allow a
-        // tiny margin for unlucky inputs); empirically observe 10 000.
         #expect(outputs.count > 9_990, "collision-heavy hash distribution: \(outputs.count) distinct of 10 000")
     }
 

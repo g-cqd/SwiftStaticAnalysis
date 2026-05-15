@@ -14,8 +14,8 @@ import SwiftSyntax
 /// to avoid re-parsing unchanged files. The cache is **bounded** (default
 /// 256 entries) with LRU eviction: each `parse(_:)` call promotes the entry
 /// to most-recently-used; once `cacheLimit` is exceeded the least-recently-
-/// used entry is evicted. This is a ship-blocker for long-running MCP
-/// sessions, which previously could retain unbounded SwiftSyntax trees.
+/// used entry is evicted. The bound matters for long-running MCP sessions
+/// where unbounded retention of SwiftSyntax trees would leak memory.
 public actor SwiftFileParser {
     // MARK: Lifecycle
 

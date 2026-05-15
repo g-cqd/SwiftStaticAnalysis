@@ -93,8 +93,7 @@ The working `sa` buffer is arena-allocated as an
 `UnsafeMutableBufferPointer<Int>` rather than a per-recursion `[Int]`.
 A single `Arena` lives at the top of `SAIS.build` and grows as
 recursion deepens; the second `placeLMSSuffixesOrdered` pass reuses the
-buffer in place. The generic-`T` migration (`UInt32` indices instead of
-`Int`) is on the roadmap.
+buffer in place.
 
 ## Streaming
 

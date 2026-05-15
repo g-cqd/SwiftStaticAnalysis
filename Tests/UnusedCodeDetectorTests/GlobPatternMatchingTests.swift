@@ -18,13 +18,10 @@ struct GlobPatternMatchingTests {
 
     @Test("Matches double star wildcard")
     func matchesDoubleStar() {
-        // 0.2.1: `**` matches zero or more path segments, including the
-        // empty segment, so `/src/**/*.swift` matches both
-        // `/src/file.swift` and `/src/sub/file.swift`. Pre-0.2.1 the
-        // partial-match implementation returned `false` for the
-        // zero-segment case; the canonical `GlobMatcher` now anchors
-        // matches and uses `(?:.*/)?` for `**/`, which is the
-        // user-intuitive shape and matches the `CodebaseContext` impl.
+        // `**` matches zero or more path segments, including the empty
+        // segment, so `/src/**/*.swift` matches both `/src/file.swift`
+        // and `/src/sub/file.swift`. `GlobMatcher` anchors matches and
+        // translates `**/` to `(?:.*/)?`.
         #expect(UnusedCodeFilter.matchesGlobPattern("/src/deep/nested/file.swift", pattern: "/src/**/*.swift") == true)
         #expect(UnusedCodeFilter.matchesGlobPattern("/src/sub/file.swift", pattern: "/src/**/*.swift") == true)
         #expect(UnusedCodeFilter.matchesGlobPattern("/src/file.swift", pattern: "/src/**/*.swift") == true)

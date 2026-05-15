@@ -5,6 +5,26 @@ All notable changes to SwiftStaticAnalysis will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.11] - Unreleased
+
+Final scrub of plan / scheduling / decision-making residue in test
+comments and one DocC roadmap mention the previous pass missed.
+
+- Six test-file comments lose their `Pre-0.2.1 ...`, `Post-0.3.0-α ...`,
+  `0.3.0-α: ...` temporal slugs. The technical justifications stay —
+  regression-pin tests need their WHY — but they no longer reference
+  release lines or "previously the code did X".
+- `Performance.md` drops the "the generic-`T` migration is on the
+  roadmap" line. Roadmap lives in issues, not in DocC.
+- `SwiftFileParser` docstring rewords "ship-blocker for long-running
+  MCP sessions" to plain "the bound matters for long-running MCP
+  sessions" — same semantic, no project-management vocabulary.
+- `AtomicBitmapTests` header note loses the "retired in 0.3.0-α.8 in
+  favour of …" version-tagged narrative; the comment now just states
+  the current arrangement.
+
+1130 tests green; build warning-free.
+
 ## [0.3.0-alpha.10] - Unreleased
 
 Documentation truth-up sweep against the 0.3.0-α code surface. Every

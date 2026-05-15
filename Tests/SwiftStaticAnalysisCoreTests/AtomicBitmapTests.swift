@@ -168,8 +168,5 @@ struct AtomicBitmapTests {
     }
 }
 
-// MARK: - Non-Atomic Bits
-//
-// The non-atomic `Bitmap` struct was retired in 0.3.0-α.8 in favour of
-// `swift-collections.BitArray`. `BitArray` is exercised by swift-collections'
-// own test suite, so no shim tests live here.
+// Non-atomic bits use `swift-collections.BitArray`, which has its own
+// test coverage in swift-collections. No shim tests live here.
