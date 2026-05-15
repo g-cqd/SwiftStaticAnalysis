@@ -462,9 +462,9 @@ struct SoATokenStorageTests {
     func appendTokens() throws {
         var storage = SoATokenStorage()
 
-        try storage.append(kind:.keyword, offset: 0, length: 4, line: 1, column: 1)
-        try storage.append(kind:.identifier, offset: 5, length: 3, line: 1, column: 6)
-        try storage.append(kind:.punctuation, offset: 8, length: 1, line: 1, column: 9)
+        try storage.append(kind: .keyword, offset: 0, length: 4, line: 1, column: 1)
+        try storage.append(kind: .identifier, offset: 5, length: 3, line: 1, column: 6)
+        try storage.append(kind: .punctuation, offset: 8, length: 1, line: 1, column: 9)
 
         #expect(storage.count == 3)
         #expect(storage.kind(at: 0) == .keyword)
@@ -475,7 +475,7 @@ struct SoATokenStorageTests {
     @Test("Token access methods work correctly")
     func tokenAccess() throws {
         var storage = SoATokenStorage()
-        try storage.append(kind:.literal, offset: 100, length: 50, line: 10, column: 20)
+        try storage.append(kind: .literal, offset: 100, length: 50, line: 10, column: 20)
 
         #expect(storage.kind(at: 0) == .literal)
         #expect(storage.offset(at: 0) == 100)
@@ -491,7 +491,7 @@ struct SoATokenStorageTests {
 
         // Should be able to add without reallocation
         for i in 0..<1000 {
-            try storage.append(kind:.identifier, offset: i, length: 1, line: 1)
+            try storage.append(kind: .identifier, offset: i, length: 1, line: 1)
         }
 
         #expect(storage.count == 1000)
@@ -501,7 +501,7 @@ struct SoATokenStorageTests {
     func removeAll() throws {
         var storage = SoATokenStorage()
         for i in 0..<100 {
-            try storage.append(kind:.keyword, offset: i, length: 1, line: 1)
+            try storage.append(kind: .keyword, offset: i, length: 1, line: 1)
         }
 
         storage.removeAll()
@@ -512,11 +512,11 @@ struct SoATokenStorageTests {
     @Test("Indices with kind returns correct indices")
     func indicesWithKind() throws {
         var storage = SoATokenStorage()
-        try storage.append(kind:.keyword, offset: 0, length: 1, line: 1)
-        try storage.append(kind:.identifier, offset: 1, length: 1, line: 1)
-        try storage.append(kind:.keyword, offset: 2, length: 1, line: 1)
-        try storage.append(kind:.identifier, offset: 3, length: 1, line: 1)
-        try storage.append(kind:.keyword, offset: 4, length: 1, line: 1)
+        try storage.append(kind: .keyword, offset: 0, length: 1, line: 1)
+        try storage.append(kind: .identifier, offset: 1, length: 1, line: 1)
+        try storage.append(kind: .keyword, offset: 2, length: 1, line: 1)
+        try storage.append(kind: .identifier, offset: 3, length: 1, line: 1)
+        try storage.append(kind: .keyword, offset: 4, length: 1, line: 1)
 
         let keywordIndices = storage.indicesWithKind(.keyword)
         #expect(keywordIndices == [0, 2, 4])
@@ -528,12 +528,12 @@ struct SoATokenStorageTests {
     @Test("Count by kind works correctly")
     func countByKind() throws {
         var storage = SoATokenStorage()
-        try storage.append(kind:.keyword, offset: 0, length: 1, line: 1)
-        try storage.append(kind:.keyword, offset: 1, length: 1, line: 1)
-        try storage.append(kind:.identifier, offset: 2, length: 1, line: 1)
-        try storage.append(kind:.literal, offset: 3, length: 1, line: 1)
-        try storage.append(kind:.literal, offset: 4, length: 1, line: 1)
-        try storage.append(kind:.literal, offset: 5, length: 1, line: 1)
+        try storage.append(kind: .keyword, offset: 0, length: 1, line: 1)
+        try storage.append(kind: .keyword, offset: 1, length: 1, line: 1)
+        try storage.append(kind: .identifier, offset: 2, length: 1, line: 1)
+        try storage.append(kind: .literal, offset: 3, length: 1, line: 1)
+        try storage.append(kind: .literal, offset: 4, length: 1, line: 1)
+        try storage.append(kind: .literal, offset: 5, length: 1, line: 1)
 
         let counts = storage.countByKind()
         #expect(counts[Int(TokenKindByte.keyword.rawValue)] == 2)
@@ -544,11 +544,11 @@ struct SoATokenStorageTests {
     @Test("Tokens in line range works")
     func tokensInLineRange() throws {
         var storage = SoATokenStorage()
-        try storage.append(kind:.keyword, offset: 0, length: 1, line: 1)
-        try storage.append(kind:.keyword, offset: 1, length: 1, line: 2)
-        try storage.append(kind:.keyword, offset: 2, length: 1, line: 3)
-        try storage.append(kind:.keyword, offset: 3, length: 1, line: 4)
-        try storage.append(kind:.keyword, offset: 4, length: 1, line: 5)
+        try storage.append(kind: .keyword, offset: 0, length: 1, line: 1)
+        try storage.append(kind: .keyword, offset: 1, length: 1, line: 2)
+        try storage.append(kind: .keyword, offset: 2, length: 1, line: 3)
+        try storage.append(kind: .keyword, offset: 3, length: 1, line: 4)
+        try storage.append(kind: .keyword, offset: 4, length: 1, line: 5)
 
         let range = storage.tokensInLineRange(2...4)
         #expect(range == 1..<4)
@@ -557,8 +557,8 @@ struct SoATokenStorageTests {
     @Test("Hash range produces consistent hash")
     func hashRange() throws {
         var storage = SoATokenStorage()
-        try storage.append(kind:.keyword, offset: 0, length: 4, line: 1)
-        try storage.append(kind:.identifier, offset: 5, length: 3, line: 1)
+        try storage.append(kind: .keyword, offset: 0, length: 4, line: 1)
+        try storage.append(kind: .identifier, offset: 5, length: 3, line: 1)
 
         let hash1 = storage.hashRange(0..<2)
         let hash2 = storage.hashRange(0..<2)
@@ -569,10 +569,10 @@ struct SoATokenStorageTests {
     @Test("Ranges equal comparison works")
     func rangesEqual() throws {
         var storage = SoATokenStorage()
-        try storage.append(kind:.keyword, offset: 0, length: 4, line: 1)
-        try storage.append(kind:.identifier, offset: 5, length: 3, line: 1)
-        try storage.append(kind:.keyword, offset: 10, length: 4, line: 2)
-        try storage.append(kind:.identifier, offset: 15, length: 3, line: 2)
+        try storage.append(kind: .keyword, offset: 0, length: 4, line: 1)
+        try storage.append(kind: .identifier, offset: 5, length: 3, line: 1)
+        try storage.append(kind: .keyword, offset: 10, length: 4, line: 2)
+        try storage.append(kind: .identifier, offset: 15, length: 3, line: 2)
 
         #expect(storage.rangesEqual(0..<2, 2..<4))
     }
@@ -581,7 +581,7 @@ struct SoATokenStorageTests {
     func memoryUsage() throws {
         var storage = SoATokenStorage()
         for i in 0..<100 {
-            try storage.append(kind:.keyword, offset: i, length: 1, line: 1)
+            try storage.append(kind: .keyword, offset: i, length: 1, line: 1)
         }
 
         // Each token: 1 (kind) + 4 (offset) + 2 (length) + 4 (line) + 2 (column) = 13 bytes
@@ -612,8 +612,8 @@ struct ArenaTokenStorageTests {
     @Test("Arena token storage copies from SoA storage")
     func copyFromSoA() throws {
         var soaStorage = SoATokenStorage()
-        try soaStorage.append(kind:.keyword, offset: 0, length: 4, line: 1)
-        try soaStorage.append(kind:.identifier, offset: 5, length: 3, line: 1)
+        try soaStorage.append(kind: .keyword, offset: 0, length: 4, line: 1)
+        try soaStorage.append(kind: .identifier, offset: 5, length: 3, line: 1)
 
         var arena = Arena()
         let arenaStorage = ArenaTokenStorage(from: soaStorage, arena: &arena)
@@ -642,12 +642,12 @@ struct MultiFileSoAStorageTests {
         var multi = MultiFileSoAStorage()
 
         var tokens1 = SoATokenStorage()
-        try tokens1.append(kind:.keyword, offset: 0, length: 4, line: 1)
-        try tokens1.append(kind:.identifier, offset: 5, length: 3, line: 1)
+        try tokens1.append(kind: .keyword, offset: 0, length: 4, line: 1)
+        try tokens1.append(kind: .identifier, offset: 5, length: 3, line: 1)
         multi.addFile(path: "file1.swift", tokens: tokens1)
 
         var tokens2 = SoATokenStorage()
-        try tokens2.append(kind:.literal, offset: 0, length: 5, line: 1)
+        try tokens2.append(kind: .literal, offset: 0, length: 5, line: 1)
         multi.addFile(path: "file2.swift", tokens: tokens2)
 
         #expect(multi.fileCount == 2)
@@ -660,13 +660,13 @@ struct MultiFileSoAStorageTests {
 
         var tokens1 = SoATokenStorage()
         for i in 0..<5 {
-            try tokens1.append(kind:.keyword, offset: i, length: 1, line: 1)
+            try tokens1.append(kind: .keyword, offset: i, length: 1, line: 1)
         }
         multi.addFile(path: "file1.swift", tokens: tokens1)
 
         var tokens2 = SoATokenStorage()
         for i in 0..<3 {
-            try tokens2.append(kind:.identifier, offset: i, length: 1, line: 1)
+            try tokens2.append(kind: .identifier, offset: i, length: 1, line: 1)
         }
         multi.addFile(path: "file2.swift", tokens: tokens2)
 
@@ -685,13 +685,13 @@ struct MultiFileSoAStorageTests {
 
         var tokens1 = SoATokenStorage()
         for i in 0..<5 {
-            try tokens1.append(kind:.keyword, offset: i, length: 1, line: 1)
+            try tokens1.append(kind: .keyword, offset: i, length: 1, line: 1)
         }
         multi.addFile(path: "file1.swift", tokens: tokens1)
 
         var tokens2 = SoATokenStorage()
         for i in 0..<3 {
-            try tokens2.append(kind:.identifier, offset: i, length: 1, line: 1)
+            try tokens2.append(kind: .identifier, offset: i, length: 1, line: 1)
         }
         multi.addFile(path: "file2.swift", tokens: tokens2)
 

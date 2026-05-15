@@ -29,7 +29,7 @@ struct LRUDictionaryTests {
         cache.setValue(3, forKey: "c")
 
         #expect(cache.count == 2)
-        #expect(cache.peek(forKey: "a") == nil) // evicted
+        #expect(cache.peek(forKey: "a") == nil)  // evicted
         #expect(cache.peek(forKey: "b") == 2)
         #expect(cache.peek(forKey: "c") == 3)
     }
@@ -47,7 +47,7 @@ struct LRUDictionaryTests {
         cache.setValue(3, forKey: "c")
 
         #expect(cache.peek(forKey: "a") == 1)
-        #expect(cache.peek(forKey: "b") == nil) // evicted
+        #expect(cache.peek(forKey: "b") == nil)  // evicted
         #expect(cache.peek(forKey: "c") == 3)
     }
 
@@ -114,7 +114,7 @@ struct LRUDictionaryTests {
         cache.setValue(1, forKey: "a")
         cache.setValue(2, forKey: "b")
         cache.setValue(3, forKey: "c")
-        _ = cache.value(forKey: "a") // promote a to MRU
+        _ = cache.value(forKey: "a")  // promote a to MRU
 
         // Expected order (LRU first): b, c, a
         #expect(Array(cache.keysInLRUOrder) == ["b", "c", "a"])

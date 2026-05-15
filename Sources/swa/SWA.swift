@@ -46,7 +46,7 @@ enum DeprecatedFlags {
         guard firstUse else { return }
         eprint(
             "warning: '--parallel' is deprecated; use '--parallel-mode safe|maximum|none'. "
-            + "Legacy '--parallel' now maps to '--parallel-mode safe', matching the .swa.json contract."
+                + "Legacy '--parallel' now maps to '--parallel-mode safe', matching the .swa.json contract."
         )
     }
 }

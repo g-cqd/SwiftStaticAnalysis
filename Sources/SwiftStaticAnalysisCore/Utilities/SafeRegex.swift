@@ -78,7 +78,8 @@ public enum SafeRegex {
             throw Failure.tooLong(actual: byteCount, limit: maxPatternLength)
         }
         for antipattern in antipatterns where pattern.contains(antipattern) {
-            throw Failure.antipattern(reason: "contains a nested-quantifier construct known for catastrophic backtracking.")
+            throw Failure.antipattern(
+                reason: "contains a nested-quantifier construct known for catastrophic backtracking.")
         }
     }
 
@@ -103,19 +104,21 @@ public enum SafeRegex {
     ///   `(.*)` already matches arbitrarily; quantifying it again is
     ///   gratuitous and pathological under most engines.
     nonisolated(unsafe) private static let antipatterns: [Regex<AnyRegexOutput>] = [
-        Regex(Regex {
-            "("
-            ZeroOrMore(CharacterClass.anyOf(")").inverted)
-            One(.anyOf("*+"))
-            ZeroOrMore(CharacterClass.anyOf(")").inverted)
-            ")"
-            ZeroOrMore(.whitespace)
-            One(.anyOf("*+"))
-        }),
-        Regex(Regex {
-            "(.*)"
-            ZeroOrMore(.whitespace)
-            One(.anyOf("*+"))
-        }),
+        Regex(
+            Regex {
+                "("
+                ZeroOrMore(CharacterClass.anyOf(")").inverted)
+                One(.anyOf("*+"))
+                ZeroOrMore(CharacterClass.anyOf(")").inverted)
+                ")"
+                ZeroOrMore(.whitespace)
+                One(.anyOf("*+"))
+            }),
+        Regex(
+            Regex {
+                "(.*)"
+                ZeroOrMore(.whitespace)
+                One(.anyOf("*+"))
+            }),
     ]
 }

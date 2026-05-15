@@ -282,7 +282,9 @@ public actor ZeroCopyParser {
         )
     }
 
-    private func extractTokensToSoA(from tree: SourceFileSyntax, source: String) throws(SoAStorageError) -> SoATokenStorage {
+    private func extractTokensToSoA(from tree: SourceFileSyntax, source: String) throws(SoAStorageError)
+        -> SoATokenStorage
+    {
         var storage = SoATokenStorage()
         let converter = SourceLocationConverter(fileName: "", tree: tree)
 

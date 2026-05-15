@@ -66,8 +66,8 @@ struct GlobMatcherTests {
         "Question-mark matches a single non-slash character",
         arguments: [
             ("F?o.swift", "Foo.swift", true),
-            ("F?o.swift", "Fo.swift", false), // ? requires exactly one char
-            ("F?o.swift", "F/o.swift", false), // ? does not match /
+            ("F?o.swift", "Fo.swift", false),  // ? requires exactly one char
+            ("F?o.swift", "F/o.swift", false),  // ? does not match /
         ] as [(String, String, Bool)]
     )
     func questionMarkSemantics(pattern: String, path: String, expected: Bool) {

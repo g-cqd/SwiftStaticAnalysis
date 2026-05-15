@@ -59,7 +59,7 @@ struct RegexCacheTests {
 
         _ = cache.regex(for: "gamma")
         #expect(cache.isCached("alpha"))
-        #expect(cache.isCached("beta") == false) // genuinely LRU → evicted
+        #expect(cache.isCached("beta") == false)  // genuinely LRU → evicted
         #expect(cache.isCached("gamma"))
     }
 

@@ -33,7 +33,8 @@ struct VersionTests {
         // most-recent release entry. The repo's release policy is to add a
         // new top-most entry whenever `swaVersion` is bumped.
         let pattern = #/^##\s+\[(?<version>\d+\.\d+\.\d+)\]/#
-        let topVersion = contents
+        let topVersion =
+            contents
             .split(separator: "\n")
             .lazy
             .compactMap { line -> String? in
