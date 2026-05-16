@@ -13,7 +13,12 @@ import SwiftStaticAnalysisCore
 struct Search: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "search",
-        abstract: "Semantic code search via embedding similarity",
+        abstract: "[experimental] Semantic code search via embedding similarity",
+        discussion: """
+            Experimental embedding-backed search. Requires `--semantic` infra
+            (Models/ bundle or `--embedding-bundle`). Output shape may change
+            in 0.5.x without notice.
+            """
     )
 
     @Argument(help: "Natural-language or code-snippet query")
@@ -105,7 +110,12 @@ struct Search: AsyncParsableCommand {
 struct Anomaly: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "anomaly",
-        abstract: "Find snippets that look unlike everything else (outlier detection)",
+        abstract: "[experimental] Find snippets that look unlike everything else (outlier detection)",
+        discussion: """
+            Experimental embedding-backed outlier detector. Requires
+            `--semantic` infra. Scoring threshold and output shape may
+            change in 0.5.x without notice.
+            """
     )
 
     @Argument(help: "Paths to scan (directories or files)")
@@ -215,7 +225,12 @@ struct Anomaly: AsyncParsableCommand {
 struct Cohesion: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "cohesion",
-        abstract: "Aggregate embedding similarity per module to surface (lack of) cohesion",
+        abstract: "[experimental] Aggregate embedding similarity per module to surface (lack of) cohesion",
+        discussion: """
+            Experimental embedding-backed module-cohesion metric. Requires
+            `--semantic` infra. Output shape may change in 0.5.x without
+            notice.
+            """
     )
 
     @Argument(help: "Paths to scan (directories or files)")
