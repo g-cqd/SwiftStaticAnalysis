@@ -23,7 +23,10 @@ struct StaticAnalysisCommandPlugin: CommandPlugin {
         let extractor = ArgumentExtractor(arguments)
         let analysisType = extractor.remainingArguments.first ?? "all"
 
-        // Determine what to analyze
+        // Determine what to analyze. `all` is a single `swa analyze`
+        // invocation (which does both passes in one process and reuses
+        // the parse phase) instead of two sequential subprocesses each
+        // re-parsing the whole tree.
         let commands: [(name: String, args: [String])]
         switch analysisType {
         case "unused":
@@ -33,10 +36,7 @@ struct StaticAnalysisCommandPlugin: CommandPlugin {
             commands = [("Duplications", ["duplicates", context.package.directoryURL.path])]
 
         case "all":
-            commands = [
-                ("Unused Code", ["unused", context.package.directoryURL.path]),
-                ("Duplications", ["duplicates", context.package.directoryURL.path]),
-            ]
+            commands = [("Analyze", ["analyze", context.package.directoryURL.path])]
 
         default:
             print("Unknown analysis type: \(analysisType)")
@@ -104,6 +104,8 @@ struct StaticAnalysisCommandPlugin: CommandPlugin {
             let extractor = ArgumentExtractor(arguments)
             let analysisType = extractor.remainingArguments.first ?? "all"
 
+            // Mirrors the SPM branch: `all` is one `swa analyze`
+            // invocation (single parse phase) instead of two.
             let commands: [(name: String, args: [String])]
             switch analysisType {
             case "unused":
@@ -113,10 +115,7 @@ struct StaticAnalysisCommandPlugin: CommandPlugin {
                 commands = [("Duplications", ["duplicates", context.xcodeProject.directoryURL.path])]
 
             case "all":
-                commands = [
-                    ("Unused Code", ["unused", context.xcodeProject.directoryURL.path]),
-                    ("Duplications", ["duplicates", context.xcodeProject.directoryURL.path]),
-                ]
+                commands = [("Analyze", ["analyze", context.xcodeProject.directoryURL.path])]
 
             default:
                 print("Unknown analysis type: \(analysisType)")

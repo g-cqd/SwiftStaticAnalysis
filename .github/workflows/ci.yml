@@ -136,6 +136,25 @@ jobs:
             --sensible-defaults \
             --format text
 
+      - name: Orphan-count regression gate
+        # Compares the live orphan count from `swa unused` against the
+        # pinned baseline in `bench/baselines/orphans-Sources.json`.
+        # Fails the run if the count grows; tolerates shrinkage (deletions
+        # are good). Threshold is wallclock-style equality plus a small
+        # slack for noise; tighten once Phase 4 wiring lands.
+        run: |
+          set -euo pipefail
+          BASELINE_COUNT=$(jq 'length' bench/baselines/orphans-Sources.json)
+          LIVE_COUNT=$(swa unused Sources --mode simple --exclude-imports \
+            --exclude-deinit --exclude-enum-cases --exclude-test-suites \
+            --format json | jq 'length')
+          echo "Orphan baseline: $BASELINE_COUNT, live: $LIVE_COUNT"
+          # Allow 1 extra orphan as slack while the audit phases land.
+          if [ "$LIVE_COUNT" -gt $((BASELINE_COUNT + 1)) ]; then
+            echo "::error::Orphan count regressed ($LIVE_COUNT > $BASELINE_COUNT). Refresh bench/baselines/orphans-Sources.json or remove the new orphans."
+            exit 1
+          fi
+
   # ============================================================================
   # Executables smoke test: every shipped target must build + answer --help.
   # Previously swa-lsp / swa-bench could bitrot silently because neither was
