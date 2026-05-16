@@ -160,9 +160,6 @@ public final class LSPSymbolResolver: @unchecked Sendable {
     /// `Synchronization.Mutex` rather than `NSLock` because the
     /// latter is not async-safe.
     private let clientState: Mutex<SourceKitLSPClient?> = Mutex(nil)
-    private var startedClient: SourceKitLSPClient? {
-        clientState.withLock { $0 }
-    }
 
     private func ensureStarted() async throws -> SourceKitLSPClient {
         // Two-phase lazy init: create-or-fetch the client inside the

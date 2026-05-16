@@ -38,13 +38,12 @@ import SwiftStaticAnalysisCore
 ///
 /// ## Status
 ///
-/// Spike-level (post-0.3.0-beta.2). The client struct and the
-/// request shape work end-to-end against `sourcekit-lsp`'s stdio
-/// transport, but the integration into `IndexStoreResolver` /
-/// `SymbolFinder` is **not yet wired** — that requires a
-/// "build-required mode" CLI / programmatic-API surface that
-///0.3.0 doesn't ship. Treat this file as scaffolding for the
-/// 0.4.0 build-required resolver.
+/// Wired into `LSPSymbolResolver` (used by the CLI `--lsp <workspace>`
+/// flag on both `swa unused` and `swa symbol`). Routes requests through
+/// `BinaryTrustChecker`-verified subprocess spawn with opt-in
+/// `DEVELOPER_DIR` inheritance (off by default). A deeper integration
+/// into the programmatic `SymbolFinder` API for non-CLI callers is
+/// still future work.
 public final class SourceKitLSPClient: @unchecked Sendable {
     // MARK: - Options
 

@@ -345,6 +345,9 @@ extension UnusedCodeDetector {
 
         case .parameterUnused:
             "Parameter '\(declaration.name)' is never used; consider renaming to '_'"
+
+        case .deadBranch:
+            "Branch is provably never taken — remove or simplify the surrounding conditional."
         }
     }
 

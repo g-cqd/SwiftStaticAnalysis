@@ -38,6 +38,7 @@ public struct UnusedCodeConfiguration: Sendable {
         ignoreViewBody: Bool = true,
         useParallelBFS: Bool? = nil,
         parallelBFSThreshold: Int = 1000,
+        detectDeadBranches: Bool = false,
         logger: AnalysisLogger = .osLog(category: "UnusedCodeDetector"),
     ) {
         self.detectVariables = detectVariables
@@ -66,6 +67,7 @@ public struct UnusedCodeConfiguration: Sendable {
         self.ignoreViewBody = ignoreViewBody
         self.useParallelBFS = useParallelBFS
         self.parallelBFSThreshold = max(1, parallelBFSThreshold)
+        self.detectDeadBranches = detectDeadBranches
         self.logger = logger
     }
 
@@ -207,6 +209,14 @@ public struct UnusedCodeConfiguration: Sendable {
     /// parallel BFS. Only consulted when `useParallelBFS == nil`.
     /// Default 1000 matches the documented contract.
     public var parallelBFSThreshold: Int
+
+    /// When `true`, runs an SCCP-based dead-branch pass per function
+    /// body after the standard reachability analysis. Each dead branch
+    /// detected (e.g. `if false { ... }`, `if x { ... }` where SCCP
+    /// proves `x == true`) is reported as an `UnusedCode` finding
+    /// with `.deadBranch` reason. Default `false` — opt-in until the
+    /// pass has been calibrated against real-world codebases.
+    public var detectDeadBranches: Bool
 
     /// Logger used for warnings and fallback notices in library code.
     public var logger: AnalysisLogger

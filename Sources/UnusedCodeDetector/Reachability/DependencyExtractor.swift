@@ -4,7 +4,9 @@
 
 import AsyncAlgorithms
 import Foundation
+import SwiftParser
 import SwiftStaticAnalysisCore
+import SwiftSyntax
 
 // MARK: - DependencyExtractor
 
@@ -605,6 +607,16 @@ public struct ReachabilityBasedDetector: Sendable {
 
     /// Detect unused code using reachability analysis.
     public func detect(in result: AnalysisResult) async -> [UnusedCode] {
+        var findings = await runReachabilityPass(result)
+        if configuration.detectDeadBranches {
+            findings.append(contentsOf: await runDeadBranchPass(result))
+        }
+        return findings
+    }
+
+    /// Reachability-only pass — extracted so the dead-branch pass can
+    /// be appended in `detect(in:)` without nesting the original logic.
+    private func runReachabilityPass(_ result: AnalysisResult) async -> [UnusedCode] {
         // Build the reachability graph
         let extractor = DependencyExtractor(configuration: extractionConfiguration)
         let graph = await extractor.buildGraph(from: result)
@@ -690,5 +702,90 @@ public struct ReachabilityBasedDetector: Sendable {
         default:
             true
         }
+    }
+
+    /// SCCP-based dead-branch pass. Parses each file fresh (the
+    /// reachability pipeline drops trees after building the
+    /// AnalysisResult), walks every FunctionDeclSyntax, builds a CFG,
+    /// runs SCCP, and emits an UnusedCode finding per `DeadBranch`.
+    ///
+    /// Opt-in via `UnusedCodeConfiguration.detectDeadBranches`. The
+    /// re-parse cost is the price of staying decoupled from the
+    /// reachability flow's tree lifetime.
+    private func runDeadBranchPass(_ result: AnalysisResult) async -> [UnusedCode] {
+        var findings: [UnusedCode] = []
+        for file in result.files {
+            guard let source = try? String(contentsOfFile: file, encoding: .utf8) else {
+                continue
+            }
+            let tree = Parser.parse(source: source)
+            let collector = FunctionCollector()
+            collector.walk(tree)
+            let cfgBuilder = CFGBuilder(file: file, tree: tree)
+            for function in collector.functions {
+                let cfg = cfgBuilder.buildCFG(from: function)
+                let result = SCCPAnalysis().analyze(cfg)
+                for dead in result.deadBranches {
+                    findings.append(
+                        UnusedCode(
+                            declaration: makeSyntheticDeclaration(
+                                forDeadBranchAt: dead.location,
+                                condition: dead.condition,
+                                file: file
+                            ),
+                            reason: .deadBranch,
+                            confidence: .high,
+                            suggestion:
+                                "Dead \(dead.deadBranch == .trueBranch ? "true" : "false") branch — "
+                                + "condition `\(dead.condition.trimmingCharacters(in: .whitespaces))` is provably "
+                                + "`\(dead.conditionValue)` here."
+                        )
+                    )
+                }
+            }
+        }
+        return findings
+    }
+
+    /// Synthesise a `Declaration` for a dead branch so it slots into
+    /// the `UnusedCode` output shape (which is declaration-centric).
+    /// The name encodes the condition for easier grep/diff.
+    private func makeSyntheticDeclaration(
+        forDeadBranchAt location: SwiftStaticAnalysisCore.SourceLocation,
+        condition: String,
+        file: String
+    ) -> Declaration {
+        let trimmed = condition.trimmingCharacters(in: .whitespaces)
+        // Synthetic range collapses the dead branch to its conditional
+        // line — the original branch span isn't reconstructible without
+        // re-walking the syntax tree.
+        let range = SourceRange(start: location, end: location)
+        return Declaration(
+            name: "deadBranch(\(trimmed))",
+            kind: .function,
+            accessLevel: .internal,
+            location: location,
+            range: range,
+            scope: ScopeID.global,
+            attributes: []
+        )
+    }
+}
+
+// MARK: - FunctionCollector
+
+/// Collects every `FunctionDeclSyntax` in a parsed source tree for the
+/// dead-branch pass. Could be inlined into `runDeadBranchPass` but a
+/// named visitor keeps the syntax walk testable in isolation.
+private final class FunctionCollector: SyntaxVisitor {
+    private(set) var functions: [FunctionDeclSyntax] = []
+
+    init() {
+        super.init(viewMode: .sourceAccurate)
+    }
+
+    override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
+        functions.append(node)
+        return .visitChildren
     }
 }

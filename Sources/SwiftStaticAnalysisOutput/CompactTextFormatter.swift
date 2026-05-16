@@ -113,6 +113,7 @@ public enum CompactTextFormatter {
         case .onlySelfReferenced: return "self-ref"
         case .importNotUsed: return "unused-import"
         case .parameterUnused: return "unused-param"
+        case .deadBranch: return "dead-branch"
         }
     }
 }

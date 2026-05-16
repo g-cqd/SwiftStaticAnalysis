@@ -23,6 +23,13 @@ public enum UnusedReason: String, Sendable, Codable {
 
     /// Parameter is never used in function body.
     case parameterUnused
+
+    /// Branch of an `if`/`guard`/`while` provably never executes —
+    /// gated by a constant condition (`if false { ... }`,
+    /// `if x { ... }` where SCCP proves `x = true`, etc.). Produced
+    /// by the SCCP-based dead-branch pass when
+    /// `UnusedCodeConfiguration.detectDeadBranches == true`.
+    case deadBranch
 }
 
 // MARK: - Confidence

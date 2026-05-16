@@ -135,6 +135,7 @@ public struct DiagnosticProducer: Sendable {
         case .onlySelfReferenced: "Only self-referenced"
         case .importNotUsed: "Unused import"
         case .parameterUnused: "Unused parameter"
+        case .deadBranch: "Dead branch (provably never taken)"
         }
     }
 

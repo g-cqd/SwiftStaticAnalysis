@@ -663,6 +663,50 @@ struct SCCPAnalysisTests {
         #expect(result.cfg.functionName == "test")
     }
 
+    @Test("Cross-block constant propagation marks else branch dead")
+    func crossBlockPropagationDeadBranch() {
+        // Tests the SSA-worklist propagation path (`propagateValue`)
+        // combined with literal extraction from `let` declarations.
+        // Both are required: declarations must populate the lattice,
+        // and propagation must re-visit the gating block.
+        let source = """
+            func test() {
+                let flag = true
+                if flag {
+                    let x = 1
+                } else {
+                    let y = 2
+                }
+            }
+            """
+        guard let cfg = buildCFG(from: source) else {
+            Issue.record("Failed to build CFG")
+            return
+        }
+        let result = SCCPAnalysis().analyze(cfg)
+        #expect(result.deadBranches.contains { $0.deadBranch == .falseBranch })
+    }
+
+    @Test("Propagation converges with chained constants")
+    func propagationConvergesWithChainedConstants() {
+        let source = """
+            func test() {
+                let flag = false
+                if flag {
+                    let dead = 1
+                } else {
+                    let live = 2
+                }
+            }
+            """
+        guard let cfg = buildCFG(from: source) else {
+            Issue.record("Failed to build CFG")
+            return
+        }
+        let result = SCCPAnalysis().analyze(cfg)
+        #expect(result.deadBranches.contains { $0.deadBranch == .trueBranch })
+    }
+
     @Test("Propagation worklist terminates without infinite loop")
     func propagationWorklistTerminates() {
         // Stresses the SSA worklist path (`propagateValue`). Before the

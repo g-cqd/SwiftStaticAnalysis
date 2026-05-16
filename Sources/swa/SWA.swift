@@ -414,6 +414,12 @@ struct Unused: AsyncParsableCommand {
     var sensibleDefaults: Bool = false
 
     @Flag(
+        name: .customLong("detect-dead-branches"),
+        help: "Run the SCCP-based dead-branch pass: each `if false { ... }` / `if x { ... }` where SCCP proves the condition surfaces as an unused-code finding (reachability mode only)."
+    )
+    var detectDeadBranches: Bool = false
+
+    @Flag(
         name: .customLong("auto-build"),
         help: "Build the project automatically when the IndexStoreDB is missing or stale (indexStore mode only)"
     )
@@ -554,6 +560,7 @@ struct Unused: AsyncParsableCommand {
             ignorePreviewProviders: effectiveIgnorePreviewProviders,
             ignoreViewBody: effectiveIgnoreViewBody,
             useParallelBFS: effectiveUseParallelBFS,
+            detectDeadBranches: detectDeadBranches,
         )
 
         // `--report` is only meaningful in reachability mode (it walks the

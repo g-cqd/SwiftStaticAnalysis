@@ -347,14 +347,52 @@ private struct SCCPAnalysisSession {
     }
 
     private mutating func evaluateStatement(_ statement: CFGStatement) {
+        // Look up per-variable RHS so `let x = 42` and `var y = true`
+        // actually populate the lattice. The previous version evaluated
+        // `statement.syntax` directly — for declarations that's a
+        // VariableDeclSyntax, which never matches any expression case
+        // in `evaluateExpression`, so every variable defaulted to
+        // `.bottom` and SCCP could only detect dead branches written
+        // as `if true { ... }` / `if false { ... }`.
+        let initializers = extractInitializers(from: statement.syntax)
+
         for variable in statement.defs {
             if configuration.ignoredVariables.contains(variable.name) {
                 continue
             }
-
-            let value = evaluateExpression(statement.syntax)
+            let value: LatticeValue
+            if let rhs = initializers[variable.name] {
+                value = evaluateExpression(rhs)
+            } else {
+                // Fall back to evaluating the whole syntax (covers
+                // expression statements that aren't declarations).
+                value = evaluateExpression(statement.syntax)
+            }
             updateValue(variable: variable.name, value: value)
         }
+    }
+
+    /// Pull `name -> initializer expression` mappings out of a statement
+    /// syntax. Currently covers `VariableDeclSyntax` and
+    /// `PatternBindingSyntax` (the let/var case). Returns empty for
+    /// every other syntax kind — caller falls back to whole-statement
+    /// evaluation.
+    private func extractInitializers(from syntax: Syntax) -> [String: Syntax] {
+        var out: [String: Syntax] = [:]
+        if let varDecl = syntax.as(VariableDeclSyntax.self) {
+            for binding in varDecl.bindings {
+                guard let value = binding.initializer?.value else { continue }
+                if let id = binding.pattern.as(IdentifierPatternSyntax.self) {
+                    out[id.identifier.text] = Syntax(value)
+                }
+            }
+        } else if let binding = syntax.as(PatternBindingSyntax.self),
+            let value = binding.initializer?.value,
+            let id = binding.pattern.as(IdentifierPatternSyntax.self)
+        {
+            out[id.identifier.text] = Syntax(value)
+        }
+        return out
     }
 
     private func evaluateExpression(_ syntax: Syntax) -> LatticeValue {
