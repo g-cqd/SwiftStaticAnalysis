@@ -82,12 +82,18 @@ runs:
     - name: Build swa (release)
       shell: bash
       working-directory: ${{ inputs.working-directory }}
+      env:
+        # Indirect through env so a ref containing shell metacharacters
+        # cannot break out of the `git checkout` argument. Avoids the
+        # standard `${{ inputs.* }}` direct-interpolation injection
+        # pattern called out by GitHub's hardening guide.
+        SWA_VERSION: ${{ inputs.swa-version }}
       run: |
         set -euo pipefail
-        if [[ -n "${{ inputs.swa-version }}" ]]; then
-          echo "Checking out swa ref: ${{ inputs.swa-version }}"
-          git fetch --tags --quiet origin "${{ inputs.swa-version }}" || true
-          git checkout --quiet "${{ inputs.swa-version }}"
+        if [[ -n "$SWA_VERSION" ]]; then
+          echo "Checking out swa ref: $SWA_VERSION"
+          git fetch --tags --quiet origin -- "$SWA_VERSION" || true
+          git checkout --quiet -- "$SWA_VERSION"
         fi
         echo "Building swa in release configuration..."
         swift build -c release --product swa
@@ -274,7 +280,9 @@ runs:
 
     - name: Upload SARIF artifact
       if: ${{ inputs.format == 'sarif' && steps.run.outputs.sarif-path != '' }}
-      uses: actions/upload-artifact@v4
+      # Pinned by SHA per https://docs.github.com/en/actions/security-guides
+      # `actions/upload-artifact@v4` resolved to v4.4.3 at audit time.
+      uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
       with:
         name: swa-sarif
         path: ${{ steps.run.outputs.sarif-path }}

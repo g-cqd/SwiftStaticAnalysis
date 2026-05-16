@@ -70,4 +70,38 @@ struct LSPFramingTests {
         let truncated = framed.subdata(in: 0..<(framed.count - 1))
         #expect(LSPFraming.decode(truncated) == nil)
     }
+
+    @Test("typed decode rejects oversized Content-Length")
+    func typedDecodeRejectsOversizedContentLength() {
+        // 9 GB header — must not allocate. Closes the DoS vector flagged
+        // in the audit (LSP framing accepted unbounded Content-Length).
+        let header = Data("Content-Length: 9999999999\r\n\r\n".utf8)
+        let result = LSPFraming.decode(header, maxBytes: 1024)
+        guard case .oversized(let declared, let limit) = result else {
+            Issue.record("Expected .oversized, got \(result)")
+            return
+        }
+        #expect(declared == 9_999_999_999)
+        #expect(limit == 1024)
+    }
+
+    @Test("typed decode rejects negative Content-Length")
+    func typedDecodeRejectsNegativeContentLength() {
+        let header = Data("Content-Length: -1\r\n\r\n".utf8)
+        #expect(LSPFraming.decode(header, maxBytes: 1024) == .malformedHeader)
+    }
+
+    @Test("typed decode rejects non-decimal Content-Length")
+    func typedDecodeRejectsNonDecimalContentLength() {
+        let header = Data("Content-Length: abc\r\n\r\n".utf8)
+        #expect(LSPFraming.decode(header, maxBytes: 1024) == .malformedHeader)
+    }
+
+    @Test("typed decode reports incomplete when payload still arriving")
+    func typedDecodeReportsIncompleteForPartial() {
+        let payload = Data("{}".utf8)
+        let framed = LSPFraming.encode(payload)
+        let truncated = framed.subdata(in: 0..<(framed.count - 1))
+        #expect(LSPFraming.decode(truncated, maxBytes: 1024) == .incomplete)
+    }
 }

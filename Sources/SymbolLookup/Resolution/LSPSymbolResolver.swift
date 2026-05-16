@@ -175,6 +175,10 @@ public final class LSPSymbolResolver: @unchecked Sendable {
             let client = try SourceKitLSPClient(
                 workspaceRoot: workspaceRoot,
                 executablePath: executablePath,
+                // Preserves the historical behaviour of inheriting the
+                // parent's toolchain. Resolver is opt-in from the CLI
+                // (`--lsp <workspace-root>`), so this is a trusted invocation.
+                options: .init(trustDeveloperDir: true, requireTrustedBinary: true)
             )
             stored = client
             return client

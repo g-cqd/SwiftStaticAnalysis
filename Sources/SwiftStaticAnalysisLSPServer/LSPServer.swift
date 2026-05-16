@@ -33,6 +33,25 @@ public protocol LSPTransport: Sendable {
 /// side of the same wire format). Pulled out into a free-standing
 /// type so tests can round-trip without spinning up a process.
 public enum LSPFraming {
+    /// Decoded outcomes for `decode(_:maxBytes:)`. Distinguishes
+    /// "need more bytes" (`incomplete`) from "header was malformed"
+    /// (`malformedHeader`) and "client claimed an oversized payload"
+    /// (`oversized`). The previous Optional-returning API conflated
+    /// the first two, which meant a malicious header that never
+    /// closed could not be detected without timing.
+    public enum DecodeResult: Equatable {
+        case incomplete
+        case malformedHeader
+        case oversized(declaredLength: Int, limit: Int)
+        case message(payload: Data, consumed: Int)
+    }
+
+    /// Default cap on `Content-Length`. 16 MiB is generously above any
+    /// real LSP message (typical didChange is sub-100 KiB; the biggest
+    /// publishDiagnostics is sub-1 MiB) but small enough that a
+    /// malicious header can't trigger gigabyte-scale buffering.
+    public static let defaultMaxMessageBytes = 16 * 1024 * 1024
+
     /// Encode a JSON payload into a framed LSP message.
     public static func encode(_ payload: Data) -> Data {
         var output = Data()
@@ -45,37 +64,60 @@ public enum LSPFraming {
     }
 
     /// Decode the first framed LSP message from `buffer`. Returns the
-    /// payload and the number of bytes consumed (including the
-    /// header). Returns `nil` if `buffer` does not yet contain a
-    /// complete message.
+    /// payload and the number of bytes consumed (including the header).
+    /// Returns `nil` if `buffer` does not yet contain a complete
+    /// message. Bridges the new typed API to the legacy callers.
     public static func decode(_ buffer: Data) -> (payload: Data, consumed: Int)? {
-        // Find the `\r\n\r\n` header terminator.
-        guard let headerEnd = buffer.range(of: Data([0x0D, 0x0A, 0x0D, 0x0A])) else {
+        switch decode(buffer, maxBytes: defaultMaxMessageBytes) {
+        case .message(let payload, let consumed):
+            return (payload, consumed)
+        case .incomplete, .malformedHeader, .oversized:
             return nil
+        }
+    }
+
+    /// Typed decoder. Caps `Content-Length` at `maxBytes` and refuses
+    /// negative or non-decimal lengths. Returns a `DecodeResult` so
+    /// callers can distinguish "still waiting" from "client misbehaved".
+    public static func decode(
+        _ buffer: Data, maxBytes: Int
+    ) -> DecodeResult {
+        guard let headerEnd = buffer.range(of: Data([0x0D, 0x0A, 0x0D, 0x0A])) else {
+            return .incomplete
         }
         let headerRange = buffer.startIndex..<headerEnd.lowerBound
         let headerData = buffer.subdata(in: headerRange)
         guard let headerString = String(data: headerData, encoding: .ascii) else {
-            return nil
+            return .malformedHeader
         }
         var contentLength: Int?
         for line in headerString.split(separator: "\r\n") {
-            let parts = line.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            let parts = line.split(separator: ":", maxSplits: 1)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
             if parts.count == 2, parts[0].caseInsensitiveCompare("Content-Length") == .orderedSame {
-                contentLength = Int(parts[1])
+                // `Int(_:)` already rejects negatives via overflow when the
+                // leading minus is in the string; be explicit so reviewers
+                // see the policy without tracing into the stdlib.
+                guard let parsed = Int(parts[1]), parsed >= 0 else {
+                    return .malformedHeader
+                }
+                contentLength = parsed
             }
         }
         guard let length = contentLength else {
-            return nil
+            return .malformedHeader
+        }
+        if length > maxBytes {
+            return .oversized(declaredLength: length, limit: maxBytes)
         }
         let payloadStart = headerEnd.upperBound
         let payloadEnd = payloadStart + length
         guard buffer.endIndex >= payloadEnd else {
-            return nil
+            return .incomplete
         }
         let payload = buffer.subdata(in: payloadStart..<payloadEnd)
         let consumed = payloadEnd - buffer.startIndex
-        return (payload, consumed)
+        return .message(payload: payload, consumed: consumed)
     }
 }
 
@@ -98,15 +140,19 @@ public final class StdioLSPTransport: LSPTransport, Sendable {
         self.init(input: FileHandle.standardInput, output: FileHandle.standardOutput)
     }
 
-    public init(input: FileHandle, output: FileHandle) {
-        self.storage = Storage(input: input, output: output)
+    public init(
+        input: FileHandle,
+        output: FileHandle,
+        maxMessageBytes: Int = LSPFraming.defaultMaxMessageBytes
+    ) {
+        self.storage = Storage(input: input, output: output, maxMessageBytes: maxMessageBytes)
     }
 
     // MARK: Public
 
     public func readMessage() async throws -> Data? {
-        await Task.detached(priority: .userInitiated) { [storage] in
-            storage.readFramedMessage()
+        try await Task.detached(priority: .userInitiated) { [storage] in
+            try storage.readFramedMessage()
         }.value
     }
 
@@ -124,27 +170,43 @@ public final class StdioLSPTransport: LSPTransport, Sendable {
     private final class Storage: @unchecked Sendable {
         // MARK: Lifecycle
 
-        init(input: FileHandle, output: FileHandle) {
+        init(input: FileHandle, output: FileHandle, maxMessageBytes: Int) {
             self.input = input
             self.output = output
+            self.maxMessageBytes = maxMessageBytes
         }
 
         // MARK: Public
 
         /// Read until either a complete framed message arrives or
         /// stdin closes (EOF). Returns the raw JSON payload (header
-        /// stripped) or `nil` on EOF.
-        func readFramedMessage() -> Data? {
-            readLock.withLock { _ in
+        /// stripped) or `nil` on EOF. Throws `LSPTransportError` if
+        /// the peer claims an oversized payload or sends a malformed
+        /// header — both signal a hostile client.
+        func readFramedMessage() throws -> Data? {
+            try readLock.withLock { _ in
                 while true {
-                    if let (payload, consumed) = LSPFraming.decode(readBuffer) {
+                    switch LSPFraming.decode(readBuffer, maxBytes: maxMessageBytes) {
+                    case .message(let payload, let consumed):
                         readBuffer.removeSubrange(0..<consumed)
                         return payload
+                    case .oversized(let declared, let limit):
+                        throw LSPTransportError.oversizedMessage(
+                            declaredLength: declared, limit: limit
+                        )
+                    case .malformedHeader:
+                        throw LSPTransportError.malformedHeader
+                    case .incomplete:
+                        break  // need more data
                     }
-                    // Need more data. Use a small chunk size; LSP
-                    // messages are typically small and we don't want to
-                    // block on `availableData` for the entire next
-                    // message.
+                    // Need more data. Cap the buffer so a malicious peer
+                    // can't drip headers + bytes forever and exhaust RAM:
+                    // header+payload together cannot exceed maxMessageBytes
+                    // plus a small slack for the header.
+                    let cap = maxMessageBytes + headerSlack
+                    if readBuffer.count > cap {
+                        throw LSPTransportError.bufferExhausted(limit: cap)
+                    }
                     let chunk = input.availableData
                     if chunk.isEmpty {
                         return nil  // EOF
@@ -163,8 +225,13 @@ public final class StdioLSPTransport: LSPTransport, Sendable {
 
         // MARK: Private
 
+        /// Slack for the header itself (a few KiB is more than enough for
+        /// the largest sensible `Content-Length: N\r\n\r\n` plus optional
+        /// `Content-Type` headers).
+        private let headerSlack = 4 * 1024
         private let input: FileHandle
         private let output: FileHandle
+        private let maxMessageBytes: Int
         // Mutex storage is `Int` (zero-cost placeholder); the lock
         // protects access to the `readBuffer` and to the output
         // handle. Mutex is the Swift 6 async-safe primitive — NSLock
@@ -175,6 +242,29 @@ public final class StdioLSPTransport: LSPTransport, Sendable {
     }
 
     private let storage: Storage
+}
+
+// MARK: - LSPTransportError
+
+/// Errors raised by `StdioLSPTransport` when an LSP peer misbehaves
+/// (oversized payload, malformed framing, buffer exhaustion). These
+/// terminate the read loop so the server tears down cleanly instead of
+/// continuing to read attacker-controlled bytes.
+public enum LSPTransportError: Error, Sendable, CustomStringConvertible {
+    case oversizedMessage(declaredLength: Int, limit: Int)
+    case malformedHeader
+    case bufferExhausted(limit: Int)
+
+    public var description: String {
+        switch self {
+        case .oversizedMessage(let declared, let limit):
+            return "LSP peer declared Content-Length \(declared) bytes, exceeding limit \(limit)."
+        case .malformedHeader:
+            return "LSP peer sent a malformed Content-Length header."
+        case .bufferExhausted(let limit):
+            return "LSP read buffer exceeded \(limit) bytes without a complete message."
+        }
+    }
 }
 
 // MARK: - LSPServer
@@ -195,11 +285,15 @@ public actor LSPServer {
     public init(
         transport: any LSPTransport,
         producer: DiagnosticProducer = DiagnosticProducer(),
-        serverInfo: LSPServerInfo = LSPServerInfo(name: "swa-lsp", version: "0.3.0")
+        serverInfo: LSPServerInfo = LSPServerInfo(name: "swa-lsp", version: "0.3.0"),
+        maxOpenDocuments: Int = 4096,
+        maxDocumentBytes: Int = 8 * 1024 * 1024
     ) {
         self.transport = transport
         self.producer = producer
         self.serverInfo = serverInfo
+        self.maxOpenDocuments = maxOpenDocuments
+        self.maxDocumentBytes = maxDocumentBytes
     }
 
     // MARK: Public
@@ -233,10 +327,46 @@ public actor LSPServer {
     private let transport: any LSPTransport
     private let producer: DiagnosticProducer
     private let serverInfo: LSPServerInfo
+    private let maxOpenDocuments: Int
+    private let maxDocumentBytes: Int
     private var documents: [String: String] = [:]
     private var documentVersions: [String: Int] = [:]
+    /// LRU order: front = most recently touched URI. Used to evict the
+    /// oldest entry once `documents.count == maxOpenDocuments`.
+    private var documentLRU: [String] = []
     private var shutdownReceived = false
     private var shouldExit = false
+
+    /// Insert / update a document while enforcing the per-document size
+    /// cap (`maxDocumentBytes`) and global LRU cap (`maxOpenDocuments`).
+    /// Returns the text actually stored (`nil` if rejected for size).
+    private func storeDocument(uri: String, text: String, version: Int?) -> String? {
+        guard text.utf8.count <= maxDocumentBytes else {
+            let msg = "[LSPServer] document \(uri) exceeds maxDocumentBytes "
+                + "(\(text.utf8.count) > \(maxDocumentBytes)); dropping.\n"
+            FileHandle.standardError.write(Data(msg.utf8))
+            return nil
+        }
+        documents[uri] = text
+        if let version { documentVersions[uri] = version }
+        if let idx = documentLRU.firstIndex(of: uri) {
+            documentLRU.remove(at: idx)
+        }
+        documentLRU.insert(uri, at: 0)
+        while documents.count > maxOpenDocuments, let evict = documentLRU.popLast() {
+            documents.removeValue(forKey: evict)
+            documentVersions.removeValue(forKey: evict)
+        }
+        return text
+    }
+
+    private func forgetDocument(uri: String) {
+        documents.removeValue(forKey: uri)
+        documentVersions.removeValue(forKey: uri)
+        if let idx = documentLRU.firstIndex(of: uri) {
+            documentLRU.remove(at: idx)
+        }
+    }
 
     /// Dispatch a decoded JSON-RPC payload by method. Unknown
     /// requests get a `methodNotFound` error; unknown notifications
@@ -308,12 +438,15 @@ public actor LSPServer {
 
     private func handleDidOpen(params: Any?) async {
         guard let params = decode(params, as: LSPDidOpenParams.self) else { return }
-        documents[params.textDocument.uri] = params.textDocument.text
-        documentVersions[params.textDocument.uri] = params.textDocument.version
+        guard let stored = storeDocument(
+            uri: params.textDocument.uri,
+            text: params.textDocument.text,
+            version: params.textDocument.version
+        ) else { return }
         await publishDiagnostics(
             uri: params.textDocument.uri,
             version: params.textDocument.version,
-            text: params.textDocument.text
+            text: stored
         )
     }
 
@@ -321,19 +454,21 @@ public actor LSPServer {
         guard let params = decode(params, as: LSPDidChangeParams.self) else { return }
         // Full sync: the last change carries the complete document.
         guard let last = params.contentChanges.last else { return }
-        documents[params.textDocument.uri] = last.text
-        documentVersions[params.textDocument.uri] = params.textDocument.version
+        guard let stored = storeDocument(
+            uri: params.textDocument.uri,
+            text: last.text,
+            version: params.textDocument.version
+        ) else { return }
         await publishDiagnostics(
             uri: params.textDocument.uri,
             version: params.textDocument.version,
-            text: last.text
+            text: stored
         )
     }
 
     private func handleDidClose(params: Any?) {
         guard let params = decode(params, as: LSPDidCloseParams.self) else { return }
-        documents.removeValue(forKey: params.textDocument.uri)
-        documentVersions.removeValue(forKey: params.textDocument.uri)
+        forgetDocument(uri: params.textDocument.uri)
     }
 
     private func handleDocumentDiagnostic(id: JSONRPCID?, params: Any?) async {

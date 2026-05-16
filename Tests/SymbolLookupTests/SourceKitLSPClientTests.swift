@@ -25,7 +25,14 @@ struct SourceKitLSPClientTests {
         )
         defer { try? FileManager.default.removeItem(atPath: workspaceRoot) }
 
-        let client = try SourceKitLSPClient(workspaceRoot: workspaceRoot, executablePath: executable)
+        let client = try SourceKitLSPClient(
+            workspaceRoot: workspaceRoot,
+            executablePath: executable,
+            // Smoke test opts in to DEVELOPER_DIR pass-through — the spawned
+            // sourcekit-lsp would otherwise have no toolchain selector on
+            // hosts where xcrun doesn't auto-resolve.
+            options: .init(trustDeveloperDir: true, requireTrustedBinary: true)
+        )
         do {
             // Issue the LSP `initialize` request and let it complete.
             // We're not asserting capabilities (the response shape
@@ -38,6 +45,33 @@ struct SourceKitLSPClientTests {
             // Surface the error so a regression in the client's
             // framing reads as a test failure rather than a hang.
             Issue.record("sourcekit-lsp handshake failed: \(error)")
+        }
+    }
+
+    @Test("Init rejects an untrusted (non-root-owned) executable")
+    func initRejectsUntrustedBinary() throws {
+        // Create a user-owned binary in a tmp dir and verify the trust
+        // check refuses to spawn it. This is the regression test for the
+        // attacker-plant-a-binary vector flagged in the audit.
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("swa-sk-trust-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+        let fakeBinary = tmpDir.appendingPathComponent("sourcekit-lsp")
+        // Minimal shell shim — but it's user-owned, not root.
+        try "#!/bin/sh\nexit 0\n".write(to: fakeBinary, atomically: true, encoding: .utf8)
+        chmod(fakeBinary.path, 0o755)
+
+        do {
+            _ = try SourceKitLSPClient(
+                workspaceRoot: tmpDir.path,
+                executablePath: fakeBinary.path
+            )
+            Issue.record("Expected untrustedExecutable error, init succeeded")
+        } catch SourceKitLSPError.untrustedExecutable {
+            // Expected.
+        } catch {
+            Issue.record("Expected .untrustedExecutable, got \(error)")
         }
     }
 }

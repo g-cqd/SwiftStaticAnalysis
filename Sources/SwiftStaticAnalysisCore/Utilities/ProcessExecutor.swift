@@ -20,7 +20,7 @@ import Foundation
 /// `swift-subprocess` is intentionally not adopted yet: it's pre-1.0 and
 /// the Foundation `Process` plumbing is correct after the env scrub.
 /// When the upstream package reaches a stable release we can re-evaluate.
-internal enum ProcessExecutor {
+public enum ProcessExecutor {
     /// Environment variables inherited from the parent. Anything else is
     /// dropped — including `DYLD_INSERT_LIBRARIES`, `DEVELOPER_DIR`,
     /// `SWIFTPM_HOOKS_DIR`, all `LD_*` / `DYLD_*` overrides.
@@ -28,23 +28,23 @@ internal enum ProcessExecutor {
     /// The list intentionally excludes shell-related variables (`SHELL`,
     /// `BASH_ENV`) and IFS-style settings that have historically been
     /// vectors for privilege-escalation chains.
-    internal static let allowedEnvironmentKeys: Set<String> = [
+    public static let allowedEnvironmentKeys: Set<String> = [
         "PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL",
         "LC_CTYPE", "LC_MESSAGES", "TMPDIR", "TERM",
     ]
 
     /// Result of a subprocess invocation.
-    internal struct Result: Sendable {
-        internal let exitCode: Int32
-        internal let stdout: String
-        internal let stderr: String
+    public struct Result: Sendable {
+        public let exitCode: Int32
+        public let stdout: String
+        public let stderr: String
 
         /// `true` if the process exited normally with code 0.
-        internal var succeeded: Bool { exitCode == 0 }
+        public var succeeded: Bool { exitCode == 0 }
     }
 
     /// Errors raised by `ProcessExecutor.run`.
-    internal enum Error: Swift.Error, Sendable {
+    public enum Error: Swift.Error, Sendable {
         case launchFailed(executable: String, underlying: String)
     }
 
@@ -61,7 +61,7 @@ internal enum ProcessExecutor {
     /// - Returns: stdout / stderr / exit code.
     /// - Throws: `ProcessExecutor.Error.launchFailed` if `Process.run()`
     ///   throws.
-    internal static func run(
+    public static func run(
         executable: URL,
         arguments: [String],
         currentDirectory: URL? = nil,

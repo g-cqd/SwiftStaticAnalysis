@@ -3,6 +3,7 @@
 //  MIT License
 
 import Foundation
+import SwiftStaticAnalysisCore
 
 // MARK: - SourceKitLSPClient
 
@@ -45,6 +46,35 @@ import Foundation
 ///0.3.0 doesn't ship. Treat this file as scaffolding for the
 /// 0.4.0 build-required resolver.
 public final class SourceKitLSPClient: @unchecked Sendable {
+    // MARK: - Options
+
+    /// Configuration for the spawned `sourcekit-lsp` subprocess.
+    /// Defaults are conservative: the parent's `DEVELOPER_DIR` is **not**
+    /// inherited (preventing a hostile parent env from redirecting the
+    /// toolchain), and the binary path is verified to be root-owned and
+    /// not group/world-writable before spawn.
+    public struct Options: Sendable {
+        public init(
+            trustDeveloperDir: Bool = false,
+            requireTrustedBinary: Bool = true
+        ) {
+            self.trustDeveloperDir = trustDeveloperDir
+            self.requireTrustedBinary = requireTrustedBinary
+        }
+
+        /// When `true`, inherit `DEVELOPER_DIR` from the parent process.
+        /// Off by default — `sourcekit-lsp` will fall back to `xcrun`
+        /// to resolve its toolchain. Set to `true` only when the parent
+        /// environment is trusted (e.g. a developer's interactive shell
+        /// inside Xcode-managed toolchain selection).
+        public let trustDeveloperDir: Bool
+
+        /// When `true`, verify `executablePath` via `BinaryTrustChecker`
+        /// before spawning. Refuses non-root-owned or world-writable
+        /// binaries (the dlopen / exec vector described in the audit).
+        public let requireTrustedBinary: Bool
+    }
+
     // MARK: Lifecycle
 
     /// Spawn `sourcekit-lsp` rooted at `workspaceRoot`.
@@ -54,22 +84,38 @@ public final class SourceKitLSPClient: @unchecked Sendable {
     ///     directory (the directory containing `Package.swift` or
     ///     `*.xcodeproj`).
     ///   - executablePath: Path to the `sourcekit-lsp` binary. Defaults
-    ///     to the one on `PATH`; an explicit path bypasses the
-    ///     `PATH` lookup.
-    /// - Throws: `SourceKitLSPError.spawnFailed` if `sourcekit-lsp`
-    ///   cannot be started.
-    public init(workspaceRoot: String, executablePath: String = "/usr/bin/sourcekit-lsp") throws {
+    ///     to `/usr/bin/sourcekit-lsp`.
+    ///   - options: Security and environment-passthrough toggles. The
+    ///     defaults refuse to inherit `DEVELOPER_DIR` and refuse to
+    ///     spawn a non-root-owned binary.
+    /// - Throws:
+    ///   - `SourceKitLSPError.spawnFailed` if `sourcekit-lsp` cannot be
+    ///     started.
+    ///   - `SourceKitLSPError.untrustedExecutable` if the binary fails
+    ///     the `BinaryTrustChecker` policy and `requireTrustedBinary`
+    ///     is `true`.
+    public init(
+        workspaceRoot: String,
+        executablePath: String = "/usr/bin/sourcekit-lsp",
+        options: Options = Options()
+    ) throws {
+        if options.requireTrustedBinary,
+            !BinaryTrustChecker.isTrusted(at: executablePath)
+        {
+            throw SourceKitLSPError.untrustedExecutable(path: executablePath)
+        }
         self.workspaceRoot = workspaceRoot
         self.process = Process()
         self.process.executableURL = URL(fileURLWithPath: executablePath)
         // Empty argv — sourcekit-lsp defaults to stdio transport.
         self.process.arguments = []
-        // Scrub the environment to the minimum LSP-relevant subset.
-        // `sourcekit-lsp` resolves its own toolchain via
-        // `DEVELOPER_DIR` / `xcrun`; we let it inherit the parent's
-        // `DEVELOPER_DIR` so it picks the right Swift toolchain.
+        // Scrub the environment. PATH/HOME/TMPDIR are baseline; DEVELOPER_DIR
+        // is opt-in because a hostile parent value redirects the toolchain
+        // and is dlopen'd as code via `libIndexStore.dylib`.
         var environment: [String: String] = ["PATH": ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"]
-        if let dd = ProcessInfo.processInfo.environment["DEVELOPER_DIR"] {
+        if options.trustDeveloperDir,
+            let dd = ProcessInfo.processInfo.environment["DEVELOPER_DIR"]
+        {
             environment["DEVELOPER_DIR"] = dd
         }
         if let home = ProcessInfo.processInfo.environment["HOME"] {
@@ -290,6 +336,7 @@ public enum SourceKitLSPError: Error, Sendable, CustomStringConvertible {
     case requestFailed(method: String, reason: String)
     case encodingFailed
     case protocolError(reason: String)
+    case untrustedExecutable(path: String)
 
     public var description: String {
         switch self {
@@ -303,6 +350,10 @@ public enum SourceKitLSPError: Error, Sendable, CustomStringConvertible {
             return "Failed to encode JSON-RPC message"
         case .protocolError(let reason):
             return "sourcekit-lsp protocol error: \(reason)"
+        case .untrustedExecutable(let path):
+            return "sourcekit-lsp binary at \(path) failed BinaryTrustChecker policy "
+                + "(must be regular file, root-owned, not group/world-writable). "
+                + "Set SourceKitLSPClient.Options.requireTrustedBinary = false to override."
         }
     }
 }

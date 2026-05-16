@@ -363,22 +363,13 @@ public final class IndexStoreReader: @unchecked Sendable {
         return nil
     }
 
-    /// Verify a candidate `libIndexStore.dylib` path is a regular file
-    /// owned by `root` (uid 0). Returning `true` means it's safe to
-    /// hand to `IndexStoreLibrary.init`; `false` means skip this
-    /// candidate.
+    /// Verify a candidate `libIndexStore.dylib` path is safe to hand to
+    /// `IndexStoreLibrary.init`. Delegates to the shared
+    /// `BinaryTrustChecker` so the policy (root-owned + not
+    /// group/world-writable + regular file, no symlinks) stays in one
+    /// place and survives future security additions.
     private static func isTrustedDylib(at path: String) -> Bool {
-        guard !path.isEmpty else { return false }
-        var info = stat()
-        guard lstat(path, &info) == 0 else { return false }
-        // Reject symlinks at this layer — `IndexStoreLibrary` will
-        // dlopen whatever resolves, and a symlink in a writable
-        // toolchain directory is a redirect we have no business
-        // following without an explicit check.
-        guard (info.st_mode & S_IFMT) == S_IFREG else { return false }
-        // Owner must be root (uid 0). Any other owner means a non-
-        // privileged user could have replaced the dylib.
-        return info.st_uid == 0
+        BinaryTrustChecker.isTrusted(at: path)
     }
 
     /// Find all occurrences of a symbol with the given name.

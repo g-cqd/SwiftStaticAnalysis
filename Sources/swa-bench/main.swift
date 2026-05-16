@@ -306,22 +306,22 @@ private func durationInSeconds(_ duration: Duration) -> Double {
 /// Run a command and return its trimmed stdout, or nil on failure. Used
 /// only at report-construction time, so failures degrade gracefully into
 /// an "unknown" string rather than crashing the benchmark.
+///
+/// Routes through `ProcessExecutor` so the spawned subprocess inherits the
+/// same scrubbed environment as the rest of the analyzer's child processes
+/// (no `DYLD_INSERT_LIBRARIES`, `DEVELOPER_DIR` opt-in, etc.). The previous
+/// implementation used `/usr/bin/env` with the parent's full environment
+/// and bypassed the project-wide subprocess hygiene policy.
 private func captureCommand(_ executable: String, _ arguments: [String]) -> String? {
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-    process.arguments = [executable] + arguments
-    let pipe = Pipe()
-    process.standardOutput = pipe
-    process.standardError = FileHandle(forWritingAtPath: "/dev/null")
-    do {
-        try process.run()
-        process.waitUntilExit()
-    } catch {
-        return nil
-    }
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    return String(data: data, encoding: .utf8)?
-        .trimmingCharacters(in: .whitespacesAndNewlines)
+    // Resolve the executable through `/usr/bin/env --` once (via a trusted
+    // path) so callers can pass bare names like "git" or "swift".
+    let envURL = URL(fileURLWithPath: "/usr/bin/env")
+    let result = try? ProcessExecutor.run(
+        executable: envURL,
+        arguments: [executable] + arguments
+    )
+    guard let result, result.succeeded else { return nil }
+    return result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
 // MARK: - RSS reading
