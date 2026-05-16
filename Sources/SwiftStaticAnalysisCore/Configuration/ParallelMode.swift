@@ -67,6 +67,22 @@ extension ParallelMode {
         legacyParallel ? .safe : .none
     }
 
+    /// Resolve an effective `ParallelMode` from the three input sources
+    /// every detector configuration carries: an explicit `parallelMode`,
+    /// a legacy boolean `parallel`, and a default applied when neither is
+    /// set. Replaces the duplicated `resolvedParallelMode` getter that
+    /// previously lived on both `UnusedConfiguration` and
+    /// `DuplicatesConfiguration` with identical bodies.
+    public static func resolved(
+        explicit: ParallelMode?,
+        legacy: Bool?,
+        fallback: ParallelMode = .maximum
+    ) -> ParallelMode {
+        if let explicit { return explicit }
+        if let legacy { return .from(legacyParallel: legacy) }
+        return fallback
+    }
+
     /// Convert to boolean for backward compatibility with existing code.
     public var isParallel: Bool {
         switch self {

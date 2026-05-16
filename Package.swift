@@ -186,6 +186,12 @@ let package = Package(
                 "SwiftStaticAnalysisCore",
                 "DuplicationDetector",
                 "UnusedCodeDetector",
+                // SymbolLookup is needed for OutputFormatter's symbol-printing
+                // surface (SymbolMatch, SymbolOccurrence, SymbolContext).
+                // Previously the symbol printers lived inside `swa/SWA.swift`
+                // because OutputFormatter was in the executable; now the
+                // library carries the full formatting surface.
+                "SymbolLookup",
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

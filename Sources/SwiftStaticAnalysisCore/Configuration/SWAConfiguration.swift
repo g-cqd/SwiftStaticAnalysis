@@ -197,13 +197,7 @@ public struct UnusedConfiguration: Codable, Sendable, Equatable {
 
     /// Resolved parallel mode, considering both `parallelMode` and legacy `parallel`.
     public var resolvedParallelMode: ParallelMode {
-        if let mode = parallelMode {
-            return mode
-        }
-        if let legacy = parallel {
-            return ParallelMode.from(legacyParallel: legacy)
-        }
-        return .maximum
+        ParallelMode.resolved(explicit: parallelMode, legacy: parallel)
     }
 }
 
@@ -271,12 +265,6 @@ public struct DuplicatesConfiguration: Codable, Sendable, Equatable {
 
     /// Resolved parallel mode, considering both `parallelMode` and legacy `parallel`.
     public var resolvedParallelMode: ParallelMode {
-        if let mode = parallelMode {
-            return mode
-        }
-        if let legacy = parallel {
-            return ParallelMode.from(legacyParallel: legacy)
-        }
-        return .maximum
+        ParallelMode.resolved(explicit: parallelMode, legacy: parallel)
     }
 }
