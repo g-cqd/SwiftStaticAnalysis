@@ -40,6 +40,29 @@ public enum GlobMatcher {
         return path.wholeMatch(of: regex) != nil
     }
 
+    /// Like ``matches(path:pattern:)`` but routes the three most common
+    /// project-level patterns (`**/Tests/**`, `**/*Tests.swift`,
+    /// `**/Fixtures/**`) through hand-tuned predicates that skip regex
+    /// compilation entirely. The fallback for anything else is the
+    /// canonical anchored-regex path.
+    ///
+    /// Moved out of `UnusedCodeDetector.UnusedCodeFilter.matchesGlobPattern`
+    /// in Phase 3.2 of the audit-driven cleanup so file discovery
+    /// (in Core / CLI / MCP / bench) no longer pulls in
+    /// `UnusedCodeDetector` just to honour the fast paths.
+    public static func matchesWithFastPaths(path: String, pattern: String) -> Bool {
+        switch pattern {
+        case "**/Tests/**":
+            return pathMatchesTestsGlob(path)
+        case "**/*Tests.swift":
+            return pathMatchesTestFileSuffixGlob(path)
+        case "**/Fixtures/**":
+            return pathMatchesFixturesGlob(path)
+        default:
+            return matches(path: path, pattern: pattern)
+        }
+    }
+
     /// Compile `pattern` to the canonical anchored regex. Returns `nil` if
     /// the translated pattern is rejected by `SafeRegex` (length cap or
     /// ReDoS prefilter) or fails to compile.

@@ -168,23 +168,13 @@ struct SwaBench: AsyncParsableCommand {
     }
 
     private func findSwiftFiles(in path: String) throws -> [String] {
-        let fm = FileManager.default
-        let root = URL(fileURLWithPath: path)
-        guard
-            let enumerator = fm.enumerator(
-                at: root,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            )
-        else {
-            throw ValidationError("Cannot enumerate '\(path)'.")
-        }
-
-        var files: [String] = []
-        for case let url as URL in enumerator where url.pathExtension == "swift" {
-            files.append(url.path)
-        }
-        return files.sorted()
+        // Delegates to the canonical Core enumerator under the
+        // `.fast` preset (no symlink-canonical confinement, no default
+        // deny list, no glob excludes) — preserves the historical
+        // benchmark behaviour while removing the bespoke copy of the
+        // enumeration logic.
+        let finder = SwiftFileFinder(options: .fast)
+        return try finder.find(in: [path])
     }
 }
 

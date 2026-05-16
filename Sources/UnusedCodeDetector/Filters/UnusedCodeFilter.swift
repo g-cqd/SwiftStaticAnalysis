@@ -111,24 +111,13 @@ public struct UnusedCodeFilter: Sendable {
         name.hasSuffix("Tests") || name.hasSuffix("Test")
     }
 
-    /// Check if a path matches a glob pattern.
-    ///
-    /// Uses hand-tuned fast paths for the three most common project-level
-    /// globs (avoiding regex compilation altogether) and falls back to the
-    /// canonical ``GlobMatcher`` for anything else. Both the CLI and the
-    /// MCP `CodebaseContext` route through `GlobMatcher`'s anchored
-    /// `wholeMatch` semantics.
+    /// Check if a path matches a glob pattern. Thin back-compat alias
+    /// over ``GlobMatcher/matchesWithFastPaths(path:pattern:)``;
+    /// retained so existing `UnusedCodeFilter.matchesGlobPattern`
+    /// callers keep working. New call sites should use the Core helper
+    /// directly so they don't pull in `UnusedCodeDetector`.
     public static func matchesGlobPattern(_ path: String, pattern: String) -> Bool {
-        switch pattern {
-        case "**/Tests/**":
-            return pathMatchesTestsGlob(path)
-        case "**/*Tests.swift":
-            return pathMatchesTestFileSuffixGlob(path)
-        case "**/Fixtures/**":
-            return pathMatchesFixturesGlob(path)
-        default:
-            return GlobMatcher.matches(path: path, pattern: pattern)
-        }
+        GlobMatcher.matchesWithFastPaths(path: path, pattern: pattern)
     }
 
     // MARK: - Filtering

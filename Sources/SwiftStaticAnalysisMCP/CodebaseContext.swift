@@ -103,57 +103,25 @@ public struct CodebaseContext: Sendable {
     /// - Parameter excludePatterns: Glob patterns to exclude (e.g., "**/Tests/**").
     /// - Returns: Array of canonical absolute paths to Swift files.
     public func findSwiftFiles(excludePatterns: [String] = []) throws(CodebaseContextError) -> [String] {
-        let fileManager = FileManager.default
-        guard
-            let enumerator = fileManager.enumerator(
-                at: rootURL,
-                includingPropertiesForKeys: [
-                    .isRegularFileKey,
-                    .isDirectoryKey,
-                    .isSymbolicLinkKey,
-                ],
-                options: [.skipsHiddenFiles]
-            )
-        else {
+        // Delegate to the canonical SwiftFileFinder in Core. The
+        // strict preset matches the historical hygiene:
+        // symlink-canonical-confines-to-root, hidden-file skip,
+        // default deny list (.build, Pods, etc.), and glob fast paths.
+        // The previous bespoke MCP enumerator handled the same set;
+        // routing through Core eliminates the divergent copies.
+        let finder = SwiftFileFinder(options: .strict)
+        do {
+            return try finder.find(in: [rootPath], excludePaths: excludePatterns)
+        } catch {
             throw CodebaseContextError.enumerationFailed(rootPath)
         }
-
-        var swiftFiles: [String] = []
-
-        for case let fileURL as URL in enumerator {
-            let relativePath = String(fileURL.path.dropFirst(rootPath.count + 1))
-
-            // Check exclude patterns
-            let shouldExclude = excludePatterns.contains { pattern in
-                Self.matchesGlobPattern(relativePath, pattern: pattern)
-            }
-
-            if shouldExclude {
-                if fileURL.hasDirectoryPath {
-                    enumerator.skipDescendants()
-                }
-                continue
-            }
-
-            guard fileURL.pathExtension == "swift" else { continue }
-
-            // Reject symlinks whose target escapes the sandbox. The enumerator
-            // follows symlinks by default; we explicitly canonicalise each
-            // candidate and re-check it against the root.
-            let canonical = fileURL.resolvingSymlinksInPath().standardizedFileURL.path
-            guard canonical == rootPath || canonical.hasPrefix(rootPath + "/") else { continue }
-
-            swiftFiles.append(canonical)
-        }
-
-        return swiftFiles.sorted()
     }
 
     /// Simple glob pattern matching. Delegates to the canonical
     /// `GlobMatcher` in `SwiftStaticAnalysisCore`. Retained as a thin
     /// alias so callers inside this file read naturally.
     static func matchesGlobPattern(_ path: String, pattern: String) -> Bool {
-        GlobMatcher.matches(path: path, pattern: pattern)
+        GlobMatcher.matchesWithFastPaths(path: path, pattern: pattern)
     }
 
     /// Maximum size of an individual file we will scan for line count in
