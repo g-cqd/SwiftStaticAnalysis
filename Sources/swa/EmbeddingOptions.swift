@@ -32,7 +32,7 @@ public enum SemanticPreset: String, ExpressibleByArgument, CaseIterable, Sendabl
         switch self {
         case .balanced:
             return SemanticThresholds(
-                cosine: 0.85, jaccard: 0.20, maxsim: nil, astShape: nil, apted: nil)
+                cosine: 0.85, jaccard: 0.20, maxsim: nil, astShape: nil, apted: nil, pdg: nil)
         case .strict:
             // Strict layers four signals — cosine + token Jaccard +
             // MaxSim (token-level alignment) + APTED (full tree edit
@@ -40,12 +40,14 @@ public enum SemanticPreset: String, ExpressibleByArgument, CaseIterable, Sendabl
             // trigram approximation (`astShape`) is still selectable
             // via the hidden `--embedding-rerank-shape` flag for users
             // who want the faster but coarser variant; `strict` uses
-            // APTED proper.
+            // APTED proper. `pdg` stays nil — opt-in via
+            // `--embedding-rerank-pdg` because it requires `swiftc`
+            // and the snippet to compile standalone.
             return SemanticThresholds(
-                cosine: 0.90, jaccard: 0.30, maxsim: 0.85, astShape: nil, apted: 0.70)
+                cosine: 0.90, jaccard: 0.30, maxsim: 0.85, astShape: nil, apted: 0.70, pdg: nil)
         case .loose:
             return SemanticThresholds(
-                cosine: 0.80, jaccard: 0.10, maxsim: nil, astShape: nil, apted: nil)
+                cosine: 0.80, jaccard: 0.10, maxsim: nil, astShape: nil, apted: nil, pdg: nil)
         }
     }
 }
@@ -65,6 +67,11 @@ public struct SemanticThresholds: Sendable {
     /// Score = 1 - (TED / max(treeSize)). Higher = more structurally
     /// similar. Strict preset uses 0.70.
     public var apted: Double?
+    /// PDG (program-dependence-graph fingerprint Jaccard) rerank
+    /// threshold. `nil` disables the PDG rerank. Requires `swiftc`
+    /// available on PATH and the snippet to compile standalone —
+    /// snippets that don't compile are scored 1.0 (gate falls open).
+    public var pdg: Double?
 }
 
 // MARK: - EmbeddingOptions
@@ -163,6 +170,18 @@ public struct EmbeddingOptions: ParsableArguments {
     )
     public var aptedThresholdOverride: Double?
 
+    @Flag(
+        name: .customLong("embedding-rerank-pdg"),
+        help: ArgumentHelp(visibility: .hidden),
+    )
+    public var rerankPDG: Bool = false
+
+    @Option(
+        name: .customLong("embedding-pdg-threshold"),
+        help: ArgumentHelp(visibility: .hidden),
+    )
+    public var pdgThresholdOverride: Double?
+
     // ---- Resolution helpers ----
 
     /// Default top-k for HNSW / search / anomaly etc. Overridden by
@@ -183,6 +202,12 @@ public struct EmbeddingOptions: ParsableArguments {
         }
         if rerankApted || aptedThresholdOverride != nil {
             t.apted = aptedThresholdOverride ?? t.apted ?? 0.70
+        }
+        if rerankPDG || pdgThresholdOverride != nil {
+            // Default threshold 0.50 — PDG fingerprints differ more
+            // than AST trigrams (SSA value churn, terminator
+            // variants); a lower default avoids over-pruning.
+            t.pdg = pdgThresholdOverride ?? t.pdg ?? 0.50
         }
         return t
     }

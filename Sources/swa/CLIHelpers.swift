@@ -181,7 +181,7 @@ func runUmbrellaEmbeddingDiscovery(
 
     guard !groups.isEmpty else { return groups }
 
-    // Late-interaction reranks. Three optional gates can be layered on
+    // Late-interaction reranks. Four optional gates can be layered on
     // top of cosine + token-Jaccard, each catching a different
     // false-positive class:
     //   * MaxSim    — token-level alignment in embedding space
@@ -190,11 +190,18 @@ func runUmbrellaEmbeddingDiscovery(
     //   * APTED     — full tree edit distance (Pawlik-Augsten /
     //                 Zhang-Shasha gold standard; replaces astShape in
     //                 the `strict` preset)
+    //   * PDG       — Jaccard over program-dependence-graph fingerprints
+    //                 derived from `swiftc -emit-sil`. Catches snippets
+    //                 with matching syntax but different SSA def-use
+    //                 topology (e.g. swapped operands). Opt-in.
     // A group must pass EVERY enabled rerank to survive.
     let maxSimVerifier = thresholds.maxsim != nil ? MaxSimVerifier() : nil
     let shapeReranker = thresholds.astShape != nil ? ASTShapeReranker() : nil
     let aptedReranker = thresholds.apted != nil ? APTEDReranker() : nil
-    guard maxSimVerifier != nil || shapeReranker != nil || aptedReranker != nil else {
+    let pdgReranker = thresholds.pdg != nil ? PDGReranker() : nil
+    guard maxSimVerifier != nil || shapeReranker != nil
+        || aptedReranker != nil || pdgReranker != nil
+    else {
         return groups
     }
 
@@ -224,6 +231,15 @@ func runUmbrellaEmbeddingDiscovery(
 
         if let aptedReranker, let aptedThreshold = thresholds.apted {
             if aptedReranker.score(aCode, bCode) < aptedThreshold {
+                continue outer
+            }
+        }
+
+        if let pdgReranker, let pdgThreshold = thresholds.pdg {
+            // Score is 1.0 when SIL extraction fails for either
+            // snippet — the gate falls open instead of pruning a
+            // candidate the compiler can't analyse.
+            if pdgReranker.score(aCode, bCode) < pdgThreshold {
                 continue outer
             }
         }
