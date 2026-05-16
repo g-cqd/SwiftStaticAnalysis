@@ -1,0 +1,1690 @@
+[
+  {
+    "confidence" : "high",
+    "declaration" : {
+      "accessLevel" : "private",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "variable",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SymbolLookup\/Resolution\/LSPSymbolResolver.swift",
+        "line" : 163,
+        "offset" : 7183
+      },
+      "modifiers" : 0,
+      "name" : "startedClient",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SymbolLookup\/Resolution\/LSPSymbolResolver.swift",
+          "line" : 165,
+          "offset" : 7273
+        },
+        "start" : {
+          "column" : 69,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SymbolLookup\/Resolution\/LSPSymbolResolver.swift",
+          "line" : 162,
+          "offset" : 7178
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SymbolLookup\/Resolution\/LSPSymbolResolver.swift:1"
+      },
+      "typeAnnotation" : "SourceKitLSPClient?"
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused variable 'startedClient'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "function",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/Semantic\/ASTShapeReranker.swift",
+        "line" : 88,
+        "offset" : 3587
+      },
+      "modifiers" : 8,
+      "name" : "visitAny",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/Semantic\/ASTShapeReranker.swift",
+          "line" : 99,
+          "offset" : 4114
+        },
+        "start" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/Semantic\/ASTShapeReranker.swift",
+          "line" : 86,
+          "offset" : 3581
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/Semantic\/ASTShapeReranker.swift:9"
+      },
+      "signature" : {
+        "isAsync" : false,
+        "isRethrowing" : false,
+        "isThrowing" : false,
+        "parameters" : [
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "name" : "node",
+            "type" : "Syntax"
+          }
+        ],
+        "returnType" : "SyntaxVisitorContinueKind"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused function 'visitAny'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "extension",
+      "location" : {
+        "column" : 1,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/Semantic\/TokenJaccard.swift",
+        "line" : 87,
+        "offset" : 3620
+      },
+      "modifiers" : 0,
+      "name" : "Unicode.Scalar",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 2,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/Semantic\/TokenJaccard.swift",
+          "line" : 95,
+          "offset" : 3888
+        },
+        "start" : {
+          "column" : 2,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/Semantic\/TokenJaccard.swift",
+          "line" : 85,
+          "offset" : 3618
+        }
+      },
+      "scope" : {
+        "id" : "global"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused extension 'Unicode.Scalar'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "package",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Find all positions where LCP >= threshold.",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "function",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/SuffixArray\/LCPArray.swift",
+        "line" : 44,
+        "offset" : 1360
+      },
+      "modifiers" : 0,
+      "name" : "findRepeatsAboveThreshold",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/SuffixArray\/LCPArray.swift",
+          "line" : 50,
+          "offset" : 1597
+        },
+        "start" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/SuffixArray\/LCPArray.swift",
+          "line" : 40,
+          "offset" : 1227
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/SuffixArray\/LCPArray.swift:1"
+      },
+      "signature" : {
+        "isAsync" : false,
+        "isRethrowing" : false,
+        "isThrowing" : false,
+        "parameters" : [
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "name" : "threshold",
+            "type" : "Int"
+          }
+        ],
+        "returnType" : "[Int]"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused function 'findRepeatsAboveThreshold'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "package",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Find all maximal repeats of at least `minLength` tokens.",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "function",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/SuffixArray\/LCPArray.swift",
+        "line" : 137,
+        "offset" : 4166
+      },
+      "modifiers" : 0,
+      "name" : "findMaximalRepeats",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/SuffixArray\/LCPArray.swift",
+          "line" : 177,
+          "offset" : 5612
+        },
+        "start" : {
+          "column" : 21,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/SuffixArray\/LCPArray.swift",
+          "line" : 128,
+          "offset" : 3810
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/SuffixArray\/LCPArray.swift:16"
+      },
+      "signature" : {
+        "isAsync" : false,
+        "isRethrowing" : false,
+        "isThrowing" : false,
+        "parameters" : [
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "label" : "minLength",
+            "name" : "minLength",
+            "type" : "Int"
+          }
+        ],
+        "returnType" : "[DetectedRepeat]"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused function 'findMaximalRepeats'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "package",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Creates a suffix array from an array of strings.",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "function",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/SuffixArray\/SuffixArray.swift",
+        "line" : 44,
+        "offset" : 1274
+      },
+      "modifiers" : 1,
+      "name" : "fromStrings",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/SuffixArray\/SuffixArray.swift",
+          "line" : 62,
+          "offset" : 1912
+        },
+        "start" : {
+          "column" : 28,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/SuffixArray\/SuffixArray.swift",
+          "line" : 38,
+          "offset" : 1085
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/DuplicationDetector\/SuffixArray\/SuffixArray.swift:1"
+      },
+      "signature" : {
+        "isAsync" : false,
+        "isRethrowing" : false,
+        "isThrowing" : false,
+        "parameters" : [
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "name" : "strings",
+            "type" : "[String]"
+          }
+        ],
+        "returnType" : "(Self, [String: Int])"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused function 'fromStrings'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Test-only introspection. Reports the current count of cached",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "variable",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+        "line" : 41,
+        "offset" : 1775
+      },
+      "modifiers" : 0,
+      "name" : "_test_contextCacheCount",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+          "line" : 43,
+          "offset" : 1851
+        },
+        "start" : {
+          "column" : 50,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+          "line" : 35,
+          "offset" : 1545
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift:1"
+      },
+      "typeAnnotation" : "Int"
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused variable '_test_contextCacheCount'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Test-only introspection. Reports whether a previously-cached path is",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "function",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+        "line" : 48,
+        "offset" : 2027
+      },
+      "modifiers" : 0,
+      "name" : "_test_contextCacheContains",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+          "line" : 50,
+          "offset" : 2164
+        },
+        "start" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+          "line" : 43,
+          "offset" : 1851
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift:1"
+      },
+      "signature" : {
+        "isAsync" : false,
+        "isRethrowing" : false,
+        "isThrowing" : false,
+        "parameters" : [
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "name" : "canonicalPath",
+            "type" : "String"
+          }
+        ],
+        "returnType" : "Bool"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused function '_test_contextCacheContains'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Test-only wrapper around the private `getContext(for:)`. Allows",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "function",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+        "line" : 56,
+        "offset" : 2395
+      },
+      "modifiers" : 0,
+      "name" : "_test_getContext",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+          "line" : 58,
+          "offset" : 2512
+        },
+        "start" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+          "line" : 50,
+          "offset" : 2164
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift:1"
+      },
+      "signature" : {
+        "isAsync" : false,
+        "isRethrowing" : false,
+        "isThrowing" : true,
+        "parameters" : [
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "label" : "for",
+            "name" : "path",
+            "type" : "String?"
+          }
+        ],
+        "returnType" : "CodebaseContext"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused function '_test_getContext'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Test-only wrapper that drives `handleDetectUnusedCode` end-to-end so",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "function",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+        "line" : 64,
+        "offset" : 2763
+      },
+      "modifiers" : 0,
+      "name" : "_test_handleDetectUnusedCode",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+          "line" : 68,
+          "offset" : 2942
+        },
+        "start" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+          "line" : 58,
+          "offset" : 2512
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift:1"
+      },
+      "signature" : {
+        "isAsync" : true,
+        "isRethrowing" : false,
+        "isThrowing" : true,
+        "parameters" : [
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "name" : "arguments",
+            "type" : "[String: Value]?"
+          }
+        ],
+        "returnType" : "CallTool.Result"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused function '_test_handleDetectUnusedCode'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "extension",
+      "location" : {
+        "column" : 1,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+        "line" : 1395,
+        "offset" : 61099
+      },
+      "modifiers" : 0,
+      "name" : "Tool.Content",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 2,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+          "line" : 1410,
+          "offset" : 61823
+        },
+        "start" : {
+          "column" : 2,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/SwiftStaticAnalysisMCP\/SWAMCPServer.swift",
+          "line" : 1391,
+          "offset" : 61064
+        }
+      },
+      "scope" : {
+        "id" : "global"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused extension 'Tool.Content'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "function",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/CFGBuilder.swift",
+        "line" : 54,
+        "offset" : 1550
+      },
+      "modifiers" : 1,
+      "name" : "<",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/CFGBuilder.swift",
+          "line" : 62,
+          "offset" : 1884
+        },
+        "start" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/CFGBuilder.swift",
+          "line" : 52,
+          "offset" : 1544
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/CFGBuilder.swift:1"
+      },
+      "signature" : {
+        "isAsync" : false,
+        "isRethrowing" : false,
+        "isThrowing" : false,
+        "parameters" : [
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "label" : "lhs",
+            "name" : "lhs",
+            "type" : "VariableID"
+          },
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "label" : "rhs",
+            "name" : "rhs",
+            "type" : "VariableID"
+          }
+        ],
+        "returnType" : "Bool"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused function '<'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Get all blocks in reverse postorder (for forward analysis).",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "variable",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/CFGBuilder.swift",
+        "line" : 259,
+        "offset" : 7142
+      },
+      "modifiers" : 0,
+      "name" : "blocksInReversePostOrder",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/CFGBuilder.swift",
+          "line" : 261,
+          "offset" : 7252
+        },
+        "start" : {
+          "column" : 45,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/CFGBuilder.swift",
+          "line" : 256,
+          "offset" : 7068
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/CFGBuilder.swift:15"
+      },
+      "typeAnnotation" : "[BasicBlock]"
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused variable 'blocksInReversePostOrder'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Get all blocks in postorder (for backward analysis).",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "variable",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/CFGBuilder.swift",
+        "line" : 264,
+        "offset" : 7319
+      },
+      "modifiers" : 0,
+      "name" : "blocksInPostOrder",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/CFGBuilder.swift",
+          "line" : 266,
+          "offset" : 7433
+        },
+        "start" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/CFGBuilder.swift",
+          "line" : 261,
+          "offset" : 7252
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/CFGBuilder.swift:15"
+      },
+      "typeAnnotation" : "[BasicBlock]"
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused variable 'blocksInPostOrder'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Analyze a function declaration.",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "function",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/LiveVariableAnalysis.swift",
+        "line" : 155,
+        "offset" : 4444
+      },
+      "modifiers" : 0,
+      "name" : "analyzeFunction",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/LiveVariableAnalysis.swift",
+          "line" : 163,
+          "offset" : 4740
+        },
+        "start" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/LiveVariableAnalysis.swift",
+          "line" : 152,
+          "offset" : 4398
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/LiveVariableAnalysis.swift:5"
+      },
+      "signature" : {
+        "isAsync" : false,
+        "isRethrowing" : false,
+        "isThrowing" : false,
+        "parameters" : [
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "name" : "function",
+            "type" : "FunctionDeclSyntax"
+          },
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "label" : "file",
+            "name" : "file",
+            "type" : "String"
+          },
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "label" : "tree",
+            "name" : "tree",
+            "type" : "SourceFileSyntax"
+          }
+        ],
+        "returnType" : "LiveVariableResult"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused function 'analyzeFunction'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Analyze a closure expression.",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "function",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/LiveVariableAnalysis.swift",
+        "line" : 166,
+        "offset" : 4784
+      },
+      "modifiers" : 0,
+      "name" : "analyzeClosure",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/LiveVariableAnalysis.swift",
+          "line" : 174,
+          "offset" : 5076
+        },
+        "start" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/LiveVariableAnalysis.swift",
+          "line" : 163,
+          "offset" : 4740
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/LiveVariableAnalysis.swift:5"
+      },
+      "signature" : {
+        "isAsync" : false,
+        "isRethrowing" : false,
+        "isThrowing" : false,
+        "parameters" : [
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "name" : "closure",
+            "type" : "ClosureExprSyntax"
+          },
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "label" : "file",
+            "name" : "file",
+            "type" : "String"
+          },
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "label" : "tree",
+            "name" : "tree",
+            "type" : "SourceFileSyntax"
+          }
+        ],
+        "returnType" : "LiveVariableResult"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused function 'analyzeClosure'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+        "Sendable"
+      ],
+      "documentation" : "Combines live variable and reaching definitions analysis.",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "struct",
+      "location" : {
+        "column" : 1,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/ReachingDefinitions.swift",
+        "line" : 576,
+        "offset" : 19774
+      },
+      "modifiers" : 0,
+      "name" : "CombinedDataFlowAnalysis",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 2,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/ReachingDefinitions.swift",
+          "line" : 636,
+          "offset" : 21908
+        },
+        "start" : {
+          "column" : 2,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/ReachingDefinitions.swift",
+          "line" : 571,
+          "offset" : 19673
+        }
+      },
+      "scope" : {
+        "id" : "global"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused struct 'CombinedDataFlowAnalysis'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Find all dead stores using both analyses.",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "function",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/ReachingDefinitions.swift",
+        "line" : 604,
+        "offset" : 20795
+      },
+      "modifiers" : 0,
+      "name" : "findAllDeadStores",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/ReachingDefinitions.swift",
+          "line" : 630,
+          "offset" : 21770
+        },
+        "start" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/ReachingDefinitions.swift",
+          "line" : 597,
+          "offset" : 20554
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/ReachingDefinitions.swift:82"
+      },
+      "signature" : {
+        "isAsync" : false,
+        "isRethrowing" : false,
+        "isThrowing" : false,
+        "parameters" : [
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "name" : "cfg",
+            "type" : "ControlFlowGraph"
+          }
+        ],
+        "returnType" : "[DeadStore]"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused function 'findAllDeadStores'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "function",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/ReachingDefinitions.swift",
+        "line" : 641,
+        "offset" : 21979
+      },
+      "modifiers" : 1,
+      "name" : "==",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/ReachingDefinitions.swift",
+          "line" : 643,
+          "offset" : 22172
+        },
+        "start" : {
+          "column" : 32,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/ReachingDefinitions.swift",
+          "line" : 640,
+          "offset" : 21974
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/UnusedCodeDetector\/DataFlow\/ReachingDefinitions.swift:89"
+      },
+      "signature" : {
+        "isAsync" : false,
+        "isRethrowing" : false,
+        "isThrowing" : false,
+        "parameters" : [
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "label" : "lhs",
+            "name" : "lhs",
+            "type" : "DeadStore"
+          },
+          {
+            "hasDefaultValue" : false,
+            "isInout" : false,
+            "isVariadic" : false,
+            "label" : "rhs",
+            "name" : "rhs",
+            "type" : "DeadStore"
+          }
+        ],
+        "returnType" : "Bool"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused function '=='"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "constant",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+        "line" : 235,
+        "offset" : 7582
+      },
+      "modifiers" : 0,
+      "name" : "wallSecondsMin",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 31,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 235,
+          "offset" : 7608
+        },
+        "start" : {
+          "column" : 31,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 234,
+          "offset" : 7577
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift:15"
+      },
+      "typeAnnotation" : "Double"
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused constant 'wallSecondsMin'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "constant",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+        "line" : 236,
+        "offset" : 7613
+      },
+      "modifiers" : 0,
+      "name" : "wallSecondsMax",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 31,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 236,
+          "offset" : 7639
+        },
+        "start" : {
+          "column" : 31,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 235,
+          "offset" : 7608
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift:15"
+      },
+      "typeAnnotation" : "Double"
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused constant 'wallSecondsMax'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "constant",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+        "line" : 237,
+        "offset" : 7644
+      },
+      "modifiers" : 0,
+      "name" : "peakRSSBytesMean",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 30,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 237,
+          "offset" : 7669
+        },
+        "start" : {
+          "column" : 31,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 236,
+          "offset" : 7639
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift:15"
+      },
+      "typeAnnotation" : "Int"
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused constant 'peakRSSBytesMean'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "constant",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+        "line" : 238,
+        "offset" : 7674
+      },
+      "modifiers" : 0,
+      "name" : "peakRSSBytesP99",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 29,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 238,
+          "offset" : 7698
+        },
+        "start" : {
+          "column" : 30,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 237,
+          "offset" : 7669
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift:15"
+      },
+      "typeAnnotation" : "Int"
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused constant 'peakRSSBytesP99'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "constant",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+        "line" : 246,
+        "offset" : 7949
+      },
+      "modifiers" : 0,
+      "name" : "gitSha",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 23,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 246,
+          "offset" : 7967
+        },
+        "start" : {
+          "column" : 45,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 245,
+          "offset" : 7944
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift:16"
+      },
+      "typeAnnotation" : "String"
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused constant 'gitSha'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "constant",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+        "line" : 247,
+        "offset" : 7972
+      },
+      "modifiers" : 0,
+      "name" : "swiftVersion",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 29,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 247,
+          "offset" : 7996
+        },
+        "start" : {
+          "column" : 23,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 246,
+          "offset" : 7967
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift:16"
+      },
+      "typeAnnotation" : "String"
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused constant 'swiftVersion'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "constant",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+        "line" : 249,
+        "offset" : 8022
+      },
+      "modifiers" : 0,
+      "name" : "platform",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 25,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 249,
+          "offset" : 8042
+        },
+        "start" : {
+          "column" : 21,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift",
+          "line" : 248,
+          "offset" : 8017
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa-bench\/main.swift:16"
+      },
+      "typeAnnotation" : "String"
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused constant 'platform'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "constant",
+      "location" : {
+        "column" : 17,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa\/EmbeddingSubcommands.swift",
+        "line" : 180,
+        "offset" : 6803
+      },
+      "modifiers" : 0,
+      "name" : "anomalyScore",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 40,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa\/EmbeddingSubcommands.swift",
+          "line" : 180,
+          "offset" : 6826
+        },
+        "start" : {
+          "column" : 30,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa\/EmbeddingSubcommands.swift",
+          "line" : 179,
+          "offset" : 6786
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa\/EmbeddingSubcommands.swift:21"
+      },
+      "typeAnnotation" : "Float"
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused constant 'anomalyScore'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Once-per-run diagnostic warnings for deprecated CLI surfaces.",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "enum",
+      "location" : {
+        "column" : 1,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa\/SWA.swift",
+        "line" : 32,
+        "offset" : 881
+      },
+      "modifiers" : 0,
+      "name" : "DeprecatedFlags",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 2,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa\/SWA.swift",
+          "line" : 52,
+          "offset" : 1835
+        },
+        "start" : {
+          "column" : 2,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa\/SWA.swift",
+          "line" : 23,
+          "offset" : 574
+        }
+      },
+      "scope" : {
+        "id" : "global"
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused enum 'DeprecatedFlags'"
+  },
+  {
+    "confidence" : "medium",
+    "declaration" : {
+      "accessLevel" : "internal",
+      "attributes" : [
+
+      ],
+      "conformances" : [
+
+      ],
+      "documentation" : "Emit a deprecation warning the first time `--parallel` is observed",
+      "genericParameters" : [
+
+      ],
+      "ignoreDirectives" : [
+
+      ],
+      "kind" : "function",
+      "location" : {
+        "column" : 5,
+        "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa\/SWA.swift",
+        "line" : 41,
+        "offset" : 1371
+      },
+      "modifiers" : 1,
+      "name" : "warnLegacyParallel",
+      "propertyWrappers" : [
+
+      ],
+      "range" : {
+        "end" : {
+          "column" : 6,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa\/SWA.swift",
+          "line" : 51,
+          "offset" : 1833
+        },
+        "start" : {
+          "column" : 65,
+          "file" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa\/SWA.swift",
+          "line" : 35,
+          "offset" : 1094
+        }
+      },
+      "scope" : {
+        "id" : "\/Users\/gc\/Developer\/ongoing\/swift\/SwiftStaticAnalysis\/Sources\/swa\/SWA.swift:3"
+      },
+      "signature" : {
+        "isAsync" : false,
+        "isRethrowing" : false,
+        "isThrowing" : false,
+        "parameters" : [
+
+        ]
+      }
+    },
+    "reason" : "neverReferenced",
+    "suggestion" : "Consider removing unused function 'warnLegacyParallel'"
+  }
+]
