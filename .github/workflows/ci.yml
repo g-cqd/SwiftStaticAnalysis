@@ -137,6 +137,44 @@ jobs:
             --format text
 
   # ============================================================================
+  # Executables smoke test: every shipped target must build + answer --help.
+  # Previously swa-lsp / swa-bench could bitrot silently because neither was
+  # exercised in CI; this is the cheapest watchdog short of a full E2E test.
+  # ============================================================================
+  executables-smoke:
+    name: Executables Smoke
+    runs-on: macos-15
+    needs: [format-check]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ env.XCODE_VERSION }}.app
+
+      - name: Cache SPM Dependencies
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Build every executable target
+        run: |
+          swift build -c release --product swa
+          swift build -c release --product swa-mcp
+          swift build -c release --product swa-lsp
+          swift build -c release --product swa-bench
+
+      - name: --help smoke
+        run: |
+          BIN_DIR="$(swift build -c release --show-bin-path)"
+          "$BIN_DIR/swa"       --help > /dev/null
+          "$BIN_DIR/swa-mcp"   --help > /dev/null
+          "$BIN_DIR/swa-lsp"   --help > /dev/null || true   # swa-lsp accepts no flags
+          "$BIN_DIR/swa-bench" --help > /dev/null
+
+  # ============================================================================
   # STAGE 2: Test with Coverage
   # ============================================================================
   test:
