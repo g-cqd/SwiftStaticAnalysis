@@ -311,7 +311,7 @@ struct Duplicates: AsyncParsableCommand {
             minimumSimilarity: effectiveMinSimilarity,
             algorithm: effectiveAlgorithm,
             useParallelClones: effectiveParallel,
-            useStreamingVerifier: effectiveParallelMode.usesStreamingVerifier,
+            backpressure: effectiveParallelMode.usesStreamingVerifier ? .default : .unbounded,
             lshStrategy: lshStrategy.toLSHStrategy(probesPerBand: lshProbesPerBand),
         )
 

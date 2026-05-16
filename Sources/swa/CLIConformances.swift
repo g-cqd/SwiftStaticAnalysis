@@ -22,6 +22,10 @@ extension DetectionAlgorithm: ExpressibleByArgument {}
 extension Confidence: ExpressibleByArgument {}
 extension ParallelMode: ExpressibleByArgument {}
 extension OutputFormat: ExpressibleByArgument {}
+// `SemanticPreset` itself lives in `DuplicationDetector` (Phase 5.4
+// audit move). Conformance to `ExpressibleByArgument` is grafted on
+// here so the library doesn't have to pull in `ArgumentParser`.
+extension SemanticPreset: ExpressibleByArgument {}
 
 // MARK: - LSHStrategyArg
 

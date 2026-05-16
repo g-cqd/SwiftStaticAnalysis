@@ -56,24 +56,37 @@ public struct ParallelCloneConfiguration: Sendable {
     // MARK: Lifecycle
 
     /// Create parallel clone configuration.
-    ///
-    /// - Parameters:
-    ///   - enabled: Whether to enable parallel processing.
-    ///   - minParallelDocuments: Minimum documents to trigger parallelism.
-    ///   - minParallelPairs: Minimum pairs to trigger parallel verification.
-    ///   - maxConcurrency: Maximum concurrent tasks.
     public init(
         enabled: Bool = true,
         minParallelDocuments: Int = 50,
         minParallelPairs: Int = 100,
         maxConcurrency: Int = ProcessInfo.processInfo.activeProcessorCount,
-        useStreamingVerifier: Bool = false,
+        backpressure: BackpressureMode = .unbounded,
     ) {
         self.enabled = enabled
         self.minParallelDocuments = max(1, minParallelDocuments)
         self.minParallelPairs = max(1, minParallelPairs)
         self.maxConcurrency = max(1, maxConcurrency)
-        self.useStreamingVerifier = useStreamingVerifier
+        self.backpressure = backpressure
+    }
+
+    /// Back-compat shim — accepts the old `useStreamingVerifier: Bool`
+    /// keyword. Slated for removal in 0.5.0.
+    @available(*, deprecated, message: "Use `backpressure: BackpressureMode` instead.")
+    public init(
+        enabled: Bool = true,
+        minParallelDocuments: Int = 50,
+        minParallelPairs: Int = 100,
+        maxConcurrency: Int = ProcessInfo.processInfo.activeProcessorCount,
+        useStreamingVerifier: Bool,
+    ) {
+        self.init(
+            enabled: enabled,
+            minParallelDocuments: minParallelDocuments,
+            minParallelPairs: minParallelPairs,
+            maxConcurrency: maxConcurrency,
+            backpressure: useStreamingVerifier ? .default : .unbounded
+        )
     }
 
     // MARK: Public
@@ -88,7 +101,7 @@ public struct ParallelCloneConfiguration: Sendable {
     /// through `StreamingVerifier.streamResultsBackpressured`, so a slow
     /// consumer suspends the producer instead of queueing unbounded.
     /// Engaged automatically when `ParallelMode.maximum` flows in.
-    public static let streaming = ParallelCloneConfiguration(useStreamingVerifier: true)
+    public static let streaming = ParallelCloneConfiguration(backpressure: .default)
 
     /// Whether to enable parallel processing.
     public let enabled: Bool
@@ -102,11 +115,17 @@ public struct ParallelCloneConfiguration: Sendable {
     /// Maximum concurrent tasks.
     public let maxConcurrency: Int
 
-    /// When `true`, the verifier emits clone pairs through an
-    /// `AsyncChannel` with backpressure (`BackpressuredChannelStream`)
-    /// rather than buffering all pairs before returning. Required by
-    /// `ParallelMode.maximum` per the README/CHANGELOG contract.
-    public let useStreamingVerifier: Bool
+    /// Backpressure policy for the MinHash+LSH verifier. `.bounded`
+    /// routes through `BackpressuredChannelStream`; `.unbounded`
+    /// buffers all pairs before returning. Phase 5.3 audit rename.
+    public let backpressure: BackpressureMode
+
+    /// Back-compat accessor — `true` iff `backpressure` is bounded.
+    @available(*, deprecated, message: "Use `backpressure` instead.")
+    public var useStreamingVerifier: Bool {
+        if case .bounded = backpressure { return true }
+        return false
+    }
 }
 
 // MARK: - MinHashCloneDetector
@@ -364,21 +383,25 @@ public struct MinHashCloneDetector: Sendable {
 
         // Verify candidates. Three paths:
         //
-        // 1. `useStreamingVerifier` (engaged by `ParallelMode.maximum`):
+        // 1. `backpressure == .bounded` (engaged by `ParallelMode.maximum`):
         //    pairs flow through an `AsyncChannel` with backpressure.
         //    Memory-bounded for million-pair codebases.
         // 2. Parallel TaskGroup (default `.safe` path) when pair count
         //    crosses the parallel threshold.
         // 3. Sequential verification for small codebases.
         let clonePairs: [ClonePairInfo]
-        if parallelConfig.useStreamingVerifier,
+        let streamingBuffer: Int? = {
+            if case .bounded(let buffer) = parallelConfig.backpressure { return buffer }
+            return nil
+        }()
+        if let bufferSize = streamingBuffer,
             candidatePairs.count >= parallelConfig.minParallelPairs
         {
             let streamingVerifier = StreamingVerifier(
                 minimumSimilarity: minimumSimilarity,
                 batchSize: 500,
                 maxConcurrency: parallelConfig.maxConcurrency,
-                bufferSize: 8
+                bufferSize: bufferSize
             )
             let channel = streamingVerifier.streamResultsBackpressured(
                 candidatePairs,

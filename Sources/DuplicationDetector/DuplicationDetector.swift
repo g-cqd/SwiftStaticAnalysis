@@ -114,6 +114,29 @@ public enum DetectionAlgorithm: String, Sendable, Codable, CaseIterable {
     case minHashLSH
 }
 
+// MARK: - BackpressureMode
+
+/// How the MinHash+LSH clone-verifier surfaces its output. Phase 5.3 of
+/// the audit-driven cleanup: replaces the previous boolean
+/// `useStreamingVerifier` knob with a typed enum so the meaning is
+/// readable at the call site and future backpressure variants don't
+/// require yet-another `Bool`.
+public enum BackpressureMode: Sendable, Equatable {
+    /// Collect every verified pair into an array before returning.
+    /// Lowest latency for small codebases; can blow memory on million-
+    /// pair runs.
+    case unbounded
+    /// Stream verified pairs through an `AsyncChannel` whose buffer is
+    /// capped at `buffer` items. A slow consumer suspends the
+    /// producer instead of queueing unbounded. Mirrors the historical
+    /// `useStreamingVerifier == true` shape.
+    case bounded(buffer: Int)
+
+    /// Default bounded buffer matching the streaming verifier's
+    /// historical hard-coded value.
+    public static let `default`: BackpressureMode = .bounded(buffer: 8)
+}
+
 // MARK: - DuplicationConfiguration
 
 /// Configuration for duplication detection.
@@ -129,7 +152,7 @@ public struct DuplicationConfiguration: Sendable {
         useIncremental: Bool = false,
         cacheDirectory: URL? = nil,
         useParallelClones: Bool = false,
-        useStreamingVerifier: Bool = false,
+        backpressure: BackpressureMode = .unbounded,
         semanticEmbeddingProvider: SemanticEmbeddingProvider? = nil,
         semanticEmbeddingThreshold: Double = 0.95,
         lshStrategy: LSHStrategy = .standard,
@@ -143,10 +166,44 @@ public struct DuplicationConfiguration: Sendable {
         self.useIncremental = useIncremental
         self.cacheDirectory = cacheDirectory
         self.useParallelClones = useParallelClones
-        self.useStreamingVerifier = useStreamingVerifier
+        self.backpressure = backpressure
         self.semanticEmbeddingProvider = semanticEmbeddingProvider
         self.semanticEmbeddingThreshold = min(max(semanticEmbeddingThreshold, 0.0), 1.0)
         self.lshStrategy = lshStrategy
+    }
+
+    /// Back-compat shim — the previous `useStreamingVerifier: Bool`
+    /// signature still works. `true` maps to `.bounded(.default)`,
+    /// `false` maps to `.unbounded`. Slated for removal in 0.5.0.
+    @available(*, deprecated, message: "Use `backpressure: BackpressureMode` instead.")
+    public init(
+        minimumTokens: Int = 50,
+        cloneTypes: Set<CloneType> = [.exact, .near, .semantic],
+        ignoredPatterns: [String] = [],
+        minimumSimilarity: Double = 0.8,
+        algorithm: DetectionAlgorithm = .rollingHash,
+        useIncremental: Bool = false,
+        cacheDirectory: URL? = nil,
+        useParallelClones: Bool = false,
+        useStreamingVerifier: Bool,
+        semanticEmbeddingProvider: SemanticEmbeddingProvider? = nil,
+        semanticEmbeddingThreshold: Double = 0.95,
+        lshStrategy: LSHStrategy = .standard,
+    ) {
+        self.init(
+            minimumTokens: minimumTokens,
+            cloneTypes: cloneTypes,
+            ignoredPatterns: ignoredPatterns,
+            minimumSimilarity: minimumSimilarity,
+            algorithm: algorithm,
+            useIncremental: useIncremental,
+            cacheDirectory: cacheDirectory,
+            useParallelClones: useParallelClones,
+            backpressure: useStreamingVerifier ? .default : .unbounded,
+            semanticEmbeddingProvider: semanticEmbeddingProvider,
+            semanticEmbeddingThreshold: semanticEmbeddingThreshold,
+            lshStrategy: lshStrategy
+        )
     }
 
     // MARK: Public
@@ -193,12 +250,23 @@ public struct DuplicationConfiguration: Sendable {
     /// Whether to use experimental parallel clone detection.
     public var useParallelClones: Bool
 
-    /// When `true`, MinHash+LSH verification flows through an
-    /// `AsyncChannel` with backpressure (`BackpressuredChannelStream`),
-    /// so a slow consumer suspends the producer instead of queueing
-    /// unbounded. Engaged by `ParallelMode.maximum` per the
-    /// README/CHANGELOG contract.
-    public var useStreamingVerifier: Bool
+    /// Backpressure policy for the MinHash+LSH verifier pipeline.
+    /// `.bounded(buffer:)` engages the AsyncChannel-backed streaming
+    /// verifier so a slow consumer suspends the producer instead of
+    /// queueing unbounded; `.unbounded` collects every pair before
+    /// returning. `ParallelMode.maximum` maps to `.bounded(.default)`.
+    public var backpressure: BackpressureMode
+
+    /// Back-compat accessor — `true` iff `backpressure` is bounded.
+    /// Slated for removal in 0.5.0.
+    @available(*, deprecated, message: "Use `backpressure` instead.")
+    public var useStreamingVerifier: Bool {
+        get {
+            if case .bounded = backpressure { return true }
+            return false
+        }
+        set { backpressure = newValue ? .default : .unbounded }
+    }
 
     /// Optional dense-vector embedding provider for semantic-deep
     /// verification. When non-nil, every clone group produced by the
@@ -443,10 +511,10 @@ public struct DuplicationDetector: Sendable {
     ) async throws -> [CloneGroup] {
         let parallelConfig: ParallelCloneConfiguration = {
             guard configuration.useParallelClones else { return .sequential }
-            // ParallelMode.maximum → streaming verifier; .safe keeps the
-            // TaskGroup-based path.
+            // ParallelMode.maximum → bounded backpressure; .safe keeps the
+            // TaskGroup-based path with unbounded buffer.
             return ParallelCloneConfiguration(
-                useStreamingVerifier: configuration.useStreamingVerifier
+                backpressure: configuration.backpressure
             )
         }()
         let detector = MinHashCloneDetector(
