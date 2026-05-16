@@ -237,26 +237,36 @@
                 attentionMaskName: MLFeatureValue(multiArray: attentionMask),
             ]
             if acceptsTokenTypeIDs, let name = tokenTypeIDsName {
-                let tt = try? MLMultiArray(
-                    shape: [1, NSNumber(value: sequenceLength)], dataType: .int32
-                )
-                if let tt {
-                    for i in 0..<sequenceLength {
-                        tt[[0, NSNumber(value: i)]] = 0
-                    }
-                    features[name] = MLFeatureValue(multiArray: tt)
+                let tt: MLMultiArray
+                do {
+                    tt = try MLMultiArray(
+                        shape: [1, NSNumber(value: sequenceLength)], dataType: .int32
+                    )
+                } catch {
+                    throw SemanticEmbeddingError.inferenceFailed(
+                        reason: "Failed to allocate token_type_ids MLMultiArray: \(error.localizedDescription)"
+                    )
                 }
+                for i in 0..<sequenceLength {
+                    tt[[0, NSNumber(value: i)]] = 0
+                }
+                features[name] = MLFeatureValue(multiArray: tt)
             }
             if acceptsPositionIDs, let name = positionIDsName {
-                let pos = try? MLMultiArray(
-                    shape: [1, NSNumber(value: sequenceLength)], dataType: .int32
-                )
-                if let pos {
-                    for i in 0..<sequenceLength {
-                        pos[[0, NSNumber(value: i)]] = NSNumber(value: Int32(i))
-                    }
-                    features[name] = MLFeatureValue(multiArray: pos)
+                let pos: MLMultiArray
+                do {
+                    pos = try MLMultiArray(
+                        shape: [1, NSNumber(value: sequenceLength)], dataType: .int32
+                    )
+                } catch {
+                    throw SemanticEmbeddingError.inferenceFailed(
+                        reason: "Failed to allocate position_ids MLMultiArray: \(error.localizedDescription)"
+                    )
                 }
+                for i in 0..<sequenceLength {
+                    pos[[0, NSNumber(value: i)]] = NSNumber(value: Int32(i))
+                }
+                features[name] = MLFeatureValue(multiArray: pos)
             }
 
             // 3. Inference.
@@ -286,6 +296,13 @@
             else {
                 throw SemanticEmbeddingError.inferenceFailed(
                     reason: "Model output missing '\(lastHiddenStateName)' multi-array"
+                )
+            }
+            // `assumingMemoryBound(to: Float.self)` on a non-Float32 buffer
+            // either reads garbage or traps on alignment; refuse explicitly.
+            guard lastHidden.dataType == .float32 else {
+                throw SemanticEmbeddingError.unsupportedOutputDtype(
+                    actual: String(describing: lastHidden.dataType)
                 )
             }
             let shape = lastHidden.shape.map { $0.intValue }
@@ -377,24 +394,34 @@
                 attentionMaskName: MLFeatureValue(multiArray: attentionMask),
             ]
             if acceptsTokenTypeIDs, let name = tokenTypeIDsName {
-                let tt = try? MLMultiArray(
-                    shape: [1, NSNumber(value: sequenceLength)], dataType: .int32
-                )
-                if let tt {
-                    for i in 0..<sequenceLength { tt[[0, NSNumber(value: i)]] = 0 }
-                    features[name] = MLFeatureValue(multiArray: tt)
+                let tt: MLMultiArray
+                do {
+                    tt = try MLMultiArray(
+                        shape: [1, NSNumber(value: sequenceLength)], dataType: .int32
+                    )
+                } catch {
+                    throw SemanticEmbeddingError.inferenceFailed(
+                        reason: "Failed to allocate token_type_ids MLMultiArray: \(error.localizedDescription)"
+                    )
                 }
+                for i in 0..<sequenceLength { tt[[0, NSNumber(value: i)]] = 0 }
+                features[name] = MLFeatureValue(multiArray: tt)
             }
             if acceptsPositionIDs, let name = positionIDsName {
-                let pos = try? MLMultiArray(
-                    shape: [1, NSNumber(value: sequenceLength)], dataType: .int32
-                )
-                if let pos {
-                    for i in 0..<sequenceLength {
-                        pos[[0, NSNumber(value: i)]] = NSNumber(value: Int32(i))
-                    }
-                    features[name] = MLFeatureValue(multiArray: pos)
+                let pos: MLMultiArray
+                do {
+                    pos = try MLMultiArray(
+                        shape: [1, NSNumber(value: sequenceLength)], dataType: .int32
+                    )
+                } catch {
+                    throw SemanticEmbeddingError.inferenceFailed(
+                        reason: "Failed to allocate position_ids MLMultiArray: \(error.localizedDescription)"
+                    )
                 }
+                for i in 0..<sequenceLength {
+                    pos[[0, NSNumber(value: i)]] = NSNumber(value: Int32(i))
+                }
+                features[name] = MLFeatureValue(multiArray: pos)
             }
 
             let input = try MLDictionaryFeatureProvider(dictionary: features)
@@ -412,6 +439,11 @@
                     reason:
                         "embedTokens requires per-token output (1, T, D); got \(shape). "
                         + "Pre-pooled exports (e.g. EmbeddingGemma) don't support late-interaction reranking."
+                )
+            }
+            guard lastHidden.dataType == .float32 else {
+                throw SemanticEmbeddingError.unsupportedOutputDtype(
+                    actual: String(describing: lastHidden.dataType)
                 )
             }
             let pointer = lastHidden.dataPointer.assumingMemoryBound(to: Float.self)

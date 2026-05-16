@@ -281,6 +281,12 @@ private struct SCCPAnalysisSession {
     /// Blocks that have been visited.
     private var visitedBlocks: Set<BlockID> = []
 
+    /// Inverted use-chain: for each variable name, the set of blocks that reference it.
+    /// Built lazily on the first call to `propagateValue` so analyses that converge
+    /// without an SSA-worklist pass pay no cost.
+    private var useChain: [String: Set<BlockID>] = [:]
+    private var useChainBuilt = false
+
     // MARK: - Execution
 
     mutating func run() -> SCCPResult {
@@ -549,10 +555,43 @@ private struct SCCPAnalysisSession {
     }
 
     private mutating func propagateValue(_ variable: String) {
-        _ = variable
-        // In a full SSA-based implementation, we would propagate
-        // the value to all uses of this variable.
-        // For now, re-evaluation happens on the next block visit.
+        buildUseChainIfNeeded()
+        guard let users = useChain[variable] else { return }
+        for blockID in users where visitedBlocks.contains(blockID) {
+            visitBlock(blockID)
+        }
+    }
+
+    /// Build a `name → blocks-that-use-it` index from the CFG.
+    /// Walks every statement's `uses` plus every conditional / switch terminator's
+    /// condition string (which `evaluateCondition` looks up by name).
+    private mutating func buildUseChainIfNeeded() {
+        guard !useChainBuilt else { return }
+        useChainBuilt = true
+        for (blockID, block) in cfg.blocks {
+            for statement in block.statements {
+                for use in statement.uses {
+                    useChain[use.name, default: []].insert(blockID)
+                }
+            }
+            guard let terminator = block.terminator else { continue }
+            switch terminator {
+            case .conditionalBranch(let condition, _, _):
+                let trimmed = condition.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty {
+                    useChain[trimmed, default: []].insert(blockID)
+                }
+
+            case .switch(let condition, _, _):
+                let trimmed = condition.trimmingCharacters(in: .whitespaces)
+                if !trimmed.isEmpty {
+                    useChain[trimmed, default: []].insert(blockID)
+                }
+
+            default:
+                break
+            }
+        }
     }
 
     // MARK: - Result Computation

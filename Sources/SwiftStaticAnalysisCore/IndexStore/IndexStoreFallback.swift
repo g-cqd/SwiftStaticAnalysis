@@ -284,7 +284,9 @@ public final class IndexStoreFallbackManager: Sendable {
 
             try prepareDatabaseDirectory(at: databasePath)
 
-            let libPath = libIndexStorePath ?? IndexStoreReader.findLibIndexStore()
+            guard let libPath = libIndexStorePath ?? IndexStoreReader.findLibIndexStore() else {
+                throw IndexStoreError.dylibNotFound
+            }
 
             let db = try IndexStoreDB(
                 storePath: storePath.path,
@@ -427,7 +429,9 @@ public final class IndexStoreFallbackManager: Sendable {
 
             try prepareDatabaseDirectory(at: databasePath)
 
-            let libPath = libIndexStorePath ?? IndexStoreReader.findLibIndexStore()
+            guard let libPath = libIndexStorePath ?? IndexStoreReader.findLibIndexStore() else {
+                throw IndexStoreError.dylibNotFound
+            }
 
             let db = try IndexStoreDB(
                 storePath: storePath.path,

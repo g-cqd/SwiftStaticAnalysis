@@ -20,6 +20,11 @@ public enum IndexStoreError: Error, Sendable {
     /// argument paths). The CLI auto-discovery path opts in via
     /// `IndexStoreReader.init(allowsDirectoryCreation: true)`.
     case databaseDirectoryMissing(String)
+    /// `libIndexStore.dylib` could not be located at any trusted path
+    /// (Xcode toolchain, command-line tools, xcrun-resolved toolchain). The
+    /// previous behaviour silently fell back to an empty string and let the
+    /// C++ layer crash; now surfaced as a typed Swift error.
+    case dylibNotFound
 }
 
 // MARK: - IndexedSymbol
@@ -252,12 +257,14 @@ public final class IndexStoreReader: @unchecked Sendable {
     ) throws(IndexStoreError) {
         self.indexStorePath = indexStorePath
 
-        let libPath: String =
-            if let provided = libIndexStorePath {
-                provided
-            } else {
-                Self.findLibIndexStore()
-            }
+        let libPath: String
+        if let provided = libIndexStorePath {
+            libPath = provided
+        } else if let resolved = Self.findLibIndexStore() {
+            libPath = resolved
+        } else {
+            throw IndexStoreError.dylibNotFound
+        }
 
         let storePath = URL(fileURLWithPath: indexStorePath)
         let databasePath = storePath.deletingLastPathComponent().appendingPathComponent("IndexDatabase")
@@ -311,7 +318,7 @@ public final class IndexStoreReader: @unchecked Sendable {
     /// hostile dylib that this process would later `dlopen`. The
     /// owner check is the smallest defence-in-depth gate against that
     /// shape.
-    public static func findLibIndexStore() -> String {
+    public static func findLibIndexStore() -> String? {
         // Try common locations
         let possiblePaths = [
             // Xcode toolchain
@@ -350,15 +357,10 @@ public final class IndexStoreReader: @unchecked Sendable {
             }
         }
 
-        // Default fallback — last-resort path. We still verify it
-        // before letting `IndexStoreLibrary` load it; if verification
-        // fails the empty return surfaces to the caller as a load
-        // failure rather than as a silent attacker-controlled dylib
-        // open.
-        // swiftlint:disable:next line_length
-        let xcodeDefault =
-            "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/libIndexStore.dylib"
-        return Self.isTrustedDylib(at: xcodeDefault) ? xcodeDefault : ""
+        // No trusted dylib located. Returning `nil` (vs. the previous empty
+        // string) surfaces as `IndexStoreError.dylibNotFound` at the call
+        // site rather than crashing inside the C++ `IndexStoreLibrary` init.
+        return nil
     }
 
     /// Verify a candidate `libIndexStore.dylib` path is a regular file

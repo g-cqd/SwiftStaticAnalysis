@@ -250,11 +250,30 @@ public struct ChangeDetector: Sendable {
     ///
     /// - Parameter path: File path.
     /// - Returns: File state, or nil if file doesn't exist or can't be read.
+    ///
+    /// File-gone (ENOENT) is silent — that's a legitimate "deleted" signal
+    /// the change detector relies on. Other errors (permission denied,
+    /// truncated read, etc.) are logged to stderr so a corrupted incremental
+    /// cache run can be diagnosed without rerunning under a debugger.
     public func computeState(for path: String) -> FileState? {
         let fileManager = FileManager.default
+        let attributes: [FileAttributeKey: Any]
+        do {
+            attributes = try fileManager.attributesOfItem(atPath: path)
+        } catch let err as NSError where err.domain == NSCocoaErrorDomain
+            && err.code == NSFileReadNoSuchFileError
+        {
+            return nil
+        } catch let err as CocoaError where err.code == .fileReadNoSuchFile {
+            return nil
+        } catch {
+            FileHandle.standardError.write(Data(
+                "[ChangeDetector] attributesOfItem(\(path)) failed: \(error)\n".utf8
+            ))
+            return nil
+        }
 
-        guard let attributes = try? fileManager.attributesOfItem(atPath: path),
-            let modDate = attributes[.modificationDate] as? Date,
+        guard let modDate = attributes[.modificationDate] as? Date,
             let size = attributes[.size] as? Int64,
             let data = fileManager.contents(atPath: path)
         else {
@@ -334,14 +353,29 @@ public struct ChangeDetector: Sendable {
     }
 
     /// Check if file metadata matches previous state (optimization to avoid hash computation).
+    /// Distinguishes ENOENT (file gone → returns false; treated as deleted by
+    /// caller) from unexpected errors (logged before returning false so the
+    /// state recomputation can attempt a clean hash and surface a real error).
     private func fileMetadataMatches(_ file: String, previous: FileState) -> Bool {
-        guard !configuration.alwaysVerifyHash,
-            let attrs = try? FileManager.default.attributesOfItem(atPath: file),
-            let modDate = attrs[.modificationDate] as? Date,
-            let size = attrs[.size] as? Int64
-        else {
+        guard !configuration.alwaysVerifyHash else { return false }
+        let attrs: [FileAttributeKey: Any]
+        do {
+            attrs = try FileManager.default.attributesOfItem(atPath: file)
+        } catch let err as NSError where err.domain == NSCocoaErrorDomain
+            && err.code == NSFileReadNoSuchFileError
+        {
+            return false
+        } catch let err as CocoaError where err.code == .fileReadNoSuchFile {
+            return false
+        } catch {
+            FileHandle.standardError.write(Data(
+                "[ChangeDetector] metadata check on \(file) failed: \(error)\n".utf8
+            ))
             return false
         }
+        guard let modDate = attrs[.modificationDate] as? Date,
+            let size = attrs[.size] as? Int64
+        else { return false }
         return modDate == previous.modificationTime && size == previous.size
     }
 }

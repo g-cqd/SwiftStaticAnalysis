@@ -74,6 +74,7 @@ public enum SemanticEmbeddingError: Error, Sendable, CustomStringConvertible {
     case snippetTooLong(actual: Int, limit: Int)
     case modelLoadFailed(underlying: Error)
     case inferenceFailed(reason: String)
+    case unsupportedOutputDtype(actual: String)
 
     public var description: String {
         switch self {
@@ -86,6 +87,10 @@ public enum SemanticEmbeddingError: Error, Sendable, CustomStringConvertible {
             return "Failed to load embedding model: \(underlying.localizedDescription)"
         case .inferenceFailed(let reason):
             return "Embedding inference failed: \(reason)"
+        case .unsupportedOutputDtype(let actual):
+            return
+                "Embedding model output dtype \(actual) is not supported; expected float32. "
+                + "Re-export the model with `compute_precision=ct.precision.FLOAT32` or convert via MLMultiArray's typed subscript."
         }
     }
 }

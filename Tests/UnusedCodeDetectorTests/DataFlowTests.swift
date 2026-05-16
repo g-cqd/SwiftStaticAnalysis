@@ -662,6 +662,36 @@ struct SCCPAnalysisTests {
         // Verify analysis completes
         #expect(result.cfg.functionName == "test")
     }
+
+    @Test("Propagation worklist terminates without infinite loop")
+    func propagationWorklistTerminates() {
+        // Stresses the SSA worklist path (`propagateValue`). Before the
+        // use-chain fix, propagation was a no-op so termination was trivial.
+        // After the fix, propagation re-visits use sites — this test pins the
+        // invariant that the worklist still drains within `maxIterations` for
+        // a CFG with multiple writes to the same variable across blocks.
+        let source = """
+            func test(c: Bool) {
+                var x = 1
+                if c {
+                    x = 2
+                } else {
+                    x = 3
+                }
+                if c {
+                    x = 4
+                }
+            }
+            """
+        guard let cfg = buildCFG(from: source) else {
+            Issue.record("Failed to build CFG")
+            return
+        }
+
+        let result = SCCPAnalysis().analyze(cfg)
+        #expect(result.cfg.functionName == "test")
+        #expect(!result.executableEdges.isEmpty)
+    }
 }
 
 // MARK: - ReachingDefinitionsAnalysisTests

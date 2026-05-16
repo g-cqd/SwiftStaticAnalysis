@@ -4,6 +4,24 @@
 
 import Foundation
 
+// MARK: - ArenaError
+
+/// Errors thrown by the throwing arena allocation surface.
+public enum ArenaError: Error, Sendable, CustomStringConvertible {
+    /// A bump allocation failed even after expanding the block budget. Carries
+    /// the requested byte count and the alignment so callers (and crash logs)
+    /// have enough context to attribute the failure to a specific source file
+    /// or pathological input.
+    case allocationFailed(requested: Int, alignment: Int)
+
+    public var description: String {
+        switch self {
+        case .allocationFailed(let requested, let alignment):
+            return "Arena allocation failed: \(requested) bytes (alignment \(alignment))"
+        }
+    }
+}
+
 // MARK: - ArenaConfiguration
 
 /// Configuration for arena allocation.
@@ -159,7 +177,25 @@ public struct Arena: ~Copyable {
     /// - Returns: Pointer to allocated memory.
     @discardableResult
     public mutating func allocate(size: Int, alignment: Int = 8) -> UnsafeMutableRawPointer {
-        // Try allocating from current block
+        do {
+            return try tryAllocate(size: size, alignment: alignment)
+        } catch {
+            // Preserve historical semantics (process abort) for the
+            // non-throwing entrypoint that legacy callers still use.
+            preconditionFailure("Arena.allocate: \(error)")
+        }
+    }
+
+    /// Throwing variant of `allocate(size:alignment:)`. Use this when you
+    /// need to recover gracefully from allocation pressure (very large
+    /// snippets, address-space exhaustion) instead of aborting.
+    ///
+    /// The two functions share their bump-pointer fast path; `allocate`
+    /// is a `preconditionFailure` wrapper for backwards compatibility.
+    @discardableResult
+    public mutating func tryAllocate(
+        size: Int, alignment: Int = 8
+    ) throws(ArenaError) -> UnsafeMutableRawPointer {
         if currentBlockIndex >= 0 {
             if let ptr = blocks[currentBlockIndex].allocate(size: size, alignment: alignment) {
                 updateStats(size: size)
@@ -167,16 +203,14 @@ public struct Arena: ~Copyable {
             }
         }
 
-        // Need a new block
         let blockSize = max(configuration.blockSize, size + alignment)
         let newBlock = ArenaBlock(capacity: blockSize)
         blocks.append(newBlock)
         currentBlockIndex = blocks.count - 1
 
         guard let ptr = blocks[currentBlockIndex].allocate(size: size, alignment: alignment) else {
-            fatalError("Failed to allocate \(size) bytes in fresh arena block")
+            throw .allocationFailed(requested: size, alignment: alignment)
         }
-
         updateStats(size: size)
         return ptr
     }
@@ -201,7 +235,7 @@ public struct Arena: ~Copyable {
     public mutating func store<T>(_ value: T) -> UnsafeMutablePointer<T> {
         let buffer = allocate(count: 1) as UnsafeMutableBufferPointer<T>
         guard let baseAddress = buffer.baseAddress else {
-            fatalError("Arena allocation failed: buffer has no base address")
+            preconditionFailure("Arena.store: allocated buffer has no base address")
         }
         baseAddress.initialize(to: value)
         return baseAddress

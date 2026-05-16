@@ -516,13 +516,18 @@ struct IndexStorePathFinderTests {
 
 @Suite("IndexStoreReader Tests")
 struct IndexStoreReaderTests {
-    @Test("Find libIndexStore returns valid path")
+    @Test("Find libIndexStore returns valid path or nil on bare systems")
     func findLibIndexStore() {
+        // Now returns `String?` — nil signals no trusted dylib at any
+        // known path (previously returned the empty string, which crashed
+        // the C++ `IndexStoreLibrary` loader). Either a valid path or nil
+        // is acceptable here; what we pin is that we never see an empty
+        // string sneak through.
         let path = IndexStoreReader.findLibIndexStore()
-
-        // Should return a path (even if file doesn't exist in test environment)
-        #expect(!path.isEmpty)
-        #expect(path.contains("libIndexStore.dylib"))
+        if let path {
+            #expect(!path.isEmpty)
+            #expect(path.contains("libIndexStore.dylib"))
+        }
     }
 }
 

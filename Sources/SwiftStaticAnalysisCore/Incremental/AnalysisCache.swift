@@ -251,7 +251,16 @@ public actor AnalysisCache {
         let directory = cacheURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        try data.write(to: cacheURL)
+        // Atomic write: stage into a sibling `.tmp`, then replace. A kill
+        // between the two steps leaves the previous cache intact instead of
+        // a half-written JSON blob that `load()` would discard.
+        let tempURL = cacheURL.appendingPathExtension("tmp")
+        try data.write(to: tempURL, options: .atomic)
+        if FileManager.default.fileExists(atPath: cacheURL.path) {
+            _ = try FileManager.default.replaceItemAt(cacheURL, withItemAt: tempURL)
+        } else {
+            try FileManager.default.moveItem(at: tempURL, to: cacheURL)
+        }
         isDirty = false
     }
 
