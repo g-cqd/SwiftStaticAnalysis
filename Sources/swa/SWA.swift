@@ -217,6 +217,21 @@ struct Duplicates: AsyncParsableCommand {
     @Option(name: .long, help: "Parallel mode (none, safe, maximum)")
     var parallelMode: ParallelMode?
 
+    @Option(
+        name: .long,
+        help: "LSH backend: standard (default), multi-probe, parallel."
+    )
+    var lshStrategy: LSHStrategyArg = .standard
+
+    @Option(
+        name: .long,
+        help: ArgumentHelp(
+            "Probes per band for --lsh-strategy multi-probe (default 2).",
+            visibility: .hidden
+        )
+    )
+    var lshProbesPerBand: Int = 2
+
     @Option(name: .shortAndLong, help: "Output format")
     var format: OutputFormat?
 
@@ -297,6 +312,7 @@ struct Duplicates: AsyncParsableCommand {
             algorithm: effectiveAlgorithm,
             useParallelClones: effectiveParallel,
             useStreamingVerifier: effectiveParallelMode.usesStreamingVerifier,
+            lshStrategy: lshStrategy.toLSHStrategy(probesPerBand: lshProbesPerBand),
         )
 
         let detector = DuplicationDetector(configuration: detectorConfig)

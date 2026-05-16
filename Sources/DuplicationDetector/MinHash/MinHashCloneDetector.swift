@@ -26,6 +26,29 @@ struct DocumentLocationInfo: Sendable {
     let tokenCount: Int
 }
 
+// MARK: - LSHStrategy
+
+/// Selects which LSH backend `MinHashCloneDetector` uses to find
+/// candidate near-clone pairs. Layered on top of the existing detector
+/// so the default behaviour is unchanged; opt-in via the new flag.
+public enum LSHStrategy: Sendable, Equatable {
+    /// The original `LSHIndex.findCandidatePairs` path. Default.
+    case standard
+
+    /// Multi-probe LSH (`MultiProbeLSH`). Trades index size for recall
+    /// by probing nearby buckets. `probesPerBand` controls how many
+    /// perturbed buckets are visited per band. See `MultiProbeLSH`'s
+    /// doc comment for caveats — the perturbation strategy is not
+    /// theoretically grounded for MinHash, so prefer raising
+    /// `numHashes` first.
+    case multiProbe(probesPerBand: Int)
+
+    /// `ParallelLSHPipeline` — parallel signature computation +
+    /// parallel candidate finding. `maxConcurrency` defaults to active
+    /// processor count when nil.
+    case parallel(maxConcurrency: Int?)
+}
+
 // MARK: - ParallelCloneConfiguration
 
 /// Configuration for parallel clone detection.
@@ -97,13 +120,15 @@ public struct MinHashCloneDetector: Sendable {
         shingleSize: Int = 5,
         numHashes: Int = 256,
         minimumSimilarity: Double = 0.5,
-        parallelConfig: ParallelCloneConfiguration = .default
+        parallelConfig: ParallelCloneConfiguration = .default,
+        lshStrategy: LSHStrategy = .standard
     ) {
         self.minimumTokens = minimumTokens
         self.shingleSize = shingleSize
         self.numHashes = numHashes
         self.minimumSimilarity = minimumSimilarity
         self.parallelConfig = parallelConfig
+        self.lshStrategy = lshStrategy
 
         shingleGenerator = ShingleGenerator(shingleSize: shingleSize, normalize: true)
         minHashGenerator = MinHashGenerator(numHashes: numHashes)
@@ -134,6 +159,11 @@ public struct MinHashCloneDetector: Sendable {
     /// Parallel processing configuration.
     public let parallelConfig: ParallelCloneConfiguration
 
+    /// Active LSH backend strategy. `.standard` preserves existing
+    /// behaviour; `.multiProbe` and `.parallel` route through the
+    /// alternative pipelines that previously had no callers.
+    public let lshStrategy: LSHStrategy
+
     /// Detect Type-3 clones in the given token sequences.
     ///
     /// - Parameter sequences: Array of token sequences from files.
@@ -161,24 +191,64 @@ public struct MinHashCloneDetector: Sendable {
 
         guard !allDocuments.isEmpty else { return [] }
 
-        // Compute MinHash signatures
-        let signatures = minHashGenerator.computeSignatures(for: allDocuments)
-
-        // Build LSH index
-        var lshIndex = LSHIndex(bands: lshBands, rows: lshRows)
-        lshIndex.insert(signatures)
-
-        // Find candidate pairs
-        let candidatePairs = lshIndex.findCandidatePairs()
-
-        // Build document lookup
+        // Build document lookup once — needed by every strategy.
         let documentMap = allDocuments.keyed(by: \.id)
 
-        // Verify candidates and build clone groups
-        let clonePairs = verifyCandidatePairs(candidatePairs, documentMap: documentMap)
+        // Dispatch on the LSH strategy. `.standard` is the historical
+        // path; `.multiProbe` / `.parallel` route through the previously
+        // unwired pipelines.
+        let clonePairs: [ClonePairInfo]
+        switch lshStrategy {
+        case .standard:
+            // Compute MinHash signatures
+            let signatures = minHashGenerator.computeSignatures(for: allDocuments)
+            var lshIndex = LSHIndex(bands: lshBands, rows: lshRows)
+            lshIndex.insert(signatures)
+            let candidatePairs = lshIndex.findCandidatePairs()
+            clonePairs = verifyCandidatePairs(candidatePairs, documentMap: documentMap)
+
+        case .multiProbe(let probesPerBand):
+            let pipeline = MultiProbeLSHPipeline(
+                numHashes: numHashes,
+                threshold: minimumSimilarity,
+                probesPerBand: probesPerBand
+            )
+            let similar = pipeline.findSimilarPairs(allDocuments, verifyWithExact: true)
+            clonePairs = mapSimilarPairsToClonePairs(similar, documentMap: documentMap)
+
+        case .parallel:
+            // The sync `detect(_:)` entry point cannot await; for the
+            // parallel pipeline callers should use `detectParallel(_:)`.
+            // Fall back to standard here so the contract holds.
+            let signatures = minHashGenerator.computeSignatures(for: allDocuments)
+            var lshIndex = LSHIndex(bands: lshBands, rows: lshRows)
+            lshIndex.insert(signatures)
+            let candidatePairs = lshIndex.findCandidatePairs()
+            clonePairs = verifyCandidatePairs(candidatePairs, documentMap: documentMap)
+        }
 
         // Group related clones
         return groupClones(clonePairs)
+    }
+
+    /// Convert pipeline `SimilarPair`s back into `ClonePairInfo`,
+    /// dropping any pair whose document IDs don't resolve (defensive
+    /// against pipeline/document-map drift) and any same-file
+    /// overlapping ranges (matches the standard verifier's contract).
+    private func mapSimilarPairsToClonePairs(
+        _ similar: [SimilarPair],
+        documentMap: [Int: ShingledDocument]
+    ) -> [ClonePairInfo] {
+        similar.compactMap { pair in
+            guard let doc1 = documentMap[pair.documentId1],
+                let doc2 = documentMap[pair.documentId2]
+            else { return nil }
+            if doc1.file == doc2.file,
+                doc1.startLine <= doc2.endLine && doc2.startLine <= doc1.endLine {
+                return nil
+            }
+            return ClonePairInfo(doc1: doc1, doc2: doc2, similarity: pair.similarity)
+        }
     }
 
     /// Detect clones with file path inputs.
@@ -233,6 +303,36 @@ public struct MinHashCloneDetector: Sendable {
 
         guard !allDocuments.isEmpty else { return [] }
 
+        // Build document lookup once — needed by every code path.
+        let documentMap = allDocuments.keyed(by: \.id)
+
+        // Short-circuit for explicitly-selected alternative LSH strategies.
+        // These bypass the standard sig + LSHIndex path entirely.
+        switch lshStrategy {
+        case .multiProbe(let probesPerBand):
+            let pipeline = MultiProbeLSHPipeline(
+                numHashes: numHashes,
+                threshold: minimumSimilarity,
+                probesPerBand: probesPerBand
+            )
+            let similar = pipeline.findSimilarPairs(allDocuments, verifyWithExact: true)
+            let clonePairs = mapSimilarPairsToClonePairs(similar, documentMap: documentMap)
+            return await groupClonesParallel(clonePairs, maxDocId: documentId - 1)
+
+        case .parallel(let maxConcurrency):
+            let pipeline = ParallelLSHPipeline(
+                numHashes: numHashes,
+                threshold: minimumSimilarity,
+                maxConcurrency: maxConcurrency ?? parallelConfig.maxConcurrency
+            )
+            let similar = await pipeline.findSimilarPairs(allDocuments, verifyWithExact: true)
+            let clonePairs = mapSimilarPairsToClonePairs(similar, documentMap: documentMap)
+            return await groupClonesParallel(clonePairs, maxDocId: documentId - 1)
+
+        case .standard:
+            break  // Fall through to the existing standard path.
+        }
+
         // Decide between parallel and sequential based on document count
         let useParallelMinHash = allDocuments.count >= parallelConfig.minParallelDocuments
 
@@ -261,9 +361,6 @@ public struct MinHashCloneDetector: Sendable {
         } else {
             candidatePairs = lshIndex.findCandidatePairs()
         }
-
-        // Build document lookup
-        let documentMap = allDocuments.keyed(by: \.id)
 
         // Verify candidates. Three paths:
         //

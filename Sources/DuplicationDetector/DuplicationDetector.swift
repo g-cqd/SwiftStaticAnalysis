@@ -132,6 +132,7 @@ public struct DuplicationConfiguration: Sendable {
         useStreamingVerifier: Bool = false,
         semanticEmbeddingProvider: SemanticEmbeddingProvider? = nil,
         semanticEmbeddingThreshold: Double = 0.95,
+        lshStrategy: LSHStrategy = .standard,
     ) {
         // Validate and clamp minimumTokens to safe range [1, 10000]
         self.minimumTokens = min(max(minimumTokens, 1), 10000)
@@ -145,6 +146,7 @@ public struct DuplicationConfiguration: Sendable {
         self.useStreamingVerifier = useStreamingVerifier
         self.semanticEmbeddingProvider = semanticEmbeddingProvider
         self.semanticEmbeddingThreshold = min(max(semanticEmbeddingThreshold, 0.0), 1.0)
+        self.lshStrategy = lshStrategy
     }
 
     // MARK: Public
@@ -217,6 +219,13 @@ public struct DuplicationConfiguration: Sendable {
     /// different intent). Ignored when
     /// `semanticEmbeddingProvider` is `nil`.
     public var semanticEmbeddingThreshold: Double
+
+    /// LSH backend strategy for MinHash-driven near/semantic clone
+    /// detection. `.standard` keeps the historical
+    /// `LSHIndex.findCandidatePairs` path; `.multiProbe` and `.parallel`
+    /// route through `MultiProbeLSHPipeline` / `ParallelLSHPipeline`,
+    /// which were previously built but never wired into the detector.
+    public var lshStrategy: LSHStrategy
 
     /// Incremental configuration with caching enabled.
     public static func incremental(cacheDirectory: URL? = nil) -> Self {
@@ -445,7 +454,8 @@ public struct DuplicationDetector: Sendable {
             shingleSize: 5,
             numHashes: 256,
             minimumSimilarity: configuration.minimumSimilarity,
-            parallelConfig: parallelConfig
+            parallelConfig: parallelConfig,
+            lshStrategy: configuration.lshStrategy
         )
         let groups = try await detector.detect(in: files)
         guard label != .semantic else { return groups }
