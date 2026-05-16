@@ -5,6 +5,7 @@
 #if canImport(CoreML)
     import CoreML
     import Foundation
+    import Synchronization
 
     // MARK: - CoreMLSemanticEmbeddingProvider
 
@@ -128,19 +129,23 @@
         /// don't recompile.
         private let compiledModelStorage = ModelStorage()
 
-        private final class ModelStorage: @unchecked Sendable {
-            private let lock = NSLock()
-            private var model: MLModel?
+        /// Compiled-model cache. `Mutex` from `Synchronization` is the
+        /// async-safe primitive (NSLock cannot be held across `await`)
+        /// and removes the `@unchecked Sendable` escape hatch that
+        /// `NSLock`-based storage required.
+        private final class ModelStorage: Sendable {
+            private struct State: ~Copyable {
+                var model: MLModel?
+            }
+            private let state = Mutex<MLModel?>(nil)
 
             func get(or load: () throws -> MLModel) throws -> MLModel {
-                lock.lock()
-                defer { lock.unlock() }
-                if let cached = model {
-                    return cached
+                try state.withLock { cached in
+                    if let existing = cached { return existing }
+                    let loaded = try load()
+                    cached = loaded
+                    return loaded
                 }
-                let loaded = try load()
-                model = loaded
-                return loaded
             }
         }
 

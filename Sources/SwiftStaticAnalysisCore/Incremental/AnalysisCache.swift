@@ -215,7 +215,7 @@ public actor AnalysisCache {
         }
 
         let data = try Data(contentsOf: cacheURL)
-        let cached = try JSONDecoder().decode(CacheData.self, from: data)
+        let cached = try SharedJSON.decoder.decode(CacheData.self, from: data)
 
         // Check version compatibility
         guard cached.version == CacheData.formatVersion else {
@@ -243,9 +243,7 @@ public actor AnalysisCache {
             references: references,
         )
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        let data = try encoder.encode(cacheData)
+        let data = try SharedJSON.encoder.encode(cacheData)
 
         // Ensure directory exists
         let directory = cacheURL.deletingLastPathComponent()

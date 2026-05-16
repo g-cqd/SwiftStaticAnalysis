@@ -192,22 +192,27 @@ public actor DependencyTracker {
         }
 
         let data = try Data(contentsOf: url)
-        graph = try JSONDecoder().decode(DependencyGraph.self, from: data)
+        graph = try SharedJSON.decoder.decode(DependencyGraph.self, from: data)
         isDirty = false
     }
 
-    /// Save dependency graph to disk.
+    /// Save dependency graph to disk. Atomic write so an interrupted
+    /// run does not corrupt the persisted graph.
     public func save() async throws {
         guard isDirty, let url = cacheURL else { return }
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        let data = try encoder.encode(graph)
+        let data = try SharedJSON.encoder.encode(graph)
 
         let directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        try data.write(to: url)
+        let tempURL = url.appendingPathExtension("tmp")
+        try data.write(to: tempURL, options: .atomic)
+        if FileManager.default.fileExists(atPath: url.path) {
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: tempURL)
+        } else {
+            try FileManager.default.moveItem(at: tempURL, to: url)
+        }
         isDirty = false
     }
 

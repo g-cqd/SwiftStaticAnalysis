@@ -607,9 +607,6 @@ struct Unused: AsyncParsableCommand {
         // server not yet warm) leave the candidate in place.
         if let workspaceRoot = lspWorkspaceRoot {
             let lspResolver = LSPSymbolResolver(workspaceRoot: workspaceRoot)
-            defer {
-                Task { await lspResolver.shutdown() }
-            }
             var survivors: [UnusedCode] = []
             survivors.reserveCapacity(unused.count)
             for candidate in unused {
@@ -635,6 +632,11 @@ struct Unused: AsyncParsableCommand {
                 survivors.append(candidate)
             }
             unused = survivors
+            // Structured shutdown, awaited inline. The previous
+            // `defer { Task { await ... } }` raced process teardown
+            // because `defer` returned immediately and the detached
+            // Task was unstructured.
+            await lspResolver.shutdown()
         }
 
         let outputFormat = format ?? swaConfig?.format ?? .xcode
@@ -798,11 +800,6 @@ struct Symbol: AsyncParsableCommand {
         // protocol-witness dispatch targets.
         if let workspaceRoot = lspWorkspaceRoot {
             let lspResolver = LSPSymbolResolver(workspaceRoot: workspaceRoot)
-            defer {
-                // Best-effort shutdown — we can't await in defer, so
-                // schedule a detached task that joins the subprocess.
-                Task { await lspResolver.shutdown() }
-            }
             do {
                 let lspMatches = try await lspResolver.resolve(pattern)
                 // Deduplicate by (file, line, column) — LSP and
@@ -819,6 +816,10 @@ struct Symbol: AsyncParsableCommand {
                 // USR queries can't go through LSP; the IndexStore /
                 // syntax matches already cover them. Silently continue.
             }
+            // Structured shutdown — the prior `defer { Task { ... } }`
+            // raced process teardown because `defer` returned without
+            // awaiting the detached Task.
+            await lspResolver.shutdown()
         }
 
         // If usages mode was requested, also find usages for each match

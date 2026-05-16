@@ -142,8 +142,11 @@ public struct MinHashCloneDetector: Sendable {
         // Safety: ensure minimumTokens is valid
         guard !sequences.isEmpty, minimumTokens > 0 else { return [] }
 
-        // Generate shingled documents for all code blocks
+        // Generate shingled documents for all code blocks. Pre-size the
+        // accumulator so the N append(contentsOf:) calls don't trigger
+        // O(N) reallocations on large codebases.
         var allDocuments: [ShingledDocument] = []
+        allDocuments.reserveCapacity(estimatedDocumentCount(for: sequences))
         var documentId = 0
 
         for sequence in sequences {
@@ -211,8 +214,11 @@ public struct MinHashCloneDetector: Sendable {
     public func detectParallel(in sequences: [TokenSequence]) async -> [CloneGroup] {
         guard !sequences.isEmpty, minimumTokens > 0 else { return [] }
 
-        // Generate shingled documents for all code blocks
+        // Generate shingled documents for all code blocks. Pre-size the
+        // accumulator so the N append(contentsOf:) calls don't trigger
+        // O(N) reallocations on large codebases.
         var allDocuments: [ShingledDocument] = []
+        allDocuments.reserveCapacity(estimatedDocumentCount(for: sequences))
         var documentId = 0
 
         for sequence in sequences {
@@ -302,6 +308,17 @@ public struct MinHashCloneDetector: Sendable {
     }
 
     // MARK: Private
+
+    /// Heuristic capacity hint for the document accumulator before the
+    /// per-sequence shingling pass. Token count divided by the block size
+    /// over-approximates the number of windowed documents the shingle
+    /// generator emits, so `reserveCapacity` allocates once instead of
+    /// resizing through several powers of two as documents stream in.
+    private func estimatedDocumentCount(for sequences: [TokenSequence]) -> Int {
+        guard minimumTokens > 0 else { return sequences.count }
+        let totalTokens = sequences.reduce(0) { $0 + $1.tokens.count }
+        return max(sequences.count, totalTokens / minimumTokens)
+    }
 
     /// Shingle generator.
     private let shingleGenerator: ShingleGenerator

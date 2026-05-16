@@ -87,7 +87,7 @@ public actor TokenSequenceCache {
         }
 
         let data = try Data(contentsOf: url)
-        let cached = try JSONDecoder().decode(TokenCacheData.self, from: data)
+        let cached = try SharedJSON.decoder.decode(TokenCacheData.self, from: data)
 
         guard cached.version == TokenCacheData.formatVersion else {
             return
@@ -97,18 +97,24 @@ public actor TokenSequenceCache {
         isDirty = false
     }
 
-    /// Save cache to disk.
+    /// Save cache to disk. Atomic write protects against half-written
+    /// JSON on interrupted runs.
     public func save() async throws {
         guard isDirty, let url = cacheURL else { return }
 
         let cacheData = TokenCacheData(sequences: sequences)
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(cacheData)
+        let data = try SharedJSON.encoder.encode(cacheData)
 
         let directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        try data.write(to: url)
+        let tempURL = url.appendingPathExtension("tmp")
+        try data.write(to: tempURL, options: .atomic)
+        if FileManager.default.fileExists(atPath: url.path) {
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: tempURL)
+        } else {
+            try FileManager.default.moveItem(at: tempURL, to: url)
+        }
         isDirty = false
     }
 

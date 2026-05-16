@@ -46,7 +46,14 @@ public enum ProcessExecutor {
     /// Errors raised by `ProcessExecutor.run`.
     public enum Error: Swift.Error, Sendable {
         case launchFailed(executable: String, underlying: String)
+        case timedOut(executable: String, after: Duration)
     }
+
+    /// Default subprocess timeout. The CLI never legitimately needs to
+    /// block on a child for longer than two minutes; an unresponsive
+    /// `swiftc`/`xcrun` past this point is hung and should be killed
+    /// instead of stalling the analyzer.
+    public static let defaultTimeout: Duration = .seconds(120)
 
     /// Run a subprocess with a scrubbed environment.
     ///
@@ -58,14 +65,18 @@ public enum ProcessExecutor {
     ///   - environmentOverrides: Additional environment variables on top
     ///     of the allowlist (e.g. for tests that need to inject a
     ///     deliberate value).
+    ///   - timeout: Maximum wall-clock time the child is allowed to
+    ///     run. After this the process is `terminate()`d and the call
+    ///     throws `Error.timedOut`. Defaults to `defaultTimeout`.
     /// - Returns: stdout / stderr / exit code.
     /// - Throws: `ProcessExecutor.Error.launchFailed` if `Process.run()`
-    ///   throws.
+    ///   throws; `.timedOut` if the deadline expires before exit.
     public static func run(
         executable: URL,
         arguments: [String],
         currentDirectory: URL? = nil,
-        environmentOverrides: [String: String] = [:]
+        environmentOverrides: [String: String] = [:],
+        timeout: Duration = defaultTimeout
     ) throws -> Result {
         let process = Process()
         process.executableURL = executable
@@ -88,10 +99,37 @@ public enum ProcessExecutor {
                 underlying: error.localizedDescription
             )
         }
+
+        // Background watchdog: terminate the process if it outlives the
+        // deadline. We can't use `withTimeout` (not in stdlib at this
+        // toolchain) so a small Thread runs the timer. `terminate()` is
+        // idempotent — racing a normal exit just no-ops.
+        let deadline = DispatchTime.now() + .nanoseconds(
+            Int(timeout.components.seconds * 1_000_000_000
+                + timeout.components.attoseconds / 1_000_000_000)
+        )
+        let watchdog = DispatchWorkItem { [weak process] in
+            guard let process, process.isRunning else { return }
+            process.terminate()
+        }
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(
+            deadline: deadline, execute: watchdog
+        )
+
         process.waitUntilExit()
+        watchdog.cancel()
 
         let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
         let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+
+        // If we terminated the process via watchdog, surface that as the
+        // distinct `.timedOut` error so callers don't confuse it with a
+        // normal failure exit.
+        if process.terminationReason == .uncaughtSignal,
+            process.terminationStatus == SIGTERM
+        {
+            throw Error.timedOut(executable: executable.path, after: timeout)
+        }
 
         return Result(
             exitCode: process.terminationStatus,
