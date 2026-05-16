@@ -295,6 +295,13 @@ private struct SCCPAnalysisSession {
         var iterations = 0
 
         while !cfgWorklist.isEmpty || !ssaWorklist.isEmpty, iterations < configuration.maxIterations {
+            // Cooperative cancellation: pathological code (deeply nested
+            // loops, sparse conditional chains) can drive iterations into
+            // the thousands. A `Task.isCancelled` check every outer turn
+            // lets SIGTERM / explicit cancel terminate the pass promptly
+            // and return a partial result rather than wait for the
+            // `maxIterations` cap.
+            if Task.isCancelled { break }
             iterations += 1
 
             while let edge = cfgWorklist.popLast() {

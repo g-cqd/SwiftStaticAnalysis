@@ -3,12 +3,11 @@
 //  MIT License
 
 import ArgumentParser
-import DuplicationDetector
 import Foundation
+// SwiftStaticAnalysis re-exports DuplicationDetector / SwiftStaticAnalysisCore
+// / SymbolLookup / UnusedCodeDetector; importing the umbrella alone is
+// sufficient. The previous explicit imports of all four were redundant.
 import SwiftStaticAnalysis
-import SwiftStaticAnalysisCore
-import SymbolLookup
-import UnusedCodeDetector
 
 #if canImport(Darwin)
     import Darwin

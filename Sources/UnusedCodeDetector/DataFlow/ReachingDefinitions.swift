@@ -379,6 +379,11 @@ internal struct ReachingDefinitionsAnalysis: Sendable {
         var iterations = 0
 
         while let nextIndex = worklist.popMin(), iterations < configuration.maxIterations {
+            // Cooperative cancellation — see SCCPAnalysis.run for the same
+            // pattern. Check every iteration (lightweight atomic load on
+            // the task-local flag) so SIGTERM exits within one block
+            // instead of waiting for `maxIterations`.
+            if Task.isCancelled { break }
             iterations += 1
             inWorklist.remove(nextIndex)
 

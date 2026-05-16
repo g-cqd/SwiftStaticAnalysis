@@ -191,6 +191,11 @@ public struct DependencyExtractor: Sendable {
         let types = result.declarations.declarations.filter {
             $0.kind == .class || $0.kind == .struct || $0.kind == .enum
         }
+        // Precompute the function/method slice once. Previously every
+        // protocol and type re-filtered the entire declaration list.
+        let methodLikes = result.declarations.declarations.filter {
+            $0.kind == .function || $0.kind == .method
+        }
 
         return TaskBackedAsyncStream.makeStream { continuation in
             defer { continuation.finish() }
@@ -202,7 +207,8 @@ public struct DependencyExtractor: Sendable {
                 for edge in self.computeProtocolWitnessEdges(
                     for: proto,
                     result: result,
-                    declByName: declByName
+                    declByName: declByName,
+                    methodLikes: methodLikes
                 ) {
                     continuation.yield(edge)
                     yieldedEdges += 1
@@ -215,7 +221,9 @@ public struct DependencyExtractor: Sendable {
 
             // Stream type method edges
             for type in types {
-                for edge in self.computeTypeMethodEdges(for: type, result: result) {
+                for edge in self.computeTypeMethodEdges(
+                    for: type, result: result, methodLikes: methodLikes
+                ) {
                     continuation.yield(edge)
                     yieldedEdges += 1
 
@@ -407,6 +415,9 @@ public struct DependencyExtractor: Sendable {
         let types = result.declarations.declarations.filter {
             $0.kind == .class || $0.kind == .struct || $0.kind == .enum
         }
+        let methodLikes = result.declarations.declarations.filter {
+            $0.kind == .function || $0.kind == .method
+        }
 
         let maxConcurrency = ProcessInfo.processInfo.activeProcessorCount
 
@@ -418,7 +429,8 @@ public struct DependencyExtractor: Sendable {
             let edges = self.computeProtocolWitnessEdges(
                 for: proto,
                 result: result,
-                declByName: declByName
+                declByName: declByName,
+                methodLikes: methodLikes
             )
             return edges.isEmpty ? nil : edges
         }
@@ -428,7 +440,9 @@ public struct DependencyExtractor: Sendable {
             types,
             maxConcurrency: maxConcurrency
         ) { type -> [DependencyEdge]? in
-            let edges = self.computeTypeMethodEdges(for: type, result: result)
+            let edges = self.computeTypeMethodEdges(
+                for: type, result: result, methodLikes: methodLikes
+            )
             return edges.isEmpty ? nil : edges
         }
 
@@ -438,17 +452,23 @@ public struct DependencyExtractor: Sendable {
     }
 
     /// Compute protocol witness edges for a single protocol (pure function).
+    ///
+    /// `methodLikes` is an externally-cached slice of `result.declarations`
+    /// containing just the function/method declarations. Hoisting the kind
+    /// filter out of the per-protocol loop turns the dominant cost from
+    /// O(P × M) (one pass over every declaration per protocol) into
+    /// O(M + P × M') where M' is the function/method count — typically a
+    /// large constant-factor win on real codebases.
     private func computeProtocolWitnessEdges(
         for proto: Declaration,
         result: AnalysisResult,
         declByName: [String: [Declaration]],
+        methodLikes: [Declaration],
     ) -> [DependencyEdge] {
         var edges: [DependencyEdge] = []
 
         // Get methods declared in the protocol (approximate by scope)
-        let protoMethods = result.declarations.declarations.filter { decl in
-            (decl.kind == .function || decl.kind == .method) && decl.scope.id.contains(proto.name)
-        }
+        let protoMethods = methodLikes.filter { $0.scope.id.contains(proto.name) }
 
         for protoMethod in protoMethods {
             // Find matching implementations in types
@@ -471,17 +491,18 @@ public struct DependencyExtractor: Sendable {
     }
 
     /// Compute type method edges for a single type (pure function).
+    /// See `computeProtocolWitnessEdges` for the rationale behind the
+    /// hoisted `methodLikes` parameter.
     private func computeTypeMethodEdges(
         for type: Declaration,
         result: AnalysisResult,
+        methodLikes: [Declaration],
     ) -> [DependencyEdge] {
         var edges: [DependencyEdge] = []
         let typeNode = DeclarationNode(declaration: type)
 
         // Find methods in this type's scope
-        let typeMethods = result.declarations.declarations.filter { decl in
-            (decl.kind == .function || decl.kind == .method) && decl.scope.id.contains(type.name)
-        }
+        let typeMethods = methodLikes.filter { $0.scope.id.contains(type.name) }
 
         for method in typeMethods {
             let methodNode = DeclarationNode(declaration: method)

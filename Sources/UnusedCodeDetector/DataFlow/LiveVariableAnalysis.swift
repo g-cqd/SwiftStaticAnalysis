@@ -239,6 +239,11 @@ internal struct LiveVariableAnalysis: Sendable {
 
         var iterations = 0
         while let k = worklist.popMin(), iterations < configuration.maxIterations {
+            // Cooperative cancellation (same rationale as in SCCPAnalysis
+            // and ReachingDefinitions). Lets SIGTERM / explicit cancel
+            // terminate within one block instead of waiting for the
+            // iteration cap.
+            if Task.isCancelled { break }
             iterations += 1
             inWorklist.remove(k)
 

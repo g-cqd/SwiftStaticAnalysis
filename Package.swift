@@ -314,11 +314,12 @@ let package = Package(
         .executableTarget(
             name: "swa-bench",
             dependencies: [
+                // SwiftStaticAnalysis re-exports Core / DuplicationDetector /
+                // UnusedCodeDetector / SymbolLookup. The constituent deps
+                // were previously listed redundantly; one umbrella import
+                // is enough and removes the false impression that the
+                // benchmark needed granular module access.
                 "SwiftStaticAnalysis",
-                "SwiftStaticAnalysisCore",
-                "DuplicationDetector",
-                "UnusedCodeDetector",
-                "SymbolLookup",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             swiftSettings: [

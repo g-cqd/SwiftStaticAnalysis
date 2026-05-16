@@ -521,16 +521,9 @@ struct Unused: AsyncParsableCommand {
         let effectiveExcludePaths = excludePaths.isEmpty ? (unusedConfig?.excludePaths ?? []) : excludePaths
         let allExcludePaths = effectiveExcludePaths + (swaConfig?.excludePaths ?? [])
 
-        var files = try findSwiftFiles(in: paths, excludePaths: allExcludePaths.isEmpty ? nil : allExcludePaths)
-
-        // Apply path exclusions
-        if !allExcludePaths.isEmpty {
-            files = files.filter { file in
-                !allExcludePaths.contains { pattern in
-                    UnusedCodeFilter.matchesGlobPattern(file, pattern: pattern)
-                }
-            }
-        }
+        let files = try findSwiftFiles(in: paths, excludePaths: allExcludePaths.isEmpty ? nil : allExcludePaths)
+        // (The post-filter loop that used to live here was dead work —
+        // `findSwiftFiles` already applies `excludePaths` internally.)
 
         let detectorConfig = UnusedCodeConfiguration(
             ignorePublicAPI: effectiveIgnorePublic,
